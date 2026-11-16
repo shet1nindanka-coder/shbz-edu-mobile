@@ -74,6 +74,8 @@ export const lightColors = {
   calOutBg: '#fdfdfe',
   calOutText: '#c7cad0',
   calRing: 'rgba(10, 10, 10, 0.12)',
+  // statistics charts: the "solved / green" mark of the donut and the mastery ranking (06 §1.6.a)
+  chartGreen: '#36c77e',
   // streak (tier "starter")
   streakBgStart: '#fff3e4',
   streakBgEnd: '#ffe9d2',
@@ -166,6 +168,7 @@ export const darkColors: ThemeColors = {
   calOutBg: '#131417',
   calOutText: '#4a4d52',
   calRing: 'rgba(255, 255, 255, 0.18)',
+  chartGreen: '#36c77e',
   streakBgStart: 'rgba(242, 146, 46, 0.18)',
   streakBgEnd: 'rgba(242, 146, 46, 0.08)',
   streakBorder: 'rgba(242, 146, 46, 0.35)',

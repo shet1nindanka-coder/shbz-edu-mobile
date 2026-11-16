@@ -18,7 +18,27 @@ const ru = {
     autoRefresh: "Обновлять экран не нужно — урок откроется сам."
   },
   note: {
-    saved: "Заметка сохранена"
+    saved: "Заметка сохранена",
+    // the draft is kept on the device while there is no connection (02 Q12)
+    queued: "Сохраним при подключении",
+    queuedHint: "Нет связи: заметка останется на устройстве и отправится, как только появится интернет."
+  },
+  home: {
+    // accessible name of the whole «Общая инфа» row on the overview
+    infoRowAria: "Общая инфа: баллы и разбалловка ЕГЭ и ОГЭ",
+    streakFailed: "Не удалось загрузить огонёк."
+  },
+  calendar: {
+    // chevron buttons replace the site's «← Назад» / «Вперёд →» text buttons
+    prevMonth: "Предыдущий месяц",
+    nextMonth: "Следующий месяц",
+    swipeHint: "Месяцы можно листать свайпом по календарю. Нажмите на отмеченный день, чтобы увидеть его ДЗ.",
+    deadlineForms: ["{n} дедлайн", "{n} дедлайна", "{n} дедлайнов"],
+    allDone: "все ДЗ выполнены"
+  },
+  theory: {
+    openAria: "Открыть теорию по теме «{title}»",
+    downloadAria: "Скачать файл теории по теме «{title}»"
   }
 };
 
@@ -35,7 +55,24 @@ const en: typeof ru = {
     autoRefresh: "No need to refresh — the lesson will open on its own."
   },
   note: {
-    saved: "Note saved"
+    saved: "Note saved",
+    queued: "Will save when online",
+    queuedHint: "No connection: the note stays on your device and will be sent as soon as you are back online."
+  },
+  home: {
+    infoRowAria: "General info: EGE and OGE scores and grading",
+    streakFailed: "Could not load the streak."
+  },
+  calendar: {
+    prevMonth: "Previous month",
+    nextMonth: "Next month",
+    swipeHint: "Swipe across the calendar to change the month. Tap a marked day to see its homework.",
+    deadlineForms: ["{n} deadline", "{n} deadlines"],
+    allDone: "all homework done"
+  },
+  theory: {
+    openAria: "Open the theory for “{title}”",
+    downloadAria: "Download the theory file for “{title}”"
   }
 };
 

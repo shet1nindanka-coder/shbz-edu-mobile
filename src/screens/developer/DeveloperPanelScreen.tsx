@@ -1,17 +1,158 @@
-// PLACEHOLDER of `developer.panel` — the developer area replaces this file's body; the export name and the props stay.
-// The route file under src/app already passes the params; nothing there needs to change.
-import type { ScreenParams } from '@/navigation';
-import { ScreenPlaceholder } from '@/screens/shell';
+import { useQuery } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
+import { View, type ScrollViewInstance } from 'react-native';
+
+import { qk, useApi } from '@/api';
+import type { DeveloperPanelTab } from '@/api/types';
+import { developerPanelTabs } from '@/domain/developer-panel-tabs';
+import { useI18n } from '@/i18n';
+import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { ShellAppBar, screenTitle } from '@/screens/shell';
+import { makeStyles } from '@/theme';
+import { Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Segmented, Text } from '@/ui';
+
+import { ActionsTab } from './panel/actions-tab';
+import { BroadcastTab } from './panel/broadcast-tab';
+import { errorText } from './panel/error-text';
+import { LoadFailure, isLoadFailed } from './panel/load-failure';
+import { panelChips } from './panel/logic';
+import { SettingsSaveBar, SettingsTab } from './panel/settings-tab';
+import { StatusChips } from './panel/status-chips';
+import { StatusTab } from './panel/status-tab';
+import { useRefetchOnFocus } from './panel/use-refetch-on-focus';
+import { useSettingsForm } from './panel/use-settings-form';
 
 /** Route params of `developer.panel` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type DeveloperPanelScreenProps = ScreenParams['developer.panel'];
 
+/** The journal link is one line of text: the slop brings its touch target to 44 pt. */
+const JOURNAL_LINK_SLOP = { top: 13, bottom: 13, left: 12, right: 8 };
+
+/**
+ * `developer.panel` (docs/spec/07-developer-content.md §1.9): the developer's service panel — status,
+ * service actions, broadcast and site settings — with the journal one tap away.
+ *
+ * The panel has neither a realtime event nor polling (07 §5): it is read on entry, on every return to the
+ * screen, on pull-to-refresh and after each action. `tab` (a notification target, a web address) picks the
+ * inner tab on arrival; switching tabs afterwards is local, so the forms keep what was typed.
+ */
 export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
+  const styles = useStyles();
+  const api = useApi();
+  const navigation = useAppNavigation();
+  const { dict, m } = useI18n();
+  const t = dict.planner.devPanel;
+  const scrollRef = useRef<ScrollViewInstance>(null);
+
+  const routeTab: DeveloperPanelTab = tab ?? 'status';
+  const [active, setActive] = useState<DeveloperPanelTab>(routeTab);
+  // A new arrival with another `tab` (a notification while the panel is mounted) wins over the local choice.
+  const [seenRouteTab, setSeenRouteTab] = useState(routeTab);
+  if (seenRouteTab !== routeTab) {
+    setSeenRouteTab(routeTab);
+    setActive(routeTab);
+  }
+  const [refreshing, setRefreshing] = useState(false);
+
+  const panel = useQuery({
+    queryKey: qk('developer', 'getPanel'),
+    queryFn: () => api.developer.getPanel(),
+  });
+  const data = panel.data;
+  useRefetchOnFocus(panel.refetch);
+  const form = useSettingsForm(data?.settings);
+
+  const refresh = () => {
+    setRefreshing(true);
+    void panel.refetch().finally(() => setRefreshing(false));
+  };
+
+  const selectTab = (next: DeveloperPanelTab) => {
+    setActive(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
+
   return (
-    <ScreenPlaceholder
-      screenId="developer.panel"
-      params={{ tab }}
-      links={[{ screen: 'developer.journal' }, { screen: 'developer.journal', outcome: 'failed', days: 1 }]}
-    />
+    <Screen
+      testID="developer-panel-screen"
+      header={<ShellAppBar title={screenTitle('developer.panel', m.shell.tabs)} />}
+      bottomInset={false}
+      scrollRef={scrollRef}
+      onRefresh={refresh}
+      refreshing={refreshing}
+      footer={data && form && active === 'settings' ? <SettingsSaveBar form={form} /> : undefined}
+    >
+      <View style={styles.kickerRow}>
+        <Text variant="kicker" style={styles.kicker}>
+          {t.kicker}
+        </Text>
+        {/* The site's fifth item of the tab bar is a link, not a tab: the journal is a screen of its own
+            (07 §1.9 layout item 2). Five segments do not fit a phone, so the link sits above the four tabs. */}
+        <PressableScale
+          accessibilityRole="link"
+          accessibilityLabel={m.developer.panel.openJournal}
+          onPress={() => navigation.push({ screen: 'developer.journal' })}
+          hitSlop={JOURNAL_LINK_SLOP}
+          scaleTo={1}
+          style={styles.journal}
+          pressedStyle={styles.journalPressed}
+          testID="panel-open-journal"
+        >
+          <Text variant="link" color="accentSolid">
+            {t.journal}
+          </Text>
+          <Icon name="chevronRight" size={16} color="accentSolid" />
+        </PressableScale>
+      </View>
+      <PageHeader title={t.title} gap={0} />
+      <View style={styles.body}>
+        <Segmented<DeveloperPanelTab>
+          options={developerPanelTabs(t.tabs).map((item) => ({ value: item.key, label: item.label }))}
+          value={active}
+          onChange={selectTab}
+          accessibilityLabel={t.tabsAria}
+          role="tab"
+          plain
+          fill
+          testID="panel-tabs"
+        />
+
+        {data && form ? (
+          <>
+            <StatusChips chips={panelChips(data.stats, data.settings, t)} />
+            {/* Cached values stay on screen when a refresh fails (offline): say so instead of replacing them. */}
+            {panel.isError ? (
+              <Notice tone="error" text={errorText(panel.error, m.developer.panel.refreshFailed)} testID="panel-refresh-error" />
+            ) : null}
+            {/* Every tab stays mounted: a half-written broadcast or an action result survives a tab switch. */}
+            <View style={active === 'status' ? null : styles.hidden}>
+              <StatusTab data={data} />
+            </View>
+            <View style={active === 'actions' ? null : styles.hidden}>
+              <ActionsTab />
+            </View>
+            <View style={active === 'broadcast' ? null : styles.hidden}>
+              <BroadcastTab students={data.students} />
+            </View>
+            <View style={active === 'settings' ? null : styles.hidden}>
+              <SettingsTab form={form} />
+            </View>
+          </>
+        ) : isLoadFailed(panel) ? (
+          <LoadFailure query={panel} testID="panel-error" />
+        ) : (
+          <LoadingState variant="cards" count={3} cardHeight={132} accessibilityLabel={m.common.a11y.loading} testID="panel-loading" />
+        )}
+      </View>
+    </Screen>
   );
 }
+
+const useStyles = makeStyles((t) => ({
+  kickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, marginBottom: 10 },
+  kicker: { flexShrink: 1 },
+  journal: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  journalPressed: { opacity: 0.6 },
+  body: { gap: t.space.field, marginTop: t.space.lg },
+  hidden: { display: 'none' },
+}));

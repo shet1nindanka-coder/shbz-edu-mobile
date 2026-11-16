@@ -2,6 +2,10 @@
 // always the `< 640px` branch of the site's responsive rules.
 
 export const radii = {
+  /** calendar deadline mark: the 9 × 9 rotated square (08 §5.20) */
+  mark: 3,
+  /** "today" swatch of the calendar legend (14 × 14) */
+  swatch: 5,
   /** checkbox */
   checkbox: 7,
   /** chips, badges, streak counter pill */

@@ -1,11 +1,225 @@
-// PLACEHOLDER of `student.homework` — the student area replaces this file's body; the export name and the props stay.
-// The route file under src/app already passes the params; nothing there needs to change.
-import type { ScreenParams } from '@/navigation';
-import { ScreenPlaceholder } from '@/screens/shell';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform, RefreshControl, View } from 'react-native';
+
+import { HIGHLIGHT_FLASH_MS, hasErrorCode, qk, useApi } from '@/api';
+import type { StudentCheckResultDto, StudentHomeworkNumberDto } from '@/api/types';
+import { formatDateTime } from '@/domain/dates';
+import { isHomeworkOverdue } from '@/domain/statuses';
+import { useI18n } from '@/i18n';
+import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { DetailAppBar, screenTitle } from '@/screens/shell';
+import { makeStyles, useTheme } from '@/theme';
+import { Card, Chip, Divider, ErrorState, LoadingState, Notice, Screen, Text } from '@/ui';
+
+import { errorText } from './work/error-text';
+import { HomeworkCheckBlock } from './work/homework-check-block';
+import { HomeworkNumberCard } from './work/homework-number-card';
+import { HomeworkPhotosBlock } from './work/homework-photos-block';
+import { homeworkDetailMeta, homeworkLabel, isHomeworkCompleted, serverClockOffset } from './work/logic';
+import { useHomeworkCheck } from './work/use-homework-check';
+import { useOnReturn, useScreenLive } from './work/use-screen-live';
+import { useServerNow } from './work/use-server-now';
 
 /** Route params of `student.homework` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type StudentHomeworkScreenProps = ScreenParams['student.homework'];
 
+/**
+ * `student.homework` (docs/spec/03-student-homework-lesson.md §1 H2 – H4): one homework — the photo batch,
+ * the AI check with its verdicts, and a card per problem with the statement and the student's note.
+ * A homework that no longer exists (cancelled by the teacher) leads back to the list (00 §3.3).
+ */
 export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenProps) {
-  return <ScreenPlaceholder screenId="student.homework" params={{ assignmentId }} />;
+  const styles = useStyles();
+  const theme = useTheme();
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const navigation = useAppNavigation();
+  const { dict, m, locale } = useI18n();
+  const t = dict.student.homework;
+  const live = useScreenLive();
+
+  const listRef = useRef<FlashListRef<StudentHomeworkNumberDto>>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
+
+  const detail = useQuery({
+    queryKey: qk('studentWork', 'getHomework', assignmentId),
+    queryFn: ({ signal }) => api.studentWork.getHomework(assignmentId, { signal }),
+  });
+  const data = detail.data;
+  const { isStale, refetch } = detail;
+
+  // `404 homeworkNotFound`: an unknown id, or a homework the teacher has cancelled — also when it is
+  // discovered by an upload, a delete, a check start or a poll. The list is the place to land on.
+  const left = useRef(false);
+  const leave = useCallback(() => {
+    if (left.current) return;
+    left.current = true;
+    queryClient.removeQueries({ queryKey: qk('studentWork', 'getHomework', assignmentId) });
+    void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
+    void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
+    navigation.replace({ screen: 'student.homeworks' });
+  }, [assignmentId, navigation, queryClient]);
+  const gone = hasErrorCode(detail.error, 'homeworkNotFound');
+  useEffect(() => {
+    if (gone) leave();
+  }, [gone, leave]);
+
+  const check = useHomeworkCheck({ assignmentId, check: data?.assignment.latestCheck ?? null, live, onGone: leave });
+
+  // Back on the screen (another tab, the photo viewer, the background): statuses and the batch may have
+  // changed meanwhile, and a check that is still running resumes its polling by itself.
+  useOnReturn(live, () => {
+    if (isStale) void refetch();
+  });
+
+  const nowMs = useServerNow(data ? serverClockOffset(data.serverNow, detail.dataUpdatedAt) : 0);
+
+  const refresh = () => {
+    setRefreshing(true);
+    check.retryPoll();
+    void refetch().finally(() => setRefreshing(false));
+  };
+
+  const redo = (result: StudentCheckResultDto) => {
+    if (!data) return;
+    const index = data.assignment.numbers.findIndex((number) => number.homeworkNumberId === result.homeworkNumberId);
+    if (index < 0) return;
+    void listRef.current?.scrollToIndex({ index, animated: true, viewOffset: theme.space.md });
+    setHighlighted(result.homeworkNumberId);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlighted(null), HIGHLIGHT_FLASH_MS);
+  };
+
+  const assignment = data?.assignment;
+  const label = assignment ? homeworkLabel(assignment, dict.common.homeworkN) : screenTitle('student.homework', m.shell.tabs);
+
+  let body;
+  if (data && assignment && !gone) {
+    const completed = isHomeworkCompleted(assignment);
+    const overdue = isHomeworkOverdue(assignment.deadlineAt, completed, nowMs);
+    const badges = dict.student.deadlineList;
+    const header = (
+      <View style={styles.header}>
+        <View style={styles.meta}>
+          <Text variant="small" color="textMuted" style={styles.metaText} testID="homework-meta">
+            {homeworkDetailMeta(assignment, t, assignment.deadlineAt ? formatDateTime(assignment.deadlineAt, locale) : null)}
+          </Text>
+          {completed ? <Chip tone="green" label={badges.doneBadge} /> : null}
+          {overdue ? <Chip tone="red" label={badges.overdueBadge} /> : null}
+        </View>
+
+        {/* The cached homework stays on screen when a refresh fails (offline): say so instead of replacing it. */}
+        {detail.isError ? (
+          <Notice tone="error" text={errorText(detail.error, m.studentWork.homework.refreshFailed)} testID="homework-refresh-error" />
+        ) : null}
+
+        <Card style={styles.work}>
+          <HomeworkPhotosBlock
+            assignmentId={assignmentId}
+            photos={assignment.photos}
+            maxPhotos={data.limits.maxPhotosPerAssignment}
+            onGone={leave}
+          />
+          <Divider />
+          <HomeworkCheckBlock
+            check={assignment.latestCheck}
+            hasPhotos={assignment.photos.length > 0}
+            available={data.aiCheckAvailable}
+            state={check}
+            onRedo={redo}
+          />
+        </Card>
+
+        {assignment.numbers.length > 0 ? (
+          <Text variant="sectionTitle" accessibilityRole="header">
+            {t.numbers}
+          </Text>
+        ) : null}
+      </View>
+    );
+
+    body = (
+      <FlashList
+        ref={listRef}
+        data={assignment.numbers}
+        keyExtractor={(number) => number.homeworkNumberId}
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            <HomeworkNumberCard
+              // A recycled row must not carry another problem's unsaved draft.
+              key={item.homeworkNumberId}
+              number={item}
+              notesEnabled={data.notesEnabled}
+              noteMaxLength={data.limits.noteMaxLength}
+              highlighted={highlighted === item.homeworkNumberId}
+            />
+          </View>
+        )}
+        extraData={highlighted}
+        ListHeaderComponent={header}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        // On web any scroll counts as a drag, including the browser bringing a focused note into view.
+        keyboardDismissMode={Platform.select({ ios: 'interactive', android: 'on-drag', default: 'none' })}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={theme.colors.accentSolid}
+            colors={[theme.colors.accentSolid]}
+            progressBackgroundColor={theme.colors.cardBg}
+          />
+        }
+        testID="homework-numbers"
+      />
+    );
+  } else if (detail.isError && !gone) {
+    body = (
+      <ErrorState
+        title={dict.shells.errorTitle}
+        description={errorText(detail.error, m.common.errors.generic)}
+        retryLabel={dict.common.retry}
+        onRetry={() => void refetch()}
+        retrying={detail.isFetching}
+        testID="homework-error"
+      />
+    );
+  } else {
+    body = <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="homework-loading" />;
+  }
+
+  const showList = Boolean(data && assignment && !gone);
+
+  return (
+    <Screen
+      testID="student-homework-screen"
+      header={<DetailAppBar title={label} subtitle={assignment?.topicTitle} />}
+      // The screen sits inside the «дз» tab: the tab bar owns the bottom inset.
+      bottomInset={false}
+      scroll={!showList}
+      padded={!showList}
+    >
+      {body}
+    </Screen>
+  );
 }
+
+const useStyles = makeStyles((t) => ({
+  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
+  header: { gap: t.space.field, paddingBottom: t.space.field },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
+  metaText: { flexShrink: 1 },
+  work: { gap: t.space.field },
+  row: { paddingBottom: t.space.md },
+}));

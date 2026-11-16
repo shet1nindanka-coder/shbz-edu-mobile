@@ -30,6 +30,8 @@ const STUDENT_KEYS: Record<RealtimeEvent["kind"], readonly InvalidationPrefix[]>
   "topic-content-changed": [
     key("studentStudy", "getTheoryLibrary"),
     key("studentStudy", "getNumberDetail"),
+    // The overview and calendar cards carry the topic title (02 §5: "S1/S4 labels").
+    key("studentStudy", "getHomeworkDeadlines"),
     key("studentWork", "getHomework"),
     key("studentWork", "getLiveLesson"),
   ],

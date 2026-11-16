@@ -12,7 +12,7 @@
  *
  * Screens never build paths themselves and never import `expo-router` for navigation.
  */
-import { router, useSegments, type Href } from 'expo-router';
+import { router, useIsFocused, useNavigationContainerRef, useSegments, type Href } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 
 import type { NavTarget, UserRole } from '@/api/types';
@@ -30,6 +30,7 @@ import {
   type AppLink,
   type FileViewerFile,
 } from './routes';
+import { tabsForRole } from './tabs';
 
 /**
  * The one place an `AppHref` becomes an expo-router `Href`. Patterns come from the route table, which a
@@ -45,12 +46,48 @@ function toHref(href: AppHref): Href {
  */
 let currentSegments: readonly string[] = [];
 
+/** The part of a navigation state that `tabIsAboveItsRoot` reads. */
+type NavState = { type?: string; index?: number; routes?: readonly { name: string; state?: NavState }[] };
+
+/** Reads the whole navigation tree at call time; installed by `useTrackPosition()`. */
+let readRootState: () => NavState | null = () => null;
+
 /** Mount once inside the navigator: records where the user is for `navigateTo`. */
 export function useTrackPosition(): void {
   const segments = useSegments() as string[];
+  const container = useNavigationContainerRef();
   useEffect(() => {
     currentSegments = segments;
   }, [segments]);
+  useEffect(() => {
+    readRootState = () => (container.isReady() ? (container.getRootState() as unknown as NavState) : null);
+    return () => {
+      readRootState = () => null;
+    };
+  }, [container]);
+}
+
+/**
+ * Whether the tab whose root is `root` currently holds screens above its first one, i.e. whether
+ * `router.dismissAll()` after selecting that tab has something to pop INSIDE the tab.
+ *
+ * `dismissAll` is a POP_TO_TOP for the focused stack; a stack that is already on its first screen does not
+ * handle it and the action bubbles up. The root stack is [launch, role tree] after a sign-in or a deep
+ * entry, so the bubble popped the whole role tree back to the launch route, which redirected home: the
+ * first cross-tab link of every session bounced. The pop is therefore sent only when the tab can take it.
+ */
+function tabIsAboveItsRoot(root: AppHref, role: UserRole): boolean {
+  const tab = tabsForRole(role).find((candidate) => {
+    const href = candidate.section === 'more' ? { pathname: EXTRA_ROUTES.teacherMore } : hrefFor({ screen: candidate.section } as AppLink, role);
+    return href?.pathname === root.pathname;
+  });
+  if (!tab) return false;
+  // Down the focused branch to the tab navigator.
+  let state = readRootState();
+  while (state && state.type !== 'tab') state = state.routes?.[state.index ?? 0]?.state ?? null;
+  const stack = state?.routes?.find((route) => route.name === tab.name)?.state;
+  if (!stack) return false;
+  return (stack.index ?? (stack.routes?.length ?? 1) - 1) > 0;
 }
 
 /**
@@ -72,8 +109,9 @@ export function navigateTo(link: AppLink, role: UserRole): boolean {
     case 'tab':
       if (position === 'tabs') {
         // Select the tab, then return its stack to the root.
+        const deep = tabIsAboveItsRoot(plan.root, role);
         router.navigate(toHref(plan.root));
-        router.dismissAll();
+        if (deep) router.dismissAll();
       } else {
         // Pops everything above the tabs (settings, a sheet, a role-stack screen) and lands on the tab root.
         router.dismissTo(toHref(plan.root));
@@ -99,8 +137,9 @@ export function navigateTo(link: AppLink, role: UserRole): boolean {
 export function navigateHome(role: UserRole): void {
   const home = toHref(homeHref(role));
   if (positionOf(currentSegments) === 'tabs') {
+    const deep = tabIsAboveItsRoot(homeHref(role), role);
     router.navigate(home);
-    router.dismissAll();
+    if (deep) router.dismissAll();
   } else {
     router.dismissTo(home);
   }
@@ -129,6 +168,15 @@ export type AppNavigation = {
   /** The teacher's «ещё» list. */
   openTeacherMore: () => void;
 };
+
+/**
+ * Whether the screen that calls it is the focused one. A tab scene and the screens under a pushed one stay
+ * mounted; polling, the lesson "join" call and refetch-on-focus must follow focus, not mounting
+ * (docs/spec/03-student-homework-lesson.md, mobile notes of H2 and L1; 00 §2.3 "refetch on focus").
+ */
+export function useScreenFocused(): boolean {
+  return useIsFocused();
+}
 
 /** Navigation helpers bound to the current role. */
 export function useAppNavigation(): AppNavigation {
@@ -167,8 +215,9 @@ export function useAppNavigation(): AppNavigation {
       openDemoData: () => router.push(toHref({ pathname: EXTRA_ROUTES.demoData })),
       openTeacherMore: () => {
         if (positionOf(currentSegments) === 'tabs') {
+          const deep = role !== null && tabIsAboveItsRoot({ pathname: EXTRA_ROUTES.teacherMore }, role);
           router.navigate(toHref({ pathname: EXTRA_ROUTES.teacherMore }));
-          router.dismissAll();
+          if (deep) router.dismissAll();
         } else {
           router.dismissTo(toHref({ pathname: EXTRA_ROUTES.teacherMore }));
         }

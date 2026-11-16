@@ -4,7 +4,15 @@
 //   useAppNavigation()   open / push / replace / back / goHome / openFiles / openSettings …
 //   useNavTarget(target) { canOpen, open } for notification, search and history targets
 //   navigateTo(link, role)   imperative form (reminder taps)
-export { navigateHome, navigateTo, useAppNavigation, useNavTarget, useTrackPosition, type AppNavigation } from './navigate';
+export {
+  navigateHome,
+  navigateTo,
+  useAppNavigation,
+  useNavTarget,
+  useScreenFocused,
+  useTrackPosition,
+  type AppNavigation,
+} from './navigate';
 export {
   EXTRA_ROUTES,
   canOpen,
