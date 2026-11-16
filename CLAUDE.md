@@ -21,6 +21,9 @@ DEVELOPER. UI is bilingual (ru default, en).
 2. `docs/spec/90-addendum-*.md` — corrections (`CORRECTION to …` notes override the numbered specs).
 3. `docs/spec/01…09-*.md` — owner specs: layouts, texts, business rules, fixtures, design system.
 
+`docs/foundation.md` is the reference of the shared layers (API binding, mock context, providers, navigation,
+UI kit, i18n, domain helpers, math/files): read the relevant section before writing a screen or a mock member.
+
 Do not invent behaviour: screens, limits, enum values, error codes and copy come from the spec. If the spec
 is silent, follow the nearest site behaviour described there and leave a `// SPEC-GAP:` comment.
 
@@ -67,11 +70,35 @@ src/ui/             Reusable primitives (Text, Button, Card, Input, Segmented, S
 src/components/     Shared composites used by several areas (MathContent, FileCard, NumberCard, …).
 src/services/       Device services: session (secure storage), preferences, biometrics, notifications,
                     files, network/offline, realtime. Each hides platform differences.
-src/navigation/     Screen registry (`ScreenId`), `NavTarget` → route mapping, per-role tab config.
+src/navigation/     Screen registry (`ScreenId`), `NavTarget` → route mapping, per-role tab config,
+                    `useAppNavigation()` / `useNavTarget()`.
+src/providers/      Composition root (`AppProviders`): `useSession()`, `useCurrentUser()`, `usePreferences()`,
+                    `<Hint>`, pending-writes queue (offline note saving), demo backend access.
 src/screens/<area>/ Screen components. Areas: shell, student, teacher, planner, groups, calls, stats,
                     content, developer. An area owns its folder.
 tests/              `*.test.ts`, pure logic only.
 ```
+
+Routes: each role is a route group with one real segment — `src/app/(student)/student/…`,
+`(teacher)/teacher/…`, `(developer)/developer/…` — so URLs equal the site's paths. Settings, notifications,
+number search, file viewer and Demo data are root-stack routes above the role group. `/dev-ui` (UI kit gallery)
+and `/dev-math` (formula gallery) are developer-only pages. The route table is the comment at the top of
+`src/navigation/routes.ts`.
+
+Screens: a screen lives in `src/screens/<area>/<Name>Screen.tsx`; the export name and props are fixed by the
+route file that renders it. Tab roots render `<Screen header={<ShellAppBar title=… />} bottomInset={false}>`,
+pushed screens `<Screen header={<DetailAppBar title=… />}>` (both from `@/screens/shell`). Navigate only
+through `useAppNavigation()` / `useNavTarget()` — never import `expo-router` in a screen.
+
+Mock members: `src/mock/members/<member>.ts` exports `create<Member>(ctx: MockContext)`. Use `ctx.auth`,
+`ctx.guard`, `ctx.q`, `ctx.limits`, `ctx.progress.write`, `ctx.homework.issue`, `ctx.jobs`, `ctx.errors`
+instead of re-implementing rules; fixtures (`src/mock/fixtures/**`) change only together with a
+`FIXTURES_REVISION` bump. Member tests use `createTestMock()` from `@/mock/testing`.
+
+Generated files (never hand-edit, regenerate with the script): `src/lib/i18n/**` (`npm run sync:i18n --
+<site repo>`), `src/components/math/generated/**` (`scripts/build-katex-assets.mjs`),
+`src/services/files/generated/**` + `assets/mock-files/**` (`scripts/build-mock-files.mjs`),
+`assets/images/**` (`scripts/build-icons.mjs`).
 
 Rules:
 
@@ -87,6 +114,9 @@ Rules:
   rules from the spec apply to mock responses too (e.g. a student never receives `errorKind`).
 - **Time** — all "today"/deadline logic is Moscow time (`Europe/Moscow`) regardless of the device zone; use
   the helpers in `src/domain`. Instants are ISO strings; calendar days are `YYYY-MM-DD` Moscow days.
+  Date-time pickers hold a Moscow wall-clock value: pass `today={mskToday()}` to `DateTimeField` and convert
+  with `parseMskDateTimeInput` / `toMskDateTimeInput`.
+- **Hints** — explanatory lines are wrapped in `<Hint>` so the "hints" preference can hide them.
 - **i18n** — no hard-coded user-facing strings. Site texts come from `dict.*` (same keys as the site);
   mobile-only texts from `m.<area>.*`, always in both languages. Placeholders via `format()`, plural forms via
   `plural(locale, n, forms)`.
@@ -94,6 +124,8 @@ Rules:
   screens. Status colours come from the status meta helper, not from literals. Fonts: one `fontFamily` per
   weight (never `fontWeight` with a custom family).
 - **Math** — conditions and answers are rendered only through `MathContent` (KaTeX, same output as the site).
+- **Web quirk** — inactive tab scenes stay in the DOM on web (inert); Playwright selectors in screenshot
+  scripts need `:not([inert] *)`.
 - **Files** — a response never contains a URL; use `FileService` with a `fileId` / `StoredFileRef`.
 - **Lists** — long lists use FlashList; screens respect safe areas via the `Screen` primitive.
 - **Accessibility** — touch targets ≥ 44 pt, `accessibilityRole` / `accessibilityLabel` on controls.

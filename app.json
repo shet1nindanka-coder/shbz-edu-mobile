@@ -8,19 +8,33 @@
     "scheme": "shbz",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "ru.shbz.edu",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Камера нужна, чтобы сфотографировать решение и отправить его на проверку.",
+        "NSPhotoLibraryUsageDescription": "Доступ к фото нужен, чтобы прикрепить снимок решения из галереи.",
+        "NSFaceIDUsageDescription": "Face ID нужен, чтобы открывать «ШБЗ Школу» без ввода пароля, если вы включили вход по биометрии.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#16C79F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "ru.shbz.edu"
+      "package": "ru.shbz.edu",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "single",
@@ -32,16 +46,52 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#ffffff",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 200,
+          "dark": {
+            "backgroundColor": "#0b0c0e",
+            "image": "./assets/images/splash-icon-dark.png"
+          },
+          "ios": {
+            "imageWidth": 236
+          }
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Face ID нужен, чтобы открывать «ШБЗ Школу» без ввода пароля, если вы включили вход по биометрии.",
+          "configureAndroidBackup": true
+        }
+      ],
       "expo-sharing",
       "expo-asset",
       "expo-localization",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Face ID нужен, чтобы открывать «ШБЗ Школу» без ввода пароля, если вы включили вход по биометрии."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Камера нужна, чтобы сфотографировать решение и отправить его на проверку.",
+          "photosPermission": "Доступ к фото нужен, чтобы прикрепить снимок решения из галереи.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#16C79F",
+          "defaultChannel": "reminders",
+          "enableRemoteNotifications": false,
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

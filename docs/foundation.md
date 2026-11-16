@@ -1,0 +1,404 @@
+# Foundation reference
+
+Public API of the shared layers, as reported by the agents that built them. Area screens and mock members build on these; read the section you need before writing code. The code is the final authority — if a signature here disagrees with the source, trust the source and fix this file.
+
+## API contract and navigation registry
+
+**`@/api`** (loads React) — re-exports everything below, plus:
+- `ApiProvider({ client, children })` — mount once in the composition root with a ready `ApiClient`.
+- `useApi(): ApiClient` — e.g. `const api = useApi(); useQuery({ queryKey: qk("studentWork", "getHomework", id), queryFn: () => api.studentWork.getHomework(id) })`.
+- `qk(member)`, `qk(member, method)`, `qk(member, method, ...args)` — query key `[member, method, ...args]`. Arguments are type-checked against the method's parameters; trailing `undefined` is dropped; the shorter forms are prefixes for `invalidateQueries`.
+- Types `ApiProviderProps`, `ApiMethodParams`, `ApiQueryKeyArgs`, `ApiQueryKey`.
+
+**`@/api/client`** (no React — safe for mock code and tests):
+- Interfaces `ApiClient`, `ShellApi`, `StudentStudyApi`, `StudentHomeworkLessonApi`, `TeacherStudentsApi`, `DeveloperAccountsApi`, `TeacherPlannerApi`, `GroupsCallsStatsApi`, `ContentApi`, `DeveloperApi`.
+- `FileService`, `PreferencesStore`, `AppServices`.
+- Helper types `Res<T>`, `Abortable`, `RealtimeSubscribeOptions`, `UploadFileOptions`, `DownloadableFile`, `ApiMember`, `ApiMethodName<M>`.
+- Values `API_MEMBERS`, `API_METHODS` (method names per member, compiler-checked against the interfaces — use it for the mock's 112-name completeness test), `API_METHOD_COUNT`.
+
+**`@/api/errors`** (no React):
+- `class ApiError` — `new ApiError({ code, message, status, retryAfterSeconds?, params?, details? })`, `ApiError.fromBody(status, body)`, `ApiError.network(message)`, `.toBody()`.
+- Guards `isApiError`, `isSessionExpired`, `isNetworkError`, `hasErrorCode(e, ...codes)`, `isRoleError`, `isNotFoundError`, `isRateLimited`.
+- Types `AnyApiErrorCode`, `ApiErrorInit`, and re-exports of the code unions.
+
+**`@/api/types`** (no React) — the catalogue of 00 §1:
+- `primitives.ts`: `IsoDateTime`, `DateKey`, `Locale`, `UserRole`, `HomeworkNumberStatus`, `DerivedLessonStatus`, `LessonStatus`, `AttendanceStatus`, `SolutionCheckStatus`, `SolutionVerdict`, `ErrorKind`, `PlanErrorCode`, `PlanErrorRaw`, `CheckErrorCode`, `CreatePlanOutcome`, `ProgressSource`, `NotificationType`, `ReportPeriod`, `ThemeMode`, and the rest of §1.1. Each enum also has a runtime value list (`USER_ROLES`, `ATTENDANCE_STATUSES`, `ERROR_KINDS`, `PLAN_ERROR_CODES`, `PLAN_ERROR_PREFIX`, `DEFAULT_LOCALE`, …) for validators.
+- `entities.ts`: store rows — `User`, `StudentProfile`, `StudentGroup`, `ParentCallLog`, `StoredFile`, `Topic`, `TopicHomeworkNumber`, `StudentTopicNumberStatus`, `ProgressStatusEvent`, `HomeworkAssignment`, `HomeworkCheck`, `HomeworkCheckResult`, `Lesson`, `LessonParticipant`, `LessonAssignmentItem`, `LessonItemSubmission`, `Notification`, `AuditLog`, `SiteSettings`, `Session`, and the others of §1.2.
+- `shared.ts`: `ApiErrorBody`, `ApiErrorCode`, `GlobalErrorCode`, `EndpointErrorCode`, `NotFoundErrorCode`, `UploadErrorCode`, `KnownApiErrorCode` (with `GLOBAL_ERROR_CODES`, `NOT_FOUND_ERROR_CODES`, `UPLOAD_ERROR_CODES`); `FileRef`, `StoredFileRef`, `PhotoRef`, `AttachedPhoto`, `DownloadedFile`, `FileUpload`, `PhotoUpload`, `UploadCallOptions`; `AuthenticatedUser`, `LoginRequest`, `LoginResponse`, `MeResponse`, `MetaResponse`; `InterfacePreferences`, `DEFAULT_INTERFACE_PREFERENCES`; `ScreenId`, `NavSection`, `NavTarget`, `DeveloperPanelTab`; `NotificationItem`, `NotificationsResponse`, `NotificationParamsByType`; `DashboardRealtimeEvent`, `RealtimeEvent`, `RealtimeConnectionState`; `StudentStreak`, `TimelineEntry`, `NumberFindResult`.
+- `shell.ts`, `student-study.ts`, `student-homework-lesson.ts`, `teacher-students.ts`, `developer-accounts.ts`, `planner.ts`, `groups-calls-stats.ts`, `content.ts`, `developer.ts`: every view model, request and response of §1.4.1–§1.4.9 under the spec's names (e.g. `GetHomeworkResponse`, `LessonBoardModel`, `TeacherStudentHomeworks`, `GroupDetailResponse`, `TopicDetail`, `DeveloperPanelData`, `JournalPage`).
+- `limits.ts`: `META_LIMITS` (exactly `MetaResponse["limits"]`), `LIMITS` (09 §1.7), `POLLING`, `REALTIME`, `AI_BUDGET_WINDOW_MS`, `AI_BUDGETS`, `AI_QUEUES`, `RETRY_AFTER_SECONDS`, `RATE_LIMITS` (per-scope limit, window and the methods sharing each bucket), `SERVER_TIME_ZONE`, `HIGHLIGHT_FLASH_MS`.
+
+**`@/navigation/registry`** (pure):
+- `SCREENS: Record<ScreenId, ScreenDefinition>` — `{ id, area, roles, deferredRoles, siteRoutes, owner }`.
+- `SCREEN_IDS`, `isScreenId(value)`, `isScreenRegisteredFor(screen, role)`, `screensForRole(role)`.
+- `SECTIONS`, `HOME`, `NAV_SECTIONS: Record<UserRole, NavSection[]>` (site order, gear last; `labelKey` such as `"nav.student.overview"`).
+- `navSections(role, placement?)`, `findNavSection(role, screen)`, `SECTION_SEGMENTS`, `DEVELOPER_PANEL_TABS`.
+
+**`@/navigation/targets`** (pure):
+- `resolveHrefTarget(href: string | null, role): NavTarget | null` — the mock uses it to fill `NotificationItem.target`.
+- `targetForRole(target, role)` — null when the screen is not registered for the role.
+- `numberFindTarget(result, role)`, `historyReferenceTarget(reference, studentId, role)`.
+- `parseDeveloperPanelTab(raw)`, `parseJournalDays(raw)`, `JOURNAL_DEFAULT_DAYS`.
+
+### Decisions and deviations from the spec
+
+- `ApiErrorCode` is `KnownApiErrorCode | (string & {})` instead of the spec's `GlobalErrorCode | string`. It accepts the same values (any string) but keeps autocomplete for the roughly 90 known codes. `EndpointErrorCode` is written out from the Errors columns of 00 §2, as 90-addendum-1 A.2 intends.
+- `ApiError` has more than the five spec fields: a constructor taking an init object, `ApiError.fromBody`, `ApiError.network`, `toBody()`, and readonly fields. `message` is always supplied by the caller, so there are no hard-coded user-facing strings in the API layer.
+- `ApiError`, `FileService` and `PreferencesStore` are not in the type catalogue files although 00 §1.3 lists them there; they live in `src/api/errors.ts` and `src/api/client.ts` as the task asked. The catalogue never imports those files, so there is no cycle. Their shapes match the spec.
+- `ScreenId`, `NavSection` and `NavTarget` are declared once in `src/api/types/shared.ts` (00 §1.3 puts them there and `NotificationItem.target` needs them) and re-exported from `src/navigation/registry.ts` and `targets.ts`.
+- A few inline element shapes got their own names so screens can type a row: `StudentCheckResultDto`, `StudentHomeworkNumberDto`, `LessonItemStateDto`, `TeacherHomeworkCheckResult`, `TeacherHomeworkNumber`, `ProgressHistoryReference`, `ProgressHistoryEntry`, `GroupAttendanceLesson`, `GroupAttendanceParticipant`, `DeveloperPanelTab`. The containing types are still strictly identical to the spec.
+- Named types added for wire bodies the spec leaves anonymous: `ResetPasswordRequest`, `ScheduleLessonRequest`, `IssueHomeworkPlanRequest`, `SaveSettingsResult`, `BroadcastResult`, `RealtimeEvent`.
+- Every enum is derived from an exported value list (`USER_ROLES`, `ATTENDANCE_STATUSES`, …) so validators can check membership at runtime; the resulting union types are identical to the spec's.
+- `RATE_LIMITS` in `limits.ts` goes beyond what the task asked. It is keyed by the site's limiter scope names with the values of the 00 §2 Limit columns. One key is invented: `api:homework-plan#issue-delete`, because the site uses the single scope `api:homework-plan` with two limits (10 per 60 s for create, 30 per 60 s for issue and delete).
+- `resolveHrefTarget` details the spec does not state: (a) `developer.journal` always carries `days`, defaulting to 7 as the site page does, so the `dev_errors` href yields exactly `{ outcome: "failed", days: 1 }`; (b) `/teacher/calls` without a non-empty `studentId` resolves to null, because `NavTarget` requires it; (c) `/teacher/lessons/new` is not treated as a lesson id; (d) `/teacher/students/{studentId}` without a `#homework-…` hash resolves to the review screen without `assignmentId`; (e) absolute and protocol-relative URLs resolve to null; (f) the href is parsed by hand, not with `URL`, to stay runtime-independent.
+- Two builders were added next to `resolveHrefTarget` — `numberFindTarget` and `historyReferenceTarget` — because the number-search and history-reference rows of the 00 §3.3 table receive structured fields on mobile, not hrefs. Both apply the same role filter.
+- `SCREENS[*].siteRoutes` writes staff routes with the `/teacher` prefix (the `/developer` path is the same route on the site), while `NAV_SECTIONS[*].webPath` uses the role's real path (`/developer/topics` for a developer). Each screen also has `deferredRoles` for the roles the site guard allows but v1 leaves out (planner and groups for a developer).
+- `tests/nav-targets.test.ts` starts with three `/// <reference path="../node_modules/@types/node/…" />` lines for `assert`, `assert/strict` and `test`. This types the test runner without loading `@types/node` globally, which would change timer return types for every other file.
+
+## Mock backend
+
+**`@/mock`** (pure TS; composition root, mock FileService and tests only — never screens)
+- `createMockApiClient(options): MockApiClient` — options: `storage` (pass AsyncStorage as is), `storagePrefix`, `saveDebounceMs`, `getLocale`, `isOnline`, `latency` (number or `{minMs,maxMs}`, default 200..600, 0 in tests), `now` / `clock`, `reseedAfterMs`, `materializeDocument`, `onFileUploaded`, `onFileRemoved`.
+- `MockApiClient` = `ApiClient` plus:
+  - `ready()`, `flush()`, `dispose()`
+  - `setSessionToken(token | null)`, `getSessionToken()` — `login` and `changePassword` return a token; the caller installs it
+  - `realtimeState()`
+  - `controls`: `get`, `set(key, value)`, `resetDemoData`, `clearLimiters`, `exhaust(scope, id, rule?)`, `rearmSoonLesson`, `listLimiters`, `datasetInfo`, `setAutoReseed`
+  - `backend: MockContext`
+- Clocks: `createSystemClock`, `createManualClock(start)` with `advance` / `set`.
+- Fixtures: `buildFixtures(t0)`, `USER`, `GROUP`, `TOPIC`, `numberId(label)`, `DEMO_PASSWORDS`, `DEMO_PERSONAS` (13 rows for the demo screen), `MOCK_COVERAGE`, `FIXTURES_REVISION`.
+- Store: `MockStore`, `MockPersistence`, `createMemoryStorage`, `MockStorageAdapter`, row types (`MockUser`, `MockStoredFile`, `MockJob`, `MockRowScript`, `MockPlanScript`, `ScriptedResult`).
+- Controls and samples: `MockControls`, `MockControlActions`, `LimiterPin`, `ForcedError`; `MockFileSample`, `MOCK_DOCUMENT_SAMPLES`, `mockSampleUrl`, `parseMockSampleUrl`.
+- Rule V: `scriptVerdict`, `selectFoundNumbers`, `scriptHomeworkCheck`, `scriptLessonSubmission`, `scriptedResult`, `failedCheckError`, `failureRefundsBudget`, `MOCK_MODEL_NAME`.
+- Misc: `MOCK_TIMINGS`, `retryAfterSeconds`, `shouldReceiveRealtimeEvent`.
+
+**`@/mock/context`** — `MockContext`, passed to every `create<Member>(ctx)`:
+- `store`, `clock`, `now()`, `nowIso()`, `nowDate()`, `locale()`, `dict()`, `m()`, `settings()`
+- `errors`: `fail({status, code, message, params?, details?, retryAfterSeconds?})`, `make`, `sessionExpired`, `unauthorized`, `developerRightsRequired`, `invalidData`, `rateLimited`, `serviceUnavailable`, `notFound(code, text?)`, `internal`, `network`
+- `auth`: `requireUser(roles?)`, `requireStudent`, `requireTeacher`, `requireStaff`, `requireDeveloper`, `currentUser`, `session`, `createSession`, `deleteSessionsOfUser`, `toAuthenticatedUser`
+- `guard`: `student(viewer, id, code?)`, `group`, `lesson(viewer, id, kind)`, `lessonOrDraft`, `participant`, `lessonItem`, `homeworkOfVisibleStudent`, `ownHomework`, `ownLesson`, `topic`, `topicWithNumbers`, `number`, `canSeeStudent`
+- `q`: about 45 ordered reads, e.g. `studentsOfTeacher`, `visibleStudents`, `groupMembers`, `numbersOfTopic`, `findNumberByLabel`, `status`, `statusMap`, `timelineRows`, `homeworksOfStudent`, `homeworkNumbers`, `latestHomeworkCheck`, `homeworkOrderInTopic`, `lessonsOfTeacher`, `participants`, `items`, `submissions`, `lessonStatus`, `isPlanPending`, `callsOfStudent`
+- `limits`: `enforce(scope)`, `check`, `consumeFixed`, `releaseFixed`, `consumeSliding`, `reset`, `consumeBudget`, `releaseBudget`
+- `progress`: `write({source, …, studentId, homeworkNumberId, actor?, references?})`, `ensureRow`, `cleanupEmptyRows`
+- `notify`: `create`, `toItem`, `list`, `markRead`, `markParentCallRemindersRead`
+- `audit.write`, `emit(event)`, `validate`, `cascade.*`, `throwIfAborted(signal)`
+- `jobs`: `schedule(kind, refId, delayMs)`, `handle(kind, fn)`, `touch(refId)`, `cancel`, `pending`; timings in `ctx.timings`
+- `files`: `ref`, `storedRef`, `createFromUpload`, `removeIfUnreferenced`, `canRead`, `resolveForRead`, `lookup`
+- `homework`: `issue(input)`, `toError(failure)`, `recomputeDeadlines(studentId, numberIds)`
+- `lessons`: `finalizeDue(scope)`, `finalize(lessonId)`
+- `documents`: `download(kind, fileName)`, `url(kind, query)`
+- `switches`: `takeNextCheckOutcome()`, `takeNextPlanOutcome()`, `current()`
+
+**`@/mock/members/*`** — `createShell` (implemented); `createStudentStudy`, `createStudentHomeworkLesson`, `createTeacherStudents`, `createDeveloperAccounts`, `createPlanner`, `createGroupsCallsStats`, `createContent`, `createDeveloper` (stubs to replace in place).
+
+**`@/mock/testing`** — `createTestMock(options?)` returns `{ api, clock, storage, ctx, store, signIn(login, password?), signOut, setLocale, setOnline }` on a manual clock with zero latency; `TEST_T0`, `demoPasswordFor`.
+
+### Decisions and deviations from the spec
+
+- `shell.login` and `shell.changePassword` return a token but never install it; the caller must call `setSessionToken`. After a password change the old token is dead until the rotated one is installed.
+- `shell.logout` without a valid session rejects with `401 sessionExpired` (90-addendum-5 B.6 rule 4) instead of resolving silently.
+- Deferred work is stored as job rows and run lazily at the start of each API call, not by timer callbacks (90-addendum-6 §5 rule 1). A check uses two jobs (`*.begin` at 1 s, `*.finish` at 8 s). The timers of seeded in-flight rows start only when a member calls `ctx.jobs.touch(row.id)` on first read — the core cannot do that itself.
+- Sessions of users that still exist survive both 'Reset demo data' and the automatic 24 h re-seed, so a tester stays signed in. The spec is silent on this.
+- Additions beyond the task list: options `materializeDocument`, `onFileUploaded`, `onFileRemoved`, `reseedAfterMs`, `saveDebounceMs`, `storagePrefix`; `FIXTURES_REVISION` (a stored dataset from other fixtures is re-seeded at start); `controls.listLimiters`, `datasetInfo`, `setAutoReseed`; `DEMO_PERSONAS`; `src/mock/testing.ts`.
+- Rules added to the core although the task did not name them, because two or more members share them: the `issueHomework` port with the deadline mirror, lazy lesson finalisation, delete cascades, file read access, and rule V (`verdict-script.ts`).
+- File rows carry a `sample` key (`pdfLong`, `pdfShort`, `docx`, `cheatsheet`, `photo1..8`) rather than a file name under `assets/mock-files/`, to match the mock FileService another agent already built. Declared name, MIME type and size keep the spec's variety (e.g. a PNG row backed by a JPEG sample). Handout URLs are `mock-sample://<sample>?…`.
+- The `api:notifications` limit (60 / 60 s) applies to every role as 00 §2.2 says; the site applies it to students only.
+- A realtime handshake while offline is reported as `refused / serviceUnavailable` with the normal backoff; the spec has no state for it.
+- `forceNextError: "notFound"` picks the 404 code from a per-method table with a per-member default; the spec only says 'the entity code of that method'.
+- `MockCoverageRow.control` also accepts `"exhaust"` and `"settings"`, since some control rows of 90-addendum-6 §10 are forced that way. Script rows are executed in tests only where the core can run them (login / password scripts, issue scripts at rule level, rule V as pure functions); scripts that need other members carry `steps` only.
+- English texts of the mocked model ('Correct.', 'A calculation error — recheck your working carefully.') are constants in `verdict-script.ts`, not mobile-dictionary strings: I do not own `src/i18n/mobile`, and they are stored data, not UI copy.
+- Fixture choices where the spec conflicts with itself or with site rules: (a) Kirill is PRESENT at `les_g4` with every item SKIPPED, so his last status change stays 9 days old; (b) Polina's 23 calls span 11 months although her account is 60 days old (spec followed literally); (c) one journal row, `lesson.finished_early` for `les_early`, is 28 days old, outside the '14 days'; (d) individual lessons and `les_g_unfinalized` have fewer than '5–7 main + 2 extra' items (derivative has only 6 numbers); (e) the (Ilya, 118) history meets its link counts as 'at least': three events point at a removed lesson, and one homework-linked event names a pruned check; (f) `les_ilya_tomorrow` has an explicit plan script so it resolves deterministically.
+- Limiter buckets also record refused sliding attempts' pruned state and a `windowMs`, so the demo screen can show reset times; behaviour matches the site's two limiters.
+- Persistence writes one key per table plus a manifest with a save sequence, instead of a single JSON blob, to stay under Android AsyncStorage's row size limit and to detect torn saves.
+
+## App shell, providers, navigation and services
+
+**`@/providers`**
+- `AppProviders` — composition root, already mounted in `src/app/_layout.tsx`.
+- `useSession()` → `{ status, user, restored, notice, dismissNotice, signIn, signOut, applyUser, applyRotatedToken, refreshUser, retryRestore }`.
+- `useCurrentUser()` — the signed-in user; use on role-tree screens. `useRole()` — role or null.
+- `usePreferences()` → `{ preferences, loaded, localePending, setThemeMode, setHints, setLocale, setBiometricLock, setReminder }`.
+- `useHintsEnabled()`, `<Hint>…</Hint>` — wrap every explanatory line; renders only when hints are on.
+- `IS_MOCK_BUILD`, `getQueryClient()`, `getAppRuntime()` (`api`, `files`, `preferences`, `storage`, `mock`).
+- Pending writes: `saveStudentNote(homeworkNumberId, note)` → `{status:'sent',result}|{status:'queued'}|{status:'rejected',error}`; `usePendingStudentNote(id)`; `getPendingWrites().register(kind, handler)` / `.submit(kind, id, payload)`; `usePendingWrite(kind, id)`; `usePendingWritesCount()`; `STUDENT_NOTE_WRITE`.
+- Demo (mock builds): `getDemoBackend()`, `getDemoPersonas()`, `setLoginPrefill()`.
+
+**`@/navigation`** (React) and `@/navigation/routes`, `@/navigation/tabs` (pure)
+- `useAppNavigation()` → `{ canOpen, open, push, replace, back, goHome, openSettings, openNotifications, openNumberSearch, openFiles(files, {initialIndex,title}), openDemoData, openTeacherMore }`. `open(link)` follows the placement rule; `push` / `replace` act in the current stack.
+- `useNavTarget(target)` → `{ canOpen, open }`; when `canOpen` is false render plain text.
+- `navigateTo(link, role)`, `navigateHome(role)`, `useTrackPosition()`.
+- Types: `AppLink` (`{ screen } & params`, superset of `NavTarget`), `ScreenParams[ScreenId]` (use as screen props), `FileViewerFile`, `AppHref`, `NavigationPlan`.
+- Pure helpers: `routeFor`, `hrefFor`, `hrefToPath`, `planNavigation`, `canOpen`, `homeHref`, `positionOf`, `parseAppLink`, `allRoutePatterns`, `EXTRA_ROUTES`, and the param readers `stringParam`, `requiredParam`, `panelTabParam`, `journalOutcomeParam`, `journalDaysParam`, `fileViewerFilesParam`, `indexParam`.
+- Tabs: `RoleTabBar`, `tabsForRole(role)`, `moreSections(role)`, `navLabel`, `navItemOf`, `MORE_TAB_NAME`.
+- The route table is the comment block at the top of `src/navigation/routes.ts`.
+
+**`@/screens/shell`** (chrome for area screens)
+- `ShellAppBar({ title? })` — tab roots: `<Screen header={<ShellAppBar title={m.shell.tabs.homeworks} />} bottomInset={false}>`; omit `title` on the home tab to show the logo.
+- `DetailAppBar({ title, subtitle?, right?, onBack? })` — pushed screens.
+- `NotFoundScreen({ description? })` — for a detail whose entity is gone.
+- `RouteErrorBoundary` — already re-exported as `ErrorBoundary` by every route file.
+- `PlannerSegments({ active: 'lessons' | 'drafts' })` — root of the teacher's «занятия» section.
+- `StreakBadge({ currentStreak, onPress? })`, `useStudentStreak()`, `useNotifications()`.
+- `useCountdown(untilMs)`, `formatWait(seconds, locale, m.common.errors)` — for `retryAfterSeconds` lockouts.
+- `ScreenPlaceholder`, `screenTitle(screenId, m.shell.tabs)`.
+
+**Placeholder screens to replace in place** (keep export name and props)
+- `src/screens/student/`: `StudentHomeScreen`, `StudentLessonScreen`, `StudentHomeworksScreen`, `StudentHomeworkScreen({assignmentId})`, `StudentDeadlinesScreen`, `StudentTheoryScreen`, `StudentInfoScreen`, `StudentNumberScreen({number})`.
+- `src/screens/teacher/`: `TeacherHomeScreen`, `TeacherStudentsScreen`, `TeacherStudentScreen({studentId, segment:'review'|'assign'|'lessons', assignmentId?})`.
+- `src/screens/planner/`: `PlannerLessonsScreen`, `PlannerDraftsScreen`, `PlannerLessonNewScreen({groupId?,studentId?})`, `PlannerLessonBoardScreen({lessonId})`, `PlannerDraftNewScreen({lessonId?,groupId?,studentId?})`, `PlannerDraftBoardScreen({planId})`.
+- `src/screens/groups/`: `GroupsListScreen`, `GroupDetailScreen({groupId})`.
+- `src/screens/calls/`: `CallsListScreen({studentId?})`.
+- `src/screens/stats/`: `StatsMainScreen`.
+- `src/screens/content/`: `ContentTopicsScreen`, `ContentTopicScreen({topicId})`, `ContentTopicEditScreen({topicId})`, `ContentNumberScreen({topicId,number})`.
+- `src/screens/developer/`: `DeveloperAccountsScreen`, `DeveloperPanelScreen({tab})`, `DeveloperJournalScreen({outcome?,days?})`.
+
+**Services**
+- `@/services/network`: `isOnline()`, `useIsOnline()`, `subscribeOnline()`, `startNetworkMonitor()`, `OfflineBannerHost`, `setSimulatedOffline()`.
+- `@/services/query`: `createPendingWritesQueue` (usage documented in the file header), `createAppQueryClient`, `createPersistOptions`, `isPersistableQueryKey`, `shouldRetryQuery`.
+- `@/services/realtime`: `useRealtimeBridge(role)`, `useRealtimeState()`, `invalidationPrefixesFor(event, role)`.
+- `@/services/notifications`: `localNotifications` (`supported`, `getPermission`, `requestPermission`, `ensureChannel`, `sync`, `cancelAll`, `listenForOpens`), the pure planners `planHomeworkReminders` / `planLessonReminders` / `planParentCallReminders` / `selectReminders` / `diffReminders`, and `registerRemotePush` / `unregisterRemotePush` (the single remote-push integration point, a no-op today).
+- `@/services/biometrics`: `getBiometricAvailability()`, `authenticateWithBiometrics(prompt)`, `shouldLockOnResume`, `BIOMETRIC_GRACE_MS`.
+- `@/services/preferences`: `createPreferencesStore(storage)` (implements `PreferencesStore` plus `loadAll`, `setBiometricLock`, `setReminder`), `PREFERENCE_KEYS`, defaults and parsers.
+- `@/services/session`: `tokenStorage`, `guardApiClient(client, handlers)`, `createSessionCache`, `parseCachedUser`.
+
+**`m.shell`** (ru + en): `tabs.*` (capitalised section titles), `nav.more`, `launch.*`, `login.*`, `settings.*`, `biometrics.*`, `numberSearch.*`, `reminders.*`, `placeholder.*`, `demo.*`.
+
+### Decisions and deviations from the spec
+
+- Role folders are a route group with one real segment inside (`(student)/student/…`, `(teacher)/teacher/…`, `(developer)/developer/…`) instead of bare groups. Bare groups would give the three trees identical URLs (`/calls`, `/topics`, `/home`), which breaks web reloads; this way URLs equal the site's paths.
+- `useNavTarget()` / `navigateTo()` live in `src/navigation/navigate.ts`, not in `routes.ts`. `routes.ts` stays free of expo-router so the unit tests can import it; both are exported from `@/navigation`.
+- Settings, notifications, number search, file viewer and Demo data sit in the ROOT stack above the role group, not inside each role's stack. One route file each, same visible behaviour (they cover the tabs).
+- `content.topicEdit` exists once, in the developer's stack above the tabs, rather than both in tab 1's stack and as a cross-tab screen. A screen cannot be mounted in two navigators under one URL; back still returns to the topic or to statistics.
+- The student card is one screen component (`TeacherStudentScreen` with a `segment` prop) behind three route files (the site's three URLs), shown without a transition; switching segments is a `replace`.
+- The teacher's «ещё» tab has its own root screen at `/teacher/more` (not a registered ScreenId) and nested stacks for topics and groups, so one `push … withAnchor` rebuilds list → detail.
+- While the stored session is being restored the root layout renders the launch screen INSTEAD of the navigator, so guards are first evaluated with the final role and a deep entry lands on its own screen.
+- Added a session state the spec does not have: `restoreFailed` (token present, no answer, nothing cached) with Retry / Sign in again. With a cached user the app opens that user's tree offline and re-validates on reconnect.
+- A 403 role refusal triggers at most one `GET /me` per 5 seconds (a burst of 403s is one refresh).
+- Local reminders are a mobile decision throughout (the site has none): all categories default OFF and the OS prompt appears when one is switched on; lead times are 24 h and 2 h before a homework deadline, 10 minutes before and at lesson start, 10:00 Moscow time on the day a parent call becomes due; at most 24 scheduled.
+- Parent-call reminders are scheduled only for calls that will BECOME due in the next 14 days; already due or overdue calls stay in the in-app bell only.
+- `app.json` sets `enableRemoteNotifications: false` for expo-notifications because remote push does not exist yet; flip it when `registerRemotePush` is implemented.
+- The persisted query cache excludes the `accounts` and `developer` members, parent-call overview and history (personal data), and polled statuses; everything else that succeeded is persisted for 7 days.
+- Biometric lock: 60-second background grace period, switching it on requires a successful biometric confirmation, and it is ignored (never locks) when nothing is enrolled. None of this is in the spec.
+- The streak pill is shown in the app bar on the student's non-home tab roots (next to the section title); the overview shows the logo and is expected to render the full widget.
+- Login: the placeholder `teacher@example.com` is stored in `m.shell.login.loginPlaceholder`; a countdown line is shown under the rate-limit notice; tapping a demo account folds the list so the form is visible.
+- Settings uses the app bar title + kicker instead of a page header and does not embed number search (decision N5 makes it a shell action on tab roots). The password form shows the specific policy problem when the new password is the cause, otherwise the site's combined text.
+- Notifications sheet: 'mark all as read' is a row inside the sheet (the sheet primitive has only a title and close); no pull-to-refresh; the badge 'pop' animation is not implemented.
+- Demo data screen: control labels are plain English literals (the spec says its texts are developer-facing); it adds a 'Simulate offline' switch and an auto-reseed switch beyond §9.3; verdict outcomes are presets rather than free input.
+- Tab bar labels use -0.2 letter spacing and `adjustsFontSizeToFit` (min 0.85) so «дев-панель» fits five tabs at 390 pt.
+- `src/i18n/mobile/shell.ts` was rewritten: the earlier draft keys `shells.*`, `session.*`, `notifications.*`, `about.*` and several `biometrics` / `demo` keys were removed or renamed (site dictionary texts are used instead); `demo.resetData` is kept because `tests/i18n.test.ts` asserts it.
+- `tests/shell-routes.test.ts` references `@types/node/fs.d.ts` by path to read `src/app`; it adds no global types.
+- `src/providers/services.ts` imports `materialiseMockSample` from `@/services/files/mock-sample-store` directly because the barrel does not export it.
+
+## Theme and UI kit
+
+### `@/theme`
+
+- `ThemeProvider` — `<ThemeProvider mode={'system' | 'light' | 'dark'}>`; `system` follows the OS live. Can be nested.
+- `useTheme()` — returns `Theme`: `{ name, dark, colors, gradients, shadows, radii, borders, space, sizes, fonts, typography, motion, status, statusBarStyle }`. Outside a provider it is the light theme.
+- `makeStyles((t) => ({ ... }))` — call at module scope; returns a `useStyles()` hook with a StyleSheet cached per theme.
+- `useAppFonts()` — returns `{ loaded, error }`; loads the six Montserrat weights and the Feather icon font. `appFonts` is the raw map.
+- Tokens: `lightTheme`, `darkTheme`, `resolveTheme(mode, scheme)`, `resolveThemeName`, `lightColors`, `darkColors`, `gradients`, `radii`, `borders`, `space`, `sizes`, `motion`, `fonts`, `typography`, `lightShadows`, `darkShadows`, `lightFlattenedOnCard`, `darkFlattenedOnCard`.
+- Status: `statusPalette(colors)`, `statusTone(status | null)`, `lessonResultStatus`, `metricToneColor(tone, colors)`. `theme.status[GREEN | YELLOW | RED | none | neutral | idle]` gives `{ bg, text, border }`.
+- Streak: `streakTiers`, `STREAK_TIER_ORDER`, `STREAK_COLOR_MILESTONES`, `streakColorMeta(n)`, `streakPalette(tier, colors)`, `mixHex`.
+- `initialsOf(name)`.
+- Types: `Theme`, `ThemeMode`, `ThemeName`, `ThemeColors`, `ColorToken`, `TextVariant`, `TextStyleToken`, `RadiusToken`, `SpaceToken`, `ShadowStyle`, `ShadowToken`, `EasingToken`, `StatusTone`, `StatusColors`, `MetricTone`, `StreakTier`, `StreakPalette`, `StreakColorMeta`. `HomeworkNumberStatus` and `LessonResultValue` are structural copies; import the canonical ones from the api types.
+
+### `@/ui`
+
+**Text and icons**
+- `Text` — `<Text variant="sectionTitle" color="textMuted" tabular>`; variants are the keys of `typography`.
+- `Icon` — `<Icon name="bell" size={20} color="kicker" />`; `tint` takes a raw colour. `IconName`, `ICON_NAMES`.
+- `navIcons` — `navIcons.student.homeworks`, `navIcons.teacher.lessons`, `navIcons.developer.panel`, plus `settings`, `notifications`, `search`.
+- `Logo` — `<Logo size={24} variant="default" | "onDark" | "mono" />`.
+
+**Buttons**
+- `Button` — `<Button label onPress variant="primary|outline|dark|danger|dangerSolid|tonal" size="sm|md|lg|field" loading disabled leftIcon rightIcon fullWidth />`.
+- `IconButton` — `<IconButton icon accessibilityLabel variant="circle|ghost|danger|dangerRaised" active badge={n} />`.
+- `TextButton` — `<TextButton label tone="accent|danger|soft|muted" />`.
+
+**Form fields**
+- `TextField` — `<TextField label value onChangeText error helper disabled left right />`; accepts all TextInput props.
+- `PasswordField` — TextField plus `showLabel` and `hideLabel`.
+- `TextArea` — `variant="default" | "note"`, `labelAside`.
+- `SearchField` — `<SearchField value onChangeText onSubmit submitLabel error />`.
+- `Checkbox` — `<Checkbox checked onChange label />`. `CheckMark` is the non-interactive glyph.
+- `CheckRow` — `<CheckRow label description checked onChange left />`.
+- `Switch` — `<Switch value onValueChange label description trailing />`.
+- `Select` — `<Select options value onChange placeholder closeLabel label size="md|sm|xs" error />`; the menu is a sheet.
+- `DateTimeField` — `<DateTimeField value onChange onCommit placeholder labels={{ clear, today, done, close, date, time }} locale="ru|en" variant="field|compact" />`. Value is `YYYY-MM-DDTHH:mm` or `''`.
+- Date helpers: `formatDateTimeDisplay`, `formatDateTimeValue`, `parseDateTimeValue`, `todayDateTimeValue`.
+
+**Containers and layout**
+- `Card` — `<Card variant="card|surface|soft|panel|outline" padded dashed selected onPress />`.
+- `SectionCard` — `<SectionCard title description action card={...} bare />`.
+- `NavCard` — `<NavCard kicker title stats={[{ label, value }]} meta footer onPress />`.
+- `MetricPill` — `<MetricPill label value tone />`.
+- `PageHeader` — `<PageHeader kicker title description backLabel onBack metrics aside gap />`.
+- `Screen` — `<Screen header={<AppBar />} footer scroll padded refreshing onRefresh keyboardAvoiding bottomInset glow="dashboard|login" />`.
+- `AppBar` — `<AppBar title subtitle left right onBack backLabel border safeTop />`.
+- `ListRow` — `<ListRow title subtitle meta left right chevron onPress divider inset emphasized />`.
+- `Divider`, `Avatar` (`name`, `size`), `TitleDot`, `AccentGradient`, `PageGlow`.
+
+**Selection controls**
+- `Segmented` — `<Segmented options={[{ value, label, shortLabel }]} value onChange fill plain compact role="radio|tab" />`.
+- `Tabs` — `<Tabs options value onChange fill />`; ink-pill bar, `value={null}` fades the pill, scrolls the active tab into view.
+- `StatusOptionGroup` — `<StatusOptionGroup options={[{ value, label, tone }]} value onChange accessibilityLabel size columns />`; tapping the active option clears it.
+
+**Status and feedback**
+- `Chip` — `tone="green|yellow|red|muted"`, `size="sm|row"`, `icon`. `chipColors` helper.
+- `Badge` — `tone="GREEN|YELLOW|RED|none|neutral|count"`.
+- `StatusBadge` — `<StatusBadge status={GREEN|YELLOW|RED|null} label />`.
+- `CountBadge` — `<CountBadge count max={9} />`.
+- `Notice` — `<Notice tone="error|success|warning" text title action onDismiss dismissLabel />`.
+- `ProgressBar` — `<ProgressBar value size="sm|md|lg" accessibilityLabel />`. `completionPercent(done, total)`.
+- `CopyRow` — `<CopyRow value copiedLabel copiedAnnouncement hint label variant="field|plain" mono />`.
+- `Spinner`, `Skeleton` (`height`, `width`, `radius`, `index`).
+- `LoadingState` — `variant="cards|list|spinner"`, `tabs`, `count`.
+- `EmptyState` — `<EmptyState title hint action variant="panel|plain" />`.
+- `ErrorState` — `<ErrorState title description retryLabel onRetry secondaryLabel onSecondary numeral="404" />`.
+
+**Overlays**
+- `BottomSheet` — `<BottomSheet visible onClose closeLabel title dismissible scroll padded footer onClosed />`.
+- `Dialog` — `<Dialog visible title kicker description confirmLabel cancelLabel pendingLabel pending confirmDisabled tone="danger|default" onConfirm onCancel>`.
+
+**Motion and building blocks**
+- `Enter` — `<Enter index={i}>` cascade entry animation.
+- `PressableScale` and `hitSlopFor(width, height)` — for custom pressables that need the system press feedback.
+
+### Decisions and deviations from the spec
+
+- Shadows are per-platform style objects (web boxShadow / iOS shadow* / Android elevation), as the task asked, rather than the CSS strings of spec 08 §8. Use `style={theme.shadows.card}`.
+- Single-line control labels (buttons, tabs, chips) use a ~1.3 line box instead of the site's `line-height: 1`, to avoid clipping Cyrillic descenders on Android. Control heights are fixed, so geometry is unchanged.
+- The logo suffix «Школа» is the flat brand colour #16c79f, not gradient-filled text: masked-view is not installed. This is the spec's own 'always safe' recipe (§7.1).
+- DateTimeField uses the platform pickers inside a bottom sheet (iOS inline datetime, Android system dialogs, web date/time inputs) instead of the site's custom calendar grid, per the task. The site's rules are kept: a day with no time gets 23:59, Today = today 23:59, Clear empties and closes, onCommit fires once on close. On iOS, Done on an untouched empty picker commits the value it shows (today 23:59).
+- BottomSheet has a grabber handle, which the site's sheet does not, to make drag-to-close discoverable. Only the header area is draggable, so it does not fight the content scroll. On windows wider than 640 it becomes a centred card (max 448) but still slides rather than scale-fading.
+- Segmented and Tabs with `fill` grow equally from each label's own width instead of strictly equal widths. Equal thirds truncated «Проверка ДЗ · 3» at 390px.
+- Notice: success has no visible hairline (`shbz-notice-success`); warning uses the bordered legacy look, since that is the only warning style on the site.
+- ErrorState title is 24/32, the phone size, not the site's desktop 30. PageHeader keeps the site's 40 bottom gap by default (`gap` prop overrides).
+- KeyboardAvoidingView uses `padding` on Android as well as iOS (in Screen and BottomSheet), assuming edge-to-edge windows do not resize for the keyboard. Unverified on a device.
+- Tokens added beyond the §8 paste, all taken from spec values: colours headerBg, menuOverlay, skeletonShineClear, logoDarkBg; gradients.accentMid and gradients.glow; sizes.appBar, wideBreakpoint, dialogMaxWidth; extra typography roles (loginTitle, pageTitle, calendarMonth, errorTitle, bodyBold, smallMedium/Bold/Extra, buttonLgSoft, buttonSm, link, meta, badgeMuted/Strong, captionMedium/Strong/Bold, mono); a few motion durations.
+- Tab icons are Feather where a matching glyph exists. Three proposals from 01 §1.3 that Feather lacks (calendar-check, id-card, users-group) are drawn as custom SVGs in the same stroke style, as is the site's filled flame.
+- Splash imageWidth is 200 globally, so the wide lockup fits inside Android 12's circular splash mask, and 236 on iOS (about 54% of a 390pt screen; the spec says about 55%).
+- Two test files were added under tests/, outside the listed ownership, because the task requires tests for changes to pass: `theme.test.ts` and `ui-date-time.test.ts`.
+- Primitives beyond the task list: Logo, PageGlow, MetricPill, TitleDot, CountBadge, CheckMark, StatusOptionGroup (§5.7 ResultToggle), TextButton, Enter, Spinner, AccentGradient, PressableScale.
+- Not built, as they are content composites rather than primitives: the file row / dropzone (§5.2, §5.15), streak hero and week panel (§5.19), calendar grid (§5.20). The tokens for them are in the theme.
+
+## i18n and domain helpers
+
+**i18n (React)** — `@/i18n`
+- `useI18n()` → `{ locale, dict, m, setLocale }`. `dict` is the full site dictionary (same keys as the site); `m` is mobile-only strings, e.g. `m.common.actions.retry`, `m.common.states.loading`, `m.common.offline.banner`, `m.common.files.openInAnotherApp`, `m.common.photos.takePhoto`, `m.shell.tabs.overview`.
+- `<I18nProvider locale={locale} onChangeLocale={fn}>` — controlled; the owner persists the choice.
+- Re-exports: `format`, `plural`, `intlLocaleOf`, `isLocale`, `parseLocale`, `DEFAULT_LOCALE`, `LOCALES`, `LOCALE_STORAGE_KEY` (= "shbz-lang"), `getDictionary`, `getClientDictionary`, `getMobileDictionary`, `MOBILE_AREAS`; types `Locale`, `Dictionary`, `ClientDictionary`, `MobileDictionary`, `MobileArea`, `I18nValue`, `I18nProviderProps`.
+
+**i18n (pure, for src/mock, src/domain, tests — do not import `@/i18n` there)**
+- `@/i18n/get-dictionary`: `getDictionary(locale)`, `getClientDictionary(locale)`, `SERVER_ONLY_SECTIONS`.
+- `@/i18n/mobile`: `getMobileDictionary(locale)`, `MobileDictionary`, `MOBILE_AREAS`.
+- `@/lib/i18n/format`, `@/lib/i18n/locale`, `@/lib/i18n/dictionary`, `@/lib/i18n` — the verbatim site modules.
+- Adding mobile strings: edit only your `src/i18n/mobile/<area>.ts` (`const ru = {…}; const en: typeof ru = {…}; export const <area> = { ru, en }`). Plural arrays must be named `*Forms` (3 in ru, 2 in en, each with `{n}`); `tests/i18n.test.ts` enforces parity.
+
+**Domain** — `@/domain` (barrel) or `@/domain/<module>`
+- `enums`: `UserRole`, `HomeworkNumberStatus`, `Subject`, `LessonStatus`, `AttendanceStatus`, `LessonKind`, `AssignmentReason`, `LessonItemResult`, `ParentCallOutcome`, `SolutionCheckStatus`, `SolutionVerdict`, `AuditCategory` — each a value object and a union type.
+- `moscow-time`: `SCHOOL_TIME_ZONE`, `SCHOOL_UTC_OFFSET_MINUTES`, `DAY_MS`, `mskParts`, `mskDate({year,month,day,hour?,minute?})`, `mskDayKey`, `mskToday(now)`, `parseDayKey`, `isDayKey`, `dayKeyToDate`, `mskStartOfDay`, `mskAddDays`, `addDaysToDayKey`, `mskWeekdayIndex` (Mon = 0), `mskMonday`, `mskStartOfMonth`, `calendarDaysBetweenMsk`, `isSameMskDay`, `mskMonthGrid(year, month)` (42 day keys), `DEFAULT_PICKER_TIME` (23:59), `mskDateTimeOfDay(dayKey, time?)`, `parseMskDateTimeInput("YYYY-MM-DDTHH:mm")`, `toMskDateTimeInput(instant)`.
+- `dates`: `formatDate`, `formatShortDate`, `formatDateTime`, `toIsoDateTimeString` (site signatures, `(value, locale)`); `formatMsk(value, style, locale)` with styles `date | shortDate | fullDate | dateTime | dateTimeSeconds | dayMonth | dayMonthPadded | dayMonthShort | dayMonthNumeric | dayMonthTime | monthYear | time`; `formatDayKey`, `formatClockTime`, `formatMonthLabel`, `formatRunDateTime`, `formatNotificationTime(value, dict.student.notifications, locale, now)`, `minutesSince`.
+- `numbers`: `normalizeHomeworkNumber`, `compareHomeworkNumbers`, `findHomeworkNumberTwins`, `parseNumbersInput`, `MAX_NUMBERS_PER_INPUT`.
+- `text`: `normalizeSingleLineText`, `normalizeMultilineText`, `normalizeLoginInput`, `matchesAccountSearch`, `MAX_USER_NAME_LENGTH`, `MAX_LOGIN_LENGTH`.
+- `files`: `allowedUploadExtensions`, `allowedUploadMimeTypes`, `allowedPhotoExtensions`, `allowedPhotoMimeTypes`, `getFileExtension`, `getMimeTypeFromExtension`, `isPdfMime`, `isImageMime`, `isOfficeMime`, `sanitizeFileName`, `formatFileSize(size, locale)`.
+- `statuses`: `homeworkStatusMeta[status]` → `{ tone, isSolved, rank }` (no colours), `HOMEWORK_STATUS_ORDER`, `statusTone(status)`, `isSolvedStatus`, `homeworkStatusLabel(status, dict)`, `homeworkStatusShortLabel(status, dict)`, `lessonResultMeta[result]` → `{ tone, status }`, `LESSON_RESULT_ORDER`, `getStatusCounts`, `completionPercent`, `isHomeworkOverdue`; type `StatusTone`.
+- `utils`: the site's `lib/utils` surface re-exported under one path.
+- `account-validation`: `validateLoginInput`, `normalizeUserName`, `validateNewAccountInput`, `validateDeveloperAccountInput`, `validatePasswordChangeInput`, `MIN_PASSWORD_LENGTH`.
+- `password-policy`: `validatePasswordStrength`, `passwordProblemText(problem, dict.passwordPolicy)`, `MAX_PASSWORD_LENGTH`. `password-generate`: `generateReadablePassword(randomInt?)`, `generatePasswordFromName(name, randomInt?)`, `transliterateRuToLatin`.
+- `progress-policy`: `decideProgressChange(current, intent)`, `progressStatusLabel`, `progressSourceLabels`, `progressDecisionLabels`; types `ProgressIntent`, `ProgressDecision`.
+- `solution-check-status`: `getStatusForAiVerdict`, `isStatusDowngrade`. `solution-check-student-view`: `toStudentFacingResult(s)`. `solution-check-parse`: `ERROR_KINDS`, `ERROR_KIND_GROUP`, `parseCheckResponse`, `extractJsonObject`, `normalizeCheckResultsByConfidence`, `CheckVerdict`. `solution-check-history`: `selectCompletedCheckIdsToPrune`.
+- `solution-check-error-text`: `humanizeSolutionCheckError(raw, dict.student.checkErrors)`, `classifySolutionCheckError(raw)` → code, `checkErrorText(code, dict.student.checkErrors)`.
+- `homework-attention`: `homeworkAttentionRank`, `sortHomeworksByAttention`, `isAttentionHomeworkCompleted`. `homework-label`: `homeworkAssignmentLabel({title, orderInTopic}, locale)`. `homework-deadline-mirror`: `computeMirroredDeadlines`, `groupNumbersByDeadline`. `student-deadline-groups`: `groupStudentDeadlinesAsAssignments`, `mapStudentHomeworksToDeadlineItems`.
+- `lesson-status`: `deriveLessonStatus(lesson, now)`, `lessonStartRefreshDelay`, `shouldRefreshForLessonStart`. `lesson-live`: `isLessonItemClosed`, `isExtraPartUnlocked`, `canSubmitLessonItem`, `computeIdleLevel`, `computeSpentMinutes`, `decideAutoLessonResult`, `decideEndOfLessonResult`, `LESSON_SUBMISSION_MAX_PHOTOS`.
+- `lesson-plan`: limits (`MIN/MAX_DURATION_MINUTES`, `MIN/MAX_SPEED`, `MAX_GROUP_SIZE`, `MAX_PLAN_ITEMS`, `MAX_TITLE_LENGTH`, `MAX_TEACHER_NOTE_LENGTH`), `normalizePlanParams`, `normalizeSpeed`, `planLessonItemsUpdate`, `collectAvailableNumbers`, candidate builders and response parsers. `homework-plan`: `normalizeHomeworkParams`, `daysUntil`, `pickDominantTopicId` and limits. `plan-error`: `planErrorText(raw, dict.planner.planErrors)`, `planErrorValue(code)`.
+- `attendance`: `nextAttendance`, `summarizeAttendance`, `decideEndOfLessonAttendance`, `formatAttendanceSummary(summary, dict.planner.attendance)`. `report-period`: `academicYearStart`, `reportPeriodStart`, `parseReportPeriod`. `week-buckets`: `mondayOf`, `buildWeekBuckets`, `countByWeek`, `getDayOfWeekIndex`. `group-statistics`: `buildGroupStatistics`, `compareByActivity`.
+- `parent-call-state`: `resolveParentCallReminder`, `shouldCreateParentCallNotification`, `calendarDaysBetween`, `PARENT_CALL_DUE_DAYS`, `PARENT_CALL_OVERDUE_DAYS`, `PARENT_CALL_HISTORY_LIMIT`.
+- `progress-timeline`: `buildProgressTimelineEntries(rows, days, now)`, `buildProgressTimelineView`, `buildTeacherProgressTimeline`, `buildTimelineChartGeometry`, `MAX_TIMELINE_DAYS`. `student-streak`: `buildStudentStreak(entries, locale)`, `computeStudentStreak(rows, now, locale)`, `STREAK_WINDOW_DAYS`. `student-streak-colors`: `getStudentStreakColorMeta`, `STREAK_COLOR_MILESTONES`.
+- `upload-validation`: `validateUploadMetadata(fileName, declaredMime, size, locale)`, `validateUploadedBytes`, `UploadValidationError`, `MAX_UPLOAD_SIZE_BYTES`, `MAX_ORIGINAL_FILE_NAME_LENGTH`. `upload-file-name`: `getSafeUploadFileName`. `file-access`: `canAccessStoredFile`.
+- `topic-import`: `parseTopicImport`, `parseTopicImportText`, `buildImportPlan`, `buildImportUpdateData` and limits. `topic-import-prompt`: `TOPIC_IMPORT_PROMPT`. `topic-numbers-change`: `buildTopicNumbersChangePlan`, `describeNumberImpact`, `summarizeTopicImpact`, `describeTopicImpact`, `isRemovalConfirmationValid`, `parseConfirmedNumbers`. `teacher-topic-selection`: `getDefaultTeacherTopicId`, `filterTeacherTopicsByQuery`, `moveTopicByDirection`, `findTopicByHomeworkNumber`.
+- `latex-line-items`: `splitLineIntoItems`, `splitMathIntoItems`, `mergeSoftWrappedLines`. `math-line-breaks`: `MATH_LINE_BREAKS_SCRIPT`, `MATH_LINE_BREAKS_GLOBAL`, `MATH_LINE_BREAKS_INLINE_SCRIPT`.
+- `notification-text`: `renderNotificationText`, `notificationTextFor`, `legacyNotificationTitle`, `sanitizeNotificationParams`, `NOTIFICATION_TYPES`. `audit-text`: `renderAuditText`, `auditSummaryFor`, `resolveAuditText`, `withAuditText`, `auditActorNameFor`. `developer-alerts`: `resolveDeveloperAlerts(facts)`, `DEVELOPER_ALERT_TYPES`. `developer-panel-tabs`: `developerPanelTabs`, `parseDeveloperPanelTab`. `ai-pricing`: `resolveModelPrice`, `estimateModelCostRub`, `parseModelPrices`. `ai-output-language`: `aiOutputLanguageInstruction`. `check-queue-state`: `pickNextCheckIndex`. `exam-scores`: `getEgeProfileTasks`, `getOgeTasks`, `getOgeGrades`, `EGE_PROFILE_SCALE`.
+
+**Script** — `node scripts/sync-site-i18n.mjs <path-to-site-repo> [--check]`.
+
+### Decisions and deviations from the spec
+
+- The site's pure barrel `lib/i18n/index.ts` is copied too, beyond the three helper files the task names, so ported code and tests keep their `@/lib/i18n` imports unchanged.
+- Date formatters use month tables instead of `Intl` and always print Moscow time (the site mixes device zone and Moscow). A missing or unparsable date prints «Без даты» / "No date", where the site would throw a RangeError on an invalid date.
+- `homeworkStatusMeta` maps a status to semantic keys `{ tone, isSolved, rank }` instead of CSS class names; `lessonResultMeta` likewise. Label helpers take the dictionary.
+- Web-only parts of `lib/utils` are not ported: `cx`, `roleHome`, `roleSettingsPath`. `lib/utils` is split into `numbers`, `text`, `files`, `statuses`, `dates`, with `utils.ts` re-exporting the site surface.
+- DB and server-state parts are dropped: `loadTopicNumberFacts`, `recomputeMirroredDeadlines`, `ensureDeveloperAlerts`, `trackCheck` / `untrackCheck` / `getTrackedCheckIds`, `getStudentStreakSnapshot`. `computeStudentStreak` now has the pure signature `(rows, now, locale)`.
+- `upload-validation` decodes ZIP entry names with a local strict UTF-8 decoder instead of `TextDecoder`, which Expo's runtime polyfills do not provide; fatal-mode behaviour is covered by tests.
+- `password-generate` falls back to `Math.random` when `globalThis.crypto.getRandomValues` is missing. That is acceptable for demo data only; real passwords must pass a `randomInt` built on expo-crypto.
+- `ai-pricing` defaults `env` to `{}` instead of `process.env`.
+- `mapStudentHomeworksToDeadlineItems` returns `assignmentId` instead of the site URL `href`; `StudentDeadline` is declared locally instead of being derived from a Prisma query.
+- Ported files keep the site's Russian comments, against the repo's English-comments convention, so they stay diffable against the site. `eslint --fix` rewrote `Array<T>` to `T[]`. `enums.ts` disables `no-redeclare` for the intentional value + type pairs.
+- Additions not on the site: `account-validation.ts`, `buildProgressTimelineEntries`, `classifySolutionCheckError` / `checkErrorText`, the picker and calendar helpers in `moscow-time`, `PARENT_CALL_HISTORY_LIMIT`, `MAX_NUMBERS_PER_INPUT`, and the photo extension / MIME lists.
+- Ported tests were adapted where the port differs: local `new Date(y, m, d)` became `mskDate(...)` in report-period and week-buckets; `cx` / `roleHome` cases and the tracker and site-settings cases were removed; `Buffer` fixtures became typed arrays. The site's "client components must not import dictionaries" test is not ported, because the app bundles both languages on purpose.
+- Mobile overlay keys are grouped one level deeper than a flat list, e.g. `m.common.actions.retry`, `m.common.offline.banner`.
+- Not ported because they are server infrastructure outside 09 §1.6: `lib/rate-limit.ts`, `lib/site-settings.ts`, the aggregation in `lib/teacher-statistics.ts`, and the logger / telegram / AI-call modules.
+
+## Math, files and photos
+
+**`@/components/math`**
+- `MathContent({ value, variant?: 'card' | 'bare', maxCollapsedLines?, testID? })` — the only way to show `conditionLatex` / `answerLatex`; renders nothing for an empty value. `<MathContent value={number.conditionLatex} />`
+- `MathPreview({ value, debounceMs = 200, variant?, testID? })` — debounced live preview for editors.
+- Pure: `parseMathContent(value): MathBlock[]`, `hasMath(blocks)`, `parseInlineLine(line)`, `buildMathDocument(value)` → `{ blocks, hasMath, html }`, `renderMathHtml(blocks)`; types `MathBlock`, `MathNode`, `MathInline`, `MathDocument`.
+
+**`@/services/files`**
+- `createMockFileService({ lookup?, locale?, latencyMs? }): FileService` — put it in `AppServices.files`. `lookup(fileId)` returns `{ mimeType, originalName?, size?, sample? } | null`; null means `404 fileNotFound`.
+- `FileServiceProvider({ service, children })`, `useFileService()` — mount once next to `ApiProvider`.
+- Picked files: `registerLocalFile(fileId, { uri, mimeType, originalName, size })` (in memory), `importLocalFile(fileId, file)` (copies into the document directory, then registers), `resolveLocalFile(fileId)`, `forgetLocalFile(fileId)`, `getRegisteredLocalFile`, `unregisterLocalFile`, `clearLocalFileRegistry`; type `LocalFile`.
+- Cache: `findCachedFile(file)`, `dropCachedFile(fileId)`, `clearFileCache()` (call on sign-out), `trimFileCache(maxBytes?)`, `FILE_CACHE_MAX_BYTES`.
+- Actions on a downloaded URI: `shareFile({ uri, mimeType, name })`, `openInAnotherApp(...)` → `{ ok: true } | { ok: false, reason: 'unavailable' | 'noApp' | 'failed' }`; `SHARE_IS_DOWNLOAD` (true on web).
+- Helpers: `cacheFileName`, `extensionForMime`, `fileKindOf`, `hashFileId`, `safeFileId`, `utiForMime`, `pickMockSample`, `pickMockPhoto`, `MOCK_PHOTO_COUNT`; types `FileKind`, `MockFileMeta`, `MockSampleKey`, `MockFileLookup`, `MockFileServiceOptions`.
+
+**`@/components/files`**
+- `ViewerFile = { id, originalName, mimeType, size?, localUri? }` — a stored file, a photo mapped as `{ id: photo.fileId, … }`, or a `DownloadedFile` passed with `localUri`.
+- `FileCard({ title, description?, file: ViewerFile | null, onOpen?, hideShare?, footer?, testID? })`.
+- `FileViewer({ files, initialIndex?, title?, onClose, testID? })` — body of the `shared.fileViewer` route.
+- `FileViewerModal({ visible, ...FileViewerProps })` — the same, opened in place.
+- `PhotoGrid({ photos: PhotoGridItem[], columns?, onOpen?, onRemove?, removingKey?, onAdd?, addLabel?, addDisabled?, addBusy? })`; `PhotoGridItem = { key, fileId, name, localUri?, uploading? }`.
+- `PhotoThumb({ fileId, name, size?, localUri?, onPress?, onRemove?, removeLabel?, removing?, uploading? })`, `PHOTO_THUMB_SIZE`.
+- `PhotoSourceSheet({ visible, onClose, onSelect: (source: 'camera' | 'library') => void, title? })`.
+- Hooks: `useFileDownload(file, enabled?)` → `idle | loading{progress} | ready{uri} | error{message}` plus `retry`; `useFileActions()` → `{ share, openExternally, pending, error, dismissError }`.
+- Helpers: `fileTypeLabel`, `fileIconName`, `viewerFileKind`, `toDownloadable`.
+
+**`@/services/photos`**
+- `pickFromCamera({ locale? })`, `pickFromLibrary({ multiple?, limit?, locale? })` → `PickResult<PhotoUpload>`.
+- `pickDocument({ locale? })` → `PickResult<FileUpload>` (PDF, DOCX, PNG, JPG).
+- `PickResult<T>` = `picked{files}` | `cancelled` | `denied{permission, canAskAgain}` | `unavailable` | `invalid{message}` | `failed`.
+- `planPhotoResize`, `normalisedPhotoName`, `clampSelectionLimit`, `PHOTO_MAX_SIDE` (2400), `PHOTO_JPEG_QUALITY` (0.8), `PHOTO_MIME_TYPE`, `PHOTO_EXTENSION`, `DOCUMENT_PICKER_MIME_TYPES`.
+
+**Strings added to `m.common`** (ru + en)
+- `files.fileOf`, `previousFile`, `nextFile`, `openFailed`, `imageFailed`, `pdfExternalOnly`, `preparing`
+- `photos.pickFailed`, `openPhoto`
+
+**Scripts**
+- `node scripts/build-katex-assets.mjs [--check]`
+- `node scripts/build-mock-files.mjs` (needs Playwright)
+
+### Decisions and deviations from the spec
+
+- Renderer split is `math-view.tsx` (native) + `math-view.web.tsx`, not `math-view.native.tsx`: the Expo tsconfig has no `moduleSuffixes`, so TypeScript could not resolve a `.native`-only file. Same pattern for `pdf-view`, `file-cache`, `file-actions`, `local-file-store`, `mock-sample-store`, `file-size`.
+- Generated math assets are two files plus a font, not one `katex-assets.ts`: `generated/katex-css.ts` (shared with web) and `generated/text-font.ts` (native shell only).
+- The native shell also inlines a 17 KB Montserrat Regular subset (Latin, Cyrillic, punctuation) so prose around formulas matches the app font; the spec only mentions KaTeX fonts. `build-katex-assets.mjs` rebuilds the subset only when `pyftsubset` is available and otherwise reuses the committed `montserrat-400-subset.woff2`.
+- KaTeX is called with `strict: 'ignore'` instead of the default `warn`. The markup is identical; it only stops console warnings (LogBox on device) for Cyrillic in math mode.
+- Every KaTeX failure becomes the error markup, not only `ParseError` / `TypeError` as on the site, so one bad formula cannot take a screen down.
+- `maxCollapsedLines` clamps by height (`lines × 28 px × font scale`, overflow hidden). Only a single plain-text paragraph gets a real ellipsis.
+- Gaps inside a math block scale with the OS font scale (capped at 1.3, like the `Text` primitive), mirroring the site's rem-based spacing.
+- The site's own math test (`latex-line-items`) was already ported as `tests/domain-latex-line-items.test.ts`. My parse tests are new and use the §2.4 fixture statements.
+- The DOCX sample ships as base64 in `src/services/files/generated/mock-docx.ts` because Metro has no asset loader for `.docx`; the file is also in `assets/mock-files/` as the source.
+- Mock samples beyond the task list: 320 px thumbnails for the eight photos (served for `variant: 'thumb'`) and a typeset `cheatsheet.jpg` for image theory files.
+- PDF sample selection uses the declared size first (≥ 512 KB → the 12-page file), then the id hash, so the fixture's 1.4 MB theory file maps to the long PDF. An explicit `sample` in the lookup wins over both.
+- `source()` returns an empty `uri` for a file the lookup rejects, instead of throwing: it is synchronous and called during render. `download()` rejects with `ApiError 404 fileNotFound`.
+- `FileCard` shows a file row (type tile, name, type · size) with Open and Share/Download, not the site's inline multi-page preview, per 09 §5.2. Image files keep a fitted preview.
+- PDF on Android is a hand-off page with "Открыть в другом приложении" (no in-app renderer in Expo Go). PDF on web follows the site: iframe on a fine pointer, hand-off (new tab) on touch or when the browser has no PDF viewer.
+- iOS "open in another app" tries Quick Look through `File.preview()` from expo-file-system and falls back to the share sheet; Android uses `expo-intent-launcher` as specified.
+- The viewer header uses icon buttons (share/download, close) with accessible labels instead of the site's text buttons, to fit a phone header. On web, pager arrows are also shown.
+- The photo library picker asks for no permission up front (current iOS and Android pickers need none); `denied` is reported only if launching fails and the permission is not granted. The camera always requests permission first.
+- All picked photos are re-encoded to JPEG, including PNG, per addendum 5 A.6 item 9.
+- Added beyond the list: `PhotoSourceSheet`, `FileViewerModal`, `useFileDownload`, `useFileActions`, `FileServiceProvider` / `useFileService`, `importLocalFile` / `forgetLocalFile`, `trimFileCache` / `clearFileCache`.
+- `src/app/dev-math.tsx` uses plain English captions and hard-coded sample data, as `dev-ui.tsx` does.
