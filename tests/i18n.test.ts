@@ -9,6 +9,7 @@ import { describe, it } from "node:test";
 
 import { SERVER_ONLY_SECTIONS, getClientDictionary, getDictionary } from "@/i18n/get-dictionary";
 import { MOBILE_AREAS, getMobileDictionary, type MobileDictionary } from "@/i18n/mobile";
+import { accounts } from "@/i18n/mobile/accounts";
 import { calls } from "@/i18n/mobile/calls";
 import { common } from "@/i18n/mobile/common";
 import { content } from "@/i18n/mobile/content";
@@ -18,6 +19,7 @@ import { planner } from "@/i18n/mobile/planner";
 import { shell } from "@/i18n/mobile/shell";
 import { stats } from "@/i18n/mobile/stats";
 import { student } from "@/i18n/mobile/student";
+import { studentWork } from "@/i18n/mobile/student-work";
 import { teacher } from "@/i18n/mobile/teacher";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { ru } from "@/lib/i18n/dictionaries/ru";
@@ -290,11 +292,13 @@ describe("format and plural", () => {
 
 // ───────────────────────────── mobile overlay ─────────────────────────────
 
-const mobileAreas = { common, shell, student, teacher, planner, groups, calls, stats, content, developer };
-const EXPECTED_AREAS = ["common", "shell", "student", "teacher", "planner", "groups", "calls", "stats", "content", "developer"];
+const mobileAreas = { common, shell, student, studentWork, teacher, accounts, planner, groups, calls, stats, content, developer };
+const EXPECTED_AREAS = [
+  "common", "shell", "student", "studentWork", "teacher", "accounts", "planner", "groups", "calls", "stats", "content", "developer"
+];
 
 describe("mobile overlay `m`", () => {
-  it("has exactly the ten areas, each with ru and en", () => {
+  it("has exactly the twelve areas, each with ru and en", () => {
     assert.deepEqual([...MOBILE_AREAS].sort(), [...EXPECTED_AREAS].sort());
     assert.deepEqual(Object.keys(mobileAreas).sort(), [...EXPECTED_AREAS].sort());
 

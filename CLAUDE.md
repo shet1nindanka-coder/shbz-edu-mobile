@@ -63,7 +63,7 @@ src/domain/         Pure helpers ported 1:1 from the site (numbers, statuses, Mo
 src/lib/i18n/       Dictionaries copied VERBATIM from the site (same path as on the site so the `@/lib/i18n/…`
                     imports inside them resolve). Never hand-edit; excluded from lint.
 src/i18n/           `useI18n()` → `{ locale, dict, m }`, provider, locale preference. `m` = mobile-only
-                    strings: `src/i18n/mobile/<area>.ts` (each area owns its file, ru + en, same keys).
+                    strings: `src/i18n/mobile/<area>.ts` (each area owns its file, ru + en, same keys; areas: common, shell, student, studentWork, teacher, accounts, planner, groups, calls, stats, content, developer).
 src/theme/          Design tokens (light/dark), `useTheme()`, fonts.
 src/ui/             Reusable primitives (Text, Button, Card, Input, Segmented, Sheet, Dialog, Select, Notice,
                     Badge, StatusBadge, ProgressBar, Skeleton, EmptyState, Screen, AppBar…).

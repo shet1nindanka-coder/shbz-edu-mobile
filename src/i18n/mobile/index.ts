@@ -5,6 +5,7 @@
 // Pure module (no React): the mock API and unit tests import it directly.
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/locale";
 
+import { accounts } from "./accounts";
 import { calls } from "./calls";
 import { common } from "./common";
 import { content } from "./content";
@@ -14,9 +15,10 @@ import { planner } from "./planner";
 import { shell } from "./shell";
 import { stats } from "./stats";
 import { student } from "./student";
+import { studentWork } from "./student-work";
 import { teacher } from "./teacher";
 
-const areas = { common, shell, student, teacher, planner, groups, calls, stats, content, developer };
+const areas = { common, shell, student, studentWork, teacher, accounts, planner, groups, calls, stats, content, developer };
 
 type Areas = typeof areas;
 
