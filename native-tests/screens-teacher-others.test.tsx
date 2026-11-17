@@ -5,13 +5,6 @@ import { describe, it } from '@jest/globals';
 import { visit } from './support/drive';
 
 const ANNA = 'teacher@example.com';
-const STUDENTS = ['usr_ilya', 'usr_maria', 'usr_artem', 'usr_polina', 'usr_kirill', 'usr_dasha', 'usr_timur'];
-const LESSONS = [
-  'les_early', 'les_g4', 'les_d2', 'les_g_unfinalized', 'les_live', 'les_dasha_soon', 'les_tomorrow_group', 'les_ilya_tomorrow',
-  'les_unscheduled', 'les_ai_off', 'les_budget', 'les_stale', 'les_manual',
-];
-const DRAFTS = ['hp_generating', 'hp_ready', 'hp_issued', 'hp_stale', 'hp_past', 'hp_conflict', 'hp_full', 'hp_queue', 'hp_errors'];
-const TOPICS = ['top_linear', 'top_quadratic', 'top_derivative', 'top_log', 'top_systems', 'top_empty', 'top_word'];
 
 const LISTS: [string, string][] = [
   ['teacher.home', '/teacher'],
