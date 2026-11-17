@@ -226,6 +226,8 @@ export function turboModuleFakes(): Record<string, Record<string, unknown>> {
       shouldStartLoadWithLockIdentifier: () => undefined,
     },
     RNCMaterialTimePicker: { open: record('RNCMaterialTimePicker.open', () => dismissed), dismiss: async () => true },
+    // React Native's own `Share` on Android (a core module every phone has; RN's jest setup leaves it out).
+    ShareModule: { getConstants: () => ({}), share: record('Share.share', () => ({ action: 'sharedAction' })) },
   };
 }
 

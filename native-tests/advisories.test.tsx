@@ -37,6 +37,20 @@ const SCREENS: [PersonaLogin | undefined, string, string[]][] = [
   ['dev@example.com', '/developer/panel/journal', []],
 ];
 
+/**
+ * Advisory violations traced to their source and proven harmless on a phone. Each is a deliberate web-only
+ * style that native ignores.
+ */
+const HARMLESS: { rule: string; path: RegExp; why: string }[] = [
+  {
+    rule: 'style-text-on-view',
+    path: /(assign|lesson-compose)-number-/,
+    why:
+      'src/components/number-select-card/number-select-card.tsx:69 sets textAlign on the formula wrapper so that, on web, ' +
+      'the formula does not inherit the centred text of the <button> a pressable card becomes; native ignores it.',
+  },
+];
+
 let collected: Violation[] | null = null;
 
 /** Renders the cross-section once (in the first test that asks) and keeps what the walker found. */
@@ -55,7 +69,9 @@ async function collect(): Promise<Violation[]> {
 
 describe('design and accessibility rules on the native tree', () => {
   it.each([...ADVISORY_RULES])('%s', async (rule) => {
-    const violations = (await collect()).filter((violation) => violation.rule === rule);
+    const violations = (await collect()).filter(
+      (violation) => violation.rule === rule && !HARMLESS.some((entry) => entry.rule === rule && entry.path.test(violation.path)),
+    );
     expect(formatViolations(violations)).toBe('');
   });
 });
