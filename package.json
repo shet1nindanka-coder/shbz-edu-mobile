@@ -74,6 +74,7 @@
     "lint": "expo lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts",
+    "test:native": "jest --ci",
     "export:web": "expo export -p web",
     "sync:i18n": "node scripts/sync-site-i18n.mjs"
   },
