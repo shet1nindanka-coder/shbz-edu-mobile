@@ -148,10 +148,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
         {t.title}
       </Text>
       {notice ? (
-        <View style={styles.noticeBlock}>
-          <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="assign-notice" />
-          {notice.tone === 'error' ? <RetryWaitLine seconds={wait.seconds} testID="assign-wait" /> : null}
-        </View>
+        <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="assign-notice" />
       ) : null}
       {board.isError && data ? <Notice tone="error" text={errorText(board.error, m.common.errors.generic)} testID="assign-refresh-error" /> : null}
       {data && !data.deadlinesEnabled ? <Notice tone="warning" text={t.dbOutdated} testID="assign-db-outdated" /> : null}
@@ -258,6 +255,8 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
           style={styles.grow}
         />
       </View>
+      {/* Under the locked button, not in the notice: closing the notice or changing the topic keeps the lock. */}
+      <RetryWaitLine wait={wait} testID="assign-wait" />
     </View>
   ) : undefined;
 
@@ -333,7 +332,6 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
 const useStyles = makeStyles((t) => ({
   listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.md, paddingBottom: t.space.lg },
   header: { gap: t.space.md, paddingBottom: t.space.md },
-  noticeBlock: { gap: t.space.xs },
   links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, minHeight: 28 },
   item: { paddingBottom: t.space.md },
   bar: { gap: t.space.sm },

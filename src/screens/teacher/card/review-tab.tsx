@@ -7,6 +7,7 @@ import type { TeacherHomeworkAssignment, TeacherHomeworkCheck } from '@/api/type
 import { HIGHLIGHT_FLASH_MS } from '@/api/types/limits';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { ProgressHistorySheet } from '@/components/progress-history';
+import { useRetryWait } from '@/components/retry-wait';
 import { UndoToast } from '@/components/undo-toast';
 import { getFileExtension, getMimeTypeFromExtension } from '@/domain/files';
 import { homeworkAssignmentLabel } from '@/domain/homework-label';
@@ -70,6 +71,8 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const [completedToggled, setCompletedToggled] = useState<boolean | null>(null);
   const [notice, setNotice] = useState<ListNotice | null>(null);
   const [cancelFor, setCancelFor] = useState<TeacherHomeworkAssignment | null>(null);
+  // Cancelling has its own bucket (shared with issuing, 120 / 60 s), separate from the status marks.
+  const cancelWait = useRetryWait();
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   // The homework to bring into view: from the route (a history reference) or from the open history sheet.
   const [focus, setFocus] = useState<{ id: string; seq: number } | null>(assignmentId ? { id: assignmentId, seq: 0 } : null);
@@ -252,6 +255,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
 
       <CancelHomeworkDialog
         assignment={cancelFor}
+        wait={cancelWait}
         onClose={() => setCancelFor(null)}
         onCancelled={() => setCancelFor(null)}
         onMissing={(message) => {

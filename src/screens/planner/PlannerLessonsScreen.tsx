@@ -21,6 +21,7 @@ import { Dialog, LoadingState, Notice, Screen, Text } from '@/ui';
 import { ComposeCard } from './lessons/compose-card';
 import { LessonCard } from './lessons/lesson-card';
 import { buildLessonRows, groupLessons, hasScheduleAdvanced, type LessonListRow } from './lessons/lessons-list-logic';
+import { invalidateAroundLesson } from './shared/invalidate';
 import { useNowTick } from '@/services/clock';
 import { usePullRefresh } from '@/services/query';
 
@@ -75,10 +76,9 @@ export function PlannerLessonsScreen() {
     onSuccess: (_result, lesson) => {
       setDeleting(null);
       queryClient.removeQueries({ queryKey: qk('planner', 'getLessonBoard', lesson.id) });
-      void queryClient.invalidateQueries({ queryKey: qk('planner', 'listLessons') });
-      // The lesson also disappears from the student card's "Lessons" tab and the group's lessons block.
-      void queryClient.invalidateQueries({ queryKey: qk('teacherStudents', 'listStudentLessons') });
-      void queryClient.invalidateQueries({ queryKey: qk('groups', 'getGroup') });
+      // The lesson also disappears from the student card, the group's lessons block and its attendance
+      // table and statistics — the same set the board's own delete refreshes.
+      invalidateAroundLesson(queryClient);
     },
     onError: (error) => {
       setDeleting(null);
@@ -128,11 +128,10 @@ export function PlannerLessonsScreen() {
       {/* Cached lessons stay on screen when a refresh fails (offline): say so instead of replacing them. */}
       {lessons.isError && data ? <Notice tone="error" text={errorText(lessons.error, m.common.errors.generic)} testID="lessons-refresh-error" /> : null}
       {deleteError ? (
-        <View style={styles.noticeBlock}>
-          <Notice tone="error" text={deleteError} onDismiss={() => setDeleteError(null)} dismissLabel={m.common.actions.close} testID="lessons-delete-error" />
-          <RetryWaitLine seconds={deleteWait.seconds} />
-        </View>
+        <Notice tone="error" text={deleteError} onDismiss={() => setDeleteError(null)} dismissLabel={m.common.actions.close} testID="lessons-delete-error" />
       ) : null}
+      {/* «Delete» in every lesson menu stays locked after a dismissed notice: the reason stays with it. */}
+      <RetryWaitLine seconds={deleteWait.seconds} testID="lessons-delete-wait" />
       <HandoutNotice handout={handout} testID="lessons-handout-error" />
       <View style={styles.compose}>
         <Text variant="sectionTitle" accessibilityRole="header">
@@ -243,7 +242,6 @@ const useStyles = makeStyles((t) => ({
   // list itself and would lose a padding of the content container.
   listContent: { paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
   header: { gap: t.space.lg, paddingBottom: t.space.md, paddingHorizontal: t.space.gutter },
-  noticeBlock: { gap: t.space.xs },
   compose: { gap: t.space.md },
   sectionHeader: { paddingTop: t.space.lg, paddingBottom: t.space.sm, paddingHorizontal: t.space.gutter, backgroundColor: t.colors.pageBg },
   item: { paddingBottom: t.space.md, paddingHorizontal: t.space.gutter },

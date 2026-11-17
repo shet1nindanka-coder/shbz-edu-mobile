@@ -6,6 +6,8 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
+import { isOverlayCovered } from '@/ui/overlay-cover';
+
 import { utiForMime } from './file-names';
 
 export type FileActionTarget = {
@@ -18,8 +20,12 @@ export type FileActionTarget = {
 
 export type FileActionResult =
   | { ok: true }
-  /** `unavailable` — the device cannot do this at all; `noApp` — nothing installed handles the type. */
-  | { ok: false; reason: 'unavailable' | 'noApp' | 'failed' };
+  /**
+   * `unavailable` — the device cannot do this at all; `noApp` — nothing installed handles the type;
+   * `covered` — the app lock closed while the file was prepared: nothing was presented (a system screen
+   * would open above the lock cover), the user repeats the action after unlocking.
+   */
+  | { ok: false; reason: 'unavailable' | 'noApp' | 'failed' | 'covered' };
 
 const ACTION_VIEW = 'android.intent.action.VIEW';
 /** `Intent.FLAG_GRANT_READ_URI_PERMISSION`: the receiving app may read our content:// URI. */
@@ -32,6 +38,7 @@ export const SHARE_IS_DOWNLOAD = false;
 export async function shareFile(target: FileActionTarget): Promise<FileActionResult> {
   try {
     if (!(await Sharing.isAvailableAsync())) return { ok: false, reason: 'unavailable' };
+    if (isOverlayCovered()) return { ok: false, reason: 'covered' };
     await Sharing.shareAsync(target.uri, {
       mimeType: target.mimeType,
       UTI: utiForMime(target.mimeType),
@@ -49,6 +56,8 @@ export async function shareFile(target: FileActionTarget): Promise<FileActionRes
  * sheet for types it cannot preview.
  */
 export async function openInAnotherApp(target: FileActionTarget): Promise<FileActionResult> {
+  // The hand-off follows a download: the lock may have closed meanwhile (see `FileActionResult`).
+  if (isOverlayCovered()) return { ok: false, reason: 'covered' };
   if (Platform.OS === 'android') {
     try {
       await IntentLauncher.startActivityAsync(ACTION_VIEW, {
@@ -65,6 +74,7 @@ export async function openInAnotherApp(target: FileActionTarget): Promise<FileAc
   try {
     const file = new File(target.uri);
     if (await file.canPreview({ mimeType: target.mimeType })) {
+      if (isOverlayCovered()) return { ok: false, reason: 'covered' };
       await file.preview({ mimeType: target.mimeType, title: target.name });
       return { ok: true };
     }

@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { AttendanceStatus, GroupAttendanceLesson, GroupAttendanceResponse, ReportPeriod } from '@/api/types';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
-import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
+import { RetryWaitLine, type RetryWait } from '@/components/retry-wait';
 import { nextAttendance } from '@/domain/attendance';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
@@ -30,6 +30,9 @@ export type AttendanceTabProps = {
   groupId: string;
   attendance: UseQueryResult<GroupAttendanceResponse>;
   report: ReportExport;
+  /** The cool-down of the marks (`useRetryWait`), owned by the screen: switching tabs unmounts this one,
+   * and the server's limiter does not forget a refusal when the tab comes back. */
+  wait: RetryWait;
 };
 
 /**
@@ -37,7 +40,7 @@ export type AttendanceTabProps = {
  * year, as a table or lesson by lesson. A mark is applied at once and sent; if the server refuses it the
  * mark goes back and the reason is shown.
  */
-export function AttendanceTab({ groupId, attendance, report }: AttendanceTabProps) {
+export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceTabProps) {
   const styles = useStyles();
   const api = useApi();
   const queryClient = useQueryClient();
@@ -45,7 +48,6 @@ export function AttendanceTab({ groupId, attendance, report }: AttendanceTabProp
   const { locale, dict, m } = useI18n();
   const t = dict.planner.groups.attendance;
   const common = dict.planner.common;
-  const wait = useRetryWait();
   const [mode, setMode] = useState<Mode>('table');
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);

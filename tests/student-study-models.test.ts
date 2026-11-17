@@ -322,6 +322,13 @@ describe("personal note (S3)", () => {
     assert.equal(noteStatus({ saving: false, queued: false, savedFlash: false }), null);
   });
 
+  it("a waiting draft on an online device is «retrying», not «will save when online»", () => {
+    assert.equal(noteStatus({ saving: false, queued: true, savedFlash: false, online: true }), "retrying");
+    assert.equal(noteStatus({ saving: false, queued: true, savedFlash: false, online: false }), "queued");
+    assert.equal(noteStatus({ saving: true, queued: true, savedFlash: false, online: true }), "saving");
+    assert.equal(noteStatus({ saving: false, queued: false, savedFlash: true, online: true }), "saved");
+  });
+
   describe("a note that changed on the server under an open editor", () => {
     const idle = { saved: "", draft: "", writing: false, typing: false };
 

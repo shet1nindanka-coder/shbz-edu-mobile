@@ -4,7 +4,7 @@ import { cacheFileName, fileKindOf } from './file-names';
 
 export type FileActionTarget = { uri: string; mimeType: string; name: string };
 
-export type FileActionResult = { ok: true } | { ok: false; reason: 'unavailable' | 'noApp' | 'failed' };
+export type FileActionResult = { ok: true } | { ok: false; reason: 'unavailable' | 'noApp' | 'failed' | 'covered' };
 
 export const SHARE_IS_DOWNLOAD = true;
 

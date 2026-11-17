@@ -33,7 +33,8 @@ export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHead
   const t = dict.planner.lessonBoard;
   const isLive = lesson.status === 'ACTIVE';
   const { waits, notice, board } = controller;
-  const waitSeconds = Math.max(waits.plan.seconds, waits.items.seconds, waits.result.seconds, waits.lesson.seconds);
+  // Result marks have their own line under the rows of every open card (participant-card.tsx).
+  const waitSeconds = Math.max(waits.plan.seconds, waits.items.seconds, waits.lesson.seconds);
 
   return (
     <View style={styles.header}>
@@ -84,11 +85,10 @@ export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHead
       {!lesson.aiAvailable ? <Notice tone="warning" text={t.aiUnavailable} testID="lesson-ai-unavailable" /> : null}
 
       {notice ? (
-        <View style={styles.noticeBlock}>
-          <Notice tone={notice.tone} text={notice.text} onDismiss={controller.dismissNotice} dismissLabel={m.common.actions.close} testID="lesson-notice" />
-          <RetryWaitLine seconds={waitSeconds} testID="lesson-wait" />
-        </View>
+        <Notice tone={notice.tone} text={notice.text} onDismiss={controller.dismissNotice} dismissLabel={m.common.actions.close} testID="lesson-notice" />
       ) : null}
+      {/* Outside the notice: dismissing it does not unlock the buttons, so the reason stays as long as the lock. */}
+      <RetryWaitLine seconds={waitSeconds} testID="lesson-wait" />
 
       <HandoutNotice handout={handout} testID="lesson-handout-error" />
 
@@ -108,5 +108,4 @@ const useStyles = makeStyles((t) => ({
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
   pill: { height: t.sizes.button, paddingHorizontal: 18, borderRadius: t.radii.md, alignItems: 'center', justifyContent: 'center' },
   progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.button },
-  noticeBlock: { gap: t.space.xs },
 }));

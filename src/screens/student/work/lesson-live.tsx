@@ -4,6 +4,7 @@ import { RefreshControl, View } from 'react-native';
 
 import type { ActiveLessonDto, GetLessonResponse, LessonItemDto, PhotoUpload } from '@/api/types';
 import { PhotoSourceSheet } from '@/components/files';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, plural, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
@@ -106,6 +107,9 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshing, onR
           testID="lesson-poll-broken"
         />
       ) : null}
+      {/* A cool-down locks the submit button of every card, also the ones never tried: say why once, for as
+          long as it lasts — not under a card's error notice, which can be dismissed (90-addendum-1 A.3). */}
+      <RetryWaitLine wait={state.limit} testID="lesson-submit-wait" />
     </View>
   );
 
@@ -153,7 +157,6 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshing, onR
               submitDisabled={submitDisabled}
               submitError={state.submitErrors[item.id] ?? null}
               onDismissSubmitError={() => state.dismissSubmitError(item.id)}
-              waitSeconds={state.limit.seconds}
               pickProblem={isTarget && !previewOpen ? source.problem : null}
               onDismissPickProblem={clearProblem}
               preparing={isTarget && source.preparing && !previewOpen}

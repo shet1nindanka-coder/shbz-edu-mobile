@@ -93,11 +93,10 @@ export function DraftBoardHeader({ plan, controller, handout, onOpenSourceLesson
       {!plan.aiAvailable ? <Notice tone="warning" text={t.aiUnavailable} testID="draft-ai-unavailable" /> : null}
 
       {notice ? (
-        <View style={styles.noticeBlock}>
-          <Notice tone={notice.tone} text={notice.text} onDismiss={controller.dismissNotice} dismissLabel={m.common.actions.close} testID="draft-notice" />
-          <RetryWaitLine seconds={waitSeconds} testID="draft-wait" />
-        </View>
+        <Notice tone={notice.tone} text={notice.text} onDismiss={controller.dismissNotice} dismissLabel={m.common.actions.close} testID="draft-notice" />
       ) : null}
+      {/* Outside the notice: dismissing it does not unlock the buttons, so the reason stays as long as the lock. */}
+      <RetryWaitLine seconds={waitSeconds} testID="draft-wait" />
 
       {issueFailures.length > 0 ? (
         <Notice tone="error" title={t.issueFailures} onDismiss={controller.dismissIssueFailures} dismissLabel={m.common.actions.close} testID="draft-issue-failures">
@@ -135,6 +134,5 @@ const useStyles = makeStyles((t) => ({
   sourceText: { flex: 1, minWidth: 0 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
   progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.minTouch },
-  noticeBlock: { gap: t.space.xs },
   failures: { gap: t.space.xs },
 }));

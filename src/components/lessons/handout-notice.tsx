@@ -9,34 +9,37 @@ import type { Handout } from './use-handout';
 
 /**
  * Why a handout did not open (`404 lessonNotFound`, `404 noHomeworkHandout`, `429 rateLimited`, …). For
- * `503 pdfRendererUnavailable` it offers the HTML print version instead (90-addendum-2 A.2.6).
+ * `503 pdfRendererUnavailable` it offers the HTML print version instead (90-addendum-2 A.2.6). The wait
+ * line stays while the handout buttons are locked, also after the notice is dismissed.
  */
 export function HandoutNotice({ handout, testID }: { handout: Handout; testID?: string }) {
   const styles = useStyles();
   const { m } = useI18n();
   const failure = handout.failure;
-  if (!failure) return null;
+  if (!failure && !handout.wait.waiting) return null;
   return (
     <View style={styles.block}>
-      <Notice
-        tone="error"
-        text={failure.text}
-        onDismiss={handout.dismiss}
-        dismissLabel={m.common.actions.close}
-        action={
-          failure.canOpenPrintVersion ? (
-            <Button
-              label={m.planner.lessonBoard.print}
-              size="sm"
-              variant="outline"
-              onPress={() => handout.open({ ...failure.request, format: 'html' })}
-              testID={testID ? `${testID}-print` : undefined}
-            />
-          ) : undefined
-        }
-        testID={testID}
-      />
-      <RetryWaitLine seconds={handout.wait.seconds} />
+      {failure ? (
+        <Notice
+          tone="error"
+          text={failure.text}
+          onDismiss={handout.dismiss}
+          dismissLabel={m.common.actions.close}
+          action={
+            failure.canOpenPrintVersion ? (
+              <Button
+                label={m.planner.lessonBoard.print}
+                size="sm"
+                variant="outline"
+                onPress={() => handout.open({ ...failure.request, format: 'html' })}
+                testID={testID ? `${testID}-print` : undefined}
+              />
+            ) : undefined
+          }
+          testID={testID}
+        />
+      ) : null}
+      <RetryWaitLine wait={handout.wait} testID={testID ? `${testID}-wait` : undefined} />
     </View>
   );
 }

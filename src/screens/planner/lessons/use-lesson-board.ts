@@ -9,6 +9,7 @@ import { useRetryWait } from '@/components/retry-wait';
 import { serverClockOffset } from '@/domain/server-clock';
 import { format, useI18n } from '@/i18n';
 
+import { invalidateAroundLesson } from '../shared/invalidate';
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
 import { useStillHere } from '../shared/use-still-here';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive } from '@/navigation';
@@ -96,13 +97,7 @@ export function useLessonBoard(lessonId: string) {
   );
 
   /** Everything else that shows this lesson: the list, the student card's "Lessons" tab, the group page. */
-  const invalidateAround = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: qk('planner', 'listLessons') });
-    void queryClient.invalidateQueries({ queryKey: qk('teacherStudents') });
-    void queryClient.invalidateQueries({ queryKey: qk('groups', 'getGroup') });
-    void queryClient.invalidateQueries({ queryKey: qk('groups', 'getGroupAttendance') });
-    void queryClient.invalidateQueries({ queryKey: qk('groups', 'getGroupStatistics') });
-  }, [queryClient]);
+  const invalidateAround = useCallback(() => invalidateAroundLesson(queryClient), [queryClient]);
 
   const fail = useCallback(
     (error: unknown, fallback: string) => {

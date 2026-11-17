@@ -24,19 +24,20 @@ const STUDENT_HOMEWORK: readonly InvalidationPrefix[] = [
   key("studentStudy", "getHomeworkDeadlines"),
 ];
 
+// Every key below mirrors what the site's `router.refresh()` re-reads on the student page that shows it
+// (components/dashboard-realtime-listener.tsx): a key is listed when the event's change reaches its
+// response, whichever screen is open.
 const STUDENT_KEYS: Record<RealtimeEvent["kind"], readonly InvalidationPrefix[]> = {
   // Never delivered to a student; listed so the table is total.
   "students-changed": [],
-  "topic-content-changed": [
-    key("studentStudy", "getTheoryLibrary"),
-    key("studentStudy", "getNumberDetail"),
-    // The overview and calendar cards carry the topic title (02 §5: "S1/S4 labels").
-    key("studentStudy", "getHomeworkDeadlines"),
-    key("studentWork", "getHomework"),
-    key("studentWork", "getLiveLesson"),
-  ],
+  // A topic rename / delete or a number / condition edit reaches every student response: titles and
+  // conditions in the theory, number, homework, check and lesson views; counts in the homework list;
+  // assignments and lesson items that cascade away with a deleted topic. Content edits are rare, so the
+  // whole of both student members is re-read, as the site re-renders the whole page.
+  "topic-content-changed": [key("studentStudy"), key("studentWork")],
   "student-progress-changed": [key("shell", "getStreak"), key("studentStudy", "getNumberDetail"), ...STUDENT_HOMEWORK],
-  "student-deadlines-changed": STUDENT_HOMEWORK,
+  // Issuing / cancelling homework mirrors `deadlineAt` onto the number rows, which the number card shows.
+  "student-deadlines-changed": [...STUDENT_HOMEWORK, key("studentStudy", "getNumberDetail")],
   "lesson-activity": [key("studentWork", "getLiveLesson"), key("studentWork", "getLiveLessonState")],
 };
 

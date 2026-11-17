@@ -5,7 +5,18 @@ import { useI18n } from '@/i18n';
 import { usePreferences, useSession } from '@/providers';
 import { authenticateWithBiometrics, getBiometricAvailability, shouldLockOnResume } from '@/services/biometrics';
 import { makeStyles } from '@/theme';
-import { Button, Icon, Logo, Notice, Text, TextButton, setOverlayCover, useWindowInsets } from '@/ui';
+import {
+  Button,
+  Icon,
+  Logo,
+  Notice,
+  Text,
+  TextButton,
+  coveredAccessibilityProps,
+  setOverlayCover,
+  useOverlayCovered,
+  useWindowInsets,
+} from '@/ui';
 
 /**
  * Biometric lock (mobile-only; the site has nothing like it). When the user switched it on, the app asks
@@ -15,8 +26,18 @@ import { Button, Icon, Logo, Notice, Text, TextButton, setOverlayCover, useWindo
  * separate native windows above the navigator. "Sign in with password" signs out and leads to the login
  * screen — the only way past a failing sensor.
  *
- * Never locks on web, after a fresh sign-in, or when the device has no enrolled biometrics (the switch
- * is then ignored rather than locking the user out).
+ * While the cover is up, what lies under it leaves the accessibility tree (TalkBack / VoiceOver must not
+ * read or operate the protected screen). On iOS a plain privacy cover (no prompt) is also drawn while the
+ * app is inactive or in the background, so the app-switcher snapshot does not show the protected screen.
+ *
+ * Never locks on web, after a fresh sign-in, or when the device cannot authenticate (nothing enrolled, no
+ * passcode): the switch is then ignored rather than locking the user out — also when that changed while
+ * the app was in the background.
+ *
+ * Known limit (iOS): system screens the app presented itself (Quick Look, the share sheet, document
+ * pickers) are view controllers above every window of the app; JS in Expo Go cannot dismiss or cover them,
+ * so such a screen left open stays above the cover until it is closed. Hand-offs started while the app is
+ * covered must not present (`isOverlayCovered()` from `@/ui`).
  */
 export function LockGate({ children }: { children: ReactNode }) {
   const { preferences } = usePreferences();
@@ -24,10 +45,14 @@ export function LockGate({ children }: { children: ReactNode }) {
   const enabled = preferences.biometricLock && Platform.OS !== 'web';
   const signedIn = status === 'signedIn';
   const usePassword = useCallback(() => void signOut(), [signOut]);
+  // The published cover (lock or privacy view): the navigator under it leaves the accessibility tree.
+  const covered = useOverlayCovered();
 
   return (
     <View style={styles.root}>
-      {children}
+      <View style={styles.root} {...coveredAccessibilityProps(covered)}>
+        {children}
+      </View>
       {signedIn && user ? (
         // One controller per session: a new sign-in starts unlocked, a restored one starts locked. It draws
         // the cover of the root window itself; sheets, the in-place file viewer and the modal routes are
@@ -37,6 +62,14 @@ export function LockGate({ children }: { children: ReactNode }) {
     </View>
   );
 }
+
+/**
+ * iOS takes the app-switcher snapshot when the app leaves the foreground; the privacy cover is drawn from
+ * `inactive` on. Android has no `inactive` and its recents thumbnail needs FLAG_SECURE (not available from
+ * JS in Expo Go): a cover on `background` there would only close the system date / time dialogs on every
+ * glance at another app.
+ */
+const PRIVACY_COVER = Platform.OS === 'ios';
 
 /** Owns the lock state and the one biometric prompt; the cover it publishes is drawn in every window. */
 function LockController({
@@ -52,9 +85,14 @@ function LockController({
   // Locked from the first frame of a restored session, so its content never flashes before the prompt.
   // Switching the lock on later in settings does not remount this component, hence does not lock at once.
   const [locked, setLocked] = useState(lockOnMount);
+  // Privacy cover while the app is not in the foreground (no prompt, no lock by itself).
+  const [shielded, setShielded] = useState(false);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<'lockout' | 'failed' | null>(null);
   const backgroundedAt = useRef<number | null>(null);
+  // Bumped on every AppState change: a resume check that resolves after the app has left the foreground
+  // again (a quick switch) must not take the privacy cover down.
+  const appStateSeq = useRef(0);
   const available = useRef(false);
   const prompting = useRef(false);
   const active = locked && enabled;
@@ -69,13 +107,35 @@ function LockController({
       if (!available.current) setLocked(false);
     });
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'background') {
-        backgroundedAt.current = Date.now();
-      } else if (next === 'active') {
-        const lock = shouldLockOnResume({ enabled, available: available.current, signedIn: true }, backgroundedAt.current, Date.now());
-        backgroundedAt.current = null;
-        if (lock) setLocked(true);
+      const seq = ++appStateSeq.current;
+      if (next !== 'active') {
+        if (next === 'background') backgroundedAt.current ??= Date.now();
+        // The biometric prompt itself, Control Center or a call banner also make the app `inactive`: the
+        // cover is drawn, but only a real stay in the background decides about the lock (below).
+        if (PRIVACY_COVER && available.current) setShielded(true);
+        return;
       }
+      const since = backgroundedAt.current;
+      backgroundedAt.current = null;
+      if (since === null) {
+        setShielded(false);
+        return;
+      }
+      const now = Date.now();
+      // The device may have lost its passcode / enrolment while the app was away: read it again, so the
+      // lock is not closed with a prompt that can only fail. The privacy cover stays until then.
+      void getBiometricAvailability().then((availability) => {
+        if (!mounted) return;
+        available.current = availability.status === 'available';
+        const lock = shouldLockOnResume({ enabled, available: available.current, signedIn: true }, since, now);
+        // Locking is always safe, even if the app has left again meanwhile.
+        if (lock) setLocked(true);
+        else if (!available.current) setLocked(false);
+        // Left the foreground again before the check resolved: that newer stay keeps the cover (and decides
+        // about the lock on its own return).
+        if (seq !== appStateSeq.current || AppState.currentState !== 'active') return;
+        setShielded(false);
+      });
     });
     return () => {
       mounted = false;
@@ -91,6 +151,20 @@ function LockController({
     setPending(true);
     setFailure(null);
     const result = await authenticateWithBiometrics({ promptMessage, cancelLabel });
+    if (!result.ok && result.reason === 'unavailable') {
+      // The device can no longer authenticate (passcode or enrolment removed). Re-checked rather than
+      // trusted: a transient error of the prompt must not open the app.
+      const availability = await getBiometricAvailability();
+      prompting.current = false;
+      setPending(false);
+      if (availability.status !== 'available') {
+        available.current = false;
+        setLocked(false);
+      } else {
+        setFailure('failed');
+      }
+      return;
+    }
     prompting.current = false;
     setPending(false);
     if (result.ok) setLocked(false);
@@ -126,9 +200,15 @@ function LockController({
     };
   }, [active]);
 
+  const privacy = !active && shielded && enabled;
   const cover = useMemo(
-    () => (active ? <LockScreen pending={pending} failure={failure} onUnlock={() => void unlock()} onUsePassword={onUsePassword} /> : null),
-    [active, pending, failure, unlock, onUsePassword],
+    () =>
+      active ? (
+        <LockScreen pending={pending} failure={failure} onUnlock={() => void unlock()} onUsePassword={onUsePassword} />
+      ) : privacy ? (
+        <PrivacyScreen />
+      ) : null,
+    [active, privacy, pending, failure, unlock, onUsePassword],
   );
   // Published before paint for the other native windows (sheets, the file viewer, modal routes) …
   useLayoutEffect(() => {
@@ -139,6 +219,21 @@ function LockController({
   // … and rendered right here for the root window, so a restored session is covered from its very first
   // frame (a published cover reaches its slots one commit later).
   return cover;
+}
+
+/** The plain cover of an app that is not in the foreground: the logo, nothing to read or press. */
+function PrivacyScreen() {
+  const themed = useStyles();
+  const insets = useWindowInsets();
+  return (
+    <View
+      accessibilityViewIsModal
+      testID="privacy-screen"
+      style={[StyleSheet.absoluteFill, themed.cover, themed.privacy, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+    >
+      <Logo size={28} />
+    </View>
+  );
 }
 
 /** The cover itself: presentational, because one instance is drawn per native window. */
@@ -194,6 +289,7 @@ const useStyles = makeStyles((t) => ({
     paddingHorizontal: t.space.gutter,
     backgroundColor: t.colors.pageBg,
   },
+  privacy: { justifyContent: 'center' },
   center: { alignItems: 'center', gap: t.space.md, maxWidth: 360 },
   notice: { alignSelf: 'stretch', marginTop: t.space.sm },
   actions: { width: '100%', maxWidth: 416, alignItems: 'center', gap: t.space.field },

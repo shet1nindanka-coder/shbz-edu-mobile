@@ -36,7 +36,7 @@ import {
   type TopicNumberFacts,
   type TopicNumbersChangePlan,
 } from "@/domain/topic-numbers-change";
-import { UploadValidationError, validateUploadMetadata } from "@/domain/upload-validation";
+import { UploadValidationError, validateUploadMetadata, validateUploadedBytes } from "@/domain/upload-validation";
 import { format } from "@/lib/i18n/format";
 
 import type { MockContext } from "../context";
@@ -198,7 +198,7 @@ export function createContent(ctx: MockContext): ContentApi {
   type ImportContext = { parsed: ParsedImport; topic: Topic | null };
 
   /** Everything `POST /topic-import` does before the mode-specific part (07 §3.10). */
-  const prepareImport = (input: ImportInput): ImportContext => {
+  const prepareImport = (input: ImportInput, mode: "preview" | "apply"): ImportContext => {
     auth.requireDeveloper();
 
     const target = input?.target as { topicId?: unknown; createTopic?: unknown } | undefined;
@@ -214,8 +214,12 @@ export function createContent(ctx: MockContext): ContentApi {
     limits.enforce("api:topic-import");
 
     const text = typeof input?.text === "string" ? input.text : "";
-    // The site refuses by `Content-Length`; the text is all the mock has of the body.
-    const tooBig = text.length > LIMITS.importTextMaxBytes || (text.length * 3 > LIMITS.importTextMaxBytes && utf8ByteLength(text) > LIMITS.importTextMaxBytes);
+    // The site refuses by `Content-Length` of the JSON body its form sends, where every backslash, quote and
+    // newline of the text is escaped — LaTeX-heavy files grow noticeably. Measure that same body.
+    const body = createTopic
+      ? { mode, text, createTopic: true }
+      : { mode, text, topicId: typeof target?.topicId === "string" ? target.topicId : "", overwriteFilled: input?.overwriteFilled === true };
+    const tooBig = text.length > LIMITS.importTextMaxBytes || utf8ByteLength(JSON.stringify(body)) > LIMITS.importTextMaxBytes;
     if (tooBig) {
       return errors.fail({ status: 413, code: "fileTooBig", message: (dict) => dict.apiContent.topicImport.fileTooBig });
     }
@@ -307,10 +311,7 @@ export function createContent(ctx: MockContext): ContentApi {
         return errors.fail({ status: 400, code: "fileRequired", message: (dict) => dict.apiContent.uploads.fileRequired });
       }
 
-      let metadata: ReturnType<typeof validateUploadMetadata>;
-      try {
-        metadata = validateUploadMetadata(String(file.name ?? ""), String(file.mimeType ?? ""), size, ctx.locale());
-      } catch (error) {
+      const refuse = (error: unknown): never => {
         if (!(error instanceof UploadValidationError)) {
           return errors.fail({ status: 500, code: "uploadFailed", message: (dict) => dict.apiContent.uploads.uploadFailed });
         }
@@ -322,10 +323,30 @@ export function createContent(ctx: MockContext): ContentApi {
         if (message === texts.badChars) return errors.fail({ status: 400, code: "uploadBadName", message });
         if (message === texts.tooBig) return errors.fail({ status: 413, code: "uploadTooLarge", message });
         if (message === texts.emptySize || message === texts.sizeMismatch) return errors.fail({ status: 400, code: "uploadRejected", message });
+        // `extension`, `mimeMismatch` and `signature`.
         return errors.fail({ status: 400, code: "uploadUnsupportedType", message });
+      };
+
+      let metadata: ReturnType<typeof validateUploadMetadata>;
+      try {
+        metadata = validateUploadMetadata(String(file.name ?? ""), String(file.mimeType ?? ""), size, ctx.locale());
+      } catch (error) {
+        return refuse(error);
       }
 
-      // The transfer. The mock has no bytes to send, so the bar moves in steps spread over one more slice of
+      // The site's `saveUploadedFile` then checks the content: the real size equals the declared one and the
+      // magic bytes match the extension. The mock checks the bytes it can read (a picked file, never a sample).
+      const bytes = await ctx.files.readUploadBytes(file.uri);
+      ctx.throwIfAborted(opts?.signal);
+      if (bytes !== null) {
+        try {
+          validateUploadedBytes(bytes, String(file.name ?? ""), String(file.mimeType ?? ""), size, ctx.locale());
+        } catch (error) {
+          return refuse(error);
+        }
+      }
+
+      // The transfer. Nothing is sent anywhere, so the bar moves in steps spread over one more slice of
       // the simulated latency — the upload can be watched and cancelled half-way. Zero latency (tests): no delay.
       // SPEC-GAP: the spec defines `onProgress` (0..100, bytes sent / total) but no mock timing for it.
       const stepMs = Math.floor(Math.max(0, store.controls.latency.maxMs) / UPLOAD_PROGRESS_STEPS.length);
@@ -648,7 +669,7 @@ export function createContent(ctx: MockContext): ContentApi {
     },
 
     async previewImport(input) {
-      const { parsed, topic } = prepareImport(input);
+      const { parsed, topic } = prepareImport(input, "preview");
       const common = {
         totalInFile: parsed.numbers.length,
         sample: parsed.numbers.slice(0, IMPORT_SAMPLE_SIZE),
@@ -684,7 +705,7 @@ export function createContent(ctx: MockContext): ContentApi {
     },
 
     async applyImport(input) {
-      const { parsed, topic } = prepareImport(input);
+      const { parsed, topic } = prepareImport(input, "apply");
       const overwriteFilled = input?.overwriteFilled === true;
 
       if (!topic) {

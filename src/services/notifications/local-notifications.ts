@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { AndroidImportance, IosAuthorizationStatus } from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import type { LocalNotifications, ReminderPermissionState } from './local-notifications.types';
+import type { ExactTimingState, LocalNotifications, ReminderPermissionState } from './local-notifications.types';
 import { REMINDER_ID_PREFIX, diffReminders, reminderIdentifier, type LocalReminder, type ReminderLink } from './reminders';
 
 /** Android channel of every reminder. The id is stable; the visible name follows the interface language. */
@@ -24,6 +24,17 @@ function linkOf(response: Notifications.NotificationResponse | null): ReminderLi
   if (typeof link !== 'object' || link === null) return null;
   return typeof (link as { screen?: unknown }).screen === 'string' ? (link as ReminderLink) : null;
 }
+
+function isReminder(identifier: string): boolean {
+  return identifier.startsWith(`${REMINDER_ID_PREFIX}:`);
+}
+
+function toExactTiming(response: { granted: boolean; canAskAgain: boolean }): ExactTimingState {
+  return { status: response.granted ? 'granted' : 'denied', canAskAgain: response.canAskAgain };
+}
+
+/** What the last `sync` wanted on the device: rescheduled when exact timing is granted later. */
+let lastWanted: readonly LocalReminder[] = [];
 
 let handlerInstalled = false;
 
@@ -95,6 +106,7 @@ export const localNotifications: LocalNotifications = {
         reminders,
         keep,
       );
+      lastWanted = reminders;
       await Promise.all(plan.cancel.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
       for (const reminder of plan.schedule) await schedule(reminder);
     } catch {
@@ -103,16 +115,62 @@ export const localNotifications: LocalNotifications = {
   },
 
   async cancelAll() {
+    lastWanted = [];
     try {
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       await Promise.all(
         scheduled
-          .filter((request) => request.identifier.startsWith(`${REMINDER_ID_PREFIX}:`))
+          .filter((request) => isReminder(request.identifier))
           .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)),
       );
     } catch {
       // Nothing scheduled or the module is unavailable.
     }
+  },
+
+  async removeAll() {
+    await localNotifications.cancelAll();
+    try {
+      // A delivered notification keeps the identifier of its request.
+      const presented = await Notifications.getPresentedNotificationsAsync();
+      await Promise.all(
+        presented
+          .filter((notification) => isReminder(notification.request.identifier))
+          .map((notification) => Notifications.dismissNotificationAsync(notification.request.identifier)),
+      );
+    } catch {
+      // Nothing in the tray or the module is unavailable.
+    }
+  },
+
+  async getExactTiming() {
+    if (Platform.OS !== 'android') return { status: 'granted', canAskAgain: false };
+    try {
+      return toExactTiming(await Notifications.getExactAlarmPermissionsAsync());
+    } catch {
+      return { status: 'unavailable', canAskAgain: false };
+    }
+  },
+
+  async requestExactTiming() {
+    if (Platform.OS !== 'android') return { status: 'granted', canAskAgain: false };
+    let state: ExactTimingState;
+    try {
+      state = toExactTiming(await Notifications.requestExactAlarmPermissionsAsync());
+    } catch {
+      // The host app does not declare SCHEDULE_EXACT_ALARM (e.g. Expo Go): nothing can be asked.
+      return { status: 'unavailable', canAskAgain: false };
+    }
+    if (state.status === 'granted') {
+      try {
+        // An alarm keeps the mode it was set with: the same request scheduled again replaces it as exact.
+        const scheduled = new Set((await Notifications.getAllScheduledNotificationsAsync()).map((request) => request.identifier));
+        for (const reminder of lastWanted) if (scheduled.has(reminderIdentifier(reminder))) await schedule(reminder);
+      } catch {
+        // The next sync plans them again anyway.
+      }
+    }
+    return state;
   },
 
   listenForOpens(onOpen) {

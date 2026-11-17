@@ -15,7 +15,14 @@ import { ManualCompose } from './lessons/manual-compose';
 import { TargetChooser, type LessonTarget } from './lessons/target-chooser';
 
 /** Route params of `planner.lessonNew` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
-export type PlannerLessonNewScreenProps = ScreenParams['planner.lessonNew'];
+export type PlannerLessonNewScreenProps = ScreenParams['planner.lessonNew'] & {
+  /**
+   * Told whether a target picked on the chooser is open — a step inside this screen that "back" closes.
+   * The route turns the iOS back gesture off meanwhile, so it cannot leave the screen while the app bar
+   * arrow and Android's back return to the chooser.
+   */
+  onInnerStepChange?: (active: boolean) => void;
+};
 
 type ComposeMode = 'ai' | 'manual';
 
@@ -24,7 +31,7 @@ type ComposeMode = 'ai' | 'manual';
  * neither id — choose a group or a student; `groupId` — the AI form for the group; `studentId` — an
  * individual lesson with the "AI selection / pick manually" switch.
  */
-export function PlannerLessonNewScreen({ groupId, studentId }: PlannerLessonNewScreenProps) {
+export function PlannerLessonNewScreen({ groupId, studentId, onInnerStepChange }: PlannerLessonNewScreenProps) {
   const { dict } = useI18n();
   const t = dict.planner.lessonNew;
   const routeTarget: LessonTarget | null = groupId ? { groupId } : studentId ? { studentId } : null;
@@ -32,6 +39,10 @@ export function PlannerLessonNewScreen({ groupId, studentId }: PlannerLessonNewS
   const [picked, setPicked] = useState<LessonTarget | null>(null);
   const target = routeTarget ?? picked;
   const pickedHere = routeTarget === null && picked !== null;
+
+  useEffect(() => {
+    onInnerStepChange?.(pickedHere);
+  }, [pickedHere, onInnerStepChange]);
 
   useEffect(() => {
     if (!pickedHere) return undefined;

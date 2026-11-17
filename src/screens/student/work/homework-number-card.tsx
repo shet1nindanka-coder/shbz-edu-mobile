@@ -38,7 +38,15 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
   const errorMessage = note.error ? (wait > 0 ? `${note.error.message} ${waitText.retryIn(wait)}` : note.error.message) : null;
 
   const statusLine =
-    note.status === 'saving' ? t.saving : note.status === 'queued' ? m.student.note.queued : note.status === 'saved' ? t.saved : null;
+    note.status === 'saving'
+      ? t.saving
+      : note.status === 'queued'
+        ? m.student.note.queued
+        : note.status === 'retrying'
+          ? m.student.note.retrying
+          : note.status === 'saved'
+            ? t.saved
+            : null;
 
   return (
     <Card variant="outline" padded={16} selected={highlighted} style={styles.card} testID={`number-card-${number.number}`}>

@@ -54,10 +54,10 @@ export function GroupsListScreen() {
 
   const header = (
     <View style={styles.header}>
-      {notice === 'deleted' ? (
+      {notice ? (
         <Notice
-          tone="success"
-          text={t.notices.deleted}
+          tone={notice === 'deleted' ? 'success' : 'error'}
+          text={notice === 'deleted' ? t.notices.deleted : t.notices.missing}
           onDismiss={dismissNotice}
           dismissLabel={m.common.actions.close}
           testID="groups-notice"

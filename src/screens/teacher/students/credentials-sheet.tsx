@@ -3,7 +3,7 @@ import { AccessibilityInfo, Platform, Share, View } from 'react-native';
 
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { BottomSheet, Button, Enter, Icon, PressableScale, Text, useCopyFeedback } from '@/ui';
+import { BottomSheet, Button, Enter, Icon, isOverlayCovered, PressableScale, Text, useCopyFeedback } from '@/ui';
 
 import { buildCredentialLines, credentialsMessage, type CredentialLine } from './credentials-message';
 import { SITE_HOST } from './site-host';
@@ -67,7 +67,9 @@ export function CredentialsSheet({ credentials, title, onClose }: CredentialsShe
 
   // A dismissed share sheet is not an error; a refusal leaves the copy buttons as the way out. Returned to
   // Button, so the press lock lasts until the sheet is closed (no second sheet on a double tap).
-  const share = () => Share.share({ message }).catch(() => undefined);
+  // Never presented while the app lock covers the sheet: the system sheet would open above the cover with
+  // the password in it (iOS hand-off).
+  const share = () => (isOverlayCovered() ? Promise.resolve(undefined) : Share.share({ message }).catch(() => undefined));
 
   const close = () => {
     setFeedback(null);

@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, type TextInputInstance } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Card, Dialog, IconButton, Segmented, Text, TextArea, TextField } from '@/ui';
@@ -40,6 +41,8 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const lock = useRetryLock();
+  // «Далее» on the title moves to the text instead of closing the keyboard.
+  const bodyRef = useRef<TextInputInstance>(null);
 
   const picked = pickedStudents(students, pickedIds);
 
@@ -78,10 +81,13 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
           placeholder={t.titlePlaceholder}
           disabled={send.isPending}
           returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => bodyRef.current?.focus()}
           labelAside={<Counter length={title.length} max={BROADCAST_TITLE_MAX} />}
           testID="broadcast-title"
         />
         <TextArea
+          ref={bodyRef}
           label={t.bodyLabel}
           value={body}
           onChangeText={setBody}
@@ -164,7 +170,8 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
             fullWidth
             testID="broadcast-send"
           />
-          {send.isPending ? null : <ResultLine result={result} waitSeconds={lock.seconds} testID="broadcast-result" />}
+          {send.isPending ? null : <ResultLine result={result} testID="broadcast-result" />}
+          <RetryWaitLine seconds={lock.seconds} testID="broadcast-wait" />
         </View>
       </View>
 

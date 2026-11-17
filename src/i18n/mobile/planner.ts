@@ -18,6 +18,8 @@ const ru = {
     expand: "Показать набор: {name}",
     collapse: "Свернуть набор: {name}",
     noFreeNumbers: "В этой теме все номера уже в наборе.",
+    // the topic itself is empty (`m.teacher.assign.noNumbers` on the assign tab says the same)
+    noNumbers: "В этой теме пока нет номеров.",
     bankLoading: "Загружаем банк номеров…",
     bankFailed: "Не удалось загрузить банк номеров.",
     numberPlaceholder: "Сначала выберите тему"
@@ -76,6 +78,7 @@ const en: typeof ru = {
     expand: "Show the set: {name}",
     collapse: "Collapse the set: {name}",
     noFreeNumbers: "Every problem of this topic is already in the set.",
+    noNumbers: "This topic has no problems yet.",
     bankLoading: "Loading the problem bank…",
     bankFailed: "Could not load the problem bank.",
     numberPlaceholder: "Pick a topic first"

@@ -43,6 +43,16 @@ export function freeBankNumbers(topic: LessonBankTopic | undefined, existingIds:
   return topic.numbers.filter((number) => !taken.has(number.id));
 }
 
+/**
+ * Why the number select of the "add a problem" sheet offers nothing: the topic has no numbers at all, or
+ * every one of them is already in the set; `null` while there is something to pick (or no topic yet).
+ * The two must not share a line: for an empty topic "all already in the set" contradicts an empty set.
+ */
+export function bankNumbersGap(topic: LessonBankTopic | undefined, freeCount: number): 'topicEmpty' | 'allInSet' | null {
+  if (!topic || freeCount > 0) return null;
+  return topic.numbers.length === 0 ? 'topicEmpty' : 'allInSet';
+}
+
 // ───────────────────────────── cache patches ─────────────────────────────
 
 type LessonsData = { lessons: TeacherStudentLesson[] };

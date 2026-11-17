@@ -264,12 +264,9 @@ export function CreateAccountSheet({ visible, teachers, onClose, onCreated, onTe
             />
           ) : null}
         </View>
-        {formError ? (
-          <View style={styles.error}>
-            <Notice tone="error" text={formError} testID="create-account-error" />
-            <RetryWaitLine seconds={limit.seconds} testID="create-account-wait" />
-          </View>
-        ) : null}
+        {formError ? <Notice tone="error" text={formError} testID="create-account-error" /> : null}
+        {/* Outside the error: editing a field clears the error, the lock stays. */}
+        <RetryWaitLine wait={limit} testID="create-account-wait" />
       </View>
     </BottomSheet>
   );
@@ -278,5 +275,4 @@ export function CreateAccountSheet({ visible, teachers, onClose, onCreated, onTe
 const useStyles = makeStyles((t) => ({
   form: { gap: t.space.field, paddingBottom: t.space.md },
   password: { gap: t.space.sm },
-  error: { gap: t.space.xs },
 }));

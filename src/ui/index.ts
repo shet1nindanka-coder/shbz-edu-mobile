@@ -5,7 +5,7 @@ export { AppBar, type AppBarProps } from './app-bar';
 export { Avatar, type AvatarProps } from './avatar';
 export { Badge, type BadgeProps, type BadgeTone } from './badge';
 export { BottomSheet, type BottomSheetProps } from './bottom-sheet';
-export { OverlayCoverSlot, setOverlayCover, useOverlayCovered } from './overlay-cover';
+export { OverlayCoverSlot, coveredAccessibilityProps, isOverlayCovered, setOverlayCover, useOverlayCovered } from './overlay-cover';
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './button';
 export { Card, type CardProps, type CardVariant } from './card';
 export { CheckMark, type CheckMarkProps } from './check-mark';

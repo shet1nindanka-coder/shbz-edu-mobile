@@ -243,14 +243,26 @@ describe("content: previewImport", () => {
     assert.equal((await rejects(mock.api.content.previewImport({ text: LINEAR_FILE, target: {} as unknown as ImportTarget }), "topicMissing", 400)).message, "No topic was specified for the import.");
   });
 
-  it("refuses a text larger than 2 MiB", async () => {
+  it("refuses a request body larger than 2 MiB", async () => {
     const mock = await devMock();
-    // Exactly 2 MiB is read (and fails as a file), one byte more is 413.
-    await rejects(mock.api.content.previewImport({ text: "x".repeat(2 * MIB), target: CREATE }), "importInvalid", 400);
+    // The site measures the JSON body its form sends ({ mode, text, createTopic | topicId, overwriteFilled }),
+    // not the bare text: a body of exactly 2 MiB is read (and fails as a file), one byte more is 413.
+    const createOverhead = JSON.stringify({ mode: "preview", text: "", createTopic: true }).length;
+    await rejects(mock.api.content.previewImport({ text: "x".repeat(2 * MIB - createOverhead), target: CREATE }), "importInvalid", 400);
+    await rejects(mock.api.content.previewImport({ text: "x".repeat(2 * MIB - createOverhead + 1), target: CREATE }), "fileTooBig", 413);
     const tooBig = await rejects(mock.api.content.previewImport({ text: "x".repeat(2 * MIB + 1), target: CREATE }), "fileTooBig", 413);
     assert.equal(tooBig.message, "Файл слишком большой. Разбейте задачник на части по 200–300 задач.");
+    // "apply" is two characters shorter than "preview"; a topic target carries its id and the overwrite flag.
+    const applyOverhead = JSON.stringify({ mode: "apply", text: "", topicId: "top_linear", overwriteFilled: true }).length;
+    await rejects(mock.api.content.applyImport({ text: "x".repeat(2 * MIB - applyOverhead), target: LINEAR, overwriteFilled: true }), "importInvalid", 400);
+    await rejects(mock.api.content.applyImport({ text: "x".repeat(2 * MIB - applyOverhead + 1), target: LINEAR, overwriteFilled: true }), "fileTooBig", 413);
+    // The limiter allows 10 calls a minute.
+    mock.clock.advance(60_000);
+    // Escaping counts: a text of 1.2 MiB of backslashes doubles in the body and is over the limit.
+    await rejects(mock.api.content.previewImport({ text: "\\".repeat(1.2 * MIB), target: CREATE }), "fileTooBig", 413);
+    await rejects(mock.api.content.previewImport({ text: "\\".repeat(0.9 * MIB), target: CREATE }), "importInvalid", 400);
     // Bytes, not characters: Cyrillic takes two bytes per letter.
-    await rejects(mock.api.content.previewImport({ text: "я".repeat(MIB), target: CREATE }), "importInvalid", 400);
+    await rejects(mock.api.content.previewImport({ text: "я".repeat(MIB - createOverhead), target: CREATE }), "importInvalid", 400);
     await rejects(mock.api.content.previewImport({ text: "я".repeat(MIB + 1), target: LINEAR }), "fileTooBig", 413);
     await rejects(mock.api.content.applyImport({ text: "я".repeat(MIB + 1), target: CREATE }), "fileTooBig", 413);
     mock.setLocale("en");

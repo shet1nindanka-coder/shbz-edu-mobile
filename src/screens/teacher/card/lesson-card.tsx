@@ -145,11 +145,10 @@ export function LessonCard({
       {expanded ? (
         <View style={styles.body}>
           {error ? (
-            <View style={styles.errorBlock}>
-              <Notice tone="error" text={error} onDismiss={onDismissError} dismissLabel={m.common.actions.close} testID={`student-lesson-error-${lesson.id}`} />
-              <RetryWaitLine seconds={waitSeconds} />
-            </View>
+            <Notice tone="error" text={error} onDismiss={onDismissError} dismissLabel={m.common.actions.close} testID={`student-lesson-error-${lesson.id}`} />
           ) : null}
+          {/* Outside the error: the notice can be closed while the buckets stay locked for every lesson. */}
+          <RetryWaitLine seconds={waitSeconds} testID={`student-lesson-wait-${lesson.id}`} />
 
           {pending ? (
             <View accessibilityRole="progressbar" accessibilityLabel={t.aiPicking} accessibilityLiveRegion="polite" style={styles.pending} testID={`student-lesson-pending-${lesson.id}`}>
@@ -191,7 +190,13 @@ export function LessonCard({
             </Text>
           ) : null}
 
-          {handout.failure?.request.lessonId === lesson.id ? <HandoutNotice handout={handout} testID={`student-lesson-handout-error-${lesson.id}`} /> : null}
+          {handout.failure?.request.lessonId === lesson.id ? (
+            <HandoutNotice handout={handout} testID={`student-lesson-handout-error-${lesson.id}`} />
+          ) : (
+            // The PDF bucket is shared by every lesson: a dismissed notice, or one on another lesson, still
+            // leaves this card's «Скачать PDF» locked — say for how long.
+            <RetryWaitLine wait={handout.wait} testID={`student-lesson-pdf-wait-${lesson.id}`} />
+          )}
 
           <View style={styles.actions}>
             <Button
@@ -226,7 +231,6 @@ const useStyles = makeStyles((t) => ({
   title: { flex: 1, minWidth: 0 },
   start: { alignSelf: 'flex-start' },
   body: { gap: t.space.field },
-  errorBlock: { gap: t.space.xs },
   pending: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: 24 },
   pendingText: { flex: 1 },
   part: { gap: t.space.sm },

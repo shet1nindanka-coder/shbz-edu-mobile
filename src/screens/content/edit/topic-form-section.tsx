@@ -1,4 +1,5 @@
-import { View } from 'react-native';
+import { useRef } from 'react';
+import { View, type TextInputInstance } from 'react-native';
 
 import type { TopicDetail } from '@/api/types';
 import type { ViewerFile } from '@/components/files';
@@ -28,6 +29,8 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
   const { dict, m } = useI18n();
   const t = dict.topics.edit;
   const locked = form.phase !== 'idle';
+  // «Далее» on the title moves to the description instead of closing the keyboard.
+  const descriptionRef = useRef<TextInputInstance>(null);
 
   return (
     <View style={styles.root} testID="edit-form">
@@ -42,9 +45,12 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
           error={form.missing === 'title' ? m.content.edit.titleRequired : null}
           disabled={locked}
           returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => descriptionRef.current?.focus()}
           testID="edit-title"
         />
         <TextArea
+          ref={descriptionRef}
           label={t.descriptionLabel}
           value={form.values.description}
           onChangeText={form.setDescription}

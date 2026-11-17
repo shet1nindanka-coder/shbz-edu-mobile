@@ -2,6 +2,7 @@ import { View } from 'react-native';
 
 import type { ReasoningEffort } from '@/api/types';
 import { REASONING_EFFORTS } from '@/api/types';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Card, IconButton, Select, Switch, Text, TextButton, TextField } from '@/ui';
@@ -187,7 +188,7 @@ export function SettingsSaveBar({ form }: { form: SettingsFormState }) {
           ) : blocked ? (
             <ResultLine result={{ ok: false, message: m.developer.settings.fixErrors }} testID="settings-status" />
           ) : form.result ? (
-            <ResultLine result={form.result} waitSeconds={form.waitSeconds} testID="settings-status" />
+            <ResultLine result={form.result} testID="settings-status" />
           ) : form.dirty ? (
             <Text variant="captionMedium" color="yellowText" testID="settings-status">
               {m.developer.settings.unsaved}
@@ -212,6 +213,8 @@ export function SettingsSaveBar({ form }: { form: SettingsFormState }) {
         fullWidth
         testID="settings-save"
       />
+      {/* Under the button, not in the status: editing a field clears the status, the lock stays. */}
+      <RetryWaitLine seconds={form.waitSeconds} testID="settings-wait" />
     </View>
   );
 }

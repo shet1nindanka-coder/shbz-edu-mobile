@@ -1,4 +1,5 @@
-import { View } from 'react-native';
+import { useRef } from 'react';
+import { View, type TextInputInstance } from 'react-native';
 
 import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
@@ -17,6 +18,8 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
   const { dict } = useI18n();
   const t = dict.topics.createForm;
   const hint = state.hint === 'uploading' ? t.hintUploading : state.hint === 'ready' ? t.hintReady : t.hintStart;
+  // «Далее» on the title moves to the description instead of closing the keyboard.
+  const descriptionRef = useRef<TextInputInstance>(null);
 
   return (
     <View style={styles.root} testID="manual-create-form">
@@ -27,9 +30,12 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
         placeholder={t.titlePlaceholder}
         disabled={state.submitting}
         returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => descriptionRef.current?.focus()}
         testID="create-title"
       />
       <TextArea
+        ref={descriptionRef}
         label={`${t.descriptionLabel} ${t.optional}`}
         value={state.description}
         onChangeText={state.setDescription}

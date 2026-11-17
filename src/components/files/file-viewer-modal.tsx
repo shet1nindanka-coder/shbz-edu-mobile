@@ -1,9 +1,9 @@
 // `FileViewer` in a full-screen modal, for screens that open a file in place instead of navigating to
 // the `shared.fileViewer` route. Closes on the close button and on the system back gesture / Esc.
-import { Modal, StyleSheet } from 'react-native';
+import { Modal, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { OverlayCoverSlot, WindowInsetsScope, useOverlayCovered } from '@/ui';
+import { OverlayCoverSlot, WindowInsetsScope, coveredAccessibilityProps, useOverlayCovered } from '@/ui';
 
 import { FileViewer, type FileViewerProps } from './file-viewer';
 
@@ -26,7 +26,10 @@ export function FileViewerModal({ visible, onClose, ...viewer }: FileViewerModal
       {/* A modal is a separate native root: gestures need their own root view inside it. */}
       <GestureHandlerRootView style={styles.root}>
         {/* Its own window: the viewer pads the device insets, not those of the screen that opened it. */}
-        <WindowInsetsScope>{visible ? <FileViewer {...viewer} onClose={onClose} /> : null}</WindowInsetsScope>
+        {/* Under the cover the viewer leaves the accessibility tree; only the slot below stays reachable. */}
+        <View style={styles.root} {...coveredAccessibilityProps(covered)}>
+          <WindowInsetsScope>{visible ? <FileViewer {...viewer} onClose={onClose} /> : null}</WindowInsetsScope>
+        </View>
         {/* The app-wide cover (biometric lock) is repeated inside this window; the root one cannot reach it. */}
         <OverlayCoverSlot />
       </GestureHandlerRootView>

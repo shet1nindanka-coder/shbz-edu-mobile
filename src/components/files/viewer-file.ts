@@ -1,6 +1,7 @@
 // What the file components are given: a reference, never a URL (docs/spec/00-unified-contract.md —
 // "a response never contains a URL"). Pure helpers, no React.
 import type { DownloadableFile } from '@/api/client';
+import type { FileRef } from '@/api/types';
 import { getFileExtension } from '@/domain/files';
 import { fileKindOf, type FileKind } from '@/services/files/file-names';
 import type { IconName } from '@/ui';
@@ -21,8 +22,37 @@ export type ViewerFile = {
   localUri?: string;
 };
 
+/**
+ * The name to show for a file. A file the viewer route knows by its id alone (a deep link) has an empty
+ * name — the link's own name is never shown (`viewer-handoff.ts`) — and gets the neutral word instead.
+ */
+export function viewerFileName(file: Pick<ViewerFile, 'originalName'>, untitled: string): string {
+  return file.originalName.trim() === '' ? untitled : file.originalName;
+}
+
 export function viewerFileKind(file: Pick<ViewerFile, 'mimeType'>): FileKind {
   return fileKindOf(file.mimeType);
+}
+
+/** What `FileService.describe` answered for a file the viewer knows by id alone (`useDescribedFiles`). */
+export type FileDescription =
+  | { status: 'ready'; ref: FileRef }
+  /** `notFound` — the service answered `404 fileNotFound` (missing or not readable): nothing to retry. */
+  | { status: 'failed'; notFound: boolean };
+
+/**
+ * A file known by id alone, typed from the stored file instead of its link: the stored name, type and size
+ * once described; no name and no type while the description is pending or after it failed — the link's own
+ * name and type are never used (a PDF linked as `text/html` or as `image/png` is still a PDF).
+ */
+export function applyDescription(file: ViewerFile, description: FileDescription | undefined): ViewerFile {
+  const base: ViewerFile = { id: file.id, originalName: '', mimeType: '' };
+  if (file.localUri !== undefined) base.localUri = file.localUri;
+  if (description?.status !== 'ready') return base;
+  const { originalName, mimeType, size } = description.ref;
+  const described: ViewerFile = { ...base, originalName, mimeType };
+  if (typeof size === 'number' && Number.isFinite(size) && size > 0) described.size = size;
+  return described;
 }
 
 /** The reference `FileService.download` accepts. */

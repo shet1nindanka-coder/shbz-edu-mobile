@@ -58,127 +58,132 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
   );
 
   return (
-    <Card padded={false} style={styles.card} testID="attendance-table">
-      <View style={styles.names}>
-        <View style={[styles.headerRow, styles.headerCell, styles.nameCell]}>
-          <Text variant="kickerSm" numberOfLines={1}>
-            {t.student}
-          </Text>
-        </View>
-        {members.map((member) => (
-          <View key={member.id} style={[styles.bodyRow, styles.rowCell, styles.nameCell]}>
-            <Text variant="captionStrong" color="textStrong" numberOfLines={2}>
-              {member.name}
+    <Card padded={false} testID="attendance-table">
+      {/* The clip lives on an inner box: on iOS `overflow: hidden` on the card itself would clip its own
+          layer shadow (clipsToBounds), and this card would be the only one without one. */}
+      <View style={styles.clip}>
+        <View style={styles.names}>
+          <View style={[styles.headerRow, styles.headerCell, styles.nameCell]}>
+            <Text variant="kickerSm" numberOfLines={1}>
+              {t.student}
             </Text>
           </View>
-        ))}
-      </View>
-
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.scroll}
-        // The newest lessons and the totals are what a teacher marks: start at the right edge, once.
-        onContentSizeChange={() => {
-          if (scrolledToEnd.current) return;
-          scrolledToEnd.current = true;
-          scrollRef.current?.scrollToEnd({ animated: false });
-        }}
-        testID="attendance-table-scroll"
-      >
-        <View>
-          <View style={[styles.row, styles.headerRow]}>
-            {columns.map(({ lesson, date }) => {
-              const label = (
-                <Text variant="captionBold" color={lesson.status === 'ACTIVE' ? 'accentSolid' : 'kicker'} tabular>
-                  {date}
-                </Text>
-              );
-              const title = `${lesson.title} · ${formatDateTime(lesson.startsAt, locale)}`;
-              return onOpenLesson ? (
-                <PressableScale
-                  key={lesson.id}
-                  accessibilityRole="link"
-                  accessibilityLabel={format(m.groups.attendance.openLessonAria, {
-                    title: lesson.title,
-                    date: formatDateTime(lesson.startsAt, locale),
-                  })}
-                  onPress={() => onOpenLesson(lesson)}
-                  scaleTo={1}
-                  style={[styles.headerCell, styles.lessonCell]}
-                  pressedStyle={styles.pressed}
-                  testID={`attendance-lesson-${lesson.id}`}
-                >
-                  {label}
-                </PressableScale>
-              ) : (
-                <View key={lesson.id} accessible accessibilityLabel={title} style={[styles.headerCell, styles.lessonCell]}>
-                  {label}
-                </View>
-              );
-            })}
-            <View style={[styles.headerCell, styles.totalCell]}>
-              <Text variant="kickerSm" numberOfLines={1}>
-                {t.total}
-              </Text>
-            </View>
-          </View>
-
           {members.map((member) => (
-            <View key={member.id} style={[styles.row, styles.bodyRow]}>
-              {columns.map(({ lesson, cells, date }) => {
-                const cell = cells.get(member.id);
-                if (!cell) {
-                  return (
-                    <View
-                      key={lesson.id}
-                      accessible
-                      accessibilityLabel={`${member.name}, ${date}: ${t.notParticipated}`}
-                      style={[styles.rowCell, styles.lessonCell]}
-                    >
-                      <Text variant="bodyBold" color="textSoft">
-                        ·
-                      </Text>
-                    </View>
-                  );
-                }
-                const saving = busy.has(cell.participantId);
-                return (
-                  <PressableScale
-                    key={lesson.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={format(m.groups.attendance.cellAria, {
-                      name: member.name,
-                      date,
-                      mark: labels[cell.attendance].label,
-                    })}
-                    accessibilityState={{ disabled: disabled || saving, busy: saving }}
-                    disabled={disabled || saving}
-                    onPress={() => onToggle(lesson, member, cell)}
-                    onLongPress={() => onChoose(lesson, member, cell)}
-                    style={[styles.rowCell, styles.lessonCell]}
-                    testID={`attendance-cell-${lesson.id}-${member.id}`}
-                  >
-                    <AttendancePill value={cell.attendance} label={labels[cell.attendance].short} busy={saving || disabled} />
-                  </PressableScale>
-                );
-              })}
-              <View style={[styles.rowCell, styles.totalCell]} testID={`attendance-total-${member.id}`}>
-                <Text variant="caption" color="textMuted" tabular numberOfLines={1}>
-                  {attendanceTotalText(memberAttendanceSummary(member.id, lessons))}
-                </Text>
-              </View>
+            <View key={member.id} style={[styles.bodyRow, styles.rowCell, styles.nameCell]}>
+              <Text variant="captionStrong" color="textStrong" numberOfLines={2}>
+                {member.name}
+              </Text>
             </View>
           ))}
         </View>
-      </ScrollView>
+
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.scroll}
+          // The newest lessons and the totals are what a teacher marks: start at the right edge, once.
+          onContentSizeChange={() => {
+            if (scrolledToEnd.current) return;
+            scrolledToEnd.current = true;
+            scrollRef.current?.scrollToEnd({ animated: false });
+          }}
+          testID="attendance-table-scroll"
+        >
+          <View>
+            <View style={[styles.row, styles.headerRow]}>
+              {columns.map(({ lesson, date }) => {
+                const label = (
+                  <Text variant="captionBold" color={lesson.status === 'ACTIVE' ? 'accentSolid' : 'kicker'} tabular>
+                    {date}
+                  </Text>
+                );
+                const title = `${lesson.title} · ${formatDateTime(lesson.startsAt, locale)}`;
+                return onOpenLesson ? (
+                  <PressableScale
+                    key={lesson.id}
+                    accessibilityRole="link"
+                    accessibilityLabel={format(m.groups.attendance.openLessonAria, {
+                      title: lesson.title,
+                      date: formatDateTime(lesson.startsAt, locale),
+                    })}
+                    onPress={() => onOpenLesson(lesson)}
+                    scaleTo={1}
+                    style={[styles.headerCell, styles.lessonCell]}
+                    pressedStyle={styles.pressed}
+                    testID={`attendance-lesson-${lesson.id}`}
+                  >
+                    {label}
+                  </PressableScale>
+                ) : (
+                  <View key={lesson.id} accessible accessibilityLabel={title} style={[styles.headerCell, styles.lessonCell]}>
+                    {label}
+                  </View>
+                );
+              })}
+              <View style={[styles.headerCell, styles.totalCell]}>
+                <Text variant="kickerSm" numberOfLines={1}>
+                  {t.total}
+                </Text>
+              </View>
+            </View>
+
+            {members.map((member) => (
+              <View key={member.id} style={[styles.row, styles.bodyRow]}>
+                {columns.map(({ lesson, cells, date }) => {
+                  const cell = cells.get(member.id);
+                  if (!cell) {
+                    return (
+                      <View
+                        key={lesson.id}
+                        accessible
+                        accessibilityLabel={`${member.name}, ${date}: ${t.notParticipated}`}
+                        style={[styles.rowCell, styles.lessonCell]}
+                      >
+                        <Text variant="bodyBold" color="textSoft">
+                          ·
+                        </Text>
+                      </View>
+                    );
+                  }
+                  const saving = busy.has(cell.participantId);
+                  return (
+                    <PressableScale
+                      key={lesson.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={format(m.groups.attendance.cellAria, {
+                        name: member.name,
+                        date,
+                        mark: labels[cell.attendance].label,
+                      })}
+                      accessibilityState={{ disabled: disabled || saving, busy: saving }}
+                      disabled={disabled || saving}
+                      onPress={() => onToggle(lesson, member, cell)}
+                      onLongPress={() => onChoose(lesson, member, cell)}
+                      style={[styles.rowCell, styles.lessonCell]}
+                      testID={`attendance-cell-${lesson.id}-${member.id}`}
+                    >
+                      <AttendancePill value={cell.attendance} label={labels[cell.attendance].short} busy={saving || disabled} />
+                    </PressableScale>
+                  );
+                })}
+                <View style={[styles.rowCell, styles.totalCell]} testID={`attendance-total-${member.id}`}>
+                  <Text variant="caption" color="textMuted" tabular numberOfLines={1}>
+                    {attendanceTotalText(memberAttendanceSummary(member.id, lessons))}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
     </Card>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { flexDirection: 'row', overflow: 'hidden' },
+  // The card's radius less its hairline border, so the pinned column's corners stay round inside it.
+  clip: { flexDirection: 'row', overflow: 'hidden', borderRadius: t.radii.lg - t.borders.hairline },
   names: { width: NAME_WIDTH, borderRightWidth: t.borders.hairline, borderRightColor: t.colors.rowBorder },
   scroll: { flex: 1 },
   // Both columns build their rows from the same two boxes, so the pinned names stay level with the cells.

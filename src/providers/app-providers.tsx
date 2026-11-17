@@ -2,8 +2,8 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { AppState, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { AppState, Appearance, Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ import { I18nProvider } from '@/i18n';
 import { FileServiceProvider } from '@/services/files';
 import { startNetworkMonitor } from '@/services/network';
 import { createPersistOptions, markRestoredQueriesStale } from '@/services/query';
-import { ThemeProvider, useAppFonts, useTheme } from '@/theme';
+import { ThemeProvider, useAppFonts, useTheme, type ThemeMode } from '@/theme';
 
 import { PreferencesProvider, usePreferences } from './preferences-provider';
 import { getQueryClient } from './query';
@@ -80,7 +80,7 @@ function Themed({ children }: { children: ReactNode }) {
 
   return (
     <ThemeProvider mode={preferences.themeMode}>
-      <SystemChrome />
+      <SystemChrome mode={preferences.themeMode} />
       <I18nProvider locale={preferences.locale} onChangeLocale={setLocale}>
         <PersistQueryClientProvider client={getQueryClient()} persistOptions={persistOptions} onSuccess={onCacheRestored}>
           <FileServiceProvider service={runtime.files}>
@@ -95,10 +95,25 @@ function Themed({ children }: { children: ReactNode }) {
   );
 }
 
-/** Status-bar icons and the window background follow the resolved theme (no white flash in dark mode). */
-function SystemChrome() {
+/**
+ * Status-bar icons and the window background follow the resolved theme (no white flash in dark mode), and
+ * the native UI follows the in-app choice too: the Android date / time dialogs and navigation-bar icons,
+ * iOS system sheets and alerts. `system` removes the override, so the OS scheme applies again.
+ */
+function SystemChrome({ mode }: { mode: ThemeMode }) {
   const theme = useTheme();
   const background = theme.colors.pageBg;
+  // Not touched until the user picks an explicit theme: the default needs no override, and on Android
+  // every change of the night mode is a configuration change of the activity.
+  const overridden = useRef(false);
+
+  useEffect(() => {
+    // react-native-web has no override: the page follows the browser, the JS theme is already right.
+    if (Platform.OS === 'web' || typeof Appearance.setColorScheme !== 'function') return;
+    if (mode === 'system' && !overridden.current) return;
+    overridden.current = mode !== 'system';
+    Appearance.setColorScheme(mode === 'system' ? 'auto' : mode);
+  }, [mode]);
 
   useEffect(() => {
     void SystemUI.setBackgroundColorAsync(background).catch(() => undefined);

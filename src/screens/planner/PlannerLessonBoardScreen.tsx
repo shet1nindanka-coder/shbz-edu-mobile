@@ -151,7 +151,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
         busy={controller.busy[participant.id]}
         planBlocked={controller.waits.plan.waiting}
         itemsBlocked={controller.waits.items.waiting}
-        resultsBlocked={controller.waits.result.waiting}
+        resultWaitSeconds={controller.waits.result.seconds}
         savingItemIds={controller.savingItemIds}
         itemErrors={controller.itemErrors}
         now={now}

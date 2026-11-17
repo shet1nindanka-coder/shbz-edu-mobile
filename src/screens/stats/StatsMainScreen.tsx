@@ -54,7 +54,10 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
   // The student the progress timeline is filtered by; undefined = every student. An unknown id falls
   // back to "all students" on the server (`timelineStudentId: null`), as on the site.
   const [timelineStudentId, setTimelineStudentId] = useState<string | undefined>(initial.timelineStudentId);
+  // Why the latest change of that filter did not load (see `loadedFilter` below).
+  const [filterError, setFilterError] = useState<string | null>(null);
   if (seenRouteKey !== routeKey) {
+    setFilterError(null);
     setSeenRouteKey(routeKey);
     setView(initial.view);
     setVisited((seen) => (seen.has(initial.view) ? seen : new Set(seen).add(initial.view)));
@@ -68,6 +71,23 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
     // Changing the timeline filter keeps the page on screen while the new timeline loads.
     placeholderData: keepPreviousData,
   });
+  // The filter of the last timeline that loaded, and why the latest change of it did not. In TanStack
+  // Query v5 the previous page is a placeholder only while the new filter is pending: once its read fails,
+  // `progress.data` is gone with the picker that caused it. So a failed change goes back to the filter
+  // that loaded — its numbers and the picker stay — and says why (90-addendum-1 A.3).
+  const [loadedFilter, setLoadedFilter] = useState<{ id: string | undefined } | null>(null);
+  if (progress.isSuccess && !progress.isPlaceholderData && (loadedFilter === null || loadedFilter.id !== timelineStudentId)) {
+    setLoadedFilter({ id: timelineStudentId });
+  }
+  if (progress.isError && progress.data === undefined && loadedFilter !== null && loadedFilter.id !== timelineStudentId) {
+    setFilterError(errorText(progress.error, m.common.errors.generic));
+    setTimelineStudentId(loadedFilter.id);
+  }
+  const changeTimelineStudent = (studentId: string | undefined) => {
+    setFilterError(null);
+    setTimelineStudentId(studentId);
+  };
+
   const teachers = useQuery({
     queryKey: qk('groups', 'getStatisticsTeachers'),
     queryFn: () => api.groups.getStatisticsTeachers(),
@@ -100,7 +120,7 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
         <ProgressView
           data={progress.data}
           filterPending={progress.isPlaceholderData && progress.fetchStatus === 'fetching'}
-          onTimelineStudentChange={setTimelineStudentId}
+          onTimelineStudentChange={changeTimelineStudent}
         />
       );
     }
@@ -140,6 +160,15 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
       {/* Cached numbers stay on screen when a refresh fails (offline): say so instead of replacing them. */}
       {current.isError && current.data ? (
         <Notice tone="error" text={errorText(current.error, m.common.errors.generic)} testID="stats-refresh-error" />
+      ) : null}
+      {view === 'teacher' && filterError ? (
+        <Notice
+          tone="error"
+          text={filterError}
+          onDismiss={() => setFilterError(null)}
+          dismissLabel={m.common.actions.close}
+          testID="stats-filter-error"
+        />
       ) : null}
       {/* Offline, a new timeline filter waits for the connection while the previous numbers stay. */}
       {current.isPlaceholderData && current.fetchStatus === 'paused' ? (

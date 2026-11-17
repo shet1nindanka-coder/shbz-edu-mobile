@@ -18,8 +18,9 @@ import { makeStyles, useTheme } from '@/theme';
 
 import { IconButton } from './icon-button';
 import { MODAL_ORIENTATIONS, absoluteFill } from './internal/layout';
+import { useDismissKeyboardWhen, useKeyboardCoversHomeIndicator } from './internal/keyboard';
 import { easing } from './internal/motion';
-import { OverlayCoverSlot, useOverlayCovered } from './overlay-cover';
+import { OverlayCoverSlot, coveredAccessibilityProps, useOverlayCovered } from './overlay-cover';
 import { Text } from './text';
 import { useWindowInsets } from './window-insets';
 
@@ -89,6 +90,9 @@ export function BottomSheet({
   const sheetHeight = useSharedValue(window.height);
   const { sheetIn, sheetOut } = theme.motion.duration;
   const wide = window.width > theme.sizes.wideBreakpoint;
+  // The field the sheet was opened from must not keep the keyboard over the sheet (iOS).
+  useDismissKeyboardWhen(visible);
+  const keyboardShown = useKeyboardCoversHomeIndicator();
 
   useEffect(() => {
     if (!mounted) return;
@@ -143,13 +147,16 @@ export function BottomSheet({
   if (!mounted) return null;
 
   const closeVisible = showClose ?? Boolean(title);
-  const bottomPad = Math.max(insets.bottom, theme.space.gutter);
+  // The keyboard covers the home indicator (iOS): while it is up, its inset would only leave an empty
+  // strip between the sheet's last row and the keys.
+  const homeInset = keyboardShown ? 0 : insets.bottom;
+  const bottomPad = Math.max(homeInset, theme.space.gutter);
   const body = (
     <View
       style={[
         padded ? styles.padded : null,
         // Without a footer the content itself clears the home indicator.
-        footer ? null : { paddingBottom: padded ? bottomPad : insets.bottom },
+        footer ? null : { paddingBottom: padded ? bottomPad : homeInset },
         contentStyle,
       ]}
     >
@@ -174,6 +181,8 @@ export function BottomSheet({
           the content scrolls. Without the shrink a tall sheet was pushed up past the top of the screen.
         */}
         <KeyboardAvoidingView
+          // Under the lock cover the sheet leaves the accessibility tree; only the slot below stays reachable.
+          {...coveredAccessibilityProps(covered)}
           behavior={Platform.OS === 'web' ? undefined : 'padding'}
           style={[styles.root, wide ? styles.rootWide : styles.rootPhone, { paddingTop: insets.top + (wide ? theme.space.gutter : 0) }]}
         >
@@ -277,7 +286,7 @@ const useStyles = makeStyles((t) => ({
     paddingTop: 10,
     minHeight: t.sizes.minTouch,
   },
-  title: { flex: 1 },
+  title: { flex: 1, minWidth: 0 },
   close: { marginRight: -8 },
   scroll: { flexShrink: 1 },
   padded: { paddingHorizontal: t.space.lg, paddingTop: 8 },

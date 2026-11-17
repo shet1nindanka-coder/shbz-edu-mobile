@@ -812,6 +812,13 @@ export interface FileService {
    * (only when the size is known). Rejects with `ApiError` (`404 fileNotFound`, `429 rateLimited`, `network`).
    */
   download(file: DownloadableFile, onProgress?: (fraction: number) => void): Promise<string>;
+
+  /**
+   * The stored file's own name, type and size, after the same access check as `download` (HTTP: the
+   * `Content-Type` / `Content-Disposition` / `Content-Length` of the file response). The viewer route types a
+   * file its link names by id alone from this, never from the link. Rejects like `download`.
+   */
+  describe(fileId: string): Promise<FileRef>;
 }
 
 /**

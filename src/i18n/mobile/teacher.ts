@@ -45,6 +45,7 @@ const ru = {
     bankLoading: "Загружаем номера…",
     bankFailed: "Не удалось загрузить номера. Попробуйте ещё раз.",
     noFreeNumbers: "Все номера этой темы уже в наборе.",
+    noTopicNumbers: "В этой теме пока нет номеров.",
     pickTopicFirst: "Сначала выберите тему"
   }
 };
@@ -85,6 +86,7 @@ const en: typeof ru = {
     bankLoading: "Loading problems…",
     bankFailed: "Could not load the problems. Please try again.",
     noFreeNumbers: "Every problem of this topic is already in the set.",
+    noTopicNumbers: "This topic has no problems yet.",
     pickTopicFirst: "Pick a topic first"
   }
 };

@@ -139,6 +139,8 @@ describe("realtime invalidation (01 §5.7, 00 §2.3)", () => {
       "studentWork/listHomeworks",
       "studentWork/getHomework",
       "studentStudy/getHomeworkDeadlines",
+      // The number card shows the deadline that issuing / cancelling mirrors onto the number row.
+      "studentStudy/getNumberDetail",
     ]);
     assert.deepEqual(ids({ kind: "lesson-activity", occurredAt: at, lessonId: "l", teacherId: "t", studentId: "s" }, "STUDENT"), [
       "shell/listNotifications",
@@ -146,8 +148,9 @@ describe("realtime invalidation (01 §5.7, 00 §2.3)", () => {
       "studentWork/getLiveLessonState",
     ]);
     const content = ids({ kind: "topic-content-changed", occurredAt: at }, "STUDENT");
-    assert.ok(content.includes("studentStudy/getTheoryLibrary"));
-    assert.ok(content.includes("studentStudy/getNumberDetail"));
+    // A content change reaches every student response — the open homework list too (topic titles, number
+    // counts, assignments of a deleted topic), as the site re-renders whichever page is open.
+    assert.deepEqual(content, ["shell/listNotifications", "studentStudy", "studentWork"]);
     // The streak is refreshed only by the student's own progress.
     assert.ok(!content.includes("shell/getStreak"));
   });

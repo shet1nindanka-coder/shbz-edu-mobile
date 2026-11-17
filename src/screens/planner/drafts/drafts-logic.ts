@@ -173,6 +173,15 @@ export function freeTopicNumbers<T extends { id: string }>(topicNumbers: readonl
   return topicNumbers.filter((number) => !taken.has(number.id));
 }
 
+/**
+ * Columns of the "add a problem" number grid: as many tiles of at least `minTile` as fit `width` with
+ * `gap` between them, never fewer than one (a not yet measured width of 0 included).
+ */
+export function numberGridColumns(width: number, minTile: number, gap: number): number {
+  if (!(width > 0) || !(minTile > 0)) return 1;
+  return Math.max(1, Math.floor((width + gap) / (minTile + gap)));
+}
+
 /** Replaces one participant's set in a cached board (the answer of a set save). */
 export function replaceDraftItems(board: HomeworkPlanBoardModel, participantId: string, items: HomeworkPlanItem[]): HomeworkPlanBoardModel {
   return {

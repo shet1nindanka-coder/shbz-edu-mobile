@@ -208,12 +208,9 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
             />
           ) : null}
         </View>
-        {formError ? (
-          <View style={styles.error}>
-            <Notice tone="error" text={formError} testID="create-student-error" />
-            <RetryWaitLine seconds={limit.seconds} testID="create-student-wait" />
-          </View>
-        ) : null}
+        {formError ? <Notice tone="error" text={formError} testID="create-student-error" /> : null}
+        {/* Outside the error: editing a field clears the error, the lock stays. */}
+        <RetryWaitLine wait={limit} testID="create-student-wait" />
       </View>
     </BottomSheet>
   );
@@ -222,5 +219,4 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
 const useStyles = makeStyles((t) => ({
   form: { gap: t.space.field, paddingBottom: t.space.md },
   password: { gap: t.space.sm },
-  error: { gap: t.space.xs },
 }));

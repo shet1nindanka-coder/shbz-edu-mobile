@@ -142,12 +142,10 @@ export function RecordCallSheet({ target, onClose, onSaved, onMissing }: RecordC
             </Text>
           </Hint>
 
-          {error ? (
-            <View style={styles.error}>
-              <Notice tone="error" text={error} testID="call-record-error" />
-              <RetryWaitLine seconds={wait.seconds} testID="call-record-wait" />
-            </View>
-          ) : null}
+          {error ? <Notice tone="error" text={error} testID="call-record-error" /> : null}
+          {/* Outside the error: the limiter bucket is the teacher's, so a sheet opened for another student
+              (which starts without an error) is locked too and must say until when. */}
+          <RetryWaitLine seconds={wait.seconds} testID="call-record-wait" />
         </View>
       ) : null}
     </BottomSheet>
@@ -156,5 +154,4 @@ export function RecordCallSheet({ target, onClose, onSaved, onMissing }: RecordC
 
 const useStyles = makeStyles((t) => ({
   form: { gap: t.space.field, paddingTop: t.space.xs },
-  error: { gap: t.space.xs },
 }));

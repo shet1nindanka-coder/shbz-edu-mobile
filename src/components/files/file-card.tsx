@@ -173,7 +173,7 @@ const useStyles = makeStyles((t) => ({
     borderRadius: t.radii.md,
     backgroundColor: t.colors.greenSoft,
   },
-  fileText: { flex: 1, gap: 2 },
+  fileText: { flex: 1, minWidth: 0, gap: 2 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   action: { flexGrow: 1 },
   footer: { marginTop: t.space.md },

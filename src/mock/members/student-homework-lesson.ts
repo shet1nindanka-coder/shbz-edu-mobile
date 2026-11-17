@@ -52,7 +52,13 @@ import { classifySolutionCheckError } from "@/domain/solution-check-error-text";
 import { selectCompletedCheckIdsToPrune } from "@/domain/solution-check-history";
 import { normalizeCheckResultsByConfidence, type ParsedCheckResult } from "@/domain/solution-check-parse";
 import { toStudentFacingResult } from "@/domain/solution-check-student-view";
-import { MAX_ORIGINAL_FILE_NAME_LENGTH, MAX_UPLOAD_SIZE_BYTES, UploadValidationError, validateUploadMetadata } from "@/domain/upload-validation";
+import {
+  MAX_ORIGINAL_FILE_NAME_LENGTH,
+  MAX_UPLOAD_SIZE_BYTES,
+  UploadValidationError,
+  validateUploadMetadata,
+  validateUploadedBytes,
+} from "@/domain/upload-validation";
 import { format, plural } from "@/lib/i18n/format";
 
 import type { MockContext } from "../context";
@@ -159,7 +165,31 @@ export function createStudentHomeworkLesson(ctx: MockContext): StudentHomeworkLe
     // Unreachable for student photos (the aggregate checks run first); kept for parity with the validator.
     if (message === texts.tooBig) return errors.make({ status: 413, code: "uploadTooLarge", message });
     if (message === texts.emptySize) return errors.make({ status: 400, code: "uploadRejected", message });
+    // The content checks of `saveUploadedFile` (`validateUploadedBytes`) answer 400 with the validator's text.
+    if (message === texts.sizeMismatch) return errors.make({ status: 400, code: "uploadRejected", message });
+    if (message === texts.signature) return errors.make({ status: 400, code: "uploadUnsupportedType", message });
     return errors.make({ status: 400, code: "uploadRejected", message: (dict) => dict.apiStudent.upload.fileRejected });
+  };
+
+  /**
+   * The bytes of each photo, read before the resource checks so that no await separates those checks from
+   * the write; `checkPhotoBytes` then judges them where the site's `saveUploadedFile` runs. A photo whose
+   * content cannot be read (null) is not checked.
+   */
+  const readPhotoBytes = (photos: readonly ValidatedPhoto[]): Promise<(Uint8Array | null)[]> =>
+    Promise.all(photos.map((photo) => ctx.files.readUploadBytes(photo.uri)));
+
+  /** The site's `validateUploadedBytes` per photo: the real size equals the declared one, magic bytes match. */
+  const checkPhotoBytes = (photos: readonly ValidatedPhoto[], contents: readonly (Uint8Array | null)[]): void => {
+    photos.forEach((photo, index) => {
+      const bytes = contents[index];
+      if (!bytes) return;
+      try {
+        validateUploadedBytes(bytes, photo.originalName, photo.mimeType, photo.size, ctx.locale());
+      } catch (error) {
+        throw uploadMetadataError(error);
+      }
+    });
   };
 
   /**
@@ -813,11 +843,14 @@ export function createStudentHomeworkLesson(ctx: MockContext): StudentHomeworkLe
       const user = auth.requireStudent();
       limits.enforce("api:homework-submissions");
       const photos = validatePhotos(files);
+      const contents = await readPhotoBytes(photos);
+      ctx.throwIfAborted(opts?.signal);
       const assignment = ctx.guard.ownHomework(user, assignmentId);
 
       // The limit counts the photos attached right now, not all photos ever uploaded.
       const max = ctx.settings().maxPhotosPerAssignment;
       if (q.homeworkPhotos(assignment.id).length + photos.length > max) throw photoLimitError("homework", max);
+      checkPhotoBytes(photos, contents);
       ctx.throwIfAborted(opts?.signal);
 
       // All files of the call are stored or none.
@@ -1003,6 +1036,8 @@ export function createStudentHomeworkLesson(ctx: MockContext): StudentHomeworkLe
         return errors.fail({ status: 503, code: "checkDisabled", message: (dict) => dict.apiStudent.lessonSubmissions.disabled });
       }
       const photos = validatePhotos(files, LESSON_SUBMISSION_MAX_PHOTOS);
+      const contents = await readPhotoBytes(photos);
+      ctx.throwIfAborted(opts?.signal);
 
       // The item must belong to THIS student's participation in THIS lesson (kind LESSON); a foreign set is
       // indistinguishable from a missing one.
@@ -1033,6 +1068,8 @@ export function createStudentHomeworkLesson(ctx: MockContext): StudentHomeworkLe
       if (item.isExtra && !isExtraPartUnlocked(views.map((view) => view.state))) {
         return errors.fail({ status: 409, code: "extraPartLocked", message: (dict) => dict.apiStudent.lessonSubmissions.extraPartLocked });
       }
+      // The site stores the files (and checks their content) before its transaction looks for a running check.
+      checkPhotoBytes(photos, contents);
       // One active submission per item; other items may be checked in parallel.
       if (store.submissions.findUnique("activeSlot", `${item.id}|1`)) {
         return errors.fail({ status: 409, code: "alreadyRunning", message: (dict) => dict.apiStudent.lessonSubmissions.alreadyRunning });

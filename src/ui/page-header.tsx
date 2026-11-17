@@ -28,8 +28,21 @@ export type PageHeaderProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Web only: the last word of the title and its dot stay on one line (`white-space` is not a native style). */
-const LAST_WORD = (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : null) as TextStyle | null;
+/** Web only: the end of the title and its dot stay on one line (`white-space` is not a native style). */
+const NO_WRAP = (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : null) as TextStyle | null;
+
+/**
+ * Splits the last word into the part that may break and the part tied to the dot. On native the word
+ * joiner ties the whole word and the line breaker still splits a word wider than the line. A browser
+ * cannot break inside a no-wrap span at all, so a long last word (a user-entered lesson title) would run
+ * off the screen: there only the last character is kept with the dot, and the rest of the word stays
+ * breakable (`word-wrap: break-word` of the text) — it still moves to the next line as a whole when it fits.
+ */
+function splitTitleTail(lastWord: string, web: boolean): { breakable: string; tied: string } {
+  if (!web) return { breakable: '', tied: lastWord };
+  const chars = Array.from(lastWord);
+  return { breakable: chars.slice(0, -1).join(''), tied: chars.slice(-1).join('') };
+}
 
 /** Page header (`ShbzPageHeader`): kicker, display title with the gradient dot, optional aside below. */
 export function PageHeader({
@@ -47,7 +60,7 @@ export function PageHeader({
   // The part before the last word may wrap freely; the last word carries the dot.
   const cut = title.lastIndexOf(' ');
   const head = cut < 0 ? '' : title.slice(0, cut + 1);
-  const lastWord = cut < 0 ? title : title.slice(cut + 1);
+  const { breakable, tied } = splitTitleTail(cut < 0 ? title : title.slice(cut + 1), Platform.OS === 'web');
   return (
     <View style={[styles.header, gap === undefined ? null : { marginBottom: gap }, style]}>
       {backLabel && onBack ? (
@@ -59,13 +72,14 @@ export function PageHeader({
         {kicker ? <Text variant="kicker">{kicker}</Text> : null}
         <Text variant="display" accessibilityRole="header">
           {head}
+          {breakable}
           {/*
             The dot rides on the last line of the title, 12 after the text, centered on the line — and it
             never wraps to a line of its own: it is tied to the last word (a word joiner for the native
             line breakers, a no-wrap span for the browser, which breaks before an inline box regardless).
           */}
-          <Text variant="display" style={LAST_WORD}>
-            {lastWord}
+          <Text variant="display" style={NO_WRAP}>
+            {tied}
             {'\u2060'}
             <View style={styles.dotWrap}>
               <TitleDot />

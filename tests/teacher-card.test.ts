@@ -26,6 +26,7 @@ import {
   withConditions,
 } from "../src/screens/teacher/card/assign-logic";
 import {
+  bankNumbersGap,
   freeBankNumbers,
   lessonPlanState,
   syncPendingSince,
@@ -377,6 +378,15 @@ describe("lessons segment", () => {
     const bank = { topicId: "t", topicTitle: "T", numbers: [{ id: "1", number: "1" }, { id: "4", number: "4" }] };
     assert.deepEqual(freeBankNumbers(bank, ["1", "2"]), [{ id: "4", number: "4" }]);
     assert.deepEqual(freeBankNumbers(undefined, []), []);
+  });
+
+  it("tells a topic with no numbers apart from one whose numbers are all in the set", () => {
+    const empty = { topicId: "e", topicTitle: "E", numbers: [] };
+    const full = { topicId: "t", topicTitle: "T", numbers: [{ id: "1", number: "1" }] };
+    assert.equal(bankNumbersGap(empty, freeBankNumbers(empty, []).length), "topicEmpty");
+    assert.equal(bankNumbersGap(full, freeBankNumbers(full, ["1"]).length), "allInSet");
+    assert.equal(bankNumbersGap(full, freeBankNumbers(full, []).length), null);
+    assert.equal(bankNumbersGap(undefined, 0), null);
   });
 
   it("patches the cached list", () => {

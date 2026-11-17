@@ -3,7 +3,6 @@ import { View } from 'react-native';
 
 import type { HomeworkNumberStatus, SolutionVerdict, TeacherHomeworkCheckResult, TeacherHomeworkNumber } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { RetryWaitLine } from '@/components/retry-wait';
 import { HOMEWORK_STATUS_ORDER } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
@@ -21,9 +20,8 @@ export type ReviewNumberCardProps = {
   lessonMode: boolean;
   /** This number's status request is in flight. */
   saving: boolean;
-  /** Status writes are cooling down after a refusal that named a wait; `waitSeconds` says for how long. */
+  /** Status writes are cooling down after a refusal that named a wait (the homework card says for how long). */
   blocked: boolean;
-  waitSeconds: number;
   /** Why the last status save failed. */
   error?: string;
   onStatus: (status: HomeworkNumberStatus | null) => void;
@@ -38,7 +36,7 @@ const VERDICT_CHIP: Record<SolutionVerdict, ChipTone> = { CORRECT: 'green', INCO
  * staff-only diagnostics, the student's note and the three traffic-light buttons. A 3 px stripe on the
  * left repeats the verdict so the column can be scanned.
  */
-export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, waitSeconds, error, onStatus, onHistory }: ReviewNumberCardProps) {
+export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, error, onStatus, onHistory }: ReviewNumberCardProps) {
   const styles = useStyles();
   const theme = useTheme();
   const { dict, m } = useI18n();
@@ -182,7 +180,6 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
           <Text variant="captionStrong" color="dangerText" accessibilityRole="alert" testID={`review-number-error-${number.homeworkNumberId}`}>
             {error}
           </Text>
-          <RetryWaitLine seconds={waitSeconds} testID={`review-number-wait-${number.homeworkNumberId}`} />
         </View>
       ) : null}
 

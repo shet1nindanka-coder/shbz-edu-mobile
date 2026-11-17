@@ -168,12 +168,9 @@ export function PasswordResetSheet({
           />
           <PasswordFeedback password={password} okText={t.passwordOk} testID={`${testIDPrefix}-feedback`} />
         </View>
-        {error ? (
-          <View style={styles.error}>
-            <Notice tone="error" text={error} testID={`${testIDPrefix}-error`} />
-            <RetryWaitLine seconds={limit.seconds} testID={`${testIDPrefix}-wait`} />
-          </View>
-        ) : null}
+        {error ? <Notice tone="error" text={error} testID={`${testIDPrefix}-error`} /> : null}
+        {/* Outside the error: closing the sheet clears the error, the lock stays (it is per user). */}
+        <RetryWaitLine wait={limit} testID={`${testIDPrefix}-wait`} />
       </View>
     </BottomSheet>
   );
@@ -184,7 +181,6 @@ const useStyles = makeStyles((t) => ({
   intro: { gap: 10 },
   paragraph: { lineHeight: 24 },
   field: { gap: t.space.sm },
-  error: { gap: t.space.xs },
   actions: { flexDirection: 'row', gap: t.space.md },
   submit: { flex: 1 },
 }));

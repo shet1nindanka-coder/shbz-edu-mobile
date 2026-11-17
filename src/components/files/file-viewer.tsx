@@ -25,9 +25,10 @@ import { Button, IconButton, Notice, ProgressBar, Spinner, Text } from '@/ui';
 
 import { FileHandOff } from './file-hand-off';
 import { PdfView } from './pdf-view';
+import { useDescribedFiles } from './use-described-files';
 import { useFileDownload } from './use-file-download';
 import { useFileActions, type FileActions } from './use-file-share';
-import { fileTypeLabel, viewerFileKind, type ViewerFile } from './viewer-file';
+import { fileTypeLabel, viewerFileKind, viewerFileName, type ViewerFile } from './viewer-file';
 import { ZoomableImage } from './zoomable-image';
 
 export type FileViewerProps = {
@@ -37,6 +38,11 @@ export type FileViewerProps = {
   initialIndex?: number;
   /** Header title instead of the file name (the student's theory viewer shows the topic title). */
   title?: string;
+  /**
+   * Files known by id alone (a deep link, a web reload — `viewer-handoff.ts`): their name, type and size come
+   * from `FileService.describe` (access checked), never from the reference passed in.
+   */
+  describeIds?: readonly string[];
   onClose: () => void;
   testID?: string;
 };
@@ -45,8 +51,9 @@ function clampIndex(index: number, count: number): number {
   return Math.min(Math.max(0, Math.floor(index) || 0), Math.max(0, count - 1));
 }
 
-export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: FileViewerProps) {
+export function FileViewer({ files: givenFiles, initialIndex = 0, title, describeIds, onClose, testID }: FileViewerProps) {
   const styles = useStyles();
+  const { files, pendingIds, missingIds } = useDescribedFiles(givenFiles, describeIds);
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const { dict, m } = useI18n();
@@ -99,19 +106,23 @@ export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: 
   if (!current) return null;
 
   const sharing = actions.pending?.action === 'share';
+  // Nothing to share before the stored file's own type and name are known.
+  const describing = pendingIds.has(current.id) || missingIds.has(current.id);
+  // A deep link names files by id only: their name is not shown (viewer-handoff.ts), a neutral word is.
+  const heading = title ?? viewerFileName(current, m.common.files.untitled);
 
   return (
     <View
       testID={testID}
       accessibilityViewIsModal
-      accessibilityLabel={format(dict.student.fullscreen.dialogAria, { name: title ?? current.originalName })}
+      accessibilityLabel={format(dict.student.fullscreen.dialogAria, { name: heading })}
       style={styles.root}
     >
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <View style={styles.headerRow}>
           <View style={styles.titleBlock}>
             <Text variant="smallBold" numberOfLines={1} accessibilityRole="header">
-              {title ?? current.originalName}
+              {heading}
             </Text>
             {many ? (
               <Text variant="caption" tabular>
@@ -127,7 +138,7 @@ export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: 
             <IconButton
               icon={SHARE_IS_DOWNLOAD ? 'download' : 'share'}
               accessibilityLabel={SHARE_IS_DOWNLOAD ? dict.student.fullscreen.download : m.common.files.share}
-              disabled={actions.pending !== null}
+              disabled={actions.pending !== null || describing}
               onPress={() => void actions.share(current)}
               testID={testID ? `${testID}-share` : undefined}
             />
@@ -163,16 +174,27 @@ export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: 
                 {Math.abs(fileIndex - safeIndex) <= 1 ? (
                   <FileViewerPage
                     file={file}
+                    describing={pendingIds.has(file.id)}
+                    missing={missingIds.has(file.id)}
                     active={fileIndex === safeIndex}
                     actions={actions}
                     onZoomChange={fileIndex === safeIndex ? setZoomed : undefined}
+                    onClose={onClose}
                   />
                 ) : null}
               </View>
             ))}
           </ScrollView>
         ) : (
-          <FileViewerPage file={current} active actions={actions} onZoomChange={setZoomed} />
+          <FileViewerPage
+            file={current}
+            describing={pendingIds.has(current.id)}
+            missing={missingIds.has(current.id)}
+            active
+            actions={actions}
+            onZoomChange={setZoomed}
+            onClose={onClose}
+          />
         )}
 
         {many && Platform.OS === 'web' && !zoomed ? (
@@ -215,21 +237,38 @@ export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: 
 
 type FileViewerPageProps = {
   file: ViewerFile;
+  /** The file's stored metadata is still being read (`describeIds`): its kind of page is not known yet. */
+  describing?: boolean;
+  /** The file does not exist or may not be read (its description was `404 fileNotFound`). */
+  missing?: boolean;
   active: boolean;
   actions: FileActions;
   onZoomChange?: (zoomed: boolean) => void;
+  /** The way out of a page that cannot show anything (an unreadable picture). */
+  onClose: () => void;
 };
 
-function FileViewerPage({ file, active, actions, onZoomChange }: FileViewerPageProps) {
+function FileViewerPage({ file, describing, missing, active, actions, onZoomChange, onClose }: FileViewerPageProps) {
+  const styles = useStyles();
+  const { m } = useI18n();
+  // Retrying cannot help a 404: the way out is closing (the same page as an unreadable picture).
+  if (missing) return <PageMessage text={m.common.errors.fileNotFound} actionLabel={m.common.actions.close} onAction={onClose} />;
+  if (describing) {
+    return (
+      <View style={[styles.page, styles.centered]}>
+        <Spinner size={20} accessibilityLabel={m.common.states.loading} />
+      </View>
+    );
+  }
   const kind = viewerFileKind(file);
   return kind === 'image' ? (
-    <ImagePage file={file} active={active} onZoomChange={onZoomChange} />
+    <ImagePage file={file} active={active} onZoomChange={onZoomChange} onClose={onClose} />
   ) : (
     <DocumentPage file={file} kind={kind} actions={actions} />
   );
 }
 
-function ImagePage({ file, active, onZoomChange }: Omit<FileViewerPageProps, 'actions'>) {
+function ImagePage({ file, active, onZoomChange, onClose }: Omit<FileViewerPageProps, 'actions' | 'describing' | 'missing'>) {
   const styles = useStyles();
   const files = useFileService();
   const { m } = useI18n();
@@ -238,6 +277,13 @@ function ImagePage({ file, active, onZoomChange }: Omit<FileViewerPageProps, 'ac
   const [status, setStatus] = useState<{ attempt: number; value: 'loaded' | 'error' } | null>(null);
   const state = status !== null && status.attempt === attempt ? status.value : 'loading';
   const source = file.localUri ? { uri: file.localUri } : files.source(file.id, 'original');
+
+  // No address at all: a missing or forbidden file, or one that is not a picture. Image components never
+  // report a load or an error for an empty source (expo-image renders nothing on web, skips the request on
+  // Android), so the page would spin forever. Retrying cannot help a 404: the way out is closing.
+  if (source.uri === '') {
+    return <PageMessage text={m.common.errors.fileNotFound} actionLabel={m.common.actions.close} onAction={onClose} />;
+  }
 
   if (state === 'error') {
     return (
@@ -254,7 +300,7 @@ function ImagePage({ file, active, onZoomChange }: Omit<FileViewerPageProps, 'ac
       <ZoomableImage
         key={attempt}
         source={source}
-        accessibilityLabel={file.originalName}
+        accessibilityLabel={viewerFileName(file, m.common.files.untitled)}
         active={active}
         onZoomChange={onZoomChange}
         onLoad={() => setStatus({ attempt, value: 'loaded' })}
@@ -311,14 +357,14 @@ function DocumentPage({ file, kind, actions }: { file: ViewerFile; kind: 'pdf' |
   if (kind === 'pdf') {
     return (
       <View style={styles.page}>
-        <PdfView uri={download.uri} name={file.originalName} onOpenExternally={openExternally} opening={opening} />
+        <PdfView uri={download.uri} name={viewerFileName(file, m.common.files.untitled)} onOpenExternally={openExternally} opening={opening} />
       </View>
     );
   }
 
   return (
     <FileHandOff
-      name={file.originalName}
+      name={viewerFileName(file, m.common.files.untitled)}
       typeLabel={fileTypeLabel(file)}
       hint={kind === 'docx' ? m.common.files.docxHint : m.common.files.previewUnavailable}
       onOpenExternally={openExternally}
@@ -353,7 +399,7 @@ const useStyles = makeStyles((t) => ({
     gap: 10,
     paddingHorizontal: t.space.gutter,
   },
-  titleBlock: { flex: 1, gap: 1 },
+  titleBlock: { flex: 1, minWidth: 0, gap: 1 },
   headerSpinner: { width: t.sizes.iconCircle, height: t.sizes.iconCircle, alignItems: 'center', justifyContent: 'center' },
   // The site's viewer body: the file sits on the soft surface.
   body: { flex: 1, backgroundColor: t.colors.softBg },

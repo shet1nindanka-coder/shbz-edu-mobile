@@ -35,6 +35,7 @@ const LIST_MAX_SHARE = 0.5;
 /** Height of one entry before it is measured: a meta line, a line of comment and the paddings. */
 const ENTRY_ESTIMATE = 64;
 export function HistorySheet({ student, showTeacher, onClose }: HistorySheetProps) {
+  const styles = useStyles();
   const { m } = useI18n();
   const [shown, setShown] = useState<ParentCallStudentOverview | null>(student);
   if (student !== null && student !== shown) setShown(student);
@@ -48,6 +49,8 @@ export function HistorySheet({ student, showTeacher, onClose }: HistorySheetProp
       title={m.calls.history.sheetTitle}
       // The entries scroll by themselves (FlashList), not the sheet.
       scroll={false}
+      // Without a ScrollView the body must shrink itself in a short window, or the button falls off the sheet.
+      contentStyle={styles.shrink}
       testID="call-history-sheet"
     >
       {shown ? <HistoryContent key={shown.studentId} student={shown} showTeacher={showTeacher} /> : null}
@@ -79,6 +82,7 @@ function HistoryContent({ student, showTeacher }: { student: ParentCallStudentOv
   });
 
   const entries = mergeHistory(student.history, earlier.data?.pages.map((page) => page.calls) ?? []);
+  const listHeight = Math.min(contentHeight ?? entries.length * ENTRY_ESTIMATE, Math.round(window.height * LIST_MAX_SHARE));
   const hasMore = cursor !== null && (earlier.data ? earlier.hasNextPage : true);
   const loading = earlier.isFetching;
   // Offline the request waits for the connection instead of failing: say so, do not spin forever.
@@ -99,7 +103,8 @@ function HistoryContent({ student, showTeacher }: { student: ParentCallStudentOv
       {/* A short history is as tall as its entries; a long one scrolls inside the cap. */}
       <View
         accessibilityRole="list"
-        style={{ height: Math.min(contentHeight ?? entries.length * ENTRY_ESTIMATE, Math.round(window.height * LIST_MAX_SHARE)) }}
+        // The height is only preferred: in a short window the list gives way (down to one entry) to the button.
+        style={[styles.shrink, { height: listHeight, minHeight: Math.min(listHeight, ENTRY_ESTIMATE) }]}
       >
         <FlashList
           data={entries}
@@ -167,7 +172,8 @@ function HistoryEntry({ entry, showTeacher, divider }: { entry: ParentCallEntry;
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: t.space.md, paddingTop: t.space.xs },
+  content: { flexShrink: 1, minHeight: 0, gap: t.space.md, paddingTop: t.space.xs },
+  shrink: { flexShrink: 1, minHeight: 0 },
   entry: { gap: t.space.xxs, paddingVertical: t.space.md },
   entryDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
 }));

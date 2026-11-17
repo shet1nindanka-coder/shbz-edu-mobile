@@ -92,6 +92,8 @@ export function PickerField({ label, options, value, onChange, disabled = false,
         title={label}
         // The option list scrolls by itself (FlashList), not the sheet.
         scroll={false}
+        // Without a ScrollView the body must shrink itself in a short window, or the list overflows the sheet.
+        contentStyle={styles.shrink}
         testID={testID ? `${testID}-sheet` : undefined}
       >
         <View style={styles.sheet}>
@@ -113,7 +115,11 @@ export function PickerField({ label, options, value, onChange, disabled = false,
           {filtered.length === 0 ? (
             <EmptyState variant="plain" title={dict.planner.common.nothingFound} />
           ) : (
-            <View accessibilityRole="menu" style={{ height: listHeight }}>
+            <View
+              accessibilityRole="menu"
+              // The height is only preferred: in a short window the list gives way (down to one row) to the search.
+              style={[styles.shrink, { height: listHeight, minHeight: Math.min(listHeight, rowStride) }]}
+            >
               <FlashList
                 data={filtered}
                 keyExtractor={(option) => option.value}
@@ -174,7 +180,8 @@ const useStyles = makeStyles((t) => ({
   },
   triggerOpen: { borderColor: t.colors.inputBorderFocus },
   value: { flex: 1, minWidth: 0 },
-  sheet: { gap: t.space.sm, paddingTop: t.space.xs },
+  sheet: { flexShrink: 1, minHeight: 0, gap: t.space.sm, paddingTop: t.space.xs },
+  shrink: { flexShrink: 1, minHeight: 0 },
   // The gap between rows lives inside the cells: FlashList measures each one.
   item: { paddingBottom: ROW_GAP },
   option: {

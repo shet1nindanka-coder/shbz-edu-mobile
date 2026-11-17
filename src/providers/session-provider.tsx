@@ -12,7 +12,7 @@ import { localNotifications, registerRemotePush, unregisterRemotePush } from '@/
 import { removePersistedQueries } from '@/services/query';
 import { tokenStorage } from '@/services/session';
 
-import { getPendingWrites, setPendingWritesUser } from './pending-writes';
+import { getPendingWrites, holdPendingWritesForExpiredSession, setPendingWritesUser } from './pending-writes';
 import { getQueryClient } from './query';
 import { getAppRuntime, getRequestLocale, setSessionErrorHandlers } from './services';
 
@@ -58,10 +58,14 @@ const ROLE_REFRESH_MIN_INTERVAL_MS = 5000;
  * so the teacher who signs in next still sees the photo the student handed in. Access to them is decided
  * by the mock backend per signed-in user; they go away with a reset of the demo dataset.
  */
-async function clearSessionData(): Promise<void> {
+async function clearSessionData(options: { keepPendingWrites?: boolean } = {}): Promise<void> {
   const runtime = getAppRuntime();
   runtime.setSessionToken(null);
-  setPendingWritesUser(null);
+  // A forced expiry is not the user's choice to lose unsent drafts: they stay on the device, tied to their
+  // user, and are sent when the same user signs in again (another account drops them). Only an explicit
+  // sign-out, which asks first, deletes them.
+  const keepPendingWrites = options.keepPendingWrites === true;
+  if (!keepPendingWrites) setPendingWritesUser(null);
   getQueryClient().clear();
   clearViewerHandoff();
   clearOneShotNotices();
@@ -70,7 +74,7 @@ async function clearSessionData(): Promise<void> {
   } catch {
     // The cache directory may not exist yet.
   }
-  await Promise.all([tokenStorage.clear(), runtime.sessionCache.clear(), getPendingWrites().clear(), localNotifications.cancelAll()]);
+  await Promise.all([tokenStorage.clear(), runtime.sessionCache.clear(), keepPendingWrites ? Promise.resolve() : getPendingWrites().clear(), localNotifications.removeAll()]);
   // The cache in memory is empty already; its copy on disk is removed now, not left to the persister's
   // throttled write a second later. The removal is issued one tick after `clear()`: the persister answers
   // the first "query removed" event with an immediate write of a still half-full snapshot, and a removal
@@ -105,7 +109,7 @@ async function resolveStoredSession(): Promise<RestoreOutcome> {
     return { kind: 'confirmed', user };
   } catch (error) {
     if (isSessionExpired(error)) {
-      await clearSessionData();
+      await clearSessionData({ keepPendingWrites: true });
       return { kind: 'expired', message: error.message };
     }
     const cached = await runtime.sessionCache.read();
@@ -140,6 +144,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedIn', user, restored, notice: null });
     void getAppRuntime().sessionCache.write(user);
     void registerRemotePush({ locale: getRequestLocale() });
+    // Drafts kept from an expired session of another account are never shown or sent to this one.
+    void getPendingWrites().dropOtherUsers(user.id);
     void getPendingWrites().flush();
   }, []);
 
@@ -149,7 +155,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (status === 'signedOut' || signingOut.current) return;
     stateRef.current = { ...stateRef.current, status: 'signedOut' };
     unconfirmed.current = false;
-    void clearSessionData();
+    holdPendingWritesForExpiredSession();
+    void clearSessionData({ keepPendingWrites: true });
     setState({ status: 'signedOut', user: null, restored: false, notice: error.message });
   }, []);
 
@@ -157,6 +164,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (stateRef.current.status !== 'signedIn') return;
     try {
       const { user } = await getAppRuntime().api.shell.getMe();
+      const wasUnconfirmed = unconfirmed.current;
       unconfirmed.current = false;
       const previous = stateRef.current.user;
       // Another role means another tree and other data: nothing cached for the old role may leak into it.
@@ -164,6 +172,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setPendingWritesUser(user.id);
       setState((current) => (current.status === 'signedIn' ? { ...current, user } : current));
       void getAppRuntime().sessionCache.write(user);
+      // The server answers again after a start without an answer: send what was waiting.
+      if (wasUnconfirmed) void getPendingWrites().flush();
     } catch (error) {
       if (isSessionExpired(error)) expire(error);
       // Any other failure keeps the current user; the next request reports for itself.
@@ -199,6 +209,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           unconfirmed.current = true;
           setPendingWritesUser(outcome.user.id);
           setState({ status: 'signedIn', user: outcome.user, restored: true, notice: null });
+          // `GET /me` got no answer, but the device may be online (a timeout, a server error): try the
+          // waiting writes now; a failure without an answer re-tries them with backoff by itself.
+          void getPendingWrites().dropOtherUsers(outcome.user.id);
+          void getPendingWrites().flush();
           break;
         case 'expired':
           setState({ status: 'signedOut', user: null, restored: false, notice: outcome.message });

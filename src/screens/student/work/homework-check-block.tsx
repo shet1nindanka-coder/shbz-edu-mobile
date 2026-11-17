@@ -53,16 +53,13 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
       {!available ? <Notice tone="warning" text={dict.student.checkErrors.disabled} testID="homework-check-disabled" /> : null}
 
       {state.startError ? (
-        <View style={styles.notice}>
-          <Notice
-            tone="error"
-            text={state.startError}
-            onDismiss={state.dismissStartError}
-            dismissLabel={m.common.actions.close}
-            testID="homework-check-start-error"
-          />
-          <RetryWaitLine seconds={limit.seconds} testID="homework-check-wait" />
-        </View>
+        <Notice
+          tone="error"
+          text={state.startError}
+          onDismiss={state.dismissStartError}
+          dismissLabel={m.common.actions.close}
+          testID="homework-check-start-error"
+        />
       ) : null}
 
       <Button
@@ -74,6 +71,9 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
         fullWidth
         testID="homework-check-start"
       />
+      {/* Next to the locked button for as long as it is locked (the daily budget can last hours), whether or
+          not the error notice above was dismissed (90-addendum-1 A.3 rule 3). */}
+      <RetryWaitLine wait={limit} testID="homework-check-wait" />
       {/* The site explains the disabled button in a tooltip; a phone has none. */}
       {!hasPhotos && !running ? (
         <Text variant="caption" testID="homework-check-need-photos">
@@ -130,7 +130,6 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
 const useStyles = makeStyles((t) => ({
   block: { gap: t.space.md },
   titles: { gap: 2 },
-  notice: { gap: t.space.xs },
   results: { gap: t.space.sm },
   counters: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
 }));

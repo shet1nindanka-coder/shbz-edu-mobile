@@ -93,5 +93,6 @@ const useStyles = makeStyles((t) => ({
   card: { gap: t.space.md },
   next: { gap: t.space.xs },
   when: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-  whenText: { flexShrink: 1 },
+  // `minWidth: 0`: on web a Text keeps its longest word as min-width, so a long group name would leave the card.
+  whenText: { flexShrink: 1, minWidth: 0 },
 }));

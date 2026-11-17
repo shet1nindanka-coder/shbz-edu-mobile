@@ -5,7 +5,7 @@
 /// <reference path="../node_modules/@types/node/test.d.ts" />
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fileTypeLabel, toDownloadable, viewerFileKind } from "@/components/files/viewer-file";
+import { applyDescription, fileTypeLabel, toDownloadable, viewerFileKind, viewerFileName } from "@/components/files/viewer-file";
 import { validateUploadedBytes } from "@/domain/upload-validation";
 import {
   cacheFileName,
@@ -215,6 +215,33 @@ test("viewer file helpers", () => {
     id: "p",
     originalName: "a.jpg",
     mimeType: "image/jpeg"
+  });
+  // A file a deep link names by id only has no name of its own (viewer-handoff): the neutral word is shown.
+  assert.equal(viewerFileName(pdf, "Файл"), "theory.pdf");
+  assert.equal(viewerFileName({ originalName: "" }, "Файл"), "Файл");
+  assert.equal(viewerFileName({ originalName: "  " }, "File"), "File");
+  assert.equal(fileTypeLabel({ originalName: "", mimeType: "" }), "");
+});
+
+test("a file known by id alone is typed from the stored file, never from its link", () => {
+  const linked = { id: "f", originalName: "", mimeType: "" };
+  const stored = { id: "f", originalName: "linear-equations-theory.pdf", mimeType: "application/pdf", size: 1400 };
+  // Described: the stored name, type and size — the page is a PDF and the header shows the real name.
+  const described = applyDescription(linked, { status: "ready", ref: stored });
+  assert.deepEqual(described, stored);
+  assert.equal(viewerFileKind(described), "pdf");
+  assert.equal(viewerFileName(described, "Файл"), "linear-equations-theory.pdf");
+  // Whatever the link wrote is not used, before or after the description.
+  const forged = { id: "f", originalName: "Введите пароль", mimeType: "image/png", size: 5 };
+  assert.deepEqual(applyDescription(forged, { status: "ready", ref: stored }), stored);
+  assert.deepEqual(applyDescription(forged, undefined), linked);
+  // Not described (404, network): no name, no type — the page downloads it by id and shows that error.
+  assert.deepEqual(applyDescription(forged, { status: "failed", notFound: false }), linked);
+  // An unknown size is not passed on.
+  assert.deepEqual(applyDescription(linked, { status: "ready", ref: { ...stored, size: 0 } }), {
+    id: "f",
+    originalName: stored.originalName,
+    mimeType: stored.mimeType
   });
 });
 

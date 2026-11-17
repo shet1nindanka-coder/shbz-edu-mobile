@@ -4,6 +4,7 @@ import { qk, useApi } from '@/api';
 import type { CreateLessonInput } from '@/api/types';
 import { useAppNavigation } from '@/navigation';
 
+import { invalidateAroundLesson } from '../shared/invalidate';
 import { useStillHere } from '../shared/use-still-here';
 
 /**
@@ -22,12 +23,10 @@ export function useCreateLesson() {
   return useMutation({
     mutationFn: (input: CreateLessonInput) => api.planner.createLesson(input),
     onSuccess: (created) => {
-      void queryClient.invalidateQueries({ queryKey: qk('planner', 'listLessons') });
       // The new lesson also appears on the student card ("Lessons" tab, "already used in a lesson" marks)
-      // and in the group's lessons block.
+      // and on the group page (lessons block, attendance table once it has started).
+      invalidateAroundLesson(queryClient);
       void queryClient.invalidateQueries({ queryKey: qk('planner', 'getLessonNewForm') });
-      void queryClient.invalidateQueries({ queryKey: qk('teacherStudents', 'listStudentLessons') });
-      void queryClient.invalidateQueries({ queryKey: qk('groups', 'getGroup') });
       if (stillHere()) navigation.replace({ screen: 'planner.lessonBoard', lessonId: created.lessonId });
     },
   });

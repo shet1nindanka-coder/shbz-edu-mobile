@@ -10,9 +10,15 @@
  *   setOverlayCover(<LockScreen … />)   // the owner of the cover (LockGate); `null` removes it
  *   <OverlayCoverSlot />                // BottomSheet, FileViewerModal and the modal routes render it
  *   useOverlayCovered()                 // overlays ignore "close" requests (hardware back) while covered
+ *   <View {...coveredAccessibilityProps(covered)}>…</View>   // what lies under the cover leaves the a11y tree
+ *
+ * WHY the accessibility props: an opaque view on top does not remove its siblings from the accessibility
+ * tree. Android (TalkBack, Switch Access, Voice Access) would still read and activate them, and iOS
+ * `accessibilityViewIsModal` only hides the siblings of the modal view itself, not those of its slot. So
+ * every window hides its own content (never the slot) while a cover is up.
  */
 import { useSyncExternalStore, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { View, type ViewProps } from 'react-native';
 
 import { absoluteFill } from './internal/layout';
 
@@ -35,6 +41,32 @@ export function setOverlayCover(next: ReactNode): void {
   if (cover === next) return;
   cover = next;
   listeners.forEach((listener) => listener());
+}
+
+/** Synchronous read for code outside React (e.g. a system sheet about to be presented after an await). */
+export function isOverlayCovered(): boolean {
+  return cover !== null;
+}
+
+type CoveredAccessibilityProps = Pick<ViewProps, 'importantForAccessibility' | 'accessibilityElementsHidden' | 'aria-hidden'>;
+
+const HIDDEN: CoveredAccessibilityProps = {
+  // Android: the view and all its descendants leave the accessibility tree.
+  importantForAccessibility: 'no-hide-descendants',
+  // iOS VoiceOver.
+  accessibilityElementsHidden: true,
+  // Web (the lock never closes there, but the contract is the same on every platform).
+  'aria-hidden': true,
+};
+// Explicit values, so that removing the cover restores the defaults on every renderer.
+const SHOWN: CoveredAccessibilityProps = { importantForAccessibility: 'auto', accessibilityElementsHidden: false };
+
+/**
+ * Props for the content view of a window (never for the view holding `<OverlayCoverSlot />`): while
+ * `covered`, nothing under the cover is reachable by screen readers and other accessibility services.
+ */
+export function coveredAccessibilityProps(covered: boolean): CoveredAccessibilityProps {
+  return covered ? HIDDEN : SHOWN;
 }
 
 /** Whether a cover is up: overlays must not close or react underneath it. */

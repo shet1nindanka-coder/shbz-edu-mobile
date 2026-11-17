@@ -1,9 +1,11 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 
 import { makeStyles, useTheme } from '@/theme';
 
 import { Icon } from '../icon';
+import { useOverlayCovered } from '../overlay-cover';
 import { Text } from '../text';
 import {
   dateToParts,
@@ -38,6 +40,15 @@ export function DateTimePickerBody({ value, today, onChange, locale, dateLabel, 
   const styles = useStyles();
   const parts = parseDateTimeValue(value);
   const shown = partsToDate(parts ?? parseDateTimeValue(todayDateTimeValue(new Date(), today)) ?? dateToParts(new Date()));
+  const covered = useOverlayCovered();
+
+  // Android: the system date / time dialog is a window above every window of the app, so the lock cover
+  // cannot be drawn over it — it is closed instead (the pick in progress is dropped, the value stays).
+  useEffect(() => {
+    if (!covered || Platform.OS !== 'android') return;
+    void DateTimePickerAndroid.dismiss('date').catch(() => undefined);
+    void DateTimePickerAndroid.dismiss('time').catch(() => undefined);
+  }, [covered]);
 
   if (Platform.OS === 'ios') {
     return (

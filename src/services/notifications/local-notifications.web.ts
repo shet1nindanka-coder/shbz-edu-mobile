@@ -11,5 +11,8 @@ export const localNotifications: LocalNotifications = {
   ensureChannel: async () => undefined,
   sync: async () => undefined,
   cancelAll: async () => undefined,
+  removeAll: async () => undefined,
+  getExactTiming: async () => ({ status: 'unavailable', canAskAgain: false }),
+  requestExactTiming: async () => ({ status: 'unavailable', canAskAgain: false }),
   listenForOpens: () => () => undefined,
 };

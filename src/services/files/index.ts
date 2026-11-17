@@ -11,6 +11,7 @@ export {
   type LocalFile,
 } from './local-file-registry';
 export { forgetAllLocalFiles, forgetLocalFile, importLocalFile, resolveLocalFile } from './local-file-store';
+export { readLocalFileBytes } from './local-file-bytes';
 export { clearFileCache, dropCachedFile, FILE_CACHE_MAX_BYTES, findCachedFile, trimFileCache } from './file-cache';
 export { isDeferredDocumentUri, resolveDocumentUri } from './document-uri';
 export { materialiseMockSample, mockSampleUri } from './mock-sample-store';

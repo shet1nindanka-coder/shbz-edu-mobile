@@ -51,7 +51,7 @@ const useStyles = makeStyles((t) => ({
     borderColor: t.colors.cardBorder,
     backgroundColor: t.colors.cardBg,
   },
-  text: { flexShrink: 1 },
+  text: { flexShrink: 1, minWidth: 0 },
   // A full-height touch target for the one action of the card.
   undo: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
 }));

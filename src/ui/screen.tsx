@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { makeStyles, useTheme } from '@/theme';
 
+import { useKeyboardCoversHomeIndicator } from './internal/keyboard';
 import { PageGlow } from './page-glow';
 import { useWindowContentTop } from './window-insets';
 
@@ -68,6 +69,10 @@ export function Screen({
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const contentTop = useWindowContentTop();
+  // While the keyboard is up (iOS) it covers the home indicator: the footer sits on the keys, not on an
+  // empty inset-high strip above them.
+  const keyboardShown = useKeyboardCoversHomeIndicator(Boolean(footer) && bottomInset && keyboardAvoiding);
+  const footerInset = bottomInset && !keyboardShown ? insets.bottom : 0;
   const bottom = bottomInset && !footer ? insets.bottom : 0;
   const column: ViewStyle = { width: '100%', maxWidth, alignSelf: 'center' };
   const padding: ViewStyle | null = padded
@@ -111,7 +116,7 @@ export function Screen({
       {header}
       {content}
       {footer ? (
-        <View style={[styles.footer, { paddingBottom: theme.space.md + (bottomInset ? insets.bottom : 0) }]}>
+        <View style={[styles.footer, { paddingBottom: theme.space.md + footerInset }]}>
           <View style={column}>{footer}</View>
         </View>
       ) : null}

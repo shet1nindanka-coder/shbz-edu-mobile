@@ -10,11 +10,14 @@ export { IS_MOCK_BUILD } from './app-config';
 export { AppProviders, type AppProvidersProps } from './app-providers';
 export {
   STUDENT_NOTE_WRITE,
+  discardStudentNote,
+  flushPendingWrites,
   getPendingWrites,
   saveStudentNote,
   usePendingStudentNote,
   usePendingWrite,
   usePendingWritesCount,
+  usePendingWritesSummary,
   type PendingWriteContext,
   type StudentNotePayload,
   type StudentNoteResult,

@@ -26,7 +26,7 @@ export function FieldShell({ label, error, helper, labelAside, style, children }
       {label || labelAside ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space.md }}>
           {label ? (
-            <Text variant="label" style={{ flexShrink: 1 }}>
+            <Text variant="label" style={{ flexShrink: 1, minWidth: 0 }}>
               {label}
             </Text>
           ) : (

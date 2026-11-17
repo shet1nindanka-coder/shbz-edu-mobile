@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { View, type TextInputInstance } from 'react-native';
 
 import { errorText, useApi } from '@/api';
 import type { GroupListItem } from '@/api/types';
@@ -36,6 +36,7 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
   // Both the button and the keyboard's "done" submit: `create.isPending` reaches this render only later,
   // so a synchronous flag keeps two submits handled back to back from creating two groups.
   const inFlight = useRef(false);
+  const gradeRef = useRef<TextInputInstance>(null);
 
   const create = useMutation({
     mutationFn: (input: { name: string; grade: number | null }) => api.groups.createGroup(input),
@@ -101,10 +102,14 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
           maxLength={GROUP_NAME_MAX_LENGTH}
           autoCapitalize="sentences"
           returnKeyType="next"
+          // "Next" moves on to the grade with the keyboard kept open (a single-line field would blur).
+          submitBehavior="submit"
+          onSubmitEditing={() => gradeRef.current?.focus()}
           disabled={create.isPending}
           testID="group-create-name"
         />
         <TextField
+          ref={gradeRef}
           label={t.createForm.gradeLabel}
           value={grade}
           onChangeText={(text) => setGrade(text.replace(/\D+/g, '').slice(0, 2))}

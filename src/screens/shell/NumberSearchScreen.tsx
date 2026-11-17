@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
-import { hasErrorCode, isApiError, isNetworkError, useApi } from '@/api';
+import { isApiError, useApi } from '@/api';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { numberFindTarget } from '@/navigation/targets';
@@ -49,9 +49,7 @@ export function NumberSearchScreen() {
       }
     },
     onError: (failure) => {
-      // A validation or lookup answer carries its own text; anything else is the site's generic line.
-      const useServerText = isApiError(failure) && !isNetworkError(failure) && hasErrorCode(failure, 'invalidNumber', 'numberNotFound', 'rateLimited');
-      setError(useServerText ? failure.message : isNetworkError(failure) ? failure.message : t.notFound);
+      setError(numberSearchErrorText(failure, t.notFound));
       refocus();
     },
     onSettled: () => {
@@ -111,6 +109,15 @@ export function NumberSearchScreen() {
       </View>
     </Screen>
   );
+}
+
+/**
+ * The line under the field for a failed search. Like the site (`setFeedback(result?.error ?? t.notFound)`),
+ * every refusal shows the server's own text — 503 / 500 searchFailed / 403 must not read as "this number
+ * does not exist" — and the generic "not found" line is only for a failure without a text.
+ */
+export function numberSearchErrorText(failure: unknown, notFound: string): string {
+  return isApiError(failure) && failure.message.trim() !== '' ? failure.message : notFound;
 }
 
 const useStyles = makeStyles((t) => ({

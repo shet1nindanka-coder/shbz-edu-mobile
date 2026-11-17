@@ -2,7 +2,6 @@ import { View } from 'react-native';
 
 import type { LessonItemDto, LessonItemResult, SolutionVerdict } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { RetryWaitLine } from '@/components/retry-wait';
 import { formatClockTime } from '@/domain/dates';
 import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
@@ -29,8 +28,6 @@ export type LessonItemCardProps = {
   submitDisabled: boolean;
   submitError: string | null;
   onDismissSubmitError: () => void;
-  /** Seconds of a cool-down, shown under this item's error. */
-  waitSeconds: number;
   /** The camera / gallery could not give a photo for this item. */
   pickProblem: PickProblem | null;
   onDismissPickProblem: () => void;
@@ -54,7 +51,6 @@ export function LessonItemCard({
   submitDisabled,
   submitError,
   onDismissSubmitError,
-  waitSeconds,
   pickProblem,
   onDismissPickProblem,
   preparing,
@@ -115,17 +111,15 @@ export function LessonItemCard({
         </Text>
       ) : null}
 
+      {/* The server's text only: the cool-down that locks every card is told once, in the lesson header. */}
       {submitError ? (
-        <View style={styles.notice}>
-          <Notice
-            tone="error"
-            text={submitError}
-            onDismiss={onDismissSubmitError}
-            dismissLabel={m.common.actions.close}
-            testID={`lesson-submit-error-${item.number}`}
-          />
-          <RetryWaitLine seconds={waitSeconds} />
-        </View>
+        <Notice
+          tone="error"
+          text={submitError}
+          onDismiss={onDismissSubmitError}
+          dismissLabel={m.common.actions.close}
+          testID={`lesson-submit-error-${item.number}`}
+        />
       ) : null}
       {pickProblem ? <PickProblemNotice problem={pickProblem} onDismiss={onDismissPickProblem} /> : null}
 
@@ -172,6 +166,5 @@ const useStyles = makeStyles((t) => ({
   meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
   topic: { flexShrink: 1 },
   checking: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-  notice: { gap: t.space.xs },
   submit: { gap: t.space.sm },
 }));

@@ -90,7 +90,9 @@ const useStyles = makeStyles((t) => ({
   head: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: t.space.md },
   titleWrap: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   // A word longer than the column wraps inside it instead of leaving the card.
-  label: { ...t.typography.cardTitle, fontFamily: t.fonts.extrabold, color: t.colors.textStrong, flexShrink: 1 },
+  // RN-web gives a Text `min-width: auto` (its longest word), so without `minWidth: 0` the flex item would
+  // not shrink below that word and `break-word` never applies; Yoga on native has no such minimum.
+  label: { ...t.typography.cardTitle, fontFamily: t.fonts.extrabold, color: t.colors.textStrong, flexShrink: 1, minWidth: 0 },
   chevron: { marginTop: 4 },
   bar: { marginTop: t.space.sm },
   barCompact: { marginTop: t.space.xs, height: 7 },

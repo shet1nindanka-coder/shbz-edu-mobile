@@ -22,6 +22,9 @@ export type GroupSettingsProps = {
   onDeleted: () => void;
   /** A delete that failed: the dialog is closed, the reason is shown on the screen. */
   onDeleteFailed: (text: string) => void;
+  /** A rename answered `404`: the group is gone (deleted elsewhere) — the screen leaves for the list,
+   * which says so, as the site's redirect to `?groupError=missing` does. */
+  onMissing: () => void;
 };
 
 type Step = 'rename' | 'delete';
@@ -30,7 +33,7 @@ type Step = 'rename' | 'delete';
  * «Настройки группы» (06 §1.2 item 8, §3.2, §3.3) behind the app bar's "⋯": rename in a one-field sheet,
  * delete behind a confirmation that spells out the consequences. Grade and subject cannot be edited.
  */
-export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDeleted, onDeleteFailed }: GroupSettingsProps) {
+export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDeleted, onDeleteFailed, onMissing }: GroupSettingsProps) {
   const styles = useStyles();
   const api = useApi();
   const queryClient = useQueryClient();
@@ -68,9 +71,16 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
       onRenamed();
     },
     onError: (failure) => {
-      // 400 invalidData, 404 groupNotFound, 500 saveFailed, network — each with its own text.
+      // 404 groupNotFound: nothing to retry here — every further press would get the same answer, and
+      // the screen behind the sheet shows a group that no longer exists. The site redirects to the list.
+      if (isNotFoundError(failure)) {
+        invalidateGroupLists(queryClient);
+        setRenameOpen(false);
+        onMissing();
+        return;
+      }
+      // 400 invalidData, 500 saveFailed, network — each with its own text.
       setRenameError(errorText(failure, t.detail.notices.save));
-      if (isNotFoundError(failure)) invalidateGroupLists(queryClient);
     },
   });
 

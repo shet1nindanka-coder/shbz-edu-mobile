@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppServices } from '@/api/client';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import { createMockApiClient, type MockApiClient } from '@/mock';
-import { createMockFileService, forgetLocalFile, importLocalFile, materialiseMockSample } from '@/services/files';
+import { createMockFileService, forgetLocalFile, importLocalFile, materialiseMockSample, readLocalFileBytes } from '@/services/files';
 import { isOnline } from '@/services/network';
 import { createPreferencesStore, type AppPreferencesStore, type KeyValueStorage } from '@/services/preferences';
 import { createSessionCache, guardApiClient, type SessionCache, type SessionErrorHandlers } from '@/services/session';
@@ -68,6 +68,9 @@ export function getAppRuntime(): AppRuntime {
       );
     },
     onFileRemoved: (fileId) => forgetLocalFile(fileId),
+    // The content of a picked file (file:// / content:// on a phone, blob: on web), so the mock refuses a
+    // mislabelled upload like the site's `validateUploadedBytes`.
+    readUploadBytes: readLocalFileBytes,
   });
 
   runtime = {

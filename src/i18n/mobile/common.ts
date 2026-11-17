@@ -43,7 +43,8 @@ const ru = {
     openFailed: "Не удалось открыть файл. Попробуйте ещё раз.",
     imageFailed: "Не удалось показать изображение.",
     pdfExternalOnly: "На этом устройстве PDF открывается в отдельном приложении.",
-    preparing: "Готовим файл…"
+    preparing: "Готовим файл…",
+    untitled: "Файл"
   },
   photos: {
     add: "Добавить фото",
@@ -112,7 +113,8 @@ const en: typeof ru = {
     openFailed: "Could not open the file. Please try again.",
     imageFailed: "Could not show the image.",
     pdfExternalOnly: "On this device a PDF opens in a separate app.",
-    preparing: "Preparing the file…"
+    preparing: "Preparing the file…",
+    untitled: "File"
   },
   photos: {
     add: "Add a photo",

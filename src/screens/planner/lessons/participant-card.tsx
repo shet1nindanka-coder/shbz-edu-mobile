@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import type { DerivedLessonStatus, LessonBoardItem, LessonBoardParticipant, LessonItemResult } from '@/api/types';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { formatClockTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
@@ -24,8 +25,8 @@ export type ParticipantCardProps = {
   planBlocked: boolean;
   /** Set saves are cooling down. */
   itemsBlocked: boolean;
-  /** Result marks are cooling down. */
-  resultsBlocked: boolean;
+  /** Seconds until result marks may be saved again (`429` / `503` of the result bucket); 0 when free. */
+  resultWaitSeconds: number;
   savingItemIds: readonly string[];
   itemErrors: Record<string, string>;
   now: number;
@@ -53,7 +54,7 @@ export function ParticipantCard({
   busy,
   planBlocked,
   itemsBlocked,
-  resultsBlocked,
+  resultWaitSeconds,
   savingItemIds,
   itemErrors,
   now,
@@ -74,6 +75,7 @@ export function ParticipantCard({
   const { main, extra } = splitParts(participant.items);
   const idle = live.idle && live.idle.level !== 'ok' ? live.idle : null;
   const failed = planState.failed || planState.stale;
+  const resultsBlocked = resultWaitSeconds > 0;
 
   const renderItem = (item: LessonBoardItem, index: number) => (
     <ItemRow
@@ -179,6 +181,12 @@ export function ParticipantCard({
               <Text variant="kickerSm">{t.extraPart}</Text>
               {extra.map(renderItem)}
             </View>
+          ) : null}
+
+          {/* The result bucket locks every traffic light of the board: each open card says until when,
+              under its own rows, since the board header may be far above. */}
+          {participant.items.length > 0 ? (
+            <RetryWaitLine seconds={resultWaitSeconds} testID={`lesson-result-wait-${participant.id}`} />
           ) : null}
 
           <Button

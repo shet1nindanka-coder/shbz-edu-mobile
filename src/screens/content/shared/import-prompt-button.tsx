@@ -6,7 +6,7 @@ import { qk, useApi } from '@/api';
 import { TOPIC_IMPORT_PROMPT } from '@/domain/topic-import-prompt';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, IconButton, Text, useCopyFeedback } from '@/ui';
+import { Button, IconButton, isOverlayCovered, Text, useCopyFeedback } from '@/ui';
 
 /** The site keeps the "copied" pill for 2 s. */
 const COPIED_HOLD_MS = 2000;
@@ -66,7 +66,11 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
     setBusy(true);
     setError(null);
     try {
-      await Share.share({ message: await loadPrompt() });
+      const message = await loadPrompt();
+      // The app lock may have covered the screen while the prompt loaded: a system sheet presented now
+      // would open above the lock cover (iOS hand-off). The user taps «Share» again after unlocking.
+      if (isOverlayCovered()) return;
+      await Share.share({ message });
     } catch {
       // The user closed the sheet or sharing is unavailable: copying still works.
     } finally {

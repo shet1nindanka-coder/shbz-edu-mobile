@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import type { PanelAction } from '@/api/types';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Card, Dialog, Text } from '@/ui';
@@ -85,11 +86,11 @@ function ActionRow({ row, onSettled }: { row: PanelActionRow; onSettled: (action
         wrapLabel
         testID={`panel-action-${row.action}`}
       />
+      <RetryWaitLine seconds={lock.seconds} testID={`panel-action-${row.action}-wait`} />
       {run.isPending || result ? (
         <ResultLine
           pendingText={run.isPending ? t.actionRunning : null}
           result={result}
-          waitSeconds={lock.seconds}
           testID={`panel-action-${row.action}-result`}
         />
       ) : (

@@ -24,11 +24,33 @@
  *    ```ts
  *    const outcome = await pendingWrites.submit("student.note", homeworkNumberId, { note });
  *    // "sent"     → the server has it (`outcome.result` = what the handler returned)
- *    // "queued"   → no connection; kept locally and retried later
+ *    // "queued"   → no answer (or nobody may send now); kept locally and sent later
  *    // "rejected" → the server refused it (validation, 404…): show `outcome.error.message`
  *    ```
  *
  * 3. Show the waiting state with `usePendingWrite(kind, id)` (`@/providers`), which re-renders on changes.
+ *
+ * STATES OF AN ENTRY (one per `kind + id`, owned by `userId`)
+ *
+ *   (none) ──submit──▶ SENDING ──answer──────────────────────────────▶ (none)          delivered
+ *                         │ ──no answer (isRetryable)──▶ WAITING                       kept, attempts + 1
+ *                         │ ──session gone (isHeld)────▶ WAITING                       kept, flush stops
+ *                         └ ──refusal──▶ REFUSED  if `keepRefused(error)` returns the refusal to remember,
+ *                                        (none)   otherwise (and `onRejected` when nobody awaited it)
+ *   WAITING ──flush──▶ SENDING      flush: on reconnect, in the foreground, after sign-in, and — when
+ *                                   `retryDelaysMs` is set — by itself with backoff while the device is
+ *                                   online (a timeout while "online" brings no reconnect event).
+ *   REFUSED ──flush──▶ REFUSED      never re-sent by itself (a refused write cannot succeed unchanged); the
+ *                                   UI shows `refusal`, the user re-submits or `discard`s it.
+ *   any ──submit (newer payload)──▶ SENDING   last write wins; a refusal is forgotten with the old payload.
+ *   any ──discard / clear──▶ (none)           `clear` = explicit sign-out (the user confirmed losing them).
+ *   other users' entries ──dropOtherUsers(id)──▶ (none)   a different account signed in on this device.
+ *
+ * WHO MAY SEND: only the signed-in user (`getUserId`) sends, and only their own entries. While nobody is
+ * signed in because the session EXPIRED (not a sign-out), `getOwnerId` names the user whose drafts are
+ * kept: a submit made then (an editor flushing as the tree unmounts) is stored for that user and sent when
+ * the same user signs in again. Another user never sees or sends them, and signing in as someone else
+ * drops them.
  *
  * RULES
  * - One entry per `kind + id`: a newer payload replaces the older one (last write wins) — a queue of drafts
@@ -37,14 +59,13 @@
  *   request for the same entry has settled and then sends the NEWEST payload. Two overlapping requests could
  *   reach the server in the wrong order and the older text would win. A submit whose payload was superseded
  *   while it waited gets the outcome of the request that carried the newer payload.
- * - Only a `network` failure keeps the entry. Any answer from the server is final: success removes it, a
- *   refusal removes it and is reported (`onRejected`), because repeating a refused write cannot succeed.
- * - `flush()` is called when the connection returns, when the app comes to the foreground and after
- *   sign-in. It stops at the first network failure (the rest would fail the same way).
- * - Entries are tied to the user that created them: another account never sends them.
+ * - `flush()` stops at the first failure without an answer (the rest would fail the same way).
+ * - Backoff (`retryDelaysMs`): the n-th consecutive failure without an answer waits `retryDelaysMs[n]` (the
+ *   last value repeats); a delivery resets it. Nothing is scheduled while signed out, and a timer that fires
+ *   while offline leaves the next try to the reconnect event.
  * - NOT for actions with side effects the user must witness (issuing homework, starting a check, uploads).
  *
- * Pure: storage, clock, handler context and the "is this a network error" test are injected.
+ * Pure: storage, clock, timers, connectivity, handler context and the error classification are injected.
  */
 
 export interface PendingWritesStorage {
@@ -65,7 +86,26 @@ export type PendingWrite<P = unknown> = {
   updatedAt: number;
   /** Failed attempts so far. */
   attempts: number;
+  /** Set when the server refused this payload in the background and the refusal is kept for the UI. */
+  refusal?: PendingWriteRefusal;
 };
+
+/** What the queue remembers about a refused write (see `keepRefused`). */
+export type PendingWriteRefusal = {
+  /** Machine code of the refusal, or null. */
+  code: string | null;
+  /** Localised text at the time of the refusal, or null (the UI shows its fallback). */
+  message: string | null;
+  /** Epoch ms before which the server will refuse again (`rateLimited`), or null. */
+  retryAt: number | null;
+  at: number;
+};
+
+/** What `keepRefused` extracts from an error; `retryAfterSeconds` becomes `retryAt`. */
+export type PendingWriteRefusalInfo = { code: string | null; message: string | null; retryAfterSeconds: number | null };
+
+/** Timer functions (injected in tests). */
+export type PendingWritesTimers = { set: (callback: () => void, ms: number) => unknown; clear: (handle: unknown) => void };
 
 /** Sends one write. What it resolves to is handed to the caller of `submit` (e.g. the server's normalised value). */
 export type PendingWriteHandler<P, C, R = unknown> = (write: PendingWrite<P>, context: C) => Promise<R>;
@@ -87,8 +127,25 @@ export type PendingWritesOptions<C> = {
   getUserId: () => string | null;
   /** True when a failure means "no response" and the write should wait; anything else is a final refusal. */
   isRetryable: (error: unknown) => boolean;
+  /** True when the failure means "this session may not send" (it expired): kept, the flush stops, no backoff. */
+  isHeld?: (error: unknown) => boolean;
+  /**
+   * A refusal to keep with the entry (state REFUSED) so the UI can show it later, or null to drop the entry.
+   * Without it every refusal drops the entry.
+   */
+  keepRefused?: (error: unknown) => PendingWriteRefusalInfo | null;
   /** A write the server refused during a background flush (nobody is awaiting it). */
   onRejected?: (write: PendingWrite, error: unknown) => void;
+  /**
+   * Who owns writes submitted while nobody is signed in (the user whose session expired), or null. Such a
+   * write is kept for that user and not sent. Without it a submit while signed out is refused.
+   */
+  getOwnerId?: () => string | null;
+  /** Backoff of the automatic flush after a failure without an answer; empty or absent = no automatic flush. */
+  retryDelaysMs?: readonly number[];
+  /** Connectivity; an automatic flush is skipped while offline (the reconnect flushes). Default: online. */
+  isOnline?: () => boolean;
+  timers?: PendingWritesTimers;
   now?: () => number;
 };
 
@@ -105,8 +162,10 @@ export interface PendingWritesQueue<C> {
   list(kind?: string): PendingWrite[];
   /** Drops one entry (the user discarded the draft). */
   discard(kind: string, id: string): Promise<void>;
-  /** Drops every entry (sign-out). */
+  /** Drops every entry (explicit sign-out). */
   clear(): Promise<void>;
+  /** Drops the entries of every user but `userId` (another account signed in on this device). */
+  dropOtherUsers(userId: string): Promise<void>;
   /** Called after every change of the queue. */
   subscribe(listener: () => void): () => void;
   /** Monotonic counter of changes — a cheap snapshot for `useSyncExternalStore`. */
@@ -119,10 +178,22 @@ function entryKey(kind: string, id: string): string {
   return `${kind}\u0000${id}`;
 }
 
+function isRefusal(value: unknown): value is PendingWriteRefusal {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    (row.code === null || typeof row.code === "string") &&
+    (row.message === null || typeof row.message === "string") &&
+    (row.retryAt === null || typeof row.retryAt === "number") &&
+    typeof row.at === "number"
+  );
+}
+
 function isPendingWrite(value: unknown): value is PendingWrite {
   if (typeof value !== "object" || value === null) return false;
   const row = value as Record<string, unknown>;
   return (
+    (row.refusal === undefined || isRefusal(row.refusal)) &&
     typeof row.kind === "string" &&
     typeof row.id === "string" &&
     typeof row.userId === "string" &&
@@ -145,9 +216,15 @@ export function parsePendingWrites(raw: string | null | undefined): PendingWrite
 }
 
 export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): PendingWritesQueue<C> {
-  const { storage, getContext, getUserId, isRetryable, onRejected } = options;
+  const { storage, getContext, getUserId, isRetryable, onRejected, isHeld, keepRefused, getOwnerId } = options;
   const storageKey = options.storageKey ?? PENDING_WRITES_STORAGE_KEY;
   const now = options.now ?? Date.now;
+  const retryDelays = options.retryDelaysMs ?? [];
+  const isOnline = options.isOnline ?? (() => true);
+  const timers: PendingWritesTimers = options.timers ?? {
+    set: (callback, ms) => setTimeout(callback, ms),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  };
 
   const entries = new Map<string, PendingWrite>();
   const handlers = new Map<string, PendingWriteHandler<unknown, C>>();
@@ -196,7 +273,33 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     return hydration;
   };
 
-  type Attempt = "sent" | "retry" | "rejected" | "skipped";
+  // ── backoff of the automatic flush ──
+  let retryTimer: unknown = null;
+  let retryStep = 0;
+  /** Entries the signed-in user could send now (not refused). */
+  const hasWaiting = () => {
+    const userId = getUserId();
+    if (userId === null) return false;
+    for (const write of entries.values()) if (write.userId === userId && !write.refusal) return true;
+    return false;
+  };
+  const cancelRetry = () => {
+    if (retryTimer !== null) timers.clear(retryTimer);
+    retryTimer = null;
+  };
+  const scheduleRetry = () => {
+    if (retryDelays.length === 0 || retryTimer !== null || !hasWaiting()) return;
+    const delay = retryDelays[Math.min(retryStep, retryDelays.length - 1)] ?? 0;
+    retryStep += 1;
+    retryTimer = timers.set(() => {
+      retryTimer = null;
+      // Offline: the reconnect event flushes. Signed out: the next sign-in flushes.
+      if (getUserId() === null || !isOnline()) return;
+      void flush();
+    }, delay);
+  };
+
+  type Attempt = "sent" | "retry" | "hold" | "rejected" | "skipped";
   type AttemptOutcome = { result: Attempt; error?: unknown; value?: unknown; sentAt?: number };
 
   /** Tail of the requests of each entry: the next request for a key starts when this settles. */
@@ -209,8 +312,8 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     const write = entries.get(key);
     if (!write) return { result: "skipped" };
     const handler = handlers.get(write.kind);
-    // No sender yet (its module is not loaded) or another user's draft: leave it alone.
-    if (!handler || write.userId !== getUserId()) return { result: "skipped" };
+    // No sender yet (its module is not loaded), another user's draft, or a refusal waiting for the user.
+    if (!handler || write.userId !== getUserId() || write.refusal) return { result: "skipped" };
 
     const sentAt = write.updatedAt;
     const isStillSame = () => entries.get(key)?.updatedAt === sentAt;
@@ -230,8 +333,15 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         }
         return { result: "retry", error, sentAt };
       }
+      if (isHeld?.(error)) return { result: "hold", error, sentAt };
       if (isStillSame()) {
-        entries.delete(key);
+        const current = entries.get(key);
+        const info = keepRefused?.(error) ?? null;
+        if (current && info) {
+          const at = now();
+          const retryAt = info.retryAfterSeconds ? at + info.retryAfterSeconds * 1000 : null;
+          entries.set(key, { ...current, refusal: { code: info.code, message: info.message, retryAt, at } });
+        } else entries.delete(key);
         changed();
       }
       return { result: "rejected", error, sentAt };
@@ -245,6 +355,12 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     const tail = run.then(
       (outcome) => {
         if (outcome.sentAt !== undefined) answered.set(key, { ...outcome, sentAt: outcome.sentAt });
+        if (outcome.result === "retry") scheduleRetry();
+        else if (outcome.result === "sent") retryStep = 0;
+        if (!hasWaiting()) {
+          cancelRetry();
+          retryStep = 0;
+        }
       },
       () => undefined,
     );
@@ -272,7 +388,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         else if (outcome.result === "rejected") {
           rejected += 1;
           if (write) onRejected?.(write, outcome.error);
-        } else if (outcome.result === "retry") break;
+        } else if (outcome.result === "retry" || outcome.result === "hold") break;
       }
       return { sent, rejected, remaining: entries.size };
     })().finally(() => {
@@ -291,7 +407,8 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     },
     async submit<P, R = unknown>(kind: string, id: string, payload: P): Promise<SubmitOutcome<R>> {
       await hydrate();
-      const userId = getUserId();
+      // While a session that expired is being torn down, its user still owns what the editors flush.
+      const userId = getUserId() ?? getOwnerId?.() ?? null;
       if (userId === null) return { status: "rejected", error: new Error("pending-writes: no signed-in user") };
       if (!handlers.has(kind)) return { status: "rejected", error: new Error(`pending-writes: kind "${kind}" is not registered`) };
 
@@ -335,9 +452,22 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     },
     async clear() {
       await hydrate();
+      cancelRetry();
+      retryStep = 0;
       if (entries.size === 0) return;
       entries.clear();
       changed();
+      await saveChain;
+    },
+    async dropOtherUsers(userId) {
+      await hydrate();
+      let dropped = false;
+      for (const [key, write] of entries) {
+        if (write.userId === userId) continue;
+        entries.delete(key);
+        dropped = true;
+      }
+      if (dropped) changed();
       await saveChain;
     },
     subscribe(listener) {

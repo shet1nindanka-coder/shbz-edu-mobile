@@ -145,11 +145,10 @@ export function ReviewAssignmentCard({
       {expanded ? (
         <View style={styles.body}>
           {error ? (
-            <View style={styles.errorBlock}>
-              <Notice tone="error" text={error} onDismiss={onDismissError} dismissLabel={m.common.actions.close} testID={`review-assignment-error-${assignment.id}`} />
-              <RetryWaitLine seconds={waitSeconds} />
-            </View>
+            <Notice tone="error" text={error} onDismiss={onDismissError} dismissLabel={m.common.actions.close} testID={`review-assignment-error-${assignment.id}`} />
           ) : null}
+          {/* Outside the error: the notice can be closed, and a refused number mark locks this card too. */}
+          <RetryWaitLine seconds={waitSeconds} testID={`review-wait-${assignment.id}`} />
 
           {assignment.photos.length > 0 ? (
             <View style={styles.block}>
@@ -206,7 +205,6 @@ export function ReviewAssignmentCard({
                 lessonMode={lessonMode}
                 saving={savingIds.includes(number.homeworkNumberId)}
                 blocked={blocked}
-                waitSeconds={waitSeconds}
                 error={numberErrors[number.homeworkNumberId]}
                 onStatus={(status) => onStatus(number.homeworkNumberId, status)}
                 onHistory={() => onHistory(number.homeworkNumberId)}
@@ -247,7 +245,6 @@ const useStyles = makeStyles((t) => ({
   summaryChip: { paddingHorizontal: 9 },
   body: { gap: t.space.field },
   block: { gap: t.space.sm },
-  errorBlock: { gap: t.space.xs },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   cancel: { alignSelf: 'flex-start' },
 }));

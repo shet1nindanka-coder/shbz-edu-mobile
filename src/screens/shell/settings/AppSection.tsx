@@ -1,15 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { useEffect, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { AppState, Linking, View } from 'react-native';
 
 import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
-import { Hint, IS_MOCK_BUILD, useCurrentUser, usePendingWritesCount, usePreferences } from '@/providers';
+import { Hint, IS_MOCK_BUILD, useCurrentUser, usePendingWritesSummary, usePreferences } from '@/providers';
 import { authenticateWithBiometrics, getBiometricAvailability, type BiometricAvailability } from '@/services/biometrics';
 import { clearFileCache } from '@/services/files';
 import { useIsOnline } from '@/services/network';
-import { localNotifications, type ReminderPermissionState } from '@/services/notifications';
+import { localNotifications, type ExactTimingState, type ReminderPermissionState } from '@/services/notifications';
 import type { ReminderCategory } from '@/services/preferences';
 import { makeStyles } from '@/theme';
 import { Button, Card, Dialog, Divider, Icon, ListRow, Notice, SectionCard, Switch, Text, TextButton } from '@/ui';
@@ -30,11 +30,13 @@ export function AppSection() {
   const queryClient = useQueryClient();
   const { preferences, setBiometricLock, setReminder } = usePreferences();
   const online = useIsOnline();
-  const pendingCount = usePendingWritesCount();
+  // Refused writes are not «waiting»: the queue never sends them by itself (the student retries in the editor).
+  const pending = usePendingWritesSummary();
 
   const [biometrics, setBiometrics] = useState<BiometricAvailability | null>(null);
   const [biometricError, setBiometricError] = useState<string | null>(null);
   const [permission, setPermission] = useState<ReminderPermissionState | null>(null);
+  const [exactTiming, setExactTiming] = useState<ExactTimingState | null>(null);
   const [cacheCleared, setCacheCleared] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
@@ -46,10 +48,24 @@ export function AppSection() {
     void localNotifications.getPermission().then((value) => {
       if (active) setPermission(value);
     });
+    const readExactTiming = () =>
+      void localNotifications.getExactTiming().then((value) => {
+        if (active) setExactTiming(value);
+      });
+    readExactTiming();
+    // The access may be granted or revoked in the system settings while this screen stays open.
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') readExactTiming();
+    });
     return () => {
       active = false;
+      subscription.remove();
     };
   }, []);
+
+  const allowExactTiming = async () => {
+    setExactTiming(await localNotifications.requestExactTiming());
+  };
 
   const toggleBiometricLock = async (enabled: boolean) => {
     setBiometricError(null);
@@ -115,6 +131,12 @@ export function AppSection() {
         : m.shell.biometrics.hint;
   const remindersSupported = localNotifications.supported && permission?.status !== 'unavailable';
   const remindersDenied = permission?.status === 'denied';
+  // Android 12+ without the "alarms & reminders" access: the OS may deliver a reminder late.
+  const remindersInexact =
+    exactTiming?.status === 'denied' &&
+    remindersSupported &&
+    !remindersDenied &&
+    reminderRows.some((row) => preferences.reminders[row.category]);
   const version = Constants.expoConfig?.version ?? '';
 
   return (
@@ -126,9 +148,10 @@ export function AppSection() {
             trailing
             label={m.shell.biometrics.title}
             description={biometricDescription}
-            // The lock can always be switched OFF, even if the sensor has since become unavailable.
-            value={preferences.biometricLock && biometricsReady}
-            disabled={!biometricsReady}
+            // The lock can always be switched OFF, even if the sensor has since become unavailable: the
+            // switch shows the stored value, and only switching it on needs a ready sensor.
+            value={preferences.biometricLock}
+            disabled={!biometricsReady && !preferences.biometricLock}
             onValueChange={(value) => void toggleBiometricLock(value)}
             testID="settings-biometric-lock"
             style={styles.control}
@@ -171,6 +194,17 @@ export function AppSection() {
               testID="settings-reminders-denied"
             />
           ) : null}
+          {remindersInexact ? (
+            <Notice
+              tone="warning"
+              text={t.remindersInexact}
+              action={
+                exactTiming?.canAskAgain ? <TextButton label={t.remindersExactAllow} onPress={() => void allowExactTiming()} testID="settings-reminders-exact-allow" /> : undefined
+              }
+              style={styles.control}
+              testID="settings-reminders-inexact"
+            />
+          ) : null}
         </Card>
 
         <Card variant="soft">
@@ -181,9 +215,14 @@ export function AppSection() {
               {online ? t.connectionOnline : t.connectionOffline}
             </Text>
           </View>
-          {pendingCount > 0 ? (
+          {pending.waiting > 0 ? (
             <Text variant="small" color="textMuted" style={styles.line} testID="settings-pending-writes">
-              {plural(locale, pendingCount, t.pendingForms)}
+              {plural(locale, pending.waiting, t.pendingForms)}
+            </Text>
+          ) : null}
+          {pending.refused > 0 ? (
+            <Text variant="small" color="yellowText" style={styles.line} testID="settings-refused-writes">
+              {plural(locale, pending.refused, t.refusedForms)}
             </Text>
           ) : null}
           <Hint>

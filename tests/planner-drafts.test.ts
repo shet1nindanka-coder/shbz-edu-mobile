@@ -28,6 +28,7 @@ import {
   sortDrafts,
   toDraftItems,
   validateDraftForm,
+  numberGridColumns,
 } from "@/screens/planner/drafts/drafts-logic";
 import { planSignature, statusRowsOnBoard } from "@/screens/planner/shared/plan-state";
 
@@ -305,4 +306,17 @@ test("issueOutcomeOf: draft.issue.repeat — only failures, no success notice", 
 
 test("issueOutcomeOf: nobody new and nobody failed — everyone already has the homework", () => {
   assert.deepEqual(issueOutcomeOf({ issued: [], failed: [] }), { issuedCount: 0, notice: "alreadyIssued", failures: [] });
+});
+
+// Finding #121: the "add a problem" grid of a draft is virtualised with a column count from the width.
+test("numberGridColumns fits as many tiles as the width allows, never fewer than one", () => {
+  // 358 pt of content (390 pt phone less two 16 pt gutters), 84 pt tiles, 8 pt gaps: 4 × 84 + 3 × 8 = 360 > 358.
+  assert.equal(numberGridColumns(358, 84, 8), 3);
+  assert.equal(numberGridColumns(360, 84, 8), 4);
+  assert.equal(numberGridColumns(84, 84, 8), 1);
+  assert.equal(numberGridColumns(40, 84, 8), 1);
+  // Not measured yet / nonsense input.
+  assert.equal(numberGridColumns(0, 84, 8), 1);
+  assert.equal(numberGridColumns(Number.NaN, 84, 8), 1);
+  assert.equal(numberGridColumns(500, 0, 8), 1);
 });

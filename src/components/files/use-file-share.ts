@@ -11,7 +11,7 @@ import {
 import { resolveDocumentUri } from '@/services/files/document-uri';
 import { useFileService } from '@/services/files/file-service-context';
 
-import { toDownloadable, type ViewerFile } from './viewer-file';
+import { toDownloadable, viewerFileName, type ViewerFile } from './viewer-file';
 
 export type FileAction = 'share' | 'open';
 
@@ -46,8 +46,9 @@ export function useFileActions(): FileActions {
       const uri = file.localUri
         ? await resolveDocumentUri(file.localUri, { id: file.id, originalName: file.originalName, mimeType: file.mimeType })
         : await files.download(toDownloadable(file));
-      const result = await perform({ uri, mimeType: file.mimeType, name: file.originalName });
-      if (!result.ok) {
+      const result = await perform({ uri, mimeType: file.mimeType, name: viewerFileName(file, m.common.files.untitled) });
+      // `covered`: the lock closed during the download; nothing to report, the user taps again after unlocking.
+      if (!result.ok && result.reason !== 'covered') {
         setError(
           result.reason === 'noApp'
             ? m.common.files.noAppToOpen

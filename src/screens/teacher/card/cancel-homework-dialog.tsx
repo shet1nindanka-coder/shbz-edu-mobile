@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { errorText, hasErrorCode, useApi } from '@/api';
 import type { TeacherHomeworkAssignment } from '@/api/types';
+import { RetryWaitLine, type RetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Dialog, Notice, Text } from '@/ui';
@@ -17,6 +18,11 @@ export type CancelHomeworkDialogProps = {
   onCancelled: (assignment: TeacherHomeworkAssignment) => void;
   /** `404 homeworkNotFound`: it was already cancelled elsewhere; `message` is localised. */
   onMissing: (message: string) => void;
+  /**
+   * The cool-down of the `api:teacher-homeworks` bucket (`429` names `retryAfterSeconds`). Owned by the
+   * screen, so closing and reopening the dialog keeps the lock and its line.
+   */
+  wait: RetryWait;
 };
 
 /**
@@ -24,7 +30,7 @@ export type CancelHomeworkDialogProps = {
  * the deadlines of its numbers and — when the student has sent anything — the solution photos and the AI
  * check results, which cannot be downloaded afterwards. Statuses already set are kept.
  */
-export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissing }: CancelHomeworkDialogProps) {
+export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissing, wait }: CancelHomeworkDialogProps) {
   const styles = useStyles();
   const api = useApi();
   const queryClient = useQueryClient();
@@ -41,6 +47,7 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
       onCancelled(target);
     },
     onError: (failure) => {
+      wait.note(failure);
       const text = errorText(failure, t.errors.cancel);
       if (hasErrorCode(failure, 'homeworkNotFound')) {
         setError(null);
@@ -71,8 +78,10 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
       pendingLabel={t.cancelPending}
       cancelLabel={dict.topics.widgets.confirm.cancel}
       pending={cancel.isPending}
+      // A refusal that named a wait: «Да, отменить» stays locked until it is over (90-addendum-1 A.3 rule 3).
+      confirmDisabled={wait.waiting}
       onConfirm={() => {
-        if (!assignment) return;
+        if (!assignment || wait.waiting) return;
         setError(null);
         cancel.mutate(assignment);
       }}
@@ -99,6 +108,7 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
         {t.cancelLine3}
       </Text>
       {error ? <Notice tone="error" text={error} testID="cancel-homework-error" /> : null}
+      <RetryWaitLine wait={wait} testID="cancel-homework-wait" />
     </Dialog>
   );
 }

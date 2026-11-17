@@ -1,8 +1,8 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { errorText, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import { MathPreview } from '@/components/math';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
@@ -33,6 +33,7 @@ export type LatexEditorBlockProps = {
 export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChanged }: LatexEditorBlockProps) {
   const styles = useStyles();
   const api = useApi();
+  const queryClient = useQueryClient();
   const { dict, m } = useI18n();
   const single = dict.topics.singleNumber;
   const manager = dict.topics.answerManager;
@@ -78,6 +79,11 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Save and delete of one value share a bucket (60 / 60 s).
   const wait = useRetryWait();
+  // `404 numberNotFound`: the number (or its topic) was deleted elsewhere. Re-read it, so the screen turns
+  // into the not-found state instead of offering a save that can only fail again (90-addendum-1 A.3 rule 6).
+  const refetchIfGone = (failure: unknown) => {
+    if (isNotFoundError(failure)) void queryClient.invalidateQueries({ queryKey: qk('content') });
+  };
 
   const save = useMutation({
     mutationFn: (value: string) => (isCondition ? api.content.saveCondition(homeworkNumberId, value) : api.content.saveAnswer(homeworkNumberId, value)),
@@ -93,6 +99,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
       wait.note(failure);
       setSuccess(null);
       setError(errorText(failure, texts.saveFailed));
+      refetchIfGone(failure);
     },
   });
 
@@ -111,6 +118,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
       setSuccess(null);
       setConfirmOpen(false);
       setError(errorText(failure, texts.removeFailed));
+      refetchIfGone(failure);
     },
   });
 

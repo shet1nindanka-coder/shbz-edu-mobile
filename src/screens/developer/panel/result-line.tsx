@@ -1,4 +1,3 @@
-import { useWaitText } from '@/components/retry-wait';
 import { Text } from '@/ui';
 
 /** Outcome of a panel call: the server's `{ ok, message }`, or a failed request shown the same way. */
@@ -8,8 +7,6 @@ export type ResultLineProps = {
   /** Shown while the call is running. */
   pendingText?: string | null;
   result: PanelResult | null;
-  /** Seconds of a rate-limit wait; appended to the message while it counts down. */
-  waitSeconds?: number;
   testID?: string;
 };
 
@@ -18,8 +15,7 @@ export type ResultLineProps = {
  * screen readers. Renders nothing when there is neither a pending text nor a result — the caller shows its
  * hint then.
  */
-export function ResultLine({ pendingText, result, waitSeconds = 0, testID }: ResultLineProps) {
-  const waitText = useWaitText();
+export function ResultLine({ pendingText, result, testID }: ResultLineProps) {
   if (pendingText) {
     return (
       <Text variant="caption" color="textMuted" accessibilityLiveRegion="polite" testID={testID}>
@@ -28,7 +24,6 @@ export function ResultLine({ pendingText, result, waitSeconds = 0, testID }: Res
     );
   }
   if (!result) return null;
-  const wait = waitSeconds > 0 ? ` ${waitText.retryIn(waitSeconds)}` : '';
   return (
     <Text
       variant="captionMedium"
@@ -37,7 +32,7 @@ export function ResultLine({ pendingText, result, waitSeconds = 0, testID }: Res
       accessibilityLiveRegion="polite"
       testID={testID}
     >
-      {result.message + wait}
+      {result.message}
     </Text>
   );
 }

@@ -10,7 +10,10 @@ const ru = {
     // the draft is kept on the device while there is no connection (02 Q12); the one wording of this
     // state for every note field of the student (number screen and homework cards)
     queued: "Сохраним при подключении",
-    queuedHint: "Нет связи: заметка останется на устройстве и отправится, как только появится интернет."
+    queuedHint: "Нет связи: заметка останется на устройстве и отправится, как только появится интернет.",
+    // online, but the last save got no answer (timeout, server unreachable): the app tries again by itself
+    retrying: "Не сохранено, повторим",
+    retryingHint: "Сервер не ответил: заметка останется на устройстве, приложение отправит её ещё раз само."
   },
   home: {
     // accessible name of the whole «Общая инфа» row on the overview
@@ -35,7 +38,9 @@ const en: typeof ru = {
   },
   note: {
     queued: "Will save when online",
-    queuedHint: "No connection: the note stays on your device and will be sent as soon as you are back online."
+    queuedHint: "No connection: the note stays on your device and will be sent as soon as you are back online.",
+    retrying: "Not saved yet, retrying",
+    retryingHint: "The server did not answer: the note stays on your device and the app will send it again by itself."
   },
   home: {
     infoRowAria: "General info: EGE and OGE scores and grading",

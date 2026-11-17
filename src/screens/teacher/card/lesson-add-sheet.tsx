@@ -8,7 +8,7 @@ import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, LoadingState, Notice, Select, Text } from '@/ui';
 
-import { freeBankNumbers } from './lessons-logic';
+import { bankNumbersGap, freeBankNumbers } from './lessons-logic';
 
 export type LessonAddSheetProps = {
   visible: boolean;
@@ -49,6 +49,7 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
   const topicId = pickedTopicId ?? topics?.[0]?.topicId ?? null;
   const topic = topics?.find((entry) => entry.topicId === topicId);
   const free = useMemo(() => freeBankNumbers(topic, existingIds), [topic, existingIds]);
+  const gap = bankNumbersGap(topic, free.length);
   const picked = numberId !== null && free.some((number) => number.id === numberId) ? numberId : null;
 
   const reset = () => {
@@ -102,7 +103,7 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
               placeholder={topic ? common.pickNumber : m.teacher.lessons.pickTopicFirst}
               closeLabel={m.common.actions.close}
               disabled={free.length === 0}
-              helper={topic && free.length === 0 ? m.teacher.lessons.noFreeNumbers : undefined}
+              helper={gap === 'topicEmpty' ? m.teacher.lessons.noTopicNumbers : gap === 'allInSet' ? m.teacher.lessons.noFreeNumbers : undefined}
               testID="student-lesson-add-number"
             />
           </>

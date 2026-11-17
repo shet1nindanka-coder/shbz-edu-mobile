@@ -104,5 +104,5 @@ const useStyles = makeStyles((t) => ({
   },
   pressed: { backgroundColor: t.colors.softBg },
   disabled: { opacity: 0.5 },
-  label: { flex: 1 },
+  label: { flex: 1, minWidth: 0 },
 }));

@@ -60,9 +60,9 @@ export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: Not
           <Text variant="captionMedium" color="textMuted" accessibilityLiveRegion="polite" testID="number-note-status">
             {t.saving}
           </Text>
-        ) : editor.status === 'queued' ? (
+        ) : editor.status === 'queued' || editor.status === 'retrying' ? (
           <Text variant="captionStrong" color="yellowText" accessibilityLiveRegion="polite" testID="number-note-status">
-            {m.student.note.queued}
+            {editor.status === 'queued' ? m.student.note.queued : m.student.note.retrying}
           </Text>
         ) : editor.status === 'saved' ? (
           <Text variant="captionStrong" color="greenText" accessibilityLiveRegion="polite" testID="number-note-status">
@@ -82,9 +82,9 @@ export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: Not
         accessibilityLabel={format(t.noteAria, { number })}
         testID="number-note-input"
       />
-      {editor.status === 'queued' ? (
+      {editor.status === 'queued' || editor.status === 'retrying' ? (
         <Hint>
-          <Text variant="hint">{m.student.note.queuedHint}</Text>
+          <Text variant="hint">{editor.status === 'queued' ? m.student.note.queuedHint : m.student.note.retryingHint}</Text>
         </Hint>
       ) : null}
     </View>

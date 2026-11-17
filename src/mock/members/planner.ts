@@ -137,6 +137,10 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
     return q.student(studentId)?.teacherId === viewer.id;
   };
 
+  /** Members of a group the viewer may see — the site's `getGroupDetail` (`ownStudentsWhere`) feeds both forms. */
+  const visibleGroupMembers = (viewer: MockUser, groupId: string): MockUser[] =>
+    q.groupMembers(groupId).filter((student) => seesStudent(viewer, student.id));
+
   const ownedLessons = (viewer: MockUser, kind: LessonKind): Lesson[] =>
     viewer.role === "DEVELOPER" ? store.lessons.filter((lesson) => lesson.kind === kind).sort(byCreatedDesc) : q.lessonsOfTeacher(viewer.id, kind);
 
@@ -249,13 +253,18 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
    * Students of a new lesson / draft (05 §3.1 steps 1–2): with a group — the requested ids that are members
    * (none requested → all members); without — the requested ids that are the caller's own students. Unknown
    * and foreign ids are dropped silently. `404 groupNotFound` for a missing / foreign group.
+   *
+   * SPEC-GAP: a developer may put another teacher's student into a group. The site's POST keeps every group
+   * member and relies on its forms (built from the owner-filtered `getGroupDetail`) never sending a foreign
+   * id; the mock drops such members for a TEACHER here as well, so neither a stale form nor a crafted call
+   * can make a foreign student a participant (the board would hide that participant from the teacher).
    */
   const resolveStudents = (viewer: MockUser, groupIdRaw: unknown, studentIdsRaw: unknown): { group: StudentGroup | null; studentIds: string[] } => {
     const groupId = ctx.validate.id(groupIdRaw);
     const requested = ctx.validate.ids(studentIdsRaw);
     if (groupId) {
       const group = ctx.guard.group(viewer, groupId);
-      const members = q.groupMembers(group.id).map((member) => member.id);
+      const members = visibleGroupMembers(viewer, group.id).map((member) => member.id);
       return { group, studentIds: requested.length > 0 ? requested.filter((id) => members.includes(id)) : members };
     }
     return {
@@ -744,7 +753,7 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
 
       if (groupId) {
         const group = ctx.guard.group(user, groupId);
-        return { mode: "group", kicker: group.name, groupId: group.id, members: q.groupMembers(group.id).map(formMember), topics, aiAvailable, composeTopics: null };
+        return { mode: "group", kicker: group.name, groupId: group.id, members: visibleGroupMembers(user, group.id).map(formMember), topics, aiAvailable, composeTopics: null };
       }
       // SPEC-GAP: the site shows the target chooser when neither parameter is given; the typed method always
       // carries one of them, so a target without a usable id is a missing resource.
@@ -1255,7 +1264,7 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
       }
       if (groupId) {
         const group = ctx.guard.group(user, groupId);
-        const members = q.groupMembers(group.id).map((member) => ({ id: member.id, name: member.name }));
+        const members = visibleGroupMembers(user, group.id).map((member) => ({ id: member.id, name: member.name }));
         return { kicker: group.name, topics, members, defaultTopicId: null, defaultTitle: "", groupId: group.id, sourceLessonId: null };
       }
       // SPEC-GAP: without any of the three parameters the site page is a plain 404; the first entity of the

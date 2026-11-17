@@ -10,9 +10,19 @@ import { useSyncExternalStore } from 'react';
 
 import { qk } from '@/api';
 import type { ApiClient, Res } from '@/api/client';
-import { isNetworkError } from '@/api/errors';
+import { isSessionExpired } from '@/api/errors';
 import type { SaveNoteResponse } from '@/api/types';
-import { createPendingWritesQueue, type PendingWrite, type PendingWritesQueue, type SubmitOutcome } from '@/services/query';
+import { isOnline } from '@/services/network';
+import {
+  createPendingWritesQueue,
+  isPendingWriteRetryable,
+  keepPendingWriteRefusal,
+  summarizePendingWrites,
+  type PendingWrite,
+  type PendingWritesQueue,
+  type PendingWritesSummary,
+  type SubmitOutcome,
+} from '@/services/query';
 
 import { getQueryClient } from './query';
 import { getAppRuntime } from './services';
@@ -21,11 +31,30 @@ import { getAppRuntime } from './services';
 export type PendingWriteContext = { api: ApiClient; queryClient: QueryClient };
 
 let currentUserId: string | null = null;
+/** The user whose session expired: their drafts are kept (not sent) until they sign in again. */
+let heldUserId: string | null = null;
 
 /** The session provider reports who is signed in; writes of another user are never sent. */
 export function setPendingWritesUser(userId: string | null): void {
   currentUserId = userId;
+  heldUserId = null;
 }
+
+/**
+ * The session expired (not a sign-out): nobody may send any more, but the drafts of the user who was signed
+ * in — queued ones and those the editors flush while the tree unmounts — stay theirs and are sent when the
+ * same user signs in again.
+ */
+export function holdPendingWritesForExpiredSession(): void {
+  heldUserId = currentUserId ?? heldUserId;
+  currentUserId = null;
+}
+
+/**
+ * Automatic re-sends after a failure without an answer while the device is online (a timeout or a server
+ * that does not answer brings no reconnect event). Spaced out so a failing server is not hammered.
+ */
+export const PENDING_WRITES_RETRY_DELAYS_MS: readonly number[] = [5_000, 15_000, 30_000, 60_000];
 
 let queue: PendingWritesQueue<PendingWriteContext> | null = null;
 
@@ -37,7 +66,12 @@ export function getPendingWrites(): PendingWritesQueue<PendingWriteContext> {
     storage: runtime.storage,
     getContext: () => ({ api: runtime.api, queryClient: getQueryClient() }),
     getUserId: () => currentUserId,
-    isRetryable: isNetworkError,
+    getOwnerId: () => heldUserId,
+    isRetryable: isPendingWriteRetryable,
+    isHeld: isSessionExpired,
+    keepRefused: keepPendingWriteRefusal,
+    retryDelaysMs: PENDING_WRITES_RETRY_DELAYS_MS,
+    isOnline,
   });
   registerStudentNoteWrite(queue);
   // Loaded as soon as the queue exists, on every start path: a draft typed offline must be visible (with
@@ -65,10 +99,21 @@ function registerStudentNoteWrite(target: PendingWritesQueue<PendingWriteContext
 
 /**
  * Saves a note draft: sent now when possible, otherwise kept on the device and sent when the connection
- * returns. `sent` carries the server's normalised note; `rejected` carries the `ApiError` to show.
+ * returns. `sent` carries the server's normalised note; `rejected` carries the `ApiError` to show (the draft
+ * stays in the queue as refused, so it is not lost if the editor goes away).
  */
 export function saveStudentNote(homeworkNumberId: string, note: string): Promise<SubmitOutcome<StudentNoteResult>> {
   return getPendingWrites().submit<StudentNotePayload, StudentNoteResult>(STUDENT_NOTE_WRITE, homeworkNumberId, { note });
+}
+
+/** Forgets the refused (or waiting) draft of a number: the student has put the saved text back. */
+export function discardStudentNote(homeworkNumberId: string): Promise<void> {
+  return getPendingWrites().discard(STUDENT_NOTE_WRITE, homeworkNumberId);
+}
+
+/** Sends what waits now (the student asked to retry a draft that is already queued). */
+export function flushPendingWrites(): void {
+  void getPendingWrites().flush();
 }
 
 // ───────────────────────────── React binding ─────────────────────────────
@@ -90,9 +135,21 @@ export function usePendingStudentNote(homeworkNumberId: string): PendingWrite<St
   return usePendingWrite<StudentNotePayload>(STUDENT_NOTE_WRITE, homeworkNumberId);
 }
 
-/** How many writes are waiting (settings shows it next to the cache info). */
+/**
+ * How many unsent writes the signed-in user has on this device, refused ones included (signing out deletes
+ * them all — the confirmation counts them).
+ */
 export function usePendingWritesCount(): number {
+  const { waiting, refused } = usePendingWritesSummary();
+  return waiting + refused;
+}
+
+/**
+ * Unsent writes split by state: `waiting` ones the queue still sends by itself, `refused` ones it never will
+ * (the user re-sends or discards them in their editor). Settings names them apart.
+ */
+export function usePendingWritesSummary(): PendingWritesSummary {
   const target = getPendingWrites();
   useSyncExternalStore(target.subscribe, target.version, target.version);
-  return target.list().filter((write) => write.userId === currentUserId).length;
+  return summarizePendingWrites(target.list(), currentUserId);
 }

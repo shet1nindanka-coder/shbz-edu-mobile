@@ -21,7 +21,10 @@ export type RetryWait = {
  *   const wait = useRetryWait();
  *   const save = useMutation({ …, onError: wait.note });
  *   <Button disabled={wait.waiting} … />
- *   <RetryWaitLine seconds={wait.seconds} />
+ *   <RetryWaitLine wait={wait} />   // next to the button, never inside the dismissible error notice
+ *
+ * Keep the hook where it outlives what the user can close: in the screen that owns a sheet, not in the
+ * sheet, so reopening it still shows the lock and its line.
  */
 export function useRetryWait(): RetryWait {
   const [until, setUntil] = useState<number | null>(null);

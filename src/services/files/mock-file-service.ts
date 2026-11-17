@@ -110,6 +110,14 @@ export function createMockFileService(options: MockFileServiceOptions = {}): Fil
       return { uri: sample ? mockSampleUri(sample) : '', headers: {} };
     },
 
+    async describe(fileId) {
+      // The row's own metadata behind the same access check as `download`; without `lookup` (tests of the
+      // device layer) nothing is known about an id, which reads as a missing file.
+      const known = lookup ? lookup(fileId) : null;
+      if (!known) throw notFound();
+      return { id: fileId, originalName: known.originalName ?? '', mimeType: known.mimeType, size: known.size ?? 0 };
+    },
+
     download(file, onProgress) {
       const running = inFlight.get(file.id);
       if (running) {

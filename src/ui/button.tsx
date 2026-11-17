@@ -206,7 +206,7 @@ const useStyles = makeStyles((t) => ({
     margin: -t.borders.interactive,
     borderRadius: t.radii.md,
   },
-  labelWrap: { flexShrink: 1 },
+  labelWrap: { flexShrink: 1, minWidth: 0 },
   // Two lines need air above and below; a one-line label is centred in the fixed height as before.
   wrapping: { paddingVertical: t.space.xs },
 }));

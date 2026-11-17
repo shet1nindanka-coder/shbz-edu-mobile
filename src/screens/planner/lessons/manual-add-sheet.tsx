@@ -100,7 +100,14 @@ export function ManualAddSheet({ visible, studentName, existingIds, onClose, onA
               placeholder={topic ? common.pickNumber : m.planner.lessonBoard.numberPlaceholder}
               closeLabel={m.common.actions.close}
               disabled={free.length === 0}
-              helper={topic && free.length === 0 ? m.planner.lessonBoard.noFreeNumbers : undefined}
+              helper={
+                !topic || free.length > 0
+                  ? undefined
+                  : // An empty topic is not "all of it already in the set" (the set may well be empty).
+                    topic.numbers.length === 0
+                    ? m.planner.lessonBoard.noNumbers
+                    : m.planner.lessonBoard.noFreeNumbers
+              }
               testID="lesson-add-number"
             />
           </>

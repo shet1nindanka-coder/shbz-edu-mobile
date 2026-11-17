@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { isApiError, isNetworkError, qk, useApi } from '@/api';
+import { isApiError, isNetworkError, isNotFoundError, qk, useApi } from '@/api';
 import type { ImportApplyResult, ImportPreview, ImportTarget } from '@/api/types';
 import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
@@ -97,6 +97,12 @@ export function useImportPanel({ target, onCreated }: ImportPanelOptions): Impor
     setOverwriteFilled(false);
   };
 
+  // `404 topicDeleted` (add mode): the topic was deleted elsewhere. Re-read it, so the edit screen turns into
+  // the not-found state instead of failing every check the same way (90-addendum-1 A.3 rule 6).
+  const refetchIfGone = (failure: unknown) => {
+    if (isNotFoundError(failure)) void queryClient.invalidateQueries({ queryKey: qk('content') });
+  };
+
   const flash = () => {
     setJustLoaded(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -112,6 +118,7 @@ export function useImportPanel({ target, onCreated }: ImportPanelOptions): Impor
     onError: (failure) => {
       wait.note(failure);
       setError(failureText(failure));
+      refetchIfGone(failure);
     },
   });
 
@@ -136,6 +143,7 @@ export function useImportPanel({ target, onCreated }: ImportPanelOptions): Impor
     onError: (failure) => {
       wait.note(failure);
       setError(failureText(failure));
+      refetchIfGone(failure);
     },
   });
 

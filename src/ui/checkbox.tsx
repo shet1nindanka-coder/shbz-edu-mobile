@@ -47,6 +47,8 @@ export function Checkbox({ checked, onChange, disabled = false, label, accessibi
 const useStyles = makeStyles((t) => ({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: t.radii.checkbox },
   bare: { alignSelf: 'flex-start' },
-  label: { flex: 1, paddingTop: 1 },
+  // `minWidth: 0`: on web a flex item is at least as wide as its longest word, so a long unbroken name
+  // would run past the row instead of wrapping.
+  label: { flex: 1, minWidth: 0, paddingTop: 1 },
   disabled: { opacity: 0.5 },
 }));

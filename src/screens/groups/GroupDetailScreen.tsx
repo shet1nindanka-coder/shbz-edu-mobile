@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { POLLING, errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
+import { useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
@@ -41,6 +42,8 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const { dict, m } = useI18n();
   const t = dict.planner.groups.detail;
   const report = useReportExport();
+  // Here, not in the tab: the attendance tab unmounts on a tab switch, the cool-down of its marks must not.
+  const attendanceWait = useRetryWait();
   const [tab, setTab] = useState<Tab>('members');
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(new Set<Tab>(['members']));
   const [createdNotice, dismissCreated] = useGroupNotice(groupNoticeChannel(groupId));
@@ -191,7 +194,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
             <MembersTab group={data.group} onProfileError={(text) => setBanner({ tone: 'error', text })} />
           ) : null}
           {tab === 'statistics' ? <StatisticsTab stats={statistics} report={report} /> : null}
-          {tab === 'attendance' ? <AttendanceTab groupId={groupId} attendance={attendance} report={report} /> : null}
+          {tab === 'attendance' ? <AttendanceTab groupId={groupId} attendance={attendance} report={report} wait={attendanceWait} /> : null}
           {tab === 'lessons' ? <LessonsTab lessons={data.lessons} /> : null}
 
           <GroupSettings
@@ -207,6 +210,12 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
               navigation.back();
             }}
             onDeleteFailed={(text) => setBanner({ tone: 'error', text })}
+            onMissing={() => {
+              setLeaving(true);
+              dismissCreated();
+              postGroupNotice(GROUPS_LIST_NOTICE, 'missing');
+              navigation.back();
+            }}
           />
         </View>
       ) : isLoadFailed(group) ? (

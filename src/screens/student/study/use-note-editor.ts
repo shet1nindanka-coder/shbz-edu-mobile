@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isApiError, isRateLimited, qk } from '@/api';
 import type { StudentNumberDetailResponse } from '@/api/types';
-import { saveStudentNote, usePendingStudentNote } from '@/providers';
+import { discardStudentNote, flushPendingWrites, saveStudentNote, usePendingStudentNote } from '@/providers';
+import { isOnline, useIsOnline } from '@/services/network';
 
 import {
   NOTE_DEBOUNCE_MS,
@@ -26,11 +27,11 @@ export type NoteSaveError = {
 export type NoteEditor = {
   text: string;
   onChangeText: (value: string) => void;
-  /** Save right away (blur). */
+  /** Save right away (blur); a draft already waiting in the queue is sent again now. */
   flush: () => void;
   /** Send the current draft again after a refusal. */
   retry: () => void;
-  /** «Сохраняем…» / waiting for a connection / «Сохранено» / nothing. */
+  /** «Сохраняем…» / waiting for a connection / waiting for a re-try while online / «Сохранено» / nothing. */
   status: NoteStatus;
   error: NoteSaveError | null;
   /** The server reported that notes are switched off (`notesEnabled: false` in a save response). */
@@ -46,7 +47,7 @@ type SaveLoop = {
   saved: string;
   /** The newest text of the field. */
   draft: string;
-  /** A draft waiting in the queue (typed offline), or null. */
+  /** A draft waiting in the queue (no answer yet), or null. A draft the server refused is not "queued". */
   queued: string | null;
   inFlight: boolean;
   /** A newer draft that arrived while a save was running. */
@@ -74,26 +75,42 @@ type SaveLoop = {
  * `serverNote` is followed, not only read at mount: the screen may first render a cached detail that is
  * older than a save which finished after the previous visit (the flush on leaving), or the note may have
  * been saved from the homework screen or delivered by the offline queue meanwhile. See `adoptServerNote` in note-model.ts.
+ *
+ * The queue entry of the number is followed too (states in `src/services/query/pending-writes.ts`): another
+ * editor of the same number (homework card and number screen are mounted together) may replace the waiting
+ * draft, and a draft the server refused in the background stays in the queue with its refusal, which this
+ * editor shows like the refusal of its own save.
  */
 export function useNoteEditor(homeworkNumberId: string, serverNote: string, fallbackError: string): NoteEditor {
   const queryClient = useQueryClient();
-  const pending = usePendingStudentNote(homeworkNumberId);
-  const pendingNote = pending?.payload.note ?? null;
-  const [text, setText] = useState(() => initialNoteText(serverNote, pendingNote));
+  const online = useIsOnline();
+  const entry = usePendingStudentNote(homeworkNumberId);
+  const entryNote = entry?.payload.note ?? null;
+  const entryAt = entry?.updatedAt ?? null;
+  const refusal = entry?.refusal ?? null;
+  /** The draft waiting for an answer (not refused), or null. */
+  const pendingNote = entry && !refusal ? entryNote : null;
+  const [text, setText] = useState(() => initialNoteText(serverNote, entryNote));
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState<NoteSaveError | null>(null);
   const [disabledByServer, setDisabledByServer] = useState(false);
+  /** A kept refusal the student has started typing over (its banner goes, like the editor's own error). */
+  const [hiddenRefusalAt, setHiddenRefusalAt] = useState<number | null>(null);
+  const refusalRef = useRef(refusal);
+  useEffect(() => {
+    refusalRef.current = refusal;
+  }, [refusal]);
 
   const loopRef = useRef<SaveLoop>({
     mounted: true,
     saved: serverNote,
-    draft: initialNoteText(serverNote, pendingNote),
+    draft: initialNoteText(serverNote, entryNote),
     queued: pendingNote,
     inFlight: false,
     next: null,
     delivering: null,
-    blockedUntil: 0,
+    blockedUntil: refusal?.retryAt ?? 0,
     debounce: null,
     flash: null,
   });
@@ -123,7 +140,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
   );
 
   const send = useCallback(
-    async (value: string): Promise<void> => {
+    async (value: string, explicit = false): Promise<void> => {
       const loop = loopRef.current;
       if (loop.inFlight) {
         loop.next = value;
@@ -133,7 +150,16 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
       let draft: string | null = value;
       while (draft !== null) {
         // Nothing to send when the draft equals what the server has — or what already waits in the queue.
-        if (isNoteDirty(draft, loop.queued ?? loop.saved) && loop.blockedUntil <= Date.now()) {
+        const dirty = isNoteDirty(draft, loop.queued ?? loop.saved);
+        if (!dirty && loop.queued !== null && explicit && isOnline()) {
+          // Blur / «Повторить» / leaving on a draft that already waits: send it now rather than waiting for
+          // the queue's next try (the device may be online and the last failure a passing one).
+          flushPendingWrites();
+        } else if (!dirty && loop.queued === null && refusalRef.current) {
+          // The student put the saved text back over a refused draft: nothing is left to save.
+          void discardStudentNote(homeworkNumberId);
+        }
+        if (dirty && loop.blockedUntil <= Date.now()) {
           if (loop.mounted) {
             setError(null);
             setSaving(true);
@@ -149,6 +175,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
           } else if (outcome.status === 'queued') {
             loop.queued = draft;
           } else {
+            // The queue keeps the refused draft (with its refusal) until it is replaced or discarded.
             loop.queued = null;
             const failure = outcome.error;
             const retryAfter = isRateLimited(failure) && isApiError(failure) ? failure.retryAfterSeconds : undefined;
@@ -193,6 +220,20 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     setText(next.draft);
   }, [showSaved]);
 
+  // The queue entry changed without a save of this editor: another editor of the same number wrote a newer
+  // draft, or the queue refused the waiting one in the background. The field shows what the entry holds —
+  // unless the student is typing here or a save of this editor is on its way (its own result decides).
+  useEffect(() => {
+    const loop = loopRef.current;
+    if (entryNote === null || loop.debounce !== null || loop.inFlight) return;
+    loop.queued = refusal ? null : entryNote;
+    loop.delivering = null;
+    if (refusal?.retryAt) loop.blockedUntil = Math.max(loop.blockedUntil, refusal.retryAt);
+    if (entryNote === loop.draft) return;
+    loop.draft = entryNote;
+    setText(entryNote);
+  }, [entryNote, entryAt, refusal]);
+
   // Each value of the server's note is news once. A value that arrived while a write of this editor was on
   // its way (in flight or queued) is older than that write and is dropped for good: re-reading it once the
   // write has settled would put the editor's previous save back into the field (a re-read that started
@@ -204,17 +245,17 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     if (pendingNote === null) followServerNote(serverNote);
   }, [serverNote, pendingNote, followServerNote]);
 
-  // A queued draft that disappears without a save of ours left the queue in the background. SPEC-GAP: the
-  // queue does not tell a delivery from a refusal. A delivery invalidates the detail, and the re-read that
-  // returns the draft confirms it (`delivering`, «Сохранено»). After a refusal no re-read comes: the draft
-  // stays unsaved and is sent again on blur or when the screen goes away, like after a refusal of our own
-  // save — it is never reported as saved.
+  // A queued draft that disappears without a save of ours left the queue in the background: delivered (a
+  // refusal stays in the queue, see above), or dropped because its number is gone. A delivery invalidates the
+  // detail, and the re-read that returns the draft confirms it (`delivering`, «Сохранено»). Without that
+  // re-read the draft stays unsaved and is sent again on blur or when the screen goes away — it is never
+  // reported as saved on the queue's word alone.
   useEffect(() => {
     const loop = loopRef.current;
-    if (pendingNote !== null || loop.queued === null || loop.inFlight) return;
+    if (entryNote !== null || loop.queued === null || loop.inFlight) return;
     loop.delivering = normalizeNoteDraft(loop.queued);
     loop.queued = null;
-  }, [pendingNote]);
+  }, [entryNote]);
 
   // The screen is going away: save what the debounce still holds.
   useEffect(() => {
@@ -225,7 +266,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
       if (loop.debounce) clearTimeout(loop.debounce);
       if (loop.flash) clearTimeout(loop.flash);
       loop.debounce = null;
-      void send(loop.draft);
+      void send(loop.draft, true);
     };
   }, [send]);
 
@@ -237,6 +278,8 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
       setSavedFlash(false);
       // The banner goes on the next keystroke — unless it is a rate-limit wait, which still holds.
       setError((current) => (current?.retryAt && current.retryAt > Date.now() ? current : null));
+      const kept = refusalRef.current;
+      if (kept && !(kept.retryAt && kept.retryAt > Date.now())) setHiddenRefusalAt(kept.at);
       if (loop.debounce) clearTimeout(loop.debounce);
       loop.debounce = setTimeout(() => {
         loop.debounce = null;
@@ -250,16 +293,23 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     const loop = loopRef.current;
     if (loop.debounce) clearTimeout(loop.debounce);
     loop.debounce = null;
-    void send(loop.draft);
+    void send(loop.draft, true);
   }, [send]);
+
+  // A refusal kept in the queue (this editor's or one met in the background) is shown like the editor's own;
+  // a `retryAt` in the past counts as no wait (`useCountdown`).
+  const keptError: NoteSaveError | null =
+    refusal && refusal.at !== hiddenRefusalAt && !saving
+      ? { message: refusal.message ?? fallbackError, retryAt: refusal.retryAt }
+      : null;
 
   return {
     text,
     onChangeText,
     flush,
     retry: flush,
-    status: noteStatus({ saving, queued: pending !== null && !saving, savedFlash }),
-    error,
+    status: noteStatus({ saving, queued: pendingNote !== null && !saving, savedFlash, online }),
+    error: error ?? keptError,
     disabledByServer,
   };
 }

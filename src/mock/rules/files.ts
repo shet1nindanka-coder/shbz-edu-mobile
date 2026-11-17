@@ -42,6 +42,12 @@ export interface MockFiles {
    * points at the local URI. Validate the upload BEFORE calling (`validateUploadMetadata` from `@/domain`).
    */
   createFromUpload(upload: FileUpload, uploadedById: string): MockStoredFile;
+  /**
+   * The bytes of a file picked in the app, read through the device hook (`MockFileHooks.readBytes`) so the
+   * upload can be checked with `validateUploadedBytes` like the site's `saveUploadedFile`. Null when the
+   * content cannot be known (no hook, an unreadable URI, a read error): the byte check is then skipped.
+   */
+  readUploadBytes(uri: string): Promise<Uint8Array | null>;
   /** Deletes the row when no topic, number, attached photo, check snapshot or lesson submission references it. */
   removeIfUnreferenced(fileId: string | null | undefined): boolean;
   /** Whether the user may read the file's bytes. */
@@ -64,6 +70,8 @@ export type MockFileHooks = {
   onFileUploaded?: (file: MockUploadedFile) => void;
   /** A file row was removed because nothing references it any more. */
   onFileRemoved?: (fileId: string) => void;
+  /** Reads the bytes of a picked file; null when the URI cannot be read on this platform. */
+  readBytes?: (uri: string) => Promise<Uint8Array | null>;
 };
 
 export function createFiles(core: MockCore, auth: MockAuth, hooks: MockFileHooks = {}): MockFiles {
@@ -148,6 +156,16 @@ export function createFiles(core: MockCore, auth: MockAuth, hooks: MockFileHooks
       });
       hooks.onFileUploaded?.({ id: file.id, uri: upload.uri, mimeType: file.mimeType, originalName: file.originalName, size: file.size });
       return file;
+    },
+    async readUploadBytes(uri) {
+      if (!hooks.readBytes || !uri) return null;
+      try {
+        const bytes = await hooks.readBytes(uri);
+        return bytes instanceof Uint8Array ? bytes : null;
+      } catch {
+        // An unreadable file is not refused here: the mock only checks content it actually has.
+        return null;
+      }
     },
     removeIfUnreferenced(fileId) {
       const removed = deleteFileIfUnreferenced(store, fileId);

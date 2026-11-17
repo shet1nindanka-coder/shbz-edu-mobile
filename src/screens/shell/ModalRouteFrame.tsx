@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
-import { OverlayCoverSlot, WindowInsetsScope } from '@/ui';
+import { OverlayCoverSlot, WindowInsetsScope, coveredAccessibilityProps, useOverlayCovered } from '@/ui';
 
 export type ModalRouteFrameProps = {
   /**
@@ -25,12 +25,18 @@ export type ModalRouteFrameProps = {
  * the cover slot is added (it is the same cover; harmless under the root one).
  */
 export function ModalRouteFrame({ presentation, children }: ModalRouteFrameProps) {
+  const covered = useOverlayCovered();
   const content = (
     <>
-      {children}
+      {/* Under the cover the route leaves the accessibility tree; only the slot stays reachable. */}
+      <View style={styles.root} {...coveredAccessibilityProps(covered)}>
+        {children}
+      </View>
       <OverlayCoverSlot />
     </>
   );
   if (Platform.OS !== 'ios') return content;
   return <WindowInsetsScope top={presentation === 'sheet' ? 0 : undefined}>{content}</WindowInsetsScope>;
 }
+
+const styles = StyleSheet.create({ root: { flex: 1 } });

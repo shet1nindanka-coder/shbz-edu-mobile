@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { ApiError, isNetworkError } from "@/api/errors";
+import { isPendingWriteRetryable, keepPendingWriteRefusal, summarizePendingWrites } from "@/services/query/pending-write-errors";
 import {
   PENDING_WRITES_STORAGE_KEY,
   createPendingWritesQueue,
@@ -328,5 +329,302 @@ describe("pending writes", () => {
     assert.deepEqual(parsePendingWrites('[{"kind":"x"},5,null]'), []);
     const good: PendingWrite = { kind: "k", id: "i", payload: { a: 1 }, userId: "u", createdAt: 1, updatedAt: 2, attempts: 0 };
     assert.deepEqual(parsePendingWrites(JSON.stringify([good, { kind: "bad" }])), [good]);
+  });
+});
+
+// ───────────── the app's configuration: refusals kept, expired sessions held, backoff while online ─────────────
+
+const sessionExpired = () => new ApiError({ code: "sessionExpired", status: 401, message: "Сессия истекла." });
+const unavailable = () => new ApiError({ code: "serviceUnavailable", status: 503, message: "Сервис недоступен.", retryAfterSeconds: 5 });
+const saveFailed = () => new ApiError({ code: "saveFailed", status: 500, message: "Не удалось сохранить." });
+const rateLimited = () => new ApiError({ code: "rateLimited", status: 429, message: "Слишком часто.", retryAfterSeconds: 30 });
+
+/** A manual timer list: `fire()` runs the earliest timer. */
+function fakeTimers() {
+  const pending: { id: number; ms: number; callback: () => void }[] = [];
+  let next = 1;
+  return {
+    pending,
+    timers: {
+      set: (callback: () => void, ms: number) => {
+        const id = next++;
+        pending.push({ id, ms, callback });
+        return id;
+      },
+      clear: (handle: unknown) => {
+        const index = pending.findIndex((timer) => timer.id === handle);
+        if (index >= 0) pending.splice(index, 1);
+      },
+    },
+    fire() {
+      const timer = pending.shift();
+      assert.ok(timer, "a timer is scheduled");
+      timer.callback();
+    },
+  };
+}
+
+function appHarness(options: { initial?: Record<string, string> } = {}) {
+  const { storage, data } = memoryStorage(options.initial);
+  const state = {
+    online: true,
+    /** The server answers (false = timeout / unreachable while the device is "online"). */
+    reachable: true,
+    userId: "usr_ilya" as string | null,
+    ownerId: null as string | null,
+    now: 1000,
+    refuse: null as ApiError | null,
+  };
+  const clock = fakeTimers();
+  const sent: string[] = [];
+  const rejected: PendingWrite[] = [];
+  const queue = createPendingWritesQueue<Context>({
+    storage,
+    getContext: () => ({ sent }),
+    getUserId: () => state.userId,
+    getOwnerId: () => state.ownerId,
+    // The rules the app passes (src/providers/pending-writes.ts).
+    isRetryable: isPendingWriteRetryable,
+    isHeld: (error) => error instanceof ApiError && error.code === "sessionExpired",
+    keepRefused: keepPendingWriteRefusal,
+    onRejected: (write) => rejected.push(write),
+    retryDelaysMs: [5000, 15000, 30000, 60000],
+    isOnline: () => state.online,
+    timers: clock.timers,
+    now: () => (state.now += 1),
+  });
+  queue.register<{ note: string }, { note: string }>("note", async (write, ctx) => {
+    if (!state.online || !state.reachable) throw ApiError.network("no answer");
+    if (state.refuse) throw state.refuse;
+    ctx.sent.push(`${write.id}=${write.payload.note}`);
+    return { note: write.payload.note };
+  });
+  const stored = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return parsePendingWrites(data.get(PENDING_WRITES_STORAGE_KEY));
+  };
+  /** Lets the lane bookkeeping (which schedules the backoff) settle. */
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  return { queue, state, clock, sent, rejected, stored, data, tick };
+}
+
+describe("pending writes: the state machine of the app's queue", () => {
+  it("WAITING while online: re-sent by itself with backoff, not only on a reconnect event", async () => {
+    const { queue, state, clock, sent, tick } = appHarness();
+    state.reachable = false; // online, but the server does not answer (timeout)
+    assert.equal((await queue.submit("note", "n1", { note: "draft" })).status, "queued");
+    await tick();
+    assert.deepEqual(clock.pending.map((timer) => timer.ms), [5000]);
+
+    // The next try fails too: the wait grows.
+    clock.fire();
+    await tick();
+    await tick();
+    assert.deepEqual(sent, []);
+    assert.deepEqual(clock.pending.map((timer) => timer.ms), [15000]);
+
+    state.reachable = true;
+    clock.fire();
+    await tick();
+    await tick();
+    assert.deepEqual(sent, ["n1=draft"]);
+    assert.equal(queue.get("note", "n1"), null);
+    assert.equal(clock.pending.length, 0, "nothing left: no timer");
+
+    // A delivery resets the backoff.
+    state.reachable = false;
+    await queue.submit("note", "n2", { note: "next" });
+    await tick();
+    assert.deepEqual(clock.pending.map((timer) => timer.ms), [5000]);
+  });
+
+  it("a timer that fires offline leaves the next try to the reconnect; nothing is scheduled while signed out", async () => {
+    const { queue, state, clock, sent, tick } = appHarness();
+    state.online = false;
+    await queue.submit("note", "n1", { note: "offline" });
+    await tick();
+    assert.equal(clock.pending.length, 1);
+    clock.fire(); // still offline: no request, no new timer
+    await tick();
+    assert.equal(clock.pending.length, 0);
+    assert.equal(queue.get("note", "n1")?.attempts, 1);
+
+    state.online = true;
+    await queue.flush(); // the reconnect event
+    assert.deepEqual(sent, ["n1=offline"]);
+
+    state.reachable = false;
+    state.userId = null;
+    state.ownerId = "usr_ilya";
+    await queue.submit("note", "n2", { note: "x" });
+    await tick();
+    assert.equal(clock.pending.length, 0);
+  });
+
+  it("clear (explicit sign-out) cancels the backoff", async () => {
+    const { queue, state, clock, tick } = appHarness();
+    state.reachable = false;
+    await queue.submit("note", "n1", { note: "draft" });
+    await tick();
+    assert.equal(clock.pending.length, 1);
+    await queue.clear();
+    assert.equal(clock.pending.length, 0);
+  });
+
+  it("REFUSED in the background: kept with its refusal, never re-sent by itself, replaced by a newer submit", async () => {
+    const { queue, state, sent, rejected, stored } = appHarness();
+    state.online = false;
+    await queue.submit("note", "n1", { note: "refused text" });
+    state.online = true;
+    state.refuse = saveFailed();
+    assert.deepEqual(await queue.flush(), { sent: 0, rejected: 1, remaining: 1 });
+    assert.equal(rejected.length, 1);
+    const kept = queue.get<{ note: string }>("note", "n1");
+    assert.equal(kept?.payload.note, "refused text");
+    assert.equal(kept?.refusal?.code, "saveFailed");
+    assert.equal(kept?.refusal?.message, "Не удалось сохранить.");
+    assert.equal(kept?.refusal?.retryAt, null);
+    // It survives a restart with the refusal.
+    assert.equal((await stored())[0]?.refusal?.code, "saveFailed");
+
+    // Not repeated by a flush, even when the server would accept it now.
+    state.refuse = null;
+    assert.deepEqual(await queue.flush(), { sent: 0, rejected: 0, remaining: 1 });
+    assert.deepEqual(sent, []);
+
+    // The student sends it again: the refusal goes with the old payload.
+    const again = await queue.submit("note", "n1", { note: "refused text" });
+    assert.equal(again.status, "sent");
+    assert.equal(queue.get("note", "n1"), null);
+  });
+
+  it("a transient 503 (serviceUnavailable) in the background is waited out and re-sent, not parked as refused", async () => {
+    const { queue, state, clock, sent, rejected, tick } = appHarness();
+    state.online = false;
+    await queue.submit("note", "n1", { note: "typed offline" });
+    await tick();
+    clock.fire(); // the offline timer: leaves the try to the reconnect
+    state.online = true;
+    state.refuse = unavailable();
+    // The reconnect flush meets the 503.
+    assert.deepEqual(await queue.flush(), { sent: 0, rejected: 0, remaining: 1 });
+    assert.equal(rejected.length, 0);
+    // An awaited save that meets it waits too.
+    assert.equal((await queue.submit("note", "n1", { note: "typed offline" })).status, "queued");
+    assert.equal(queue.get("note", "n1")?.refusal, undefined, "still waiting, not refused");
+    assert.deepEqual(summarizePendingWrites(queue.list(), "usr_ilya"), { waiting: 1, refused: 0 });
+    await tick();
+    assert.equal(clock.pending.length, 1, "re-sent by itself with backoff");
+
+    state.refuse = null;
+    clock.fire();
+    await tick();
+    await tick();
+    assert.deepEqual(sent, ["n1=typed offline"]);
+    assert.equal(queue.get("note", "n1"), null);
+  });
+
+  it("settings count: refused drafts are not «waiting to be sent»; another user's drafts are not counted", async () => {
+    const { queue, state } = appHarness();
+    state.refuse = saveFailed();
+    assert.equal((await queue.submit("note", "b", { note: "refused" })).status, "rejected");
+    assert.ok(queue.get("note", "b")?.refusal);
+    state.refuse = null;
+    state.online = false;
+    assert.equal((await queue.submit("note", "c", { note: "offline" })).status, "queued");
+    assert.deepEqual(summarizePendingWrites(queue.list(), "usr_ilya"), { waiting: 1, refused: 1 });
+    assert.deepEqual(summarizePendingWrites(queue.list(), "usr_maria"), { waiting: 0, refused: 0 });
+  });
+
+  it("REFUSED by an awaited submit is kept too (the editor may go away); a rate limit remembers its wait", async () => {
+    const { queue, state } = appHarness();
+    state.refuse = rateLimited();
+    const outcome = await queue.submit("note", "n1", { note: "too fast" });
+    assert.equal(outcome.status, "rejected");
+    const kept = queue.get("note", "n1");
+    assert.ok(kept?.refusal);
+    assert.ok(kept.refusal.retryAt !== null && kept.refusal.retryAt >= kept.refusal.at + 30_000);
+    await queue.discard("note", "n1");
+    assert.equal(queue.get("note", "n1"), null);
+  });
+
+  it("a refusal for a target that is gone drops the entry (nothing could ever show it)", async () => {
+    const { queue, state } = appHarness();
+    state.refuse = notFound();
+    assert.equal((await queue.submit("note", "gone", { note: "x" })).status, "rejected");
+    assert.equal(queue.get("note", "gone"), null);
+  });
+
+  it("session expired: the entry is held (flush stops), not dropped as refused", async () => {
+    const { queue, state, sent, rejected, clock, tick } = appHarness();
+    state.online = false;
+    await queue.submit("note", "a", { note: "1" });
+    await queue.submit("note", "b", { note: "2" });
+    state.online = true;
+    state.refuse = sessionExpired();
+    assert.deepEqual(await queue.flush(), { sent: 0, rejected: 0, remaining: 2 });
+    assert.equal(rejected.length, 0);
+    assert.equal(queue.get("note", "a")?.refusal, undefined);
+    await tick();
+    // An awaited submit that meets the expiry is "queued", not "rejected".
+    assert.equal((await queue.submit("note", "c", { note: "3" })).status, "queued");
+    clock.pending.length = 0;
+
+    // The provider holds the drafts for the expired user; the same user signs in again and they go out.
+    state.userId = null;
+    state.ownerId = "usr_ilya";
+    state.refuse = null;
+    assert.deepEqual(await queue.flush(), { sent: 0, rejected: 0, remaining: 3 });
+    state.userId = "usr_ilya";
+    state.ownerId = null;
+    await queue.flush();
+    assert.deepEqual(sent.sort(), ["a=1", "b=2", "c=3"]);
+  });
+
+  it("a draft flushed while the expired session is torn down belongs to that user, and only to them", async () => {
+    const { queue, state, sent, stored } = appHarness();
+    state.userId = null;
+    state.ownerId = "usr_ilya";
+    // The editor's flush as the tree unmounts after the forced sign-out.
+    assert.equal((await queue.submit("note", "n1", { note: "typed at the 401" })).status, "queued");
+    assert.equal(queue.get("note", "n1")?.userId, "usr_ilya");
+    assert.equal((await stored()).length, 1, "kept on the device");
+    assert.deepEqual(sent, []);
+
+    // Another account signs in: never sent for them, and dropped from the device.
+    state.ownerId = null;
+    state.userId = "usr_maria";
+    assert.deepEqual(await queue.flush(), { sent: 0, rejected: 0, remaining: 1 });
+    await queue.dropOtherUsers("usr_maria");
+    assert.equal(queue.get("note", "n1"), null);
+    assert.deepEqual(await stored(), []);
+    assert.deepEqual(sent, []);
+  });
+
+  it("the same user signing in again gets the held draft delivered", async () => {
+    const { queue, state, sent } = appHarness();
+    state.userId = null;
+    state.ownerId = "usr_ilya";
+    await queue.submit("note", "n1", { note: "held" });
+    state.ownerId = null;
+    state.userId = "usr_ilya";
+    await queue.dropOtherUsers("usr_ilya");
+    assert.equal(queue.get<{ note: string }>("note", "n1")?.payload.note, "held");
+    await queue.flush();
+    assert.deepEqual(sent, ["n1=held"]);
+  });
+
+  it("parses a stored refusal and drops a malformed one", () => {
+    const good: PendingWrite = {
+      kind: "k",
+      id: "i",
+      payload: 1,
+      userId: "u",
+      createdAt: 1,
+      updatedAt: 2,
+      attempts: 0,
+      refusal: { code: "x", message: null, retryAt: null, at: 3 },
+    };
+    assert.deepEqual(parsePendingWrites(JSON.stringify([good, { ...good, id: "bad", refusal: { code: 1 } }])), [good]);
   });
 });

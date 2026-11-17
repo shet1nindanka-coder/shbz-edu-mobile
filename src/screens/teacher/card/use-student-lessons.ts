@@ -1,7 +1,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { errorText, hasErrorCode, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { LessonItemResult, TeacherStudentLesson } from '@/api/types';
 import { POLLING } from '@/api/types/limits';
 import { notePlanRequested, planRequestedAtOf } from '@/components/lessons';
@@ -25,7 +25,7 @@ import {
   type LessonPlanState,
   type LessonSetIds,
 } from './lessons-logic';
-import { useRefetchOnFocus, useScreenFocused } from '@/navigation';
+import { useRefetchOnFocus, useScreenLive } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 
 /** What one lesson is busy with: its set-editing controls are disabled meanwhile. */
@@ -51,7 +51,9 @@ export function useStudentLessons(studentId: string) {
   const queryClient = useQueryClient();
   const { dict } = useI18n();
   const t = dict.students.lessons;
-  const focused = useScreenFocused();
+  // The plan poll runs only while this screen is focused AND the app is in the foreground: TanStack's focus
+  // manager does not follow AppState on React Native, so a background tick would keep hitting the server.
+  const screenLive = useScreenLive();
   const now = useNowTick(30_000);
 
   const key = qk('teacherStudents', 'listStudentLessons', studentId);
@@ -92,8 +94,8 @@ export function useStudentLessons(studentId: string) {
     queries: pendingLessons.map((lesson) => ({
       queryKey: qk('planner', 'getLessonStatus', lesson.id),
       queryFn: () => api.planner.getLessonStatus(lesson.id),
-      enabled: focused,
-      refetchInterval: POLLING.planStatusStudentCardMs,
+      enabled: screenLive,
+      refetchInterval: screenLive ? POLLING.planStatusStudentCardMs : false,
       // A failed poll is ignored: the next tick tries again.
       retry: false,
       staleTime: 0,
@@ -195,7 +197,7 @@ export function useStudentLessons(studentId: string) {
       // queueFull, rateLimited, no connection.
       fail(lesson.id, error, t.errors.regenerate);
       notePlanWait(error);
-      if (hasErrorCode(error, 'participantNotFound')) void refetch();
+      if (isNotFoundError(error)) void refetch();
     },
     onSettled: (_response, _error, lesson) => {
       setBusy((current) => without(current, [lesson.id]));

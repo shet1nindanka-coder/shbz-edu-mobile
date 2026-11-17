@@ -14,10 +14,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useScreenFocused } from '@/navigation';
 import { noticeChannel, postOneShotNotice, useOneShotNotice, type NoticeChannel } from '@/services/notices';
 
-export type GroupNoticeKey = 'deleted' | 'created';
+export type GroupNoticeKey = 'deleted' | 'missing' | 'created';
 
-/** The groups list: «Группа удалена. Ученики остались на платформе.» */
-export const GROUPS_LIST_NOTICE = noticeChannel<'deleted'>('groups.list');
+/**
+ * The groups list: «Группа удалена. Ученики остались на платформе.», or — after an action on a group that
+ * turned out to be gone — «Группа не найдена — возможно, её уже удалили.» (the site's `?groupError=missing`).
+ */
+export const GROUPS_LIST_NOTICE = noticeChannel<'deleted' | 'missing'>('groups.list');
 
 /** The screen of one group: «Группа создана. Добавьте в неё учеников.» */
 export function groupNoticeChannel(groupId: string): NoticeChannel<'created'> {

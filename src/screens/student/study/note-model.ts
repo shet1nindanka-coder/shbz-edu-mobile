@@ -58,11 +58,15 @@ export function adoptServerNote(snapshot: NoteEditorSnapshot, serverNote: string
   return { saved: serverNote, draft: untouched ? serverNote : snapshot.draft };
 }
 
-/** What the line next to the «Заметка» kicker shows. */
-export type NoteStatus = "saving" | "queued" | "saved" | null;
+/**
+ * What the line next to the «Заметка» kicker shows. A waiting draft is "queued" while the device is offline
+ * and "retrying" while it is online (the last try got no answer; the queue tries again by itself) — saying
+ * "will save when online" to an online device would be false.
+ */
+export type NoteStatus = "saving" | "queued" | "retrying" | "saved" | null;
 
-export function noteStatus(state: { saving: boolean; queued: boolean; savedFlash: boolean }): NoteStatus {
+export function noteStatus(state: { saving: boolean; queued: boolean; savedFlash: boolean; online?: boolean }): NoteStatus {
   if (state.saving) return "saving";
-  if (state.queued) return "queued";
+  if (state.queued) return state.online ? "retrying" : "queued";
   return state.savedFlash ? "saved" : null;
 }

@@ -40,6 +40,7 @@ import { latencyFor } from "./rules/latency";
 import { MockPersistence, createMemoryStorage, type MockStorageAdapter } from "./store/persistence";
 import type { MockSnapshot } from "./store/schema";
 import { MockStore } from "./store/store";
+import { readPickedFileBytes } from "./upload-bytes";
 
 export type MockApiClientOptions = {
   /** Where the store is kept between app starts. Default: memory only (lost on restart). */
@@ -77,6 +78,13 @@ export type MockApiClientOptions = {
   onFileUploaded?: (file: MockUploadedFile) => void;
   /** Device hook: a file row was removed because nothing references it (wire it to `forgetLocalFile`). */
   onFileRemoved?: (fileId: string) => void;
+  /**
+   * Device hook: the bytes of a picked file, so uploads are checked like the site's `validateUploadedBytes`
+   * (declared size, magic bytes of the extension). Resolve to null when the URI cannot be read — the check
+   * is then skipped. Default: `readPickedFileBytes` (web `blob:` / `data:` URLs only); on native wire it to
+   * expo-file-system (`new File(uri).bytes()`). `null` turns the byte check off.
+   */
+  readUploadBytes?: ((uri: string) => Promise<Uint8Array | null>) | null;
   /**
    * Notifies the client that ANOTHER writer changed `key` in the same storage (web: a second browser tab of
    * the demo over one `localStorage`). The client then reloads the stored dataset before its next call
@@ -225,7 +233,11 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
     getToken: () => token,
     isOnline,
     materializeDocument,
-    fileHooks: { onFileUploaded: options.onFileUploaded, onFileRemoved: options.onFileRemoved },
+    fileHooks: {
+      onFileUploaded: options.onFileUploaded,
+      onFileRemoved: options.onFileRemoved,
+      readBytes: options.readUploadBytes === null ? undefined : (options.readUploadBytes ?? readPickedFileBytes),
+    },
   });
 
   /** New T0 and every fixture; sessions of users that still exist survive, so a tester stays signed in. */

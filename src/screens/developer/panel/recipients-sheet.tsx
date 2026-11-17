@@ -48,6 +48,8 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
       title={m.developer.broadcast.pickStudents}
       // The checklist scrolls by itself (FlashList), not the sheet.
       scroll={false}
+      // Without a ScrollView the body must shrink itself, or it overflows under the footer in a short window.
+      contentStyle={styles.shrink}
       footer={
         <View style={styles.footer}>
           <Text variant="smallMedium" color="textMuted" style={styles.counter} testID="recipients-sheet-count">
@@ -72,7 +74,11 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
         {matches.length === 0 ? (
           <EmptyState variant="plain" title={dict.planner.common.nobodyFound} testID="recipients-empty" />
         ) : (
-          <View accessibilityRole="list" style={{ height: listHeight }}>
+          <View
+            accessibilityRole="list"
+            // The height is only preferred: in a short window the list gives way (down to one row) to the footer.
+            style={[styles.shrink, { height: listHeight, minHeight: Math.min(listHeight, rowStride) }]}
+          >
             <FlashList
               data={matches}
               keyExtractor={(student) => student.id}
@@ -100,7 +106,8 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: t.space.md, paddingTop: t.space.xs },
+  content: { flexShrink: 1, minHeight: 0, gap: t.space.md, paddingTop: t.space.xs },
+  shrink: { flexShrink: 1, minHeight: 0 },
   item: { paddingBottom: t.space.xs },
   footer: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   counter: { flex: 1 },

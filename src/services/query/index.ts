@@ -9,11 +9,20 @@ export {
   type FlushResult,
   type PendingWrite,
   type PendingWriteHandler,
+  type PendingWriteRefusal,
+  type PendingWriteRefusalInfo,
   type PendingWritesOptions,
   type PendingWritesQueue,
   type PendingWritesStorage,
+  type PendingWritesTimers,
   type SubmitOutcome,
 } from './pending-writes';
+export {
+  isPendingWriteRetryable,
+  keepPendingWriteRefusal,
+  summarizePendingWrites,
+  type PendingWritesSummary,
+} from './pending-write-errors';
 export {
   PERSIST_BUSTER,
   PERSIST_MAX_AGE_MS,

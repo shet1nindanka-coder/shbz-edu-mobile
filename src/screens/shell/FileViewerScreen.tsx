@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { FileViewer } from '@/components/files';
 import { useAppNavigation, type FileViewerFile } from '@/navigation';
-import { handedOverTitle, withHandedOverUris } from '@/navigation/viewer-handoff';
+import { handedOverTitle, viewerRouteFiles } from '@/navigation/viewer-handoff';
 
 import { NotFoundScreen } from './NotFoundScreen';
 
@@ -23,9 +23,19 @@ export type FileViewerScreenProps = {
  */
 export function FileViewerScreen({ files, initialIndex }: FileViewerScreenProps) {
   const navigation = useAppNavigation();
-  const viewerFiles = useMemo(() => withHandedOverUris(files), [files]);
+  // A file the link names by id alone is typed and named from the stored file (`describeIds`).
+  const route = useMemo(() => viewerRouteFiles(files), [files]);
   // Header title instead of the file name — only the one `openFiles` handed over for this set.
   const title = useMemo(() => handedOverTitle(files), [files]);
   if (files.length === 0) return <NotFoundScreen />;
-  return <FileViewer files={viewerFiles} initialIndex={initialIndex} title={title} onClose={navigation.back} testID="file-viewer-screen" />;
+  return (
+    <FileViewer
+      files={route.files}
+      describeIds={route.linkOnlyIds}
+      initialIndex={initialIndex}
+      title={title}
+      onClose={navigation.back}
+      testID="file-viewer-screen"
+    />
+  );
 }

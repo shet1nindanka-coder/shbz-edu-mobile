@@ -158,10 +158,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
       </View>
 
       {error ? (
-        <View style={styles.notice}>
-          <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="homework-photos-error" />
-          <RetryWaitLine seconds={limit.seconds} testID="homework-photos-wait" />
-        </View>
+        <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="homework-photos-error" />
       ) : null}
       {source.problem ? (
         <PickProblemNotice problem={source.problem} onDismiss={source.clearProblem} testID="homework-photos-pick-problem" />
@@ -184,6 +181,8 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
         addBusy={uploading || source.preparing}
         testID="homework-photos-grid"
       />
+      {/* Why the add tile is off, for as long as it is — not inside the dismissible notice (90-addendum-1 A.3). */}
+      <RetryWaitLine wait={limit} testID="homework-photos-wait" />
 
       {progress !== null ? (
         <ProgressBar
@@ -237,6 +236,5 @@ const useStyles = makeStyles((t) => ({
   block: { gap: t.space.md },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.md },
   titles: { flex: 1, minWidth: 0, gap: 2 },
-  notice: { gap: t.space.xs },
   hints: { gap: 2 },
 }));

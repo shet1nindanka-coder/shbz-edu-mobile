@@ -15,7 +15,17 @@ type DeviceState = {
   /** Biometry of the simulated device. */
   biometrics: { hardware: boolean; enrolled: boolean; types: number[]; nextResult: { success: boolean; error?: string } };
   network: { type: string; isConnected: boolean; isInternetReachable: boolean };
-  notifications: { status: 'granted' | 'denied' | 'undetermined'; scheduled: { identifier: string; content: Record<string, unknown>; trigger: unknown }[]; channels: ({ id: string } & Record<string, unknown>)[] };
+  notifications: {
+    status: 'granted' | 'denied' | 'undetermined';
+    scheduled: { identifier: string; content: Record<string, unknown>; trigger: unknown }[];
+    channels: ({ id: string } & Record<string, unknown>)[];
+    /** Delivered notifications still in the tray (request identifier + content). */
+    presented: { identifier: string; content: Record<string, unknown> }[];
+    /** Android "alarms & reminders" access; `undeclared` = the app has no SCHEDULE_EXACT_ALARM (request rejects). */
+    exactAlarm: 'granted' | 'denied' | 'undeclared';
+    /** What the system settings page answers when the user comes back. */
+    exactAlarmAfterRequest: 'granted' | 'denied';
+  };
   /** What the next camera / gallery / document picker call answers; null = the user cancelled. */
   picker: { nextAssets: PickedAsset[] | null; cameraPermission: boolean; libraryPermission: boolean };
   clipboard: string;
@@ -36,7 +46,7 @@ function freshState(): DeviceState {
     secureStore: new Map(),
     biometrics: { hardware: true, enrolled: true, types: [1], nextResult: { success: true } },
     network: { type: 'WIFI', isConnected: true, isInternetReachable: true },
-    notifications: { status: 'undetermined', scheduled: [], channels: [] },
+    notifications: { status: 'undetermined', scheduled: [], channels: [], presented: [], exactAlarm: 'granted', exactAlarmAfterRequest: 'granted' },
     picker: { nextAssets: null, cameraPermission: true, libraryPermission: true },
     clipboard: '',
     appState: 'active',
@@ -117,6 +127,31 @@ export function expoNativeModuleFakes(): Record<string, Record<string, unknown>>
       requestPermissionsAsync: async () => {
         device().notifications.status = 'granted';
         return permission(true);
+      },
+      getExactAlarmPermissionsAsync: async () => {
+        const { exactAlarm } = device().notifications;
+        return { ...permission(exactAlarm === 'granted'), canAskAgain: exactAlarm !== 'undeclared' };
+      },
+      requestExactAlarmPermissionsAsync: async () => {
+        const state = device().notifications;
+        device().calls.push({ name: 'Notifications.requestExactAlarmPermissionsAsync', args: [] });
+        if (state.exactAlarm === 'undeclared') throw new Error('SCHEDULE_EXACT_ALARM is not declared');
+        state.exactAlarm = state.exactAlarmAfterRequest;
+        return permission(state.exactAlarm === 'granted');
+      },
+    },
+    ExpoNotificationPresenter: {
+      getPresentedNotificationsAsync: async () =>
+        device().notifications.presented.map((entry) => ({
+          date: 0,
+          request: { identifier: entry.identifier, content: { ...entry.content }, trigger: null },
+        })),
+      dismissNotificationAsync: async (identifier: string) => {
+        const state = device().notifications;
+        state.presented = state.presented.filter((entry) => entry.identifier !== identifier);
+      },
+      dismissAllNotificationsAsync: async () => {
+        device().notifications.presented = [];
       },
     },
     ExpoNotificationScheduler: {
@@ -217,8 +252,8 @@ export function turboModuleFakes(): Record<string, Record<string, unknown>> {
   const dismissed = { action: 'dismissedAction' };
   return {
     // @react-native-community/datetimepicker (Android dialogs): the dialog opens and the user dismisses it.
-    RNCDatePicker: { open: record('RNCDatePicker.open', () => dismissed), dismiss: async () => true },
-    RNCTimePicker: { open: record('RNCTimePicker.open', () => dismissed), dismiss: async () => true },
+    RNCDatePicker: { open: record('RNCDatePicker.open', () => dismissed), dismiss: record('RNCDatePicker.dismiss', () => true) },
+    RNCTimePicker: { open: record('RNCTimePicker.open', () => dismissed), dismiss: record('RNCTimePicker.dismiss', () => true) },
     RNCMaterialDatePicker: { open: record('RNCMaterialDatePicker.open', () => dismissed), dismiss: async () => true },
     // react-native-webview: the JS component is real and renders the `RNCWebView` host view.
     RNCWebViewModule: {
