@@ -2,25 +2,24 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { HomeworkPlanParticipant } from '@/api/types';
+import { ActionSheet, type SheetAction } from '@/components/action-sheet';
+import { planRequestedAtOf, useHandout } from '@/components/lessons';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { Hint } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Dialog, ErrorState, IconButton, LoadingState, Screen, Text } from '@/ui';
+import { Button, Dialog, IconButton, LoadingState, Screen, Text } from '@/ui';
 
 import { DraftAddSheet } from './drafts/draft-add-sheet';
 import { DraftBoardHeader } from './drafts/draft-board-header';
 import { DraftParticipantCard } from './drafts/draft-participant-card';
 import { draftCreatedAt } from './drafts/drafts-logic';
 import { useDraftBoard } from './drafts/use-draft-board';
-import { ActionSheet, type SheetAction } from './shared/action-sheet';
-import { errorText } from './shared/error-text';
-import { planRequestedAtOf } from './shared/plan-anchors';
 import { planStateOf } from './shared/plan-state';
-import { isWaitingForNetwork } from './shared/query-state';
-import { useHandout } from './shared/use-handout';
 
 /** Route params of `planner.draftBoard` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type PlannerDraftBoardScreenProps = ScreenParams['planner.draftBoard'];
@@ -63,14 +62,7 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
     return (
       <Screen testID="planner-draft-board-screen" header={<DetailAppBar title={dict.planner.homeworkPlans.new.kicker} />}>
         {board.isError || isWaitingForNetwork(board) ? (
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={board.isError ? errorText(board.error, dict.shells.errorDescription) : m.common.errors.network}
-            retryLabel={dict.common.retry}
-            onRetry={() => void board.refetch()}
-            retrying={board.isFetching}
-            testID="draft-board-error"
-          />
+          <LoadFailure query={board} testID="draft-board-error" />
         ) : (
           <LoadingState variant="cards" count={3} cardHeight={120} accessibilityLabel={m.common.a11y.loading} testID="draft-board-loading" />
         )}

@@ -4,10 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isApiError, isNetworkError, qk, useApi } from '@/api';
 import type { ImportApplyResult, ImportPreview, ImportTarget } from '@/api/types';
+import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-
-import { pickJsonFile } from './pick-json-file';
-import { useRateLimit, type RateLimitWait } from './use-rate-limit';
+import { pickJsonFile } from '@/services/photos';
 
 /** How long the load tile shows «Файл добавлен» (the site's `SUCCESS_HOLD_MS`). */
 const SUCCESS_HOLD_MS = 900;
@@ -35,7 +34,7 @@ export type ImportPanelState = {
   error: string | null;
   checking: boolean;
   applying: boolean;
-  wait: RateLimitWait;
+  wait: RetryWait;
   pickFile: () => void;
   pasteFromClipboard: () => void;
   changeText: (value: string) => void;
@@ -69,7 +68,7 @@ export function useImportPanel({ target, onCreated }: ImportPanelOptions): Impor
   const [overwriteFilled, setOverwriteFilled] = useState(false);
   const [result, setResult] = useState<ImportApplyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const wait = useRateLimit();
+  const wait = useRetryWait();
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(

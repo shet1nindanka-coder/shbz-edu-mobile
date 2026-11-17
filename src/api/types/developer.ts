@@ -6,7 +6,7 @@ import type { SiteSettings } from "./entities";
 import type { AuditCategory, IsoDateTime, UserRole } from "./primitives";
 
 export type DeveloperPanelStats = {
-  /** Waiting homework checks. */
+  /** Checks waiting in the shared AI queue: homework checks and lesson submissions together. */
   queueLength: number;
   /** Trailing 24 h, homework checks only — NOT the budget bucket. */
   checksLastDay: number;

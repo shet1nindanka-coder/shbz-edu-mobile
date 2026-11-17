@@ -738,6 +738,15 @@ describe("rules: files, notifications, realtime filter", () => {
       `uploaded ${uploaded.id} file:///documents/IMG_7.jpg image/jpeg 77`,
       `removed ${uploaded.id}`,
     ]);
+
+    // A delete cascade removes file rows by itself; the device layer hears about each of them too, so the
+    // bytes of picked photos do not stay behind without a row.
+    calls.length = 0;
+    const photoIds = custom.store.homeworkPhotos.by("assignmentId", "hw_ilya_open").map((photo) => photo.fileId);
+    assert.equal(photoIds.length, 3);
+    custom.ctx.cascade.deleteHomework("hw_ilya_open");
+    assert.deepEqual([...calls].sort(), photoIds.map((fileId) => `removed ${fileId}`).sort());
+    for (const fileId of photoIds) assert.equal(custom.store.files.has(fileId), false);
   });
 
   it("creates notifications with a Russian snapshot and projects the target for the recipient's role", async () => {
@@ -838,6 +847,12 @@ describe("rule V — verdict scripting (90-addendum-6 §4)", () => {
     assert.deepEqual(selectFoundNumbers(numbers, 0), []);
     // Explicit verdicts of the demo control override the cycle by index.
     assert.deepEqual(scriptHomeworkCheck(rows([["1", null], ["2", null]]), 2, "ru", ["UNCERTAIN", "CORRECT"]).map((entry) => entry.result.verdict), ["UNCERTAIN", "CORRECT"]);
+    // The override is read by index: a list shorter than the found numbers hands the rest back to the
+    // cycle, so an "all …" outcome of the demo screen names its verdict for every index.
+    const three = rows([["1", null], ["2", null], ["3", null]]);
+    assert.deepEqual(scriptHomeworkCheck(three, 3, "ru", ["INCORRECT"]).map((entry) => entry.result.verdict), ["INCORRECT", "INCORRECT", "UNCERTAIN"]);
+    const all = Array.from({ length: 30 }, () => "INCORRECT" as const);
+    assert.deepEqual(scriptHomeworkCheck(three, 3, "ru", all).map((entry) => entry.result.verdict), ["INCORRECT", "INCORRECT", "INCORRECT"]);
   });
 
   it("completes a homework of 12 numbers with batches of 10 photos", () => {

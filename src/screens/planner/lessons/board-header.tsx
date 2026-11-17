@@ -1,15 +1,15 @@
 import { View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { LessonBoardModel } from '@/api/types';
+import { HandoutNotice } from '@/components/lessons';
+import type { Handout } from '@/components/lessons';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, Notice, Spinner, Text } from '@/ui';
 
-import { errorText } from '../shared/error-text';
-import { HandoutNotice } from '../shared/handout-notice';
-import type { Handout } from '../shared/use-handout';
-import { RetryWaitLine } from '../shared/use-retry-wait';
 import { needsSchedule } from './board-logic';
 import { ScheduleBanner } from './schedule-banner';
 import type { LessonBoardController } from './use-lesson-board';
@@ -45,10 +45,12 @@ export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHead
         <View
           accessible
           accessibilityLabel={dict.planner.lessonStatus[lesson.status]}
-          style={[styles.pill, { backgroundColor: isLive ? theme.colors.accentSolid : theme.colors.tabHover }]}
+          // The running lesson is the kit's positive pair (green text on the soft green): white on the
+          // accent fill is below 3:1 in the light theme and below 2:1 in the dark one.
+          style={[styles.pill, { backgroundColor: isLive ? theme.status.GREEN.bg : theme.colors.tabHover }]}
           testID="lesson-status-pill"
         >
-          <Text variant="smallBold" style={{ color: isLive ? theme.colors.onAccent : theme.colors.kicker }}>
+          <Text variant="smallBold" style={{ color: isLive ? theme.status.GREEN.text : theme.colors.kicker }}>
             {dict.planner.lessonStatus[lesson.status]}
           </Text>
         </View>

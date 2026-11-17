@@ -26,11 +26,14 @@ import {
   issuedSegments,
   issuedSolvedPercent,
   moreGapsLine,
+  nearestPointIndex,
   platformMetricCards,
   platformSummary,
   progressMetricCards,
   recentLessonLine,
   resolveHomeworkSelection,
+  slotIndexAt,
+  stepChartSelection,
   studentRankings,
   topicBarRatios,
   topicRankings,
@@ -487,3 +490,52 @@ test("filterPickerOptions: case-insensitive substring; an empty query keeps ever
   assert.deepEqual(filterPickerOptions(options, "zzz"), []);
   assert.ok(PICKER_SEARCH_FROM > 1);
 });
+
+// ───────────────────────────── chart selection ─────────────────────────────
+
+test("stepChartSelection: from nothing, next starts at the first mark and previous at the last", () => {
+  assert.equal(stepChartSelection(null, 12, 1), 0);
+  assert.equal(stepChartSelection(null, 12, -1), 11);
+});
+
+test("stepChartSelection: one mark per step, stopping at both ends", () => {
+  assert.equal(stepChartSelection(4, 12, 1), 5);
+  assert.equal(stepChartSelection(4, 12, -1), 3);
+  assert.equal(stepChartSelection(11, 12, 1), 11);
+  assert.equal(stepChartSelection(0, 12, -1), 0);
+});
+
+test("stepChartSelection: a selection outside the marks restarts; no marks → nothing", () => {
+  // The period changed and the chart now has fewer points than the remembered index.
+  assert.equal(stepChartSelection(9, 4, 1), 0);
+  assert.equal(stepChartSelection(9, 4, -1), 3);
+  assert.equal(stepChartSelection(Number.NaN, 4, 1), 0);
+  assert.equal(stepChartSelection(null, 0, 1), null);
+  assert.equal(stepChartSelection(2, 0, -1), null);
+});
+
+test("slotIndexAt: the column under the finger, clamped to the plot", () => {
+  // Twelve columns across 324 pt: 27 pt each.
+  assert.equal(slotIndexAt(0, 324, 12), 0);
+  assert.equal(slotIndexAt(26.9, 324, 12), 0);
+  assert.equal(slotIndexAt(27, 324, 12), 1);
+  assert.equal(slotIndexAt(323, 324, 12), 11);
+  assert.equal(slotIndexAt(324, 324, 12), 11);
+  assert.equal(slotIndexAt(-5, 324, 12), 0);
+  assert.equal(slotIndexAt(100, 0, 12), 0);
+  assert.equal(slotIndexAt(100, 324, 0), 0);
+});
+
+test("nearestPointIndex: points spread from the side inset across the plot", () => {
+  // Seven points from x = 24 to x = 264: 40 pt apart.
+  assert.equal(nearestPointIndex(24, 24, 240, 7), 0);
+  assert.equal(nearestPointIndex(43, 24, 240, 7), 0);
+  assert.equal(nearestPointIndex(45, 24, 240, 7), 1);
+  assert.equal(nearestPointIndex(264, 24, 240, 7), 6);
+  // Touches in the side insets belong to the outermost points.
+  assert.equal(nearestPointIndex(2, 24, 240, 7), 0);
+  assert.equal(nearestPointIndex(286, 24, 240, 7), 6);
+  // A single point sits in the middle: every touch selects it.
+  assert.equal(nearestPointIndex(150, 24, 240, 1), 0);
+});
+

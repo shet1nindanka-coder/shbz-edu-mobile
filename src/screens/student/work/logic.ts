@@ -316,16 +316,8 @@ export function applySubmission(lesson: GetLessonResponse, submission: LessonSub
   return { ...lesson, active: { ...lesson.active, items } };
 }
 
-// ───────────────────────────── server clock (03 §5.3, 09 §6.2 rule 6) ─────────────────────────────
-
-/**
- * `serverNow − receivedAt`: what to add to the device clock to get the server's. `receivedAt` is the device
- * time at which the response arrived, so a response restored from the cache keeps a correct offset.
- */
-export function serverClockOffset(serverNow: string, receivedAt: number): number {
-  const server = Date.parse(serverNow);
-  return Number.isFinite(server) && receivedAt > 0 ? server - receivedAt : 0;
-}
+// ───────────────────────────── lesson timers (03 §5.3) ─────────────────────────────
+// The server clock itself (`serverClockOffset`) lives in `@/domain/server-clock`.
 
 /** Grace added to the lesson's start and end moments before the screen re-reads the lesson (the site's 1000 ms). */
 export const LESSON_EDGE_GRACE_MS = 1000;

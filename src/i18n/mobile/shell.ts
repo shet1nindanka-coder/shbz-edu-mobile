@@ -53,7 +53,6 @@ const ru = {
     reminderHomeworkHint: "За сутки и за два часа до срока сдачи.",
     reminderLesson: "Начало урока",
     reminderLessonHint: "За 10 минут до урока и в момент начала.",
-    reminderCalls: "Звонки родителям",
     reminderCallsHint: "В 10:00 по Москве в день, когда пора позвонить.",
     remindersNone: "Для вашей роли напоминаний на устройстве нет.",
     remindersDenied: "Уведомления запрещены в настройках устройства. Разрешите их, чтобы получать напоминания.",
@@ -65,7 +64,15 @@ const ru = {
     pendingForms: ["{n} изменение ждёт отправки", "{n} изменения ждут отправки", "{n} изменений ждут отправки"],
     clearCache: "Очистить кэш",
     cacheCleared: "Сохранённые данные удалены.",
-    moreKicker: "Разделы",
+    clearCacheOfflineTitle: "Очистить кэш без подключения?",
+    clearCacheOfflineBody:
+      "Сейчас нет подключения, и сохранённые данные — всё, что может показать приложение. После очистки разделы останутся пустыми, пока связь не вернётся.",
+    signOutPendingTitle: "Выйти без отправки изменений?",
+    signOutPendingBodyForms: [
+      "{n} изменение ещё не отправлено. При выходе оно будет удалено с устройства и не сохранится.",
+      "{n} изменения ещё не отправлены. При выходе они будут удалены с устройства и не сохранятся.",
+      "{n} изменений ещё не отправлено. При выходе они будут удалены с устройства и не сохранятся."
+    ],
     version: "Версия {version}",
     signingOut: "Выходим…"
   },
@@ -95,10 +102,6 @@ const ru = {
     lessonStartTitle: "Урок начался",
     lessonBody: "{title}",
     lessonBodyWithGroup: "{title} · {group}"
-  },
-  placeholder: {
-    body: "Экран «{screen}» появится в одной из следующих сборок.",
-    params: "Параметры"
   },
   demo: {
     title: "Демо-данные",
@@ -159,7 +162,6 @@ const en: typeof ru = {
     reminderHomeworkHint: "A day and two hours before the deadline.",
     reminderLesson: "Lesson start",
     reminderLessonHint: "10 minutes before the lesson and when it starts.",
-    reminderCalls: "Parent calls",
     reminderCallsHint: "At 10:00 Moscow time on the day a call becomes due.",
     remindersNone: "There are no on-device reminders for your role.",
     remindersDenied: "Notifications are turned off in the device settings. Allow them to get reminders.",
@@ -171,7 +173,14 @@ const en: typeof ru = {
     pendingForms: ["{n} change is waiting to be sent", "{n} changes are waiting to be sent"],
     clearCache: "Clear cache",
     cacheCleared: "Saved data has been removed.",
-    moreKicker: "Sections",
+    clearCacheOfflineTitle: "Clear the cache while offline?",
+    clearCacheOfflineBody:
+      "There is no connection right now, and saved data is all the app can show. After clearing, sections stay empty until the connection returns.",
+    signOutPendingTitle: "Log out without sending your changes?",
+    signOutPendingBodyForms: [
+      "{n} change has not been sent yet. Logging out deletes it from this device, and it will not be saved.",
+      "{n} changes have not been sent yet. Logging out deletes them from this device, and they will not be saved."
+    ],
     version: "Version {version}",
     signingOut: "Signing out…"
   },
@@ -201,10 +210,6 @@ const en: typeof ru = {
     lessonStartTitle: "The lesson has started",
     lessonBody: "{title}",
     lessonBodyWithGroup: "{title} · {group}"
-  },
-  placeholder: {
-    body: "The “{screen}” screen arrives in one of the next builds.",
-    params: "Parameters"
   },
   demo: {
     title: "Demo data",

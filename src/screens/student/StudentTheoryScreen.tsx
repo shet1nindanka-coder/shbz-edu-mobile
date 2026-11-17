@@ -1,19 +1,20 @@
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshControl, View } from 'react-native';
+import { useMemo } from 'react';
+import { RefreshControl, useWindowDimensions, View } from 'react-native';
 
 import { qk, useApi } from '@/api';
 import { useFileActions, type ViewerFile } from '@/components/files';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { EmptyState, LoadingState, Notice, PageHeader, Screen } from '@/ui';
+import { EmptyState, LoadingState, MAX_FONT_SCALE, Notice, PageHeader, Screen } from '@/ui';
 
-import { LoadError } from './study/load-error';
 import { RefreshError } from './study/refresh-error';
-import { TheoryCard, type TheoryTopic } from './study/theory-card';
-import { useRefetchOnFocus } from './study/use-refetch-on-focus';
+import { TheoryCard, isPreviewableTheory, type TheoryTopic } from './study/theory-card';
+import { theoryTitleBasis } from './study/theory-layout';
 import { useRefresh } from './study/use-refresh';
 
 function viewerFileOf(topic: TheoryTopic): ViewerFile {
@@ -45,6 +46,20 @@ export function StudentTheoryScreen() {
   useRefetchOnFocus([library]);
   const topics = library.data?.topics;
 
+  // One layout for the whole list: the title column must hold the longest word of any title that shares
+  // its row with «Открыть» (a DOCX card is always a column).
+  const fontScale = Math.min(useWindowDimensions().fontScale, MAX_FONT_SCALE);
+  const titleFontSize = theme.typography.cardTitle.fontSize;
+  const titleBasis = useMemo(
+    () =>
+      theoryTitleBasis(
+        (topics ?? []).filter((topic) => isPreviewableTheory(topic.theoryFile.mimeType)).map((topic) => topic.title),
+        titleFontSize,
+        fontScale,
+      ),
+    [topics, titleFontSize, fontScale],
+  );
+
   // The viewer is titled with the topic, not with the file name (02 S2a).
   const open = (topic: TheoryTopic) => navigation.openFiles([viewerFileOf(topic)], { title: topic.title });
   const download = (topic: TheoryTopic) => void fileActions.openExternally(viewerFileOf(topic));
@@ -67,6 +82,7 @@ export function StudentTheoryScreen() {
         <FlashList
           data={topics}
           keyExtractor={(topic) => topic.id}
+          extraData={titleBasis}
           renderItem={({ item }) => (
             <View style={styles.item}>
               <TheoryCard
@@ -74,6 +90,7 @@ export function StudentTheoryScreen() {
                 onOpen={open}
                 onDownload={download}
                 downloading={fileActions.pending?.fileId === item.theoryFile.id}
+                titleBasis={titleBasis}
               />
             </View>
           )}
@@ -110,15 +127,8 @@ export function StudentTheoryScreen() {
       ) : (
         <>
           {pageHeader}
-          {library.isError ? (
-            <LoadError
-              error={library.error}
-              failedAt={library.errorUpdatedAt}
-              onRetry={refresh}
-              retrying={library.isFetching}
-              home
-              testID="theory-error"
-            />
+          {isLoadFailed(library) ? (
+            <LoadFailure query={library} home testID="theory-error" />
           ) : (
             <LoadingState variant="cards" count={5} cardHeight={78} accessibilityLabel={m.common.a11y.loading} testID="theory-loading" />
           )}

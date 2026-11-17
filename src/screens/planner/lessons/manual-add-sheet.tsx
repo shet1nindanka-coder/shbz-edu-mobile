@@ -2,12 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, LoadingState, Notice, Select, Text } from '@/ui';
 
-import { errorText } from '../shared/error-text';
 import { availableNumbers } from './board-logic';
 
 export type ManualAddSheetProps = {

@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { formatDate } from '@/domain/dates';
-import { useI18n } from '@/i18n';
-import { useCurrentUser, useSession } from '@/providers';
+import { plural, useI18n } from '@/i18n';
+import { useCurrentUser, usePendingWritesCount, useSession } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Avatar, Button, Card, Screen, SectionCard, Text } from '@/ui';
+import { Avatar, Button, Card, Dialog, Screen, SectionCard, Text } from '@/ui';
 
 import { DetailAppBar } from './DetailAppBar';
 import { AppSection } from './settings/AppSection';
@@ -17,7 +17,8 @@ import { ProfileSection } from './settings/ProfileSection';
  * `shell.settings` (docs/spec/01-shell-auth.md §1.5; 00 §3.1): pushed from the gear. Top to bottom, as on
  * the site: interface → personal information → change password → profile status; then the app-only block,
  * and at the very bottom the profile row with "Log out" — on the site those two live in the header menu.
- * Logout has no confirmation, as on the site.
+ * Logout has no confirmation, as on the site — except when changes typed offline are still waiting to be
+ * sent (mobile-only): signing out deletes them, so the user is told how many and may cancel.
  */
 export function SettingsScreen() {
   const styles = useStyles();
@@ -27,11 +28,22 @@ export function SettingsScreen() {
   const { signOut } = useSession();
   const [signingOut, setSigningOut] = useState(false);
 
+  const pendingCount = usePendingWritesCount();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const logout = () => {
     if (signingOut) return;
+    setConfirmOpen(false);
     setSigningOut(true);
     // The role tree unmounts when the session ends; there is no state to reset afterwards.
     void signOut();
+  };
+
+  // Nothing typed offline is lost silently: unsent changes are named before they are deleted.
+  const requestLogout = () => {
+    if (signingOut) return;
+    if (pendingCount > 0) setConfirmOpen(true);
+    else logout();
   };
 
   return (
@@ -78,12 +90,22 @@ export function SettingsScreen() {
             leftIcon="logout"
             fullWidth
             loading={signingOut}
-            onPress={logout}
+            onPress={requestLogout}
             style={styles.logout}
             testID="settings-logout"
           />
         </Card>
       </View>
+      <Dialog
+        visible={confirmOpen}
+        title={m.shell.settings.signOutPendingTitle}
+        description={plural(locale, pendingCount, m.shell.settings.signOutPendingBodyForms)}
+        confirmLabel={dict.nav.logout}
+        cancelLabel={m.common.actions.cancel}
+        onConfirm={logout}
+        onCancel={() => setConfirmOpen(false)}
+        testID="settings-logout-confirm"
+      />
     </Screen>
   );
 }

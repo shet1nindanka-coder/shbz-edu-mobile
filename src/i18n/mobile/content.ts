@@ -58,7 +58,7 @@ const ru = {
     resetDraft: "Вернуть сохранённое"
   },
   edit: {
-    sections: { topic: "тема", answers: "условия и ответы", import: "импорт" },
+    sections: { topic: "Тема", answers: "Условия и ответы", import: "Импорт" },
     sectionsAria: "Разделы редактирования темы",
     unsaved: "Есть несохранённые изменения",
     reset: "Вернуть сохранённое",
@@ -129,7 +129,7 @@ const en: typeof ru = {
     resetDraft: "Restore the saved text"
   },
   edit: {
-    sections: { topic: "topic", answers: "statements and answers", import: "import" },
+    sections: { topic: "Topic", answers: "Statements and answers", import: "Import" },
     sectionsAria: "Topic editing sections",
     unsaved: "There are unsaved changes",
     reset: "Restore the saved topic",

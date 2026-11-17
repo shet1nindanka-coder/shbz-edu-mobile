@@ -2,9 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { isApiError, isNetworkError, qk, useApi } from '@/api';
+import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-
-import { useRateLimit, type RateLimitWait } from '../shared/use-rate-limit';
 
 import { useUploadSlot, type UploadSlot } from './use-upload-slot';
 
@@ -23,8 +22,8 @@ export type ManualCreateState = {
   submitting: boolean;
   error: string | null;
   /** `api:topics-create` and `api:teacher-uploads` cool-downs. */
-  createWait: RateLimitWait;
-  uploadWait: RateLimitWait;
+  createWait: RetryWait;
+  uploadWait: RetryWait;
   submit: () => void;
 };
 
@@ -43,8 +42,8 @@ export function useManualCreate(onCreated: (topicId: string) => void): ManualCre
   const [description, setDescription] = useState('');
   const [numbers, setNumbers] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const createWait = useRateLimit();
-  const uploadWait = useRateLimit();
+  const createWait = useRetryWait();
+  const uploadWait = useRetryWait();
   const theory = useUploadSlot(uploadWait.note);
   const homework = useUploadSlot(uploadWait.note);
 

@@ -31,6 +31,7 @@ import {
   type FileViewerFile,
 } from './routes';
 import { tabsForRole } from './tabs';
+import { handOverViewerFiles } from './viewer-handoff';
 
 /**
  * The one place an `AppHref` becomes an expo-router `Href`. Patterns come from the route table, which a
@@ -209,8 +210,11 @@ export function useAppNavigation(): AppNavigation {
       openNumberSearch: () => router.push(toHref({ pathname: '/number-search' })),
       openFiles: (files, options) => {
         if (role === null || files.length === 0) return;
-        const href = hrefFor({ screen: 'shared.fileViewer', files, ...options }, role);
-        if (href) router.push(toHref(href));
+        const href = hrefFor({ screen: 'shared.fileViewer', files, initialIndex: options?.initialIndex }, role);
+        if (!href) return;
+        // Downloaded documents and the title go to the viewer in memory; the URL carries file references only.
+        handOverViewerFiles(files, options?.title);
+        router.push(toHref(href));
       },
       openDemoData: () => router.push(toHref({ pathname: EXTRA_ROUTES.demoData })),
       openTeacherMore: () => {

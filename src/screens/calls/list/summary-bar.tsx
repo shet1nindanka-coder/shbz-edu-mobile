@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Text } from '@/ui';
 
-import { summaryLine } from '../logic';
+import { longestWordLength, summaryLine } from '../logic';
 
 export type SummaryBarProps = { counts: { overdue: number; due: number; total: number } };
 
@@ -31,7 +31,9 @@ export function SummaryBar({ counts }: SummaryBarProps) {
 function Counter({ value, label, color, testID }: { value: number; label: string; color: ColorToken; testID: string }) {
   const styles = useStyles();
   return (
-    <View style={styles.counter}>
+    // The row is shared in proportion to each label's longest word, so «Просрочено» is never broken
+    // inside the word on a narrow phone while «Пора позвонить» and «Всего учеников» wrap at the space.
+    <View style={[styles.counter, { flexGrow: longestWordLength(label) }]}>
       <Text variant="miniStat" color={color} tabular testID={testID}>
         {value}
       </Text>
@@ -46,17 +48,19 @@ const useStyles = makeStyles((t) => ({
   // Opaque: rows scroll underneath while the bar is pinned.
   bar: {
     flexDirection: 'row',
-    gap: t.space.sm,
+    // A narrow gap: at 320 pt every point of width goes to the labels.
+    gap: t.space.xs,
     paddingVertical: t.space.sm,
     paddingHorizontal: t.space.gutter,
     backgroundColor: t.colors.pageBg,
   },
   counter: {
-    flex: 1,
+    flexBasis: 0,
+    flexShrink: 1,
     minWidth: 0,
     gap: 2,
     paddingVertical: t.space.sm,
-    paddingHorizontal: t.space.md,
+    paddingHorizontal: t.space.sm,
     borderRadius: t.radii.md,
     borderWidth: t.borders.hairline,
     borderColor: t.colors.softBorder,

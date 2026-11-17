@@ -3,12 +3,17 @@
  *
  * - Queries are `offlineFirst`: the first attempt always runs (the mock answers in-process; an HTTP client
  *   fails fast), and with no connection the cached value stays on screen instead of an endless spinner.
+ * - A query that has NOTHING to show never waits for the network: TanStack parks the retry of a failed
+ *   first load until the device is back online, which left a never-opened screen on its skeleton for as
+ *   long as the connection was gone. Such a query is ended with its network error instead
+ *   (`failQueriesWaitingWithoutData`), so the screen reaches its error state with "Retry"; it is fetched
+ *   again by itself on reconnect. A refetch over cached data keeps waiting silently, as before.
  * - Mutations are `always`: they run even offline and reject at once with the `network` error, so the form
  *   can say so. A mutation is NEVER retried automatically (CLAUDE.md "Errors"). The one exception with a
  *   retry — the student's note — goes through the pending-writes queue (`pending-writes.ts`).
  */
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { QueryClient, defaultShouldDehydrateQuery } from '@tanstack/react-query';
+import { CancelledError, QueryClient, defaultShouldDehydrateQuery, onlineManager } from '@tanstack/react-query';
 import type { PersistQueryClientProviderProps } from '@tanstack/react-query-persist-client';
 
 import { isApiError, isNetworkError } from '@/api/errors';
@@ -30,15 +35,47 @@ export function shouldRetryQuery(failureCount: number, error: unknown): boolean 
   return isNetworkError(error) || error.code === 'serviceUnavailable';
 }
 
-export function createAppQueryClient(): QueryClient {
-  return new QueryClient({
+/**
+ * Ends every query that is parked offline with no data: its state becomes `error` with the failure of the
+ * first attempt (the `network` error), exactly as if there had been no retry. Returns the unsubscribe
+ * function.
+ *
+ * Left alone on purpose:
+ * - a query that has data — the cached value stays on screen and the refetch resumes on reconnect;
+ * - a query whose screen still shows the previous result as placeholder data (a filter switched offline);
+ * - a pause that is not about the connection.
+ */
+export function failQueriesWaitingWithoutData(client: QueryClient): () => void {
+  return client.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action.type !== 'pause') return;
+    const { query } = event;
+    if (query.state.data !== undefined || onlineManager.isOnline()) return;
+    if (query.observers.some((observer) => observer.getCurrentResult().isPlaceholderData)) return;
+    const reason: unknown = query.state.fetchFailureReason;
+    // Cancelling settles the parked fetch as an error; the error shown is the one the request failed with.
+    void query.cancel().then(() => {
+      const { state } = query;
+      if (reason !== null && state.status === 'error' && state.error instanceof CancelledError) {
+        query.setState({ ...state, error: reason as typeof state.error });
+      }
+    });
+  });
+}
+
+export type AppQueryClientOptions = {
+  /** Pause before the one retry; tests shorten it. */
+  retryDelayMs?: number;
+};
+
+export function createAppQueryClient(options: AppQueryClientOptions = {}): QueryClient {
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         networkMode: 'offlineFirst',
         staleTime: QUERY_STALE_TIME_MS,
         gcTime: QUERY_GC_TIME_MS,
         retry: shouldRetryQuery,
-        retryDelay: 1500,
+        retryDelay: options.retryDelayMs ?? 1500,
         refetchOnReconnect: true,
         // React Native has no window focus; the realtime bridge refreshes on return to the foreground.
         refetchOnWindowFocus: false,
@@ -49,6 +86,22 @@ export function createAppQueryClient(): QueryClient {
       },
     },
   });
+  // Lives as long as the client (a module-level singleton in the app).
+  failQueriesWaitingWithoutData(client);
+  return client;
+}
+
+/**
+ * Deletes the persisted cache from the device at once. The persister only writes on a throttle, so after
+ * `queryClient.clear()` the previous user's responses would stay on disk for about a second — for good if
+ * the app is closed inside that second. Sign-out awaits this instead of relying on the next write.
+ */
+export async function removePersistedQueries(storage: KeyValueStorage): Promise<void> {
+  try {
+    await storage.removeItem(PERSIST_STORAGE_KEY);
+  } catch {
+    // Nothing stored, or the storage is unavailable: the next throttled write stores the empty cache.
+  }
 }
 
 /** `persistOptions` of `PersistQueryClientProvider`: AsyncStorage persister + the dehydration policy. */

@@ -3,12 +3,12 @@ import { View } from 'react-native';
 
 import type { HomeworkNumberStatus, SolutionVerdict, TeacherHomeworkCheckResult, TeacherHomeworkNumber } from '@/api/types';
 import { MathContent } from '@/components/math';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { HOMEWORK_STATUS_ORDER } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
 import { Chip, PressableScale, StatusBadge, StatusOptionGroup, Text, TextButton, type ChipTone } from '@/ui';
 
-import { RateLimitLine } from '../students/rate-limit-line';
 import { DisclosureRow } from './disclosure-row';
 import { hasResultDiagnostics, shortenRecognizedAnswer } from './review-logic';
 
@@ -138,7 +138,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
       {/* PROPOSAL of the spec (04 S4, §7 item 15): the statement and the reference answer on demand. */}
       <View>
         <DisclosureRow
-          label={conditionOpen ? m.teacher.review.hideCondition : m.teacher.review.showCondition}
+          label={conditionOpen ? m.teacher.review.hideCondition : dict.topics.singleNumber.sectionTitle}
           variant="captionStrong"
           color="textMuted"
           expanded={conditionOpen}
@@ -147,7 +147,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
         />
         {conditionOpen ? (
           <View style={styles.condition}>
-            <Text variant="kickerSm">{m.teacher.review.condition}</Text>
+            <Text variant="kickerSm">{dict.topics.viewNumbers.condition}</Text>
             {number.conditionLatex ? (
               <MathContent value={number.conditionLatex} variant="bare" />
             ) : (
@@ -155,7 +155,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
                 {m.teacher.review.noCondition}
               </Text>
             )}
-            <Text variant="kickerSm">{m.teacher.review.answer}</Text>
+            <Text variant="kickerSm">{dict.topics.viewNumbers.answer}</Text>
             {number.answerLatex ? (
               <MathContent value={number.answerLatex} variant="bare" />
             ) : (
@@ -182,7 +182,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
           <Text variant="captionStrong" color="dangerText" accessibilityRole="alert" testID={`review-number-error-${number.homeworkNumberId}`}>
             {error}
           </Text>
-          <RateLimitLine seconds={waitSeconds} testID={`review-number-wait-${number.homeworkNumberId}`} />
+          <RetryWaitLine seconds={waitSeconds} testID={`review-number-wait-${number.homeworkNumberId}`} />
         </View>
       ) : null}
 

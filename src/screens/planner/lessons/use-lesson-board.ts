@@ -1,18 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { LessonBoardItem, LessonBoardModel, LessonBoardParticipant, LessonItemResult } from '@/api/types';
 import { POLLING } from '@/api/types/limits';
+import { notePlanRequested, planRequestedAtOf } from '@/components/lessons';
+import { useRetryWait } from '@/components/retry-wait';
+import { serverClockOffset } from '@/domain/server-clock';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
 
-import { errorText } from '../shared/error-text';
-import { notePlanRequested, planRequestedAtOf } from '../shared/plan-anchors';
-import { patchKeepingFetchTime, serverClockOffset } from '../shared/board-cache';
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
-import { useNowTick } from '../shared/use-now-tick';
-import { useRetryWait } from '../shared/use-retry-wait';
+import { useAppNavigation, useRefetchOnFocus, useScreenLive } from '@/navigation';
+import { useNowTick } from '@/services/clock';
+import { mergeQueryData } from '@/services/query';
 import {
   hasScheduleMovedOn,
   markParticipantPending,
@@ -50,6 +50,11 @@ export function useLessonBoard(lessonId: string) {
 
   // Opening the board runs the lazy finalisation of this lesson on the server, so it is always re-read.
   const board = useQuery({ queryKey: boardKey, queryFn: () => api.planner.getLessonBoard(lessonId), refetchOnMount: 'always' });
+  // The board stays mounted under the screens it opens (a new homework draft, the photo viewer): what went
+  // stale meanwhile is re-read when it comes back (00 §2.3 "refetch on focus" — the realtime fallback).
+  useRefetchOnFocus([board]);
+  // The two polls below run only while the board is on screen and the app is in the foreground.
+  const screenLive = useScreenLive();
   const data = board.data;
   const refetchBoard = board.refetch;
   const boardUpdatedAt = board.dataUpdatedAt;
@@ -80,7 +85,7 @@ export function useLessonBoard(lessonId: string) {
   const patchBoard = useCallback(
     (update: (current: LessonBoardModel) => LessonBoardModel) => {
       // The fetch time stays as it was: the board clock pairs it with `serverNow` of that fetch.
-      patchKeepingFetchTime<LessonBoardModel>(queryClient, boardKey, update);
+      mergeQueryData<LessonBoardModel>(queryClient, boardKey, update);
       patchedAt.current = Date.now();
     },
     // The key is rebuilt on every render from the same strings.
@@ -116,8 +121,8 @@ export function useLessonBoard(lessonId: string) {
   const status = useQuery({
     queryKey: qk('planner', 'getLessonStatus', lessonId),
     queryFn: () => api.planner.getLessonStatus(lessonId),
-    enabled: polling,
-    refetchInterval: polling ? POLLING.planStatusBoardMs : false,
+    enabled: polling && screenLive,
+    refetchInterval: polling && screenLive ? POLLING.planStatusBoardMs : false,
     // A failed poll is ignored: the next tick tries again.
     retry: false,
     staleTime: 0,
@@ -146,8 +151,8 @@ export function useLessonBoard(lessonId: string) {
   const live = useQuery({
     queryKey: qk('planner', 'getLessonLive', lessonId),
     queryFn: () => api.planner.getLessonLive(lessonId),
-    enabled: isLive,
-    refetchInterval: isLive ? POLLING.lessonLiveMs : false,
+    enabled: isLive && screenLive,
+    refetchInterval: isLive && screenLive ? POLLING.lessonLiveMs : false,
     retry: false,
     staleTime: 0,
     gcTime: 0,

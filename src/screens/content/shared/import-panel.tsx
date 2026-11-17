@@ -2,6 +2,7 @@ import { View } from 'react-native';
 
 import type { ImportNumber, ImportPreview } from '@/api/types';
 import { MathContent } from '@/components/math';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
@@ -9,7 +10,6 @@ import { Button, Card, Checkbox, Icon, Notice, PressableScale, Text, TextArea, T
 
 import { ImportPromptButton } from './import-prompt-button';
 import { useImportPanel, type ImportPanelOptions, type ImportPanelState } from './use-import-panel';
-import { RateLimitLine } from './use-rate-limit';
 
 /** Placeholder of the «JSON текстом» field — a format sample, not a sentence (the site hard-codes it too). */
 const JSON_PLACEHOLDER = '{"formatVersion": 1, "topic": {...}, "numbers": [...]}';
@@ -113,7 +113,7 @@ export function ImportPanelView({ state, hidePromptButton = false, testID = 'imp
       ) : null}
 
       {state.error ? <Notice tone="error" text={state.error} testID="import-error" /> : null}
-      <RateLimitLine seconds={state.wait.seconds} testID="import-wait" />
+      <RetryWaitLine seconds={state.wait.seconds} testID="import-wait" />
 
       {state.result ? (
         <Notice

@@ -3,8 +3,10 @@
 const ru = {
   chart: {
     // Charts have no hover on a phone: the tapped point or column is shown in a caption below.
-    pointHint: "Коснитесь точки, чтобы увидеть значение.",
-    barHint: "Коснитесь столбца, чтобы увидеть неделю.",
+    pointHint: "Коснитесь графика или листайте стрелками, чтобы увидеть значение.",
+    barHint: "Коснитесь графика или листайте стрелками, чтобы увидеть неделю.",
+    previousAria: "Предыдущее значение",
+    nextAria: "Следующее значение",
     periodAria: "Период графика",
     segmentValue: "{label}: {value} ({percent}%)"
   },
@@ -12,6 +14,7 @@ const ru = {
     searchPlaceholder: "Поиск по списку"
   },
   ranking: {
+    // Also read by the group's own ranking (statistics tab of a group): one wording for «Место {n}».
     placeAria: "Место {n}"
   },
   gaps: {
@@ -21,8 +24,10 @@ const ru = {
 
 const en: typeof ru = {
   chart: {
-    pointHint: "Tap a point to see its value.",
-    barHint: "Tap a column to see its week.",
+    pointHint: "Tap the chart or use the arrows to see a value.",
+    barHint: "Tap the chart or use the arrows to see a week.",
+    previousAria: "Previous value",
+    nextAria: "Next value",
     periodAria: "Chart period",
     segmentValue: "{label}: {value} ({percent}%)"
   },

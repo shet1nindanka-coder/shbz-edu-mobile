@@ -1,13 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
-import * as Clipboard from 'expo-clipboard';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Platform, Share, View } from 'react-native';
 
 import { qk, useApi } from '@/api';
 import { TOPIC_IMPORT_PROMPT } from '@/domain/topic-import-prompt';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, IconButton, Text } from '@/ui';
+import { Button, IconButton, Text, useCopyFeedback } from '@/ui';
 
 /** The site keeps the "copied" pill for 2 s. */
 const COPIED_HOLD_MS = 2000;
@@ -24,17 +23,10 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
   const queryClient = useQueryClient();
   const { dict, m } = useI18n();
   const t = dict.topics.importPrompt;
-  const [copied, setCopied] = useState(false);
+  const feedback = useCopyFeedback(COPIED_HOLD_MS);
+  const copied = feedback.copied !== null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
 
   const loadPrompt = async (): Promise<string> => {
     try {
@@ -57,14 +49,7 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
     setBusy(true);
     setError(null);
     try {
-      const prompt = await loadPrompt();
-      const ok = await Clipboard.setStringAsync(prompt);
-      if (!ok) throw new Error('clipboard');
-      setCopied(true);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setCopied(false), COPIED_HOLD_MS);
-    } catch {
-      setError(m.content.importPanel.clipboardDenied);
+      if (!(await feedback.copy('prompt', await loadPrompt()))) setError(m.content.importPanel.clipboardDenied);
     } finally {
       setBusy(false);
     }

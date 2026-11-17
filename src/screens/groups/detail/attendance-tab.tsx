@@ -2,8 +2,10 @@ import { useMutation, useQueryClient, type UseQueryResult } from '@tanstack/reac
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { AttendanceStatus, GroupAttendanceLesson, GroupAttendanceResponse, ReportPeriod } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { nextAttendance } from '@/domain/attendance';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
@@ -13,9 +15,6 @@ import { makeStyles } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, Segmented, Text } from '@/ui';
 
 import { applyAttendanceMark, type AttendanceCell } from '../logic';
-import { errorText } from '../shared/error-text';
-import { LoadFailure, isLoadFailed } from '../shared/load-failure';
-import { RetryWaitLine, useRetryWait } from '../shared/use-retry-wait';
 import { AttendanceLessonList } from './attendance-lesson-list';
 import { AttendanceMarkSheet, type AttendanceMarkTarget } from './attendance-mark-sheet';
 import { AttendanceTable } from './attendance-table';
@@ -219,11 +218,10 @@ export function AttendanceTab({ groupId, attendance, report }: AttendanceTabProp
             }}
             onOpenLesson={openLesson}
           />
-          <Hint>
-            <Text variant="hint" color="textMuted">
-              {format(m.groups.attendance.notParticipatedLegend, { text: t.notParticipated })}
-            </Text>
-          </Hint>
+          {/* Not a hint: it decodes a symbol of the table (the site's cell tooltip), so it never hides. */}
+          <Text variant="hint" color="textMuted" testID="group-attendance-legend">
+            {format(m.groups.attendance.notParticipatedLegend, { text: t.notParticipated })}
+          </Text>
         </>
       ) : (
         <AttendanceLessonList

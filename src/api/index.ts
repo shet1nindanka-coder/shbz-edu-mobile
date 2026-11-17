@@ -15,6 +15,7 @@ export * from "./types";
 export * from "./client";
 export {
   ApiError,
+  errorText,
   hasErrorCode,
   isApiError,
   isNetworkError,
@@ -22,6 +23,7 @@ export {
   isRateLimited,
   isRoleError,
   isSessionExpired,
+  retryAfterOf,
 } from "./errors";
 export type { AnyApiErrorCode, ApiErrorInit } from "./errors";
 

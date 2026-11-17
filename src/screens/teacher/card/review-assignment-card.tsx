@@ -2,6 +2,7 @@ import { View } from 'react-native';
 
 import type { HomeworkNumberStatus, TeacherHomeworkAssignment, TeacherHomeworkCheck } from '@/api/types';
 import { PhotoThumb } from '@/components/files';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { formatMsk } from '@/domain/dates';
 import { homeworkAssignmentLabel } from '@/domain/homework-label';
 import { format, useI18n } from '@/i18n';
@@ -9,7 +10,6 @@ import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Card, Chip, Icon, Notice, PressableScale, ProgressBar, Text } from '@/ui';
 
-import { RateLimitLine } from '../students/rate-limit-line';
 import { ReviewCheckHistory } from './review-check-history';
 import { ReviewInjectionBanner } from './review-injection-banner';
 import {
@@ -147,7 +147,7 @@ export function ReviewAssignmentCard({
           {error ? (
             <View style={styles.errorBlock}>
               <Notice tone="error" text={error} onDismiss={onDismissError} dismissLabel={m.common.actions.close} testID={`review-assignment-error-${assignment.id}`} />
-              <RateLimitLine seconds={waitSeconds} />
+              <RetryWaitLine seconds={waitSeconds} />
             </View>
           ) : null}
 

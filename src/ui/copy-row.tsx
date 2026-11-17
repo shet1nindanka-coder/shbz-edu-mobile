@@ -1,5 +1,4 @@
-import * as Clipboard from 'expo-clipboard';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -11,6 +10,7 @@ import { absoluteFill } from './internal/layout';
 import { easing } from './internal/motion';
 import { PressableScale } from './internal/pressable-scale';
 import { Text } from './text';
+import { useCopyFeedback } from './use-copy-feedback';
 
 export type CopyRowProps = {
   /** The text that is shown and copied. */
@@ -54,37 +54,25 @@ export function CopyRow({
   const theme = useTheme();
   const styles = useStyles();
   const reducedMotion = useReducedMotion();
-  const [copied, setCopied] = useState(false);
+  // `copied` clears itself after the pill's 1300 ms.
+  const { copied: copiedId, copy: copyText } = useCopyFeedback();
+  const copied = copiedId !== null;
   const flash = useSharedValue(0);
   const pill = useSharedValue(0);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { copyFlash, copyPillIn, copyPillVisible } = theme.motion.duration;
+  const { copyFlash, copyPillIn } = theme.motion.duration;
 
-  useEffect(
-    () => () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-    },
-    [],
-  );
+  // The pill leaves when the "copied" state ends.
+  useEffect(() => {
+    if (!copied) pill.set(withTiming(0, { duration: reducedMotion ? 0 : copyPillIn }));
+  }, [copied, pill, reducedMotion, copyPillIn]);
 
   const copy = async () => {
-    try {
-      const done = await Clipboard.setStringAsync(value);
-      if (!done) return;
-    } catch {
-      return;
-    }
-    setCopied(true);
+    if (!(await copyText('value', value))) return;
     flash.set(1);
     flash.set(withTiming(0, { duration: reducedMotion ? 0 : copyFlash, easing: easing('out') }));
     pill.set(withTiming(1, { duration: reducedMotion ? 0 : copyPillIn, easing: easing('out') }));
     if (copiedAnnouncement) AccessibilityInfo.announceForAccessibility(copiedAnnouncement);
     onCopied?.();
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      pill.set(withTiming(0, { duration: reducedMotion ? 0 : copyPillIn }));
-      setCopied(false);
-    }, copyPillVisible);
   };
 
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.get() }));

@@ -3,26 +3,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { LessonListItem } from '@/api/types';
+import { ActionSheet, type SheetAction } from '@/components/action-sheet';
+import { HandoutNotice, useHandout } from '@/components/lessons';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
+import { serverClockOffset } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { PlannerSegments, ShellAppBar, screenTitle } from '@/screens/shell';
+import { useLatched } from '@/screens/teacher/students';
 import { makeStyles, useTheme } from '@/theme';
-import { Dialog, ErrorState, LoadingState, Notice, Screen, Text } from '@/ui';
+import { Dialog, LoadingState, Notice, Screen, Text } from '@/ui';
 
 import { ComposeCard } from './lessons/compose-card';
 import { LessonCard } from './lessons/lesson-card';
 import { buildLessonRows, groupLessons, hasScheduleAdvanced, type LessonListRow } from './lessons/lessons-list-logic';
-import { ActionSheet, type SheetAction } from './shared/action-sheet';
-import { serverClockOffset } from './shared/board-cache';
-import { errorText } from './shared/error-text';
-import { HandoutNotice } from './shared/handout-notice';
-import { isWaitingForNetwork } from './shared/query-state';
-import { useHandout } from './shared/use-handout';
-import { useNowTick } from './shared/use-now-tick';
-import { RetryWaitLine, useRetryWait } from './shared/use-retry-wait';
+import { useNowTick } from '@/services/clock';
 
 /**
  * `planner.lessons` (docs/spec/05-teacher-lessons-plans.md §1.1): root of the teacher's «занятия» tab —
@@ -47,6 +46,9 @@ export function PlannerLessonsScreen() {
 
   // Opening the list runs the lazy finalisation of finished lessons on the server, so it is always re-read.
   const lessons = useQuery({ queryKey: qk('planner', 'listLessons'), queryFn: () => api.planner.listLessons(), refetchOnMount: 'always' });
+  // A tab root stays mounted: `refetchOnMount` covers the first visit only, so a list that went stale
+  // while another tab or a board was open is re-read on the way back (00 §2.3 "refetch on focus").
+  useRefetchOnFocus([lessons]);
   const data = lessons.data;
 
   // "Today" follows the server clock: a wrong device clock must not move lessons between sections.
@@ -93,15 +95,18 @@ export function PlannerLessonsScreen() {
   const open = (lesson: LessonListItem) => navigation.open({ screen: 'planner.lessonBoard', lessonId: lesson.id });
   const compose = () => navigation.open({ screen: 'planner.lessonNew' });
 
-  const menuActions: SheetAction[] = menuFor
+  // The menu keeps its lesson while it slides away: its rows must not collapse mid-animation, and the
+  // chosen action runs only after the sheet has left (see `ActionSheet`).
+  const menuLesson = useLatched(menuFor);
+  const menuActions: SheetAction[] = menuLesson
     ? [
-        { key: 'open', label: dict.planner.common.open, icon: 'forward', onPress: () => open(menuFor) },
+        { key: 'open', label: dict.planner.common.open, icon: 'forward', onPress: () => open(menuLesson) },
         {
           key: 'pdf',
           label: m.planner.lessonBoard.handout,
           icon: 'file',
           disabled: handout.wait.waiting,
-          onPress: () => handout.open({ lessonId: menuFor.id, createdAt: menuFor.createdAt }),
+          onPress: () => handout.open({ lessonId: menuLesson.id, createdAt: menuLesson.createdAt }),
         },
         {
           key: 'delete',
@@ -111,7 +116,7 @@ export function PlannerLessonsScreen() {
           disabled: deleteWait.waiting,
           onPress: () => {
             setDeleteError(null);
-            setDeleting(menuFor);
+            setDeleting(menuLesson);
           },
         },
       ]
@@ -200,14 +205,7 @@ export function PlannerLessonsScreen() {
       ) : lessons.isError || isWaitingForNetwork(lessons) ? (
         <View style={styles.state}>
           <PlannerSegments active="lessons" />
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={lessons.isError ? errorText(lessons.error, dict.shells.errorDescription) : m.common.errors.network}
-            retryLabel={dict.common.retry}
-            onRetry={() => void lessons.refetch()}
-            retrying={lessons.isFetching}
-            testID="lessons-error"
-          />
+          <LoadFailure query={lessons} testID="lessons-error" />
         </View>
       ) : (
         <View style={styles.state}>
@@ -216,7 +214,7 @@ export function PlannerLessonsScreen() {
         </View>
       )}
 
-      <ActionSheet visible={menuFor !== null} title={menuFor?.title ?? ''} actions={menuActions} onClose={() => setMenuFor(null)} testID="lesson-menu" />
+      <ActionSheet visible={menuFor !== null} title={menuLesson?.title ?? ''} actions={menuActions} onClose={() => setMenuFor(null)} testID="lesson-menu" />
 
       <Dialog
         visible={deleting !== null}

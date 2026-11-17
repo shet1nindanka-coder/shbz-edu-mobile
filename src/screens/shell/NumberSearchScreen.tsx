@@ -55,6 +55,7 @@ export function NumberSearchScreen() {
 
   const submit = (raw: string) => {
     if (search.isPending) return;
+    // Also the empty field: that is what is left after typing letters, which are stripped (01 §1.5.4).
     if (!DIGITS_ONLY.test(raw) || ALL_ZEROS.test(raw)) {
       setError(t.invalid);
       return;

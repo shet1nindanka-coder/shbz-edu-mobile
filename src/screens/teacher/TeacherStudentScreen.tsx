@@ -6,12 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen, screenTitle } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { BottomSheet, ErrorState, IconButton, LoadingState, Notice, Screen, Segmented, Spinner, Text } from '@/ui';
+import { BottomSheet, IconButton, LoadingState, Notice, Screen, Segmented, Spinner, Text } from '@/ui';
 
 import { AssignTab } from './card/assign-tab';
 import type { CardChrome } from './card/card-screen';
@@ -19,11 +21,8 @@ import { LessonsTab } from './card/lessons-tab';
 import { ReviewTab } from './card/review-tab';
 import { StudentMenuSheet, type StudentMenuAction } from './card/student-menu-sheet';
 import { useStudentReport } from './card/use-student-report';
-import { useRefetchOnFocus } from './home/use-refetch-on-focus';
 import { DeleteStudentDialog } from './students/delete-student-dialog';
-import { errorText, loadFailureOf } from './students/error-text';
 import { postStudentsListNotice } from './students/list-notice';
-import { RateLimitLine } from './students/rate-limit-line';
 import { ResetPasswordSheet } from './students/reset-password-sheet';
 
 export type TeacherStudentSegment = 'review' | 'assign' | 'lessons';
@@ -86,14 +85,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
     return (
       <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} />}>
         {cardFailure ? (
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={errorText(cardFailure.error, dict.shells.errorDescription)}
-            retryLabel={dict.common.retry}
-            onRetry={() => void card.refetch()}
-            retrying={card.isFetching}
-            testID="student-card-error"
-          />
+          <LoadFailure query={card} testID="student-card-error" />
         ) : (
           <LoadingState variant="cards" tabs count={3} cardHeight={130} accessibilityLabel={m.common.a11y.loading} testID="student-card-loading" />
         )}
@@ -133,10 +125,11 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
     top: (
       <View style={styles.top}>
         <Segmented<TeacherStudentSegment>
-          fill
           plain
           role="tab"
-          // Short labels always: the full ones do not fit three segments on a phone.
+          // Short labels always: the full ones do not fit three segments on a phone. Even those are never
+          // cut — on a narrow phone or with a large OS font the bar scrolls.
+          scrollable
           options={[
             { value: 'review', label: activeCount > 0 ? format(t.tabReviewShortWithCount, { n: activeCount }) : t.tabReviewShort },
             { value: 'assign', label: t.tabAssignShort },
@@ -156,7 +149,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
           <Notice tone="error" text={report.error} onDismiss={report.dismissError} dismissLabel={m.common.actions.close} testID="student-report-error" />
         ) : null}
         {/* The wait outlives a dismissed notice: the report actions stay disabled, so the reason stays on screen. */}
-        <RateLimitLine seconds={report.waitSeconds} testID="student-report-wait" />
+        <RetryWaitLine seconds={report.waitSeconds} testID="student-report-wait" />
         {/* The header stays readable when a refresh fails (offline): say so instead of dropping the card. */}
         {card.isError ? <Notice tone="error" text={errorText(card.error, m.common.errors.generic)} testID="student-card-refresh-error" /> : null}
       </View>

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { makeStyles, type MetricTone } from '@/theme';
 
@@ -28,6 +28,9 @@ export type PageHeaderProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+/** Web only: the last word of the title and its dot stay on one line (`white-space` is not a native style). */
+const LAST_WORD = (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : null) as TextStyle | null;
+
 /** Page header (`ShbzPageHeader`): kicker, display title with the gradient dot, optional aside below. */
 export function PageHeader({
   title,
@@ -41,6 +44,10 @@ export function PageHeader({
   style,
 }: PageHeaderProps) {
   const styles = useStyles();
+  // The part before the last word may wrap freely; the last word carries the dot.
+  const cut = title.lastIndexOf(' ');
+  const head = cut < 0 ? '' : title.slice(0, cut + 1);
+  const lastWord = cut < 0 ? title : title.slice(cut + 1);
   return (
     <View style={[styles.header, gap === undefined ? null : { marginBottom: gap }, style]}>
       {backLabel && onBack ? (
@@ -51,11 +58,19 @@ export function PageHeader({
       <View style={styles.titles}>
         {kicker ? <Text variant="kicker">{kicker}</Text> : null}
         <Text variant="display" accessibilityRole="header">
-          {title}
-          {/* The dot rides on the last line of the title, 12 after the text, centered on the line. */}
-          <View style={styles.dotWrap}>
-            <TitleDot />
-          </View>
+          {head}
+          {/*
+            The dot rides on the last line of the title, 12 after the text, centered on the line — and it
+            never wraps to a line of its own: it is tied to the last word (a word joiner for the native
+            line breakers, a no-wrap span for the browser, which breaks before an inline box regardless).
+          */}
+          <Text variant="display" style={LAST_WORD}>
+            {lastWord}
+            {'\u2060'}
+            <View style={styles.dotWrap}>
+              <TitleDot />
+            </View>
+          </Text>
         </Text>
       </View>
       {description ? (

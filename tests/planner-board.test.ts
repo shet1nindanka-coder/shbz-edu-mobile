@@ -22,7 +22,7 @@ import {
   withNumber,
   withoutNumber,
 } from "@/screens/planner/lessons/board-logic";
-import { handoutFileId, handoutFileName } from "@/screens/planner/shared/handout-file";
+import { handoutFileId, handoutFileName } from "@/components/lessons/handout-file";
 
 const START = Date.parse("2026-11-16T14:00:00.000Z");
 const MINUTE = 60_000;

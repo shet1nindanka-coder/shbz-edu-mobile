@@ -2,15 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { TopicListItem } from '@/api/types';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, IconButton, Notice, Text } from '@/ui';
-
-import { errorText } from '../shared/error-text';
-import { RateLimitLine, useRateLimit } from '../shared/use-rate-limit';
 
 import { applyOrder, isSameOrder, moveInOrder, reconcileOrder } from './topic-order';
 
@@ -36,7 +34,7 @@ export function ReorderSheet({ visible, topics, onClose, onSaved }: ReorderSheet
   const serverOrder = topics.map((topic) => topic.id);
   const [draft, setDraft] = useState<readonly string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const wait = useRateLimit();
+  const wait = useRetryWait();
   // The user's arrangement follows the server list: deleted topics drop out, new ones are appended.
   const order = draft === null ? serverOrder : reconcileOrder(draft, serverOrder);
   const titles = new Map(topics.map((topic) => [topic.id, topic.title]));
@@ -84,7 +82,7 @@ export function ReorderSheet({ visible, topics, onClose, onSaved }: ReorderSheet
       footer={
         <View style={styles.footer}>
           {error ? <Notice tone="error" text={error} testID="reorder-error" /> : null}
-          <RateLimitLine seconds={wait.seconds} testID="reorder-wait" />
+          <RetryWaitLine seconds={wait.seconds} testID="reorder-wait" />
           <Button
             label={save.isPending ? m.common.states.saving : m.content.reorder.save}
             loading={save.isPending}

@@ -5,8 +5,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { QueryClient } from "@tanstack/query-core";
-import { patchKeepingFetchTime, serverClockOffset } from "@/screens/planner/shared/board-cache";
-import { countReady, planAnchorMs, planSignature, planStateOf, statusRowsOnBoard, statusSignatureRows } from "@/screens/planner/shared/plan-state";
+import { mergeQueryData } from "@/services/query/merge-query-data";
+import { serverClockOffset } from "@/domain/server-clock";
+import {
+  countReady,
+  planAnchorMs,
+  planSignature,
+  planStateOf,
+  statusRowsOnBoard,
+  statusSignatureRows,
+} from "@/screens/planner/shared/plan-state";
 
 const NOW = Date.parse("2026-11-16T12:00:00.000Z");
 const MINUTE = 60_000;
@@ -124,13 +132,13 @@ test("serverClockOffset: serverNow minus the moment the response arrived; unusab
   assert.equal(serverClockOffset(iso(0), 0), 0);
 });
 
-test("patchKeepingFetchTime: a local patch of the board does not move its fetch time", () => {
+test("mergeQueryData: a local patch of the board does not move its fetch time", () => {
   const queryClient = new QueryClient();
   const key = ["planner", "getLessonBoard", "les_1"];
   type Board = { serverNow: string; marks: number };
 
   // Nothing cached yet: nothing to patch.
-  patchKeepingFetchTime<Board>(queryClient, key, (current) => ({ ...current, marks: 1 }));
+  mergeQueryData<Board>(queryClient, key, (current) => ({ ...current, marks: 1 }));
   assert.equal(queryClient.getQueryData(key), undefined);
 
   // The board was read 12 minutes ago; the server clock is 3 s ahead of the device.
@@ -138,7 +146,7 @@ test("patchKeepingFetchTime: a local patch of the board does not move its fetch 
   const serverNow = new Date(fetchedAt + 3_000).toISOString();
   queryClient.setQueryData<Board>(key, { serverNow, marks: 0 }, { updatedAt: fetchedAt });
 
-  patchKeepingFetchTime<Board>(queryClient, key, (current) => ({ ...current, marks: current.marks + 1 }));
+  mergeQueryData<Board>(queryClient, key, (current) => ({ ...current, marks: current.marks + 1 }));
   const state = queryClient.getQueryState<Board>(key);
   assert.deepEqual(state?.data, { serverNow, marks: 1 });
   assert.equal(state?.dataUpdatedAt, fetchedAt);

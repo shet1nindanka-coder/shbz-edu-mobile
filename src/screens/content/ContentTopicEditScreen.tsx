@@ -2,15 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, type ScrollViewInstance } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { ImportTarget } from '@/api/types';
 import type { ViewerFile } from '@/components/files';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { Button, IconButton, LoadingState, Notice, Screen, Segmented, Tabs, Text, TextButton } from '@/ui';
+import { Button, IconButton, LoadingState, Notice, Screen, Segmented, Text, TextButton } from '@/ui';
 
 import { AnswersSection } from './edit/answers-section';
 import { NumbersConfirmDialog } from './edit/numbers-confirm-dialog';
@@ -19,11 +20,9 @@ import { TopicFormSection } from './edit/topic-form-section';
 import { useTopicEditForm, type EditNotice } from './edit/use-topic-edit-form';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
 import { clearEditorFocus, markOpenedFromEditor, peekEditorFocus } from './shared/editor-links';
-import { errorText } from './shared/error-text';
 import { ImportPanelView } from './shared/import-panel';
-import { LoadFailure, loadFailureOf } from './shared/load-failure';
 import { pinnedColumn } from './shared/pinned-column';
-import { postTopicsFlash } from './shared/topics-flash';
+import { postTopicDeleted } from './shared/topics-flash';
 import { useImportPanel } from './shared/use-import-panel';
 
 /** Route params of `content.topicEdit` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
@@ -31,6 +30,9 @@ export type ContentTopicEditScreenProps = ScreenParams['content.topicEdit'];
 
 /** Space left above the ringed row when the screen scrolls to it. */
 const FOCUS_SCROLL_MARGIN = 12;
+
+/** A teacher never loads the editor's topic. */
+const NO_QUERIES: readonly [] = [];
 
 type TopicMode = 'view' | 'edit';
 /** The site's long page, split as its phone mapping proposes (07 §1.3): the form, the per-number materials, the import. */
@@ -74,6 +76,9 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   });
   const data = detail.data;
   const failure = loadFailureOf(detail);
+  // The editor stays mounted under the number screen: realtime first, and a stale topic is asked again when
+  // the editor is returned to (00 §2.3). Nothing is asked for a role the screen is not for.
+  useRefetchOnFocus(isDeveloper ? [detail] : NO_QUERIES);
 
   // Both keep their state while another section is shown (typed text, picked files, a loaded JSON).
   const form = useTopicEditForm({ topicId, detail: data, onNotice: setNotice });
@@ -204,7 +209,9 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
             testID="edit-mode"
           />
 
-          <Tabs<EditSection>
+          {/* In-page tabs like every other section switch of the app (08 §5.7 `--plain`); the ink pill is
+              the style of the top-level navigation bar. */}
+          <Segmented<EditSection>
             options={[
               { value: 'topic', label: m.content.edit.sections.topic },
               { value: 'answers', label: m.content.edit.sections.answers },
@@ -216,7 +223,9 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
               scrollToTop();
             }}
             accessibilityLabel={m.content.edit.sectionsAria}
-            fill
+            role="tab"
+            plain
+            scrollable
             testID="edit-sections"
           />
 
@@ -257,7 +266,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
           ) : null}
         </View>
       ) : failure ? (
-        <LoadFailure error={failure.error} onRetry={() => void detail.refetch()} retrying={detail.isFetching && !detail.isPaused} testID="edit-error" />
+        <LoadFailure query={detail} testID="edit-error" />
       ) : (
         <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="edit-loading" />
       )}
@@ -279,7 +288,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
           setDeleteOpen(false);
           setDeleted(true);
           // Back to the list, as the site's redirect does; the list shows «Тема успешно удалена».
-          postTopicsFlash('deleted');
+          postTopicDeleted(topicId);
           navigation.open({ screen: 'content.topics' });
         }}
       />

@@ -2,17 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { Enter, ErrorState, LoadingState, Notice, PageHeader, Screen } from '@/ui';
+import { Enter, LoadingState, Notice, PageHeader, Screen } from '@/ui';
 
 import { buildHomeCards, pickCallCounts, type HomeCard } from './home/home-cards';
 import { HomeNavCard } from './home/home-nav-card';
-import { useRefetchOnFocus } from './home/use-refetch-on-focus';
-import { errorText, loadFailureOf } from './students/error-text';
 
 /**
  * `teacher.home` (docs/spec/04-teacher-students.md S1): the teacher's landing tab — three navigation cards
@@ -87,14 +86,7 @@ export function TeacherHomeScreen() {
           ))}
         </View>
       ) : homeFailure ? (
-        <ErrorState
-          title={dict.shells.errorTitle}
-          description={errorText(homeFailure.error, dict.shells.errorDescription)}
-          retryLabel={dict.common.retry}
-          onRetry={() => void home.refetch()}
-          retrying={home.isFetching}
-          testID="teacher-home-error"
-        />
+        <LoadFailure query={home} testID="teacher-home-error" />
       ) : (
         <LoadingState
           variant="cards"

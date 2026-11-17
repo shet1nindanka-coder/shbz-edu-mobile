@@ -1,5 +1,7 @@
-// Query infrastructure: the QueryClient with its offline rules, the persistence policy, and the
-// pending-writes queue (read the header of `pending-writes.ts` before using it).
+// Query infrastructure: the QueryClient with its offline rules, the persistence policy, the
+// pending-writes queue (read the header of `pending-writes.ts` before using it), and `mergeQueryData` for
+// patching a cached response without moving its fetch time.
+export { mergeQueryData } from './merge-query-data';
 export {
   PENDING_WRITES_STORAGE_KEY,
   createPendingWritesQueue,
@@ -20,4 +22,11 @@ export {
   QUERY_STALE_TIME_MS,
   isPersistableQueryKey,
 } from './persist-policy';
-export { createAppQueryClient, createPersistOptions, shouldRetryQuery } from './query-client';
+export {
+  createAppQueryClient,
+  createPersistOptions,
+  failQueriesWaitingWithoutData,
+  removePersistedQueries,
+  shouldRetryQuery,
+  type AppQueryClientOptions,
+} from './query-client';

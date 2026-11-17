@@ -2,9 +2,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
 import { View, type ScrollViewInstance } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { CreateHomeworkPlanInput, HomeworkPlanNewModel } from '@/api/types';
 import { META_LIMITS } from '@/api/types/limits';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
@@ -14,10 +15,8 @@ import { Button, CheckRow, DateTimeField, Notice, Screen, Select, Text, TextArea
 
 import { DurationStepper } from '../lessons/duration-stepper';
 import { checkedMemberIds, toggleId } from '../lessons/new-lesson-logic';
-import { useDateTimeLabels } from '../shared/date-time-labels';
-import { errorText } from '../shared/error-text';
-import { useNowTick } from '../shared/use-now-tick';
-import { RetryWaitLine, useRetryWait } from '../shared/use-retry-wait';
+import { useDateTimeLabels } from '@/components/date-time';
+import { useNowTick } from '@/services/clock';
 import { buildDraftInput, draftBudget, initialTopicId, validateDraftForm, type DraftFormProblem } from './drafts-logic';
 
 export type DraftFormProps = {

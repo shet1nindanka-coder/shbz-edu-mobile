@@ -4,9 +4,12 @@ import { AppState } from 'react-native';
 import { ApiProvider } from '@/api';
 import { isApiError, isSessionExpired, type ApiError } from '@/api/errors';
 import type { AuthenticatedUser, LoginRequest, UserRole } from '@/api/types';
+import { clearViewerHandoff } from '@/navigation/viewer-handoff';
 import { clearFileCache } from '@/services/files';
 import { subscribeOnline } from '@/services/network';
+import { clearOneShotNotices } from '@/services/notices';
 import { localNotifications, registerRemotePush, unregisterRemotePush } from '@/services/notifications';
+import { removePersistedQueries } from '@/services/query';
 import { tokenStorage } from '@/services/session';
 
 import { getPendingWrites, setPendingWritesUser } from './pending-writes';
@@ -60,17 +63,20 @@ async function clearSessionData(): Promise<void> {
   runtime.setSessionToken(null);
   setPendingWritesUser(null);
   getQueryClient().clear();
+  clearViewerHandoff();
+  clearOneShotNotices();
   try {
     clearFileCache();
   } catch {
     // The cache directory may not exist yet.
   }
-  await Promise.all([
-    tokenStorage.clear(),
-    runtime.sessionCache.clear(),
-    getPendingWrites().clear(),
-    localNotifications.cancelAll(),
-  ]);
+  await Promise.all([tokenStorage.clear(), runtime.sessionCache.clear(), getPendingWrites().clear(), localNotifications.cancelAll()]);
+  // The cache in memory is empty already; its copy on disk is removed now, not left to the persister's
+  // throttled write a second later. The removal is issued one tick after `clear()`: the persister answers
+  // the first "query removed" event with an immediate write of a still half-full snapshot, and a removal
+  // issued before that write would be undone by it.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  await removePersistedQueries(runtime.storage);
 }
 
 type RestoreOutcome =
@@ -88,7 +94,10 @@ type RestoreOutcome =
 /** Start-up (docs/spec/01-shell-auth.md §1.1): read the stored token and ask `GET /me`. */
 async function resolveStoredSession(): Promise<RestoreOutcome> {
   const runtime = getAppRuntime();
-  const token = await tokenStorage.read();
+  // The queue of unsent writes is loaded together with the token, i.e. before any screen of a role tree
+  // mounts: a note typed offline is in its field from the first frame, on every start path (also the
+  // offline one, where nothing is flushed).
+  const [token] = await Promise.all([tokenStorage.read(), getPendingWrites().hydrate()]);
   if (!token) return { kind: 'none' };
   runtime.setSessionToken(token);
   try {
@@ -123,6 +132,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   /** A sign-out is running: a `sessionExpired` answer to its own `logout` call is success, not a notice. */
   const signingOut = useRef(false);
   const lastRoleRefresh = useRef(0);
+  /** The reconnect listener is registered once; it reaches the current `retryRestore` through this. */
+  const retryRestoreRef = useRef<() => void>(() => undefined);
 
   const enter = useCallback((user: AuthenticatedUser, restored: boolean) => {
     setPendingWritesUser(user.id);
@@ -210,9 +221,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [applyRestored]);
 
-  // Back online or back in the foreground: confirm an unconfirmed user and send what was waiting.
+  // Back online or back in the foreground: confirm an unconfirmed user and send what was waiting. A start
+  // that failed for lack of a connection is tried again by itself.
   useEffect(() => {
     const onReachable = () => {
+      if (stateRef.current.status === 'restoreFailed') {
+        retryRestoreRef.current();
+        return;
+      }
       if (stateRef.current.status !== 'signedIn') return;
       if (unconfirmed.current) void refreshUser();
       void getPendingWrites().flush();
@@ -244,7 +260,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    if (stateRef.current.status !== 'signedIn' || signingOut.current) return;
+    // Also from `restoreFailed` ("Sign in again" on the launch screen): the stored token is given up there.
+    const { status } = stateRef.current;
+    if ((status !== 'signedIn' && status !== 'restoreFailed') || signingOut.current) return;
     signingOut.current = true;
     try {
       await unregisterRemotePush();
@@ -275,9 +293,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const retryRestore = useCallback(() => {
+    // One attempt at a time, and never over a sign-out that is clearing the stored token.
+    if (stateRef.current.status !== 'restoreFailed' || signingOut.current) return;
+    stateRef.current = { ...stateRef.current, status: 'restoring' };
     setState({ status: 'restoring', user: null, restored: false, notice: null });
     void resolveStoredSession().then(applyRestored);
   }, [applyRestored]);
+  useEffect(() => {
+    retryRestoreRef.current = retryRestore;
+  }, [retryRestore]);
 
   const value = useMemo<SessionValue>(
     () => ({

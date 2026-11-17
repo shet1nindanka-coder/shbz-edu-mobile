@@ -356,9 +356,6 @@ describe("mobile overlay `m`", () => {
     assert.equal(mEn.common.actions.retry, "Retry");
     assert.equal(mEn.common.actions.cancel, "Cancel");
     assert.equal(mEn.common.actions.close, "Close");
-    assert.equal(mEn.common.actions.back, "Back");
-    assert.equal(mEn.common.actions.save, "Save");
-    assert.equal(mEn.common.actions.delete, "Delete");
     assert.equal(mEn.common.actions.share, "Share");
     assert.equal(mEn.common.states.loading, "Loading…");
     assert.equal(mEn.common.offline.banner, "No internet connection");
@@ -367,7 +364,7 @@ describe("mobile overlay `m`", () => {
     assert.equal(mEn.common.photos.chooseFromGallery, "Choose from gallery");
     assert.equal(mRu.shell.demo.resetData, "Сбросить демо-данные");
     assert.equal(plural("ru", 3, mRu.common.errors.secondForms), "3 секунды");
-    assert.equal(plural("en", 1, mEn.common.errors.minuteForms), "1 minute");
-    assert.equal(format(mEn.common.files.pageOf, { page: 2, total: 9 }), "Page 2 of 9");
+    assert.equal(plural("en", 1, mEn.common.errors.secondForms), "1 second");
+    assert.equal(format(mEn.common.files.fileOf, { current: 2, total: 9 }), "2 of 9");
   });
 });

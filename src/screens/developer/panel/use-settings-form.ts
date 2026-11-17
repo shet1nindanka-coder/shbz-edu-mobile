@@ -1,11 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { DeveloperPanelData, SiteSettings } from '@/api/types';
 import { useI18n } from '@/i18n';
 
-import { errorText } from './error-text';
 import type { PanelResult } from './result-line';
 import { draftToSettings, invalidFields, isDraftDirty, toDraft, type NumberSettingKey, type SettingsDraft } from './settings-form';
 import { useRetryLock } from './use-retry-lock';

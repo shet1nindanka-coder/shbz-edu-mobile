@@ -20,7 +20,8 @@ import {
   credentialLineText,
   credentialsMessage,
 } from "../src/screens/teacher/students/credentials-message";
-import { errorText, isStudentGone } from "../src/screens/teacher/students/error-text";
+import { errorText } from "../src/api/errors";
+import { isStudentGone } from "../src/screens/teacher/students/error-text";
 
 describe("password line under the field", () => {
   it("says nothing while the field is empty", () => {

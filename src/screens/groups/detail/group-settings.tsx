@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { GroupDetailResponse } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
@@ -10,7 +10,6 @@ import { makeStyles } from '@/theme';
 import { BottomSheet, Button, Dialog, Icon, ListRow, Notice, Text, TextField } from '@/ui';
 
 import { GROUP_NAME_MAX_LENGTH, normalizeGroupName } from '../logic';
-import { errorText } from '../shared/error-text';
 import { invalidateGroupLists } from '../shared/invalidate';
 
 export type GroupSettingsProps = {
@@ -40,6 +39,13 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
   const confirm = dict.topics.widgets.confirm;
   // The menu must be gone before the next sheet appears: two modals at once fight for the backdrop.
   const nextStep = useRef<Step | null>(null);
+  const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (stepTimer.current) clearTimeout(stepTimer.current);
+    },
+    [],
+  );
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [name, setName] = useState(group.name);
@@ -99,13 +105,19 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
         onClosed={() => {
           const step = nextStep.current;
           nextStep.current = null;
-          if (step === 'rename') {
-            setName(group.name);
-            setRenameError(null);
-            setRenameOpen(true);
-          } else if (step === 'delete') {
-            setDeleteOpen(true);
-          }
+          if (step === null) return;
+          // One tick later: the commit that removes the menu's modal is finished before the next sheet
+          // or dialog asks to appear (iOS refuses a modal while another one is still presented).
+          stepTimer.current = setTimeout(() => {
+            stepTimer.current = null;
+            if (step === 'rename') {
+              setName(group.name);
+              setRenameError(null);
+              setRenameOpen(true);
+            } else {
+              setDeleteOpen(true);
+            }
+          }, 0);
         }}
         closeLabel={m.common.actions.close}
         title={t.detail.settings}
@@ -137,6 +149,17 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
         closeLabel={m.common.actions.close}
         title={t.detail.rename}
         dismissible={!rename.isPending}
+        footer={
+          <Button
+            label={rename.isPending ? m.common.states.saving : t.detail.rename}
+            size="lg"
+            fullWidth
+            onPress={submitRename}
+            loading={rename.isPending}
+            disabled={normalized === ''}
+            testID="group-rename-submit"
+          />
+        }
         testID="group-rename-sheet"
       >
         <View style={styles.form}>
@@ -156,14 +179,6 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
               {m.groups.detail.renameHint}
             </Text>
           </Hint>
-          <Button
-            label={rename.isPending ? m.common.states.saving : t.detail.rename}
-            onPress={submitRename}
-            loading={rename.isPending}
-            disabled={normalized === ''}
-            fullWidth
-            testID="group-rename-submit"
-          />
         </View>
       </BottomSheet>
 

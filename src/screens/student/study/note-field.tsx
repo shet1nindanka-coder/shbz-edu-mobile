@@ -1,8 +1,8 @@
 import { View } from 'react-native';
 
+import { useCountdown, useWaitText } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { formatWait, useCountdown } from '@/screens/shell';
 import { makeStyles } from '@/theme';
 import { Notice, Text, TextArea, TextButton } from '@/ui';
 
@@ -26,7 +26,8 @@ export type NoteFieldProps = {
  */
 export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: NoteFieldProps) {
   const styles = useStyles();
-  const { dict, m, locale } = useI18n();
+  const { dict, m } = useI18n();
+  const waitText = useWaitText();
   const t = dict.student.numberCard;
   const editor = useNoteEditor(homeworkNumberId, serverNote, t.noteSaveFailed);
   const wait = useCountdown(editor.error?.retryAt ?? null);
@@ -35,7 +36,7 @@ export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: Not
 
   const errorMessage = editor.error
     ? wait > 0
-      ? `${editor.error.message} ${format(m.common.errors.retryIn, { time: formatWait(wait, locale, m.common.errors) })}`
+      ? `${editor.error.message} ${waitText.retryIn(wait)}`
       : editor.error.message
     : null;
 

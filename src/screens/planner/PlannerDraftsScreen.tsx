@@ -3,18 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { HomeworkPlanListItem } from '@/api/types';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { PlannerSegments, ShellAppBar, screenTitle } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { EmptyState, ErrorState, LoadingState, Notice, Screen } from '@/ui';
+import { EmptyState, LoadingState, Notice, Screen } from '@/ui';
 
 import { DraftCard } from './drafts/draft-card';
 import { sortDrafts } from './drafts/drafts-logic';
-import { errorText } from './shared/error-text';
-import { isWaitingForNetwork } from './shared/query-state';
 
 /**
  * `planner.drafts` (docs/spec/05-teacher-lessons-plans.md §1.5): the second segment of the teacher's
@@ -33,6 +32,9 @@ export function PlannerDraftsScreen() {
 
   // The "assigned" counters move while a board is open elsewhere, so the list is re-read on every visit.
   const drafts = useQuery({ queryKey: qk('planner', 'listHomeworkPlans'), queryFn: () => api.planner.listHomeworkPlans(), refetchOnMount: 'always' });
+  // A tab root stays mounted: `refetchOnMount` covers the first visit only, so a list that went stale
+  // while another tab or a board was open is re-read on the way back (00 §2.3 "refetch on focus").
+  useRefetchOnFocus([drafts]);
   const data = drafts.data;
   const plans = useMemo(() => (data ? sortDrafts(data) : []), [data]);
 
@@ -92,14 +94,7 @@ export function PlannerDraftsScreen() {
       ) : drafts.isError || isWaitingForNetwork(drafts) ? (
         <View style={styles.state}>
           <PlannerSegments active="drafts" />
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={drafts.isError ? errorText(drafts.error, dict.shells.errorDescription) : m.common.errors.network}
-            retryLabel={dict.common.retry}
-            onRetry={() => void drafts.refetch()}
-            retrying={drafts.isFetching}
-            testID="drafts-error"
-          />
+          <LoadFailure query={drafts} testID="drafts-error" />
         </View>
       ) : (
         <View style={styles.state}>

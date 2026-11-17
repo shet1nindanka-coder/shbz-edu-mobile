@@ -1,0 +1,34 @@
+import { useCallback, useState } from 'react';
+
+import { retryAfterOf } from '@/api/errors';
+
+import { useCountdown } from './use-countdown';
+
+export type RetryWait = {
+  /** Seconds until the refused action may be tried again; 0 when nothing is cooling down. */
+  seconds: number;
+  waiting: boolean;
+  /** Feed every mutation error here: one that carries `retryAfterSeconds` starts the countdown. */
+  note: (error: unknown) => void;
+};
+
+/**
+ * Keeps a control disabled for `retryAfterSeconds` after a refusal that names a wait — `429 rateLimited`
+ * as well as `503 serviceUnavailable` / `queueFull` / `reportsBusy` (90-addendum-1 A.3 rules 3 and 4): a
+ * mutation is never retried on the user's behalf, the screen only says when it will work again. One
+ * instance per rate-limit bucket (e.g. "create + regenerate" share `api:lesson-plan`).
+ *
+ *   const wait = useRetryWait();
+ *   const save = useMutation({ …, onError: wait.note });
+ *   <Button disabled={wait.waiting} … />
+ *   <RetryWaitLine seconds={wait.seconds} />
+ */
+export function useRetryWait(): RetryWait {
+  const [until, setUntil] = useState<number | null>(null);
+  const seconds = useCountdown(until);
+  const note = useCallback((error: unknown) => {
+    const wait = retryAfterOf(error);
+    if (wait > 0) setUntil(Date.now() + wait * 1000);
+  }, []);
+  return { seconds, waiting: seconds > 0, note };
+}

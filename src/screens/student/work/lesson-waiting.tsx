@@ -1,14 +1,14 @@
 import { View } from 'react-native';
 
 import type { UpcomingLessonDto } from '@/api/types';
+import { useCountdown, useWaitText } from '@/components/retry-wait';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
-import { formatWait, useCountdown } from '@/screens/shell';
 import { makeStyles } from '@/theme';
 import { Card, Icon, PageHeader, Spinner, Text } from '@/ui';
 
 import { secondsUntil } from './logic';
-import { useServerNow } from './use-server-now';
+import { useServerNow } from '@/services/clock';
 
 /** The countdown appears in the last hour before the start. */
 const COUNTDOWN_WINDOW_SECONDS = 60 * 60;
@@ -71,11 +71,12 @@ export function LessonWaiting({ upcoming, serverOffsetMs }: LessonWaitingProps) 
 /** «Начнётся через 2 минуты» — ticks every second, so it lives in its own component. */
 function StartCountdown({ startsAtDeviceMs }: { startsAtDeviceMs: number }) {
   const styles = useStyles();
-  const { m, locale } = useI18n();
+  const { m } = useI18n();
+  const waitText = useWaitText();
   const seconds = useCountdown(startsAtDeviceMs);
   const text =
     seconds > 0
-      ? format(m.studentWork.lesson.startsIn, { time: formatWait(seconds, locale, m.common.errors) })
+      ? format(m.studentWork.lesson.startsIn, { time: waitText.time(seconds) })
       : m.studentWork.lesson.startsSoon;
   return (
     <View style={styles.when} accessible accessibilityRole="timer" accessibilityLabel={text} testID="lesson-countdown">

@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
 import { isApiError, isRateLimited, qk, useApi } from '@/api';
+import { useCountdown, useWaitText } from '@/components/retry-wait';
 import { MAX_PASSWORD_LENGTH } from '@/domain/password-policy';
 import { MAX_LOGIN_LENGTH } from '@/domain/text';
 import { validateLoginInput } from '@/domain/account-validation';
-import { format, useI18n } from '@/i18n';
+import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import {
   Hint,
@@ -33,7 +34,7 @@ import {
   TitleDot,
 } from '@/ui';
 
-import { formatWait, useCountdown } from './use-countdown';
+import { loginFailureOf, loginFailureText, type LoginFailure } from './login-error';
 
 const LOCALE_OPTIONS = [
   { value: 'ru', label: 'RU' },
@@ -42,21 +43,23 @@ const LOCALE_OPTIONS = [
 
 /**
  * `auth.login` (docs/spec/01-shell-auth.md §1.2, §3.1; 90-addendum-6 §7.2): login + password, nothing
- * else — no registration, no password recovery. Errors come from the server already localised; the form
- * keeps the login and clears only the password. A rate-limit refusal disables the button until the wait
+ * else — no registration, no password recovery. The error line is rendered from its code (`login-error.ts`),
+ * so it follows the language switch; the form keeps the login and clears only the password. A rate-limit refusal disables the button until the wait
  * is over or the login is changed (the client cannot tell which bucket refused).
  */
 export function LoginScreen() {
   const styles = useStyles();
   const api = useApi();
   const { locale, dict, m } = useI18n();
+  const waitText = useWaitText();
   const { preferences, localePending, setLocale } = usePreferences();
   const { signIn, notice, dismissNotice } = useSession();
   const navigation = useAppNavigation();
 
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // Kept as a code, not as text: the notice must follow the language switch above the form.
+  const [failure, setFailure] = useState<LoginFailure | null>(null);
   const [pending, setPending] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [demoOpen, setDemoOpen] = useState(false);
@@ -74,7 +77,7 @@ export function LoginScreen() {
       if (!prefill) return;
       setLogin(prefill.login);
       setPassword(prefill.password);
-      setError(null);
+      setFailure(null);
       setLockedUntil(null);
     };
     apply();
@@ -92,11 +95,11 @@ export function LoginScreen() {
     if (pending || locked) return;
     const input = validateLoginInput(login, password);
     if (!input.ok) {
-      setError(dict.login.errors.empty);
+      setFailure({ code: 'empty' });
       return;
     }
     setPending(true);
-    setError(null);
+    setFailure(null);
     dismissNotice();
     try {
       await signIn({ login: input.login, password: input.password });
@@ -104,10 +107,10 @@ export function LoginScreen() {
     } catch (failure) {
       setPassword('');
       if (isApiError(failure)) {
-        setError(failure.message);
+        setFailure(loginFailureOf(failure));
         if (isRateLimited(failure) && failure.retryAfterSeconds) setLockedUntil(Date.now() + failure.retryAfterSeconds * 1000);
       } else {
-        setError(m.common.errors.generic);
+        setFailure({ code: 'unknown' });
       }
     } finally {
       setPending(false);
@@ -115,6 +118,9 @@ export function LoginScreen() {
   };
 
   const personas = getDemoPersonas();
+  const error = failure
+    ? loginFailureText(failure, locale, { login: dict.login, network: m.common.errors.network, generic: m.common.errors.generic })
+    : null;
 
   return (
     <Screen glow="login" testID="login-screen" contentContainerStyle={styles.page}>
@@ -146,7 +152,9 @@ export function LoginScreen() {
         {notice ? (
           <Notice
             tone="warning"
-            text={notice}
+            // The only forced sign-out is an expired session; rendered from the dictionary, so it follows
+            // the language switch (the stored text is in the language of the request that failed).
+            text={dict.apiCommon.sessionExpired}
             onDismiss={dismissNotice}
             dismissLabel={m.shell.login.sessionNoticeDismiss}
             style={styles.notice}
@@ -192,7 +200,7 @@ export function LoginScreen() {
                 <Notice tone="error" text={error} testID="login-error" />
                 {locked ? (
                   <Text variant="caption" color="textMuted" style={styles.wait} testID="login-wait">
-                    {format(m.common.errors.retryIn, { time: formatWait(waitSeconds, locale, m.common.errors) })}
+                    {waitText.retryIn(waitSeconds)}
                   </Text>
                 ) : null}
               </View>
@@ -242,7 +250,7 @@ export function LoginScreen() {
                     onPress={() => {
                       changeLogin(persona.login);
                       setPassword(persona.password);
-                      setError(null);
+                      setFailure(null);
                       // The list is long: folding it brings the filled form back into view.
                       setDemoOpen(false);
                     }}

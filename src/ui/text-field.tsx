@@ -1,6 +1,7 @@
 import { useState, type ReactNode, type Ref } from 'react';
 import {
   TextInput,
+  View,
   type StyleProp,
   type TextInputInstance,
   type TextInputProps,
@@ -12,6 +13,7 @@ import { makeStyles, useTheme } from '@/theme';
 
 import { FieldShell } from './internal/field-shell';
 import { InputFrame } from './internal/input-frame';
+import { MAX_FONT_SCALE } from './text';
 
 export type TextFieldProps = Omit<TextInputProps, 'style' | 'editable'> & {
   label?: string;
@@ -19,7 +21,7 @@ export type TextFieldProps = Omit<TextInputProps, 'style' | 'editable'> & {
   error?: string | null;
   helper?: string;
   disabled?: boolean;
-  /** Node inside the field on the left (icon). */
+  /** Node inside the field on the left (icon). The field insets it; pass the bare icon. */
   left?: ReactNode;
   /** Node inside the field on the right (text button, icon). */
   right?: ReactNode;
@@ -57,7 +59,7 @@ export function TextField({
   return (
     <FieldShell label={label} error={error} helper={helper} labelAside={labelAside} style={containerStyle}>
       <InputFrame focused={focused} disabled={disabled} height={theme.sizes.field}>
-        {left}
+        {left ? <View style={styles.left}>{left}</View> : null}
         <TextInput
           ref={ref}
           accessibilityLabel={accessibilityLabel ?? label}
@@ -66,6 +68,8 @@ export function TextField({
           selectionColor={theme.colors.accentSolid}
           cursorColor={theme.colors.accentSolid}
           keyboardAppearance={theme.dark ? 'dark' : 'light'}
+          // Same cap as `Text`: the frame has a fixed height, and the label next to it stops at 1.3 too.
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           {...inputProps}
           editable={!disabled}
           onFocus={(event) => {
@@ -98,6 +102,8 @@ const useStyles = makeStyles((t) => ({
     outlineWidth: 0,
     outlineStyle: 'solid',
   },
+  // The slot is inset like the text of a field without an icon; the icon never sits on the border.
+  left: { paddingLeft: t.space.lg - t.space.xxs },
   withLeft: { paddingLeft: 10 },
   withRight: { paddingRight: 8 },
 }));

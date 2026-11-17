@@ -1,8 +1,12 @@
 import { useState } from 'react';
 
-import { useCountdown } from '@/screens/shell';
+import { retryAfterOf } from '@/api';
+import { useCountdown } from '@/components/retry-wait';
 
-import { retryAfterOf } from './error-text';
+
+
+
+
 
 /**
  * Keeps a control locked for the `retryAfterSeconds` of a refused call (90-addendum-1 A.3 rule 3).

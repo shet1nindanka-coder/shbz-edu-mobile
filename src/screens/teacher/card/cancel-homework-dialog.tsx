@@ -1,13 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { hasErrorCode, useApi } from '@/api';
+import { errorText, hasErrorCode, useApi } from '@/api';
 import type { TeacherHomeworkAssignment } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Dialog, Notice, Text } from '@/ui';
 
-import { errorText } from '../students/error-text';
 import { useLatched } from '../students/use-latched';
 import { invalidateStudentData } from './invalidate';
 

@@ -3,9 +3,11 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { qk, useApi } from '@/api';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { mskToday } from '@/domain/moscow-time';
+import { correctedNow } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { ShellAppBar } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
@@ -13,12 +15,10 @@ import { PageHeader, Screen, Text } from '@/ui';
 
 import { CalendarSkeleton } from './study/calendar-skeleton';
 import { DaySheet } from './study/day-sheet';
-import { correctedNow, groupByMskDay, monthOfInstant, shiftMonth, toDeadlineItems, type CalendarMonth, type DeadlineItem } from './study/deadline-model';
+import { groupByMskDay, monthOfInstant, shiftMonth, toDeadlineItems, type CalendarMonth, type DeadlineItem } from './study/deadline-model';
 import { DeadlinesCalendar } from './study/deadlines-calendar';
-import { LoadError } from './study/load-error';
 import { RefreshError } from './study/refresh-error';
 import { useNow } from './study/use-now';
-import { useRefetchOnFocus } from './study/use-refetch-on-focus';
 import { useRefresh } from './study/use-refresh';
 
 /**
@@ -95,15 +95,8 @@ export function StudentDeadlinesScreen() {
             <Text variant="hint">{m.student.calendar.swipeHint}</Text>
           </Hint>
         </View>
-      ) : deadlines.isError ? (
-        <LoadError
-          error={deadlines.error}
-          failedAt={deadlines.errorUpdatedAt}
-          onRetry={refresh}
-          retrying={deadlines.isFetching}
-          home
-          testID="deadlines-error"
-        />
+      ) : isLoadFailed(deadlines) ? (
+        <LoadFailure query={deadlines} home testID="deadlines-error" />
       ) : (
         <CalendarSkeleton />
       )}

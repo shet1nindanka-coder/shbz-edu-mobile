@@ -5,9 +5,10 @@ import Svg, { Line, Path } from 'react-native-svg';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { PressableScale, Text } from '@/ui';
+import { Text } from '@/ui';
 
-import { weekBarTitle, weekBars, weekChartSummary } from '../logic';
+import { slotIndexAt, weekBarTitle, weekBars, weekChartSummary } from '../logic';
+import { ChartHitArea, ChartStepper } from './chart-selection';
 
 /** Height of the tallest column; a non-empty week is drawn at least `MIN_BAR` high. */
 const CHART_HEIGHT = 88;
@@ -29,7 +30,9 @@ export type WeekBarsProps = {
 /**
  * «Занятия по неделям» (06 §1.6.b): twelve columns in one accent hue, rounded at the data end only, the
  * count above each non-empty one, the week's Monday under every fourth and the last. The site's hover
- * tooltip becomes a tap: the caption under the chart names the tapped week.
+ * tooltip becomes a selection: the caption under the chart names the chosen week. A column is 27 pt wide
+ * on a phone — too narrow for a touch target of its own — so the whole plot is one target (the week under
+ * the finger is selected) and the arrows beside the caption step week by week.
  */
 export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
   const styles = useStyles();
@@ -62,7 +65,7 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
 
   return (
     <View style={styles.root} testID={testID}>
-      <View onLayout={onLayout} style={styles.plot} accessibilityRole="image" accessibilityLabel={weekChartSummary(bars, t)}>
+      <View onLayout={onLayout} style={styles.plot}>
         {width > 0 ? (
           <>
             <Svg width={width} height={PLOT_HEIGHT + 1}>
@@ -73,25 +76,24 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
                 ) : null,
               )}
             </Svg>
-            {columns.map(({ bar, height }) => (
-              // The whole column is the touch target: a 6-pt bar cannot be hit.
-              <PressableScale
-                key={bar.index}
-                accessibilityRole="button"
-                accessibilityLabel={weekBarTitle(bar, t, dict.planner.common, locale)}
-                accessibilityState={{ selected: bar.index === selected }}
-                onPress={() => setSelected(bar.index === selected ? null : bar.index)}
-                scaleTo={1}
-                style={[styles.column, { left: slot * bar.index, width: slot, paddingBottom: height + 3 }]}
-                testID={testID ? `${testID}-bar-${bar.index}` : undefined}
-              >
-                {bar.count > 0 ? (
+            {columns.map(({ bar, height }) =>
+              bar.count > 0 ? (
+                <View key={bar.index} style={[styles.column, { left: slot * bar.index, width: slot, paddingBottom: height + 3 }]}>
                   <Text variant="captionStrong" color="textMuted" tabular numberOfLines={1}>
                     {bar.count}
                   </Text>
-                ) : null}
-              </PressableScale>
-            ))}
+                </View>
+              ) : null,
+            )}
+            <ChartHitArea
+              count={bars.length}
+              selected={selected}
+              onSelect={setSelected}
+              indexAt={(x) => slotIndexAt(x, width, bars.length)}
+              accessibilityLabel={weekChartSummary(bars, t)}
+              accessibilityValue={selectedBar ? weekBarTitle(selectedBar, t, dict.planner.common, locale) : undefined}
+              testID={testID ? `${testID}-plot` : undefined}
+            />
           </>
         ) : null}
       </View>
@@ -113,17 +115,19 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
             )
           : null}
       </View>
-      {selectedBar ? (
-        <Text variant="smallStrong" accessibilityLiveRegion="polite" testID={testID ? `${testID}-selected` : undefined}>
-          {weekBarTitle(selectedBar, t, dict.planner.common, locale)}
-        </Text>
-      ) : (
-        <Hint>
-          <Text variant="hint" color="textMuted">
-            {m.stats.chart.barHint}
+      <ChartStepper count={bars.length} selected={selected} onSelect={setSelected} testID={testID}>
+        {selectedBar ? (
+          <Text variant="smallStrong" align="center" accessibilityLiveRegion="polite" testID={testID ? `${testID}-selected` : undefined}>
+            {weekBarTitle(selectedBar, t, dict.planner.common, locale)}
           </Text>
-        </Hint>
-      )}
+        ) : (
+          <Hint>
+            <Text variant="hint" color="textMuted" align="center">
+              {m.stats.chart.barHint}
+            </Text>
+          </Hint>
+        )}
+      </ChartStepper>
     </View>
   );
 }
@@ -131,7 +135,8 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.xs },
   plot: { height: PLOT_HEIGHT + 1 },
-  column: { position: 'absolute', top: 0, height: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'flex-end' },
+  // Not a touch target: the counts sit above their columns, the plot's hit area lies over them.
+  column: { position: 'absolute', top: 0, height: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'flex-end', pointerEvents: 'none' },
   axis: { height: 16 },
   tickLabel: { position: 'absolute', top: 0, width: LABEL_WIDTH },
 }));

@@ -1,11 +1,14 @@
+import { FlashList } from '@shopify/flash-list';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, EmptyState, Icon, PressableScale, Select, Text, TextField } from '@/ui';
 
 import { PICKER_SEARCH_FROM, filterPickerOptions } from '../logic';
+
+const ROW_GAP = 2;
 
 export type PickerOption = { value: string; label: string };
 
@@ -21,13 +24,21 @@ export type PickerFieldProps = {
 /**
  * A select whose menu is a bottom sheet (06 §1.6 "Mobile translation"). Short lists use the kit's
  * `Select`; a long one (every student of the school, every topic) gets the same trigger and a sheet with
- * a search field, so the wanted row is two taps and a few letters away.
+ * a search field, so the wanted row is two taps and a few letters away. That list has no upper bound (for
+ * a developer it is the whole platform), so it is virtualised; the sheet gives it a bounded height.
  */
+
+/** Share of the window the option list may take; the title and the search field need the rest. */
+const LIST_MAX_SHARE = 0.5;
 export function PickerField({ label, options, value, onChange, disabled = false, testID }: PickerFieldProps) {
   const styles = useStyles();
+  const theme = useTheme();
+  const window = useWindowDimensions();
   const { dict, m } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  // Measured height of all rows (labels may wrap); until the first layout a one-line estimate is used.
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
 
   if (options.length < PICKER_SEARCH_FROM) {
     return (
@@ -47,6 +58,9 @@ export function PickerField({ label, options, value, onChange, disabled = false,
 
   const selected = options.find((option) => option.value === value) ?? null;
   const filtered = filterPickerOptions(options, query);
+  // A short result is as tall as its rows; a long one scrolls inside the cap.
+  const rowStride = theme.sizes.minTouch + ROW_GAP;
+  const listHeight = Math.min(contentHeight ?? filtered.length * rowStride, Math.round(window.height * LIST_MAX_SHARE));
 
   return (
     <View style={styles.field}>
@@ -70,15 +84,24 @@ export function PickerField({ label, options, value, onChange, disabled = false,
       <BottomSheet
         visible={open}
         onClose={() => setOpen(false)}
-        onClosed={() => setQuery('')}
+        onClosed={() => {
+          setQuery('');
+          setContentHeight(null);
+        }}
         closeLabel={m.common.actions.close}
         title={label}
+        // The option list scrolls by itself (FlashList), not the sheet.
+        scroll={false}
         testID={testID ? `${testID}-sheet` : undefined}
       >
         <View style={styles.sheet}>
           <TextField
             value={query}
-            onChangeText={setQuery}
+            onChangeText={(text) => {
+              setQuery(text);
+              // Another result set: back to the estimate until its rows are measured.
+              setContentHeight(null);
+            }}
             placeholder={m.stats.picker.searchPlaceholder}
             accessibilityLabel={m.stats.picker.searchPlaceholder}
             autoCorrect={false}
@@ -90,31 +113,42 @@ export function PickerField({ label, options, value, onChange, disabled = false,
           {filtered.length === 0 ? (
             <EmptyState variant="plain" title={dict.planner.common.nothingFound} />
           ) : (
-            <View accessibilityRole="menu" style={styles.menu}>
-              {filtered.map((option) => {
-                const active = option.value === value;
-                return (
-                  <PressableScale
-                    key={option.value}
-                    accessibilityRole="menuitem"
-                    accessibilityLabel={option.label}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => {
-                      setOpen(false);
-                      if (!active) onChange(option.value);
-                    }}
-                    scaleTo={1}
-                    style={[styles.option, active ? styles.optionActive : null]}
-                    pressedStyle={active ? null : styles.optionPressed}
-                    testID={testID ? `${testID}-option-${option.value}` : undefined}
-                  >
-                    <Text variant="bodyStrong" color={active ? 'greenText' : 'textStrong'} style={styles.value}>
-                      {option.label}
-                    </Text>
-                    {active ? <Icon name="check" size={16} color="greenText" /> : null}
-                  </PressableScale>
-                );
-              })}
+            <View accessibilityRole="menu" style={{ height: listHeight }}>
+              <FlashList
+                data={filtered}
+                keyExtractor={(option) => option.value}
+                renderItem={({ item: option }) => {
+                  const active = option.value === value;
+                  return (
+                    <View style={styles.item}>
+                      <PressableScale
+                        accessibilityRole="menuitem"
+                        accessibilityLabel={option.label}
+                        accessibilityState={{ selected: active }}
+                        onPress={() => {
+                          setOpen(false);
+                          if (!active) onChange(option.value);
+                        }}
+                        scaleTo={1}
+                        style={[styles.option, active ? styles.optionActive : null]}
+                        pressedStyle={active ? null : styles.optionPressed}
+                        testID={testID ? `${testID}-option-${option.value}` : undefined}
+                      >
+                        <Text variant="bodyStrong" color={active ? 'greenText' : 'textStrong'} style={styles.value}>
+                          {option.label}
+                        </Text>
+                        {active ? <Icon name="check" size={16} color="greenText" /> : null}
+                      </PressableScale>
+                    </View>
+                  );
+                }}
+                // The tick lives outside the rows.
+                extraData={value}
+                onContentSizeChange={(_width, height) => setContentHeight(height)}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                testID={testID ? `${testID}-options` : undefined}
+              />
             </View>
           )}
         </View>
@@ -141,7 +175,8 @@ const useStyles = makeStyles((t) => ({
   triggerOpen: { borderColor: t.colors.inputBorderFocus },
   value: { flex: 1, minWidth: 0 },
   sheet: { gap: t.space.sm, paddingTop: t.space.xs },
-  menu: { gap: 2 },
+  // The gap between rows lives inside the cells: FlashList measures each one.
+  item: { paddingBottom: ROW_GAP },
   option: {
     minHeight: t.sizes.minTouch,
     flexDirection: 'row',

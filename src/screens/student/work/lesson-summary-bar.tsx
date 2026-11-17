@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 
+import { useCountdown } from '@/components/retry-wait';
 import { format, plural, useI18n } from '@/i18n';
-import { useCountdown } from '@/screens/shell';
 import { makeStyles } from '@/theme';
 import { Icon, ProgressBar, Text, completionPercent } from '@/ui';
 

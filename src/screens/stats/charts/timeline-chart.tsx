@@ -7,7 +7,10 @@ import { buildProgressTimelineView, buildTimelineChartGeometry, type TimelinePer
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { Icon, PressableScale, Segmented, Text } from '@/ui';
+import { Icon, Segmented, Text } from '@/ui';
+
+import { nearestPointIndex } from '../logic';
+import { ChartHitArea, ChartStepper } from './chart-selection';
 
 const PERIODS: readonly TimelinePeriod[] = ['7d', '4w', '8w'];
 
@@ -28,7 +31,8 @@ export type TimelineChartProps = {
 /**
  * «Динамика прогресса» (06 §1.6.a item 2, §4.5): period switch, the closed / red totals, the trend
  * against the previous window and a line of closed numbers per day or week. The site shows a point's
- * value on hover; here a tap selects the point and the caption under the chart names it.
+ * value on hover; here the whole plot is one touch target (a tap selects the nearest point), the arrows
+ * beside the caption step point by point, and the caption names the selected one.
  */
 export function TimelineChart({ entries, selectedStudentName }: TimelineChartProps) {
   const styles = useStyles();
@@ -60,7 +64,7 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
     return format(t.pointTitle, { label: point?.label ?? '', n: point?.closedCount ?? 0 });
   };
   const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
-  const columnWidth = chart && chart.points.length > 1 ? plotWidth / (chart.points.length - 1) : plotWidth;
+  const select = (index: number | null) => setSelected(index === null ? null : { period, index });
 
   return (
     <View style={styles.root} testID="stats-timeline">
@@ -133,20 +137,17 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
                       />
                     ))}
                   </Svg>
-                  {/* One full-height touch column per point: a dot alone is too small to hit. */}
-                  {chart.points.map((point, index) => (
-                    <PressableScale
-                      key={`hit-${index}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={pointTitle(index)}
-                      accessibilityState={{ selected: index === selectedIndex }}
-                      onPress={() => setSelected(index === selectedIndex ? null : { period, index })}
-                      scaleTo={1}
-                      // Columns tile the plot without overlapping: a tap always selects the nearest point.
-                      style={[styles.hit, { left: px(point.x) - columnWidth / 2, width: columnWidth }]}
-                      testID={`stats-timeline-point-${index}`}
-                    />
-                  ))}
+                  {/* One touch target for the whole plot: a dot — or a column between two of eight — is too
+                      small to aim at. */}
+                  <ChartHitArea
+                    count={chart.points.length}
+                    selected={selectedIndex}
+                    onSelect={select}
+                    indexAt={(x) => nearestPointIndex(x, SIDE, plotWidth, chart.points.length)}
+                    accessibilityLabel={view.title}
+                    accessibilityValue={selectedIndex !== null ? pointTitle(selectedIndex) : undefined}
+                    testID="stats-timeline-plot"
+                  />
                 </View>
                 <View style={styles.labels} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                   {chart.points.map((point, index) =>
@@ -169,17 +170,19 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
               <View style={styles.placeholder} />
             )}
 
-            {selectedPoint && selectedIndex !== null ? (
-              <Text variant="smallStrong" align="center" accessibilityLiveRegion="polite" testID="stats-timeline-selected">
-                {pointTitle(selectedIndex)}
-              </Text>
-            ) : (
-              <Hint>
-                <Text variant="hint" color="textMuted" align="center">
-                  {m.stats.chart.pointHint}
+            <ChartStepper count={chart.points.length} selected={selectedIndex} onSelect={select} testID="stats-timeline">
+              {selectedPoint && selectedIndex !== null ? (
+                <Text variant="smallStrong" align="center" accessibilityLiveRegion="polite" testID="stats-timeline-selected">
+                  {pointTitle(selectedIndex)}
                 </Text>
-              </Hint>
-            )}
+              ) : (
+                <Hint>
+                  <Text variant="hint" color="textMuted" align="center">
+                    {m.stats.chart.pointHint}
+                  </Text>
+                </Hint>
+              )}
+            </ChartStepper>
           </View>
         ) : (
           <Text variant="small" color="textMuted" align="center" style={styles.empty} testID="stats-timeline-empty">
@@ -239,7 +242,6 @@ const useStyles = makeStyles((t) => ({
     paddingHorizontal: t.space.gutter,
   },
   plot: { height: PLOT_HEIGHT + TOP * 2 },
-  hit: { position: 'absolute', top: 0, bottom: 0 },
   labels: { height: 18, marginBottom: t.space.sm },
   label: { position: 'absolute', top: 0, width: LABEL_WIDTH },
   placeholder: { height: PLOT_HEIGHT + TOP * 2 + 18 },

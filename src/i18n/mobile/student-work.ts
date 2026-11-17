@@ -23,8 +23,7 @@ const ru = {
     // replaces `dict.student.photos.successTitle` («Файлы добавлены»)
     added: "Фото добавлены",
     counterA11y: "Прикреплено фото: {count} из {max}",
-    uploadProgressA11y: "Загрузка фото: {percent}%",
-    viewerTitle: "Фото решений"
+    uploadProgressA11y: "Загрузка фото: {percent}%"
   },
   check: {
     // replaces `dict.student.check.runningHint` («Страница обновится сама»)
@@ -35,10 +34,6 @@ const ru = {
     pollRetry: "Обновить статус",
     answerExpandA11y: "Показать ответ полностью: {answer}",
     answerCollapseA11y: "Свернуть ответ: {answer}"
-  },
-  note: {
-    // the draft is kept on the device and sent when the connection returns
-    queued: "Сохраним, когда появится интернет"
   },
   lesson: {
     // replaces `dict.student.lesson.autoRefresh` (no page to reload)
@@ -78,8 +73,7 @@ const en: typeof ru = {
     sourceTitle: "Add a photo",
     added: "Photos added",
     counterA11y: "Photos attached: {count} of {max}",
-    uploadProgressA11y: "Uploading photos: {percent}%",
-    viewerTitle: "Solution photos"
+    uploadProgressA11y: "Uploading photos: {percent}%"
   },
   check: {
     runningHint: "Checking your solution — this usually takes up to a minute. The screen refreshes on its own.",
@@ -87,9 +81,6 @@ const en: typeof ru = {
     pollRetry: "Refresh status",
     answerExpandA11y: "Show the full answer: {answer}",
     answerCollapseA11y: "Collapse the answer: {answer}"
-  },
-  note: {
-    queued: "Will be saved once you are back online"
   },
   lesson: {
     autoRefresh: "No need to refresh — the lesson will open on its own.",

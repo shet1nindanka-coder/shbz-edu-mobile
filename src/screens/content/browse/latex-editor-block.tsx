@@ -2,16 +2,15 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { useApi } from '@/api';
+import { errorText, useApi } from '@/api';
 import { MathPreview } from '@/components/math';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Card, Dialog, Notice, Text, TextArea, TextButton } from '@/ui';
 
-import { errorText } from '../shared/error-text';
 import { canSaveLatexDraft, hasLatex } from '../shared/number-fill-status';
-import { RateLimitLine, useRateLimit } from '../shared/use-rate-limit';
 
 export type LatexEditorBlockProps = {
   /** Which value of the number this block edits. */
@@ -78,7 +77,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
   const [success, setSuccess] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Save and delete of one value share a bucket (60 / 60 s).
-  const wait = useRateLimit();
+  const wait = useRetryWait();
 
   const save = useMutation({
     mutationFn: (value: string) => (isCondition ? api.content.saveCondition(homeworkNumberId, value) : api.content.saveAnswer(homeworkNumberId, value)),
@@ -174,7 +173,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
       ) : null}
 
       {error ? <Notice tone="error" text={error} testID={`latex-${kind}-error`} /> : null}
-      <RateLimitLine seconds={wait.seconds} testID={`latex-${kind}-wait`} />
+      <RetryWaitLine seconds={wait.seconds} testID={`latex-${kind}-wait`} />
       {success ? (
         <Notice
           tone="success"

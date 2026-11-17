@@ -32,7 +32,7 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
   const note = useNoteAutosave(number.homeworkNumberId, number.note, t.noteSaveFailed);
 
   const statusLine =
-    note.status === 'saving' ? t.saving : note.status === 'queued' ? m.studentWork.note.queued : note.status === 'saved' ? t.saved : null;
+    note.status === 'saving' ? t.saving : note.status === 'queued' ? m.student.note.queued : note.status === 'saved' ? t.saved : null;
 
   return (
     <Card variant="outline" padded={16} selected={highlighted} style={styles.card} testID={`number-card-${number.number}`}>

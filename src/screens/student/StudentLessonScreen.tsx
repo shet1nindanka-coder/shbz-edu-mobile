@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
+import { serverClockOffset } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
-import { ErrorState, LoadingState, Notice, Screen } from '@/ui';
+import { useServerNow } from '@/services/clock';
+import { useKeepScreenAwake } from '@/services/keep-awake';
+import { LoadingState, Notice, Screen } from '@/ui';
 
-import { errorText } from './work/error-text';
 import { LessonLive } from './work/lesson-live';
 import { LessonWaiting } from './work/lesson-waiting';
-import { UNAVAILABLE_RECHECK_MS, delayUntilLessonEdge, secondsUntil, serverClockOffset } from './work/logic';
+import { UNAVAILABLE_RECHECK_MS, delayUntilLessonEdge, secondsUntil } from './work/logic';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
-import { useServerNow } from './work/use-server-now';
 
 /**
  * A response younger than this that still shows a moment already passed will not change by asking again
@@ -55,7 +57,7 @@ function useLessonEdgeRefresh(options: {
  */
 export function StudentLessonScreen() {
   const api = useApi();
-  const { dict, m } = useI18n();
+  const { m } = useI18n();
   const live = useScreenLive();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -81,6 +83,10 @@ export function StudentLessonScreen() {
   // A cached "active" lesson whose scheduled end has passed is not shown as live (offline, a cold start
   // from the persisted cache): the tab waits while the re-read is on its way.
   const active = data?.active && secondsUntil(data.active.endsAt, nowMs) > 0 ? data.active : null;
+
+  // During the classwork the phone lies next to the notebook, untouched for minutes: the screen stays on
+  // (03 §6 "keep the screen awake", optional). Only while this tab is in front and the app is open.
+  useKeepScreenAwake(live && active !== null);
 
   // The server computes `upcoming` even while a lesson is active (90-addendum-5 A.5.7), so the waiting
   // state of an expired cached lesson still knows what comes next — unless that has started as well.
@@ -127,15 +133,8 @@ export function StudentLessonScreen() {
           {refreshError ? <Notice tone="error" text={refreshError} testID="lesson-refresh-error" /> : null}
           <LessonWaiting upcoming={upcoming} serverOffsetMs={serverOffsetMs} />
         </>
-      ) : lesson.isError ? (
-        <ErrorState
-          title={dict.shells.errorTitle}
-          description={errorText(lesson.error, m.common.errors.generic)}
-          retryLabel={dict.common.retry}
-          onRetry={() => void refetch()}
-          retrying={lesson.isFetching}
-          testID="lesson-error"
-        />
+      ) : isLoadFailed(lesson) ? (
+        <LoadFailure query={lesson} testID="lesson-error" />
       ) : (
         <LoadingState variant="cards" count={2} accessibilityLabel={m.common.a11y.loading} testID="lesson-loading" />
       )}

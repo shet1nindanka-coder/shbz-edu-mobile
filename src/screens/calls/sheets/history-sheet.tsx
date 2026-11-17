@@ -1,11 +1,11 @@
+import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { ParentCallEntry, ParentCallStudentOverview } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { errorText } from '@/screens/groups/shared/error-text';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, Notice, Text } from '@/ui';
 
@@ -25,7 +25,15 @@ export type HistorySheetProps = {
  *
  * Comments are personal data. They are rendered here and nowhere else; the queries behind this sheet are
  * excluded from the persisted cache (src/services/query/persist-policy.ts).
+ *
+ * The log is append-only and grows by a page per «Показать более ранние», so the entries are a
+ * virtualised list with a bounded height; the counter and the button stay under it.
  */
+
+/** Share of the window the entries may take; the title, the name, the counter and the button need the rest. */
+const LIST_MAX_SHARE = 0.5;
+/** Height of one entry before it is measured: a meta line, a line of comment and the paddings. */
+const ENTRY_ESTIMATE = 64;
 export function HistorySheet({ student, showTeacher, onClose }: HistorySheetProps) {
   const { m } = useI18n();
   const [shown, setShown] = useState<ParentCallStudentOverview | null>(student);
@@ -38,6 +46,8 @@ export function HistorySheet({ student, showTeacher, onClose }: HistorySheetProp
       onClosed={() => setShown(null)}
       closeLabel={m.common.actions.close}
       title={m.calls.history.sheetTitle}
+      // The entries scroll by themselves (FlashList), not the sheet.
+      scroll={false}
       testID="call-history-sheet"
     >
       {shown ? <HistoryContent key={shown.studentId} student={shown} showTeacher={showTeacher} /> : null}
@@ -48,7 +58,10 @@ export function HistorySheet({ student, showTeacher, onClose }: HistorySheetProp
 function HistoryContent({ student, showTeacher }: { student: ParentCallStudentOverview; showTeacher: boolean }) {
   const styles = useStyles();
   const api = useApi();
+  const window = useWindowDimensions();
   const { m } = useI18n();
+  // Measured height of all entries (comments wrap); an estimate until the first layout.
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
   // Earlier pages are requested only after the user asks for them.
   const [expanded, setExpanded] = useState(false);
   const cursor = earlierHistoryCursor(student);
@@ -83,10 +96,21 @@ function HistoryContent({ student, showTeacher }: { student: ParentCallStudentOv
         {student.studentName}
       </Text>
 
-      <View accessibilityRole="list">
-        {entries.map((entry, index) => (
-          <HistoryEntry key={entry.id} entry={entry} showTeacher={showTeacher} divider={index < entries.length - 1} />
-        ))}
+      {/* A short history is as tall as its entries; a long one scrolls inside the cap. */}
+      <View
+        accessibilityRole="list"
+        style={{ height: Math.min(contentHeight ?? entries.length * ENTRY_ESTIMATE, Math.round(window.height * LIST_MAX_SHARE)) }}
+      >
+        <FlashList
+          data={entries}
+          keyExtractor={(entry) => entry.id}
+          renderItem={({ item, index }) => <HistoryEntry entry={item} showTeacher={showTeacher} divider={index < entries.length - 1} />}
+          // The last entry has no divider: a new page changes which one is last.
+          extraData={entries.length}
+          onContentSizeChange={(_width, height) => setContentHeight(height)}
+          showsVerticalScrollIndicator={false}
+          testID="call-history-list"
+        />
       </View>
 
       {cursor !== null ? (

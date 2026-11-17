@@ -555,6 +555,31 @@ export function topicBarRatios(topics: readonly { title: string; count: number }
   return topics.map((topic) => topic.count / maxCount);
 }
 
+// ───────────────────────────── chart selection ─────────────────────────────
+
+/**
+ * The mark a "previous / next" step lands on. From nothing selected, "next" starts at the first mark and
+ * "previous" at the last (the most recent week or day); at either end the selection stays where it is.
+ * `null` only for a chart without marks.
+ */
+export function stepChartSelection(selected: number | null, count: number, delta: 1 | -1): number | null {
+  if (count <= 0) return null;
+  if (selected === null || !Number.isInteger(selected) || selected < 0 || selected >= count) return delta === 1 ? 0 : count - 1;
+  return Math.min(count - 1, Math.max(0, selected + delta));
+}
+
+/** The column of `count` equal slots across `width` that contains `x`; clamped to the plot. */
+export function slotIndexAt(x: number, width: number, count: number): number {
+  if (count <= 0 || width <= 0) return 0;
+  return Math.min(count - 1, Math.max(0, Math.floor((x / width) * count)));
+}
+
+/** The point nearest to `x` among `count` points spread evenly from `start` to `start + span`. */
+export function nearestPointIndex(x: number, start: number, span: number, count: number): number {
+  if (count <= 1 || span <= 0) return 0;
+  return Math.min(count - 1, Math.max(0, Math.round(((x - start) / span) * (count - 1))));
+}
+
 // ───────────────────────────── pickers ─────────────────────────────
 
 /** From this many options a picker gets a search field (06 §1.6 "searchable for long student lists"). */

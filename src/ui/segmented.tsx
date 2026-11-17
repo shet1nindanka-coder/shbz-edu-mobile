@@ -1,4 +1,5 @@
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { ScrollView, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { makeStyles, useTheme } from '@/theme';
@@ -28,6 +29,12 @@ export type SegmentedProps<T extends string> = {
   fill?: boolean;
   /** Selected label in the strong text colour instead of the accent (`--plain`): in-page navigation. */
   plain?: boolean;
+  /**
+   * Labels are never cut: segments keep the width of their label and, when they do not fit the row
+   * (a narrow phone, a large OS font), the bar scrolls sideways with the selected segment kept in view.
+   * While they fit, the bar looks like `fill`. For in-page tabs, whose labels come from the dictionary.
+   */
+  scrollable?: boolean;
   /** Use `shortLabel`s. */
   compact?: boolean;
   /** `radio` for a setting (default), `tab` when the control switches the content below. */
@@ -49,6 +56,7 @@ export function Segmented<T extends string>({
   fill = false,
   plain = false,
   compact = false,
+  scrollable = false,
   role = 'radio',
   disabled = false,
   testID,
@@ -58,13 +66,29 @@ export function Segmented<T extends string>({
   const styles = useStyles();
   const activeIndex = options.findIndex((option) => option.value === value);
   const { onItemLayout, indicatorStyle } = useSlidingIndicator(activeIndex);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const spans = useRef<({ x: number; width: number } | undefined)[]>([]);
+  const viewport = useRef(0);
 
-  return (
+  // Scrollable bar: keep the selected segment in view (centred when the bar is wider than the row).
+  useEffect(() => {
+    if (!scrollable) return;
+    const span = spans.current[activeIndex];
+    if (!span || viewport.current === 0) return;
+    scrollRef.current?.scrollTo({ x: Math.max(0, span.x + span.width / 2 - viewport.current / 2), animated: true });
+  }, [activeIndex, scrollable]);
+
+  const track = (
     <View
       accessibilityRole={role === 'tab' ? 'tablist' : 'radiogroup'}
       accessibilityLabel={accessibilityLabel}
       testID={testID}
-      style={[styles.track, fill ? styles.trackFill : styles.trackInline, disabled ? styles.disabled : null, style]}
+      style={[
+        styles.track,
+        scrollable ? styles.trackScrollable : fill ? styles.trackFill : styles.trackInline,
+        disabled ? styles.disabled : null,
+        scrollable ? null : style,
+      ]}
     >
       <Animated.View style={[styles.indicator, theme.shadows.segment, indicatorStyle]} />
       {options.map((option, index) => {
@@ -80,9 +104,16 @@ export function Segmented<T extends string>({
             onPress={() => {
               if (!selected) onChange(option.value);
             }}
-            onLayout={onItemLayout(index)}
+            onLayout={(event) => {
+              spans.current[index] = { x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width };
+              onItemLayout(index)(event);
+            }}
             hitSlop={{ top: 5, bottom: 5 }}
-            style={[styles.segment, fill ? styles.segmentFill : null, option.disabled ? styles.disabled : null]}
+            style={[
+              styles.segment,
+              scrollable ? styles.segmentScrollable : fill ? styles.segmentFill : null,
+              option.disabled ? styles.disabled : null,
+            ]}
           >
             <Text
               variant="segment"
@@ -96,6 +127,23 @@ export function Segmented<T extends string>({
       })}
     </View>
   );
+
+  if (!scrollable) return track;
+  return (
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      onLayout={(event) => {
+        viewport.current = event.nativeEvent.layout.width;
+      }}
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={[styles.scroll, style]}
+      contentContainerStyle={styles.scrollContent}
+    >
+      {track}
+    </ScrollView>
+  );
 }
 
 const useStyles = makeStyles((t) => ({
@@ -108,6 +156,10 @@ const useStyles = makeStyles((t) => ({
   },
   trackInline: { alignSelf: 'flex-start' },
   trackFill: { alignSelf: 'stretch' },
+  // Inside the horizontal scroller: at least as wide as the row, wider when the labels need it.
+  scroll: { flexGrow: 0 },
+  scrollContent: { flexGrow: 1 },
+  trackScrollable: { flexGrow: 1 },
   indicator: {
     position: 'absolute',
     top: 0,
@@ -125,5 +177,7 @@ const useStyles = makeStyles((t) => ({
   },
   // Equal growth from the label's own width: a long label is not truncated while short ones have room.
   segmentFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6 },
+  // Never narrower than the label; spare room is shared equally, as in `fill`.
+  segmentScrollable: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: 4 },
   disabled: { opacity: 0.55 },
 }));

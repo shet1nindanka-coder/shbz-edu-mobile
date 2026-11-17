@@ -2,7 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { AiProfileRequest, AiProfileResponse, GroupDetailResponse, GroupMember } from '@/api/types';
 import { LIMITS } from '@/api/types';
 import { format, useI18n } from '@/i18n';
@@ -11,7 +11,6 @@ import { makeStyles } from '@/theme';
 import { Notice, Select, Text, TextField, type SelectOption } from '@/ui';
 
 import { AI_NOTE_MAX_LENGTH, aiNoteForRequest } from '../logic';
-import { errorText } from '../shared/error-text';
 import { invalidateGroupLists, invalidateGroupMembership } from '../shared/invalidate';
 import { useFlash } from '../shared/use-flash';
 import { FlashText } from './flash-text';

@@ -2,8 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
-import { hasErrorCode, useApi } from '@/api';
+import { errorText, hasErrorCode, useApi } from '@/api';
 import type { StudentCreateInput } from '@/api/types';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { generatePasswordFromName } from '@/domain/password-generate';
 import { MAX_PASSWORD_LENGTH } from '@/domain/password-policy';
 import { MAX_LOGIN_LENGTH, MAX_USER_NAME_LENGTH } from '@/domain/text';
@@ -13,13 +14,10 @@ import { BottomSheet, Button, Notice, TextField } from '@/ui';
 
 import { canSubmitStudentForm, shouldSuggestPassword } from './account-form';
 import type { CreatedCredentials } from './credentials-sheet';
-import { errorText } from './error-text';
 import { invalidateStudents } from './invalidate-students';
 import { PasswordFeedback } from './password-feedback';
 import { PasswordSuggestion } from './password-suggestion';
-import { RateLimitLine } from './rate-limit-line';
 import { secureRandomInt } from './secure-random';
-import { useRateLimit } from './use-rate-limit';
 
 export type CreateStudentSheetProps = {
   visible: boolean;
@@ -51,7 +49,7 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
   const [formError, setFormError] = useState<string | null>(null);
   // `409 exists` is about one field: shown under the login until it is edited.
   const [loginError, setLoginError] = useState<string | null>(null);
-  const limit = useRateLimit();
+  const limit = useRetryWait();
   const loginRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
   const values = { name, login, password };
@@ -207,7 +205,7 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
         {formError ? (
           <View style={styles.error}>
             <Notice tone="error" text={formError} testID="create-student-error" />
-            <RateLimitLine seconds={limit.seconds} testID="create-student-wait" />
+            <RetryWaitLine seconds={limit.seconds} testID="create-student-wait" />
           </View>
         ) : null}
       </View>

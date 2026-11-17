@@ -1,13 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { hasErrorCode, isApiError, isNetworkError, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, isApiError, isNetworkError, qk, useApi } from '@/api';
 import type { NumbersChangePreview, TopicDetail, UpdateTopicRequest } from '@/api/types';
+import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 
 import { useUploadSlot, type UploadSlot } from '../browse/use-upload-slot';
-import { errorText } from '../shared/error-text';
-import { useRateLimit, type RateLimitWait } from '../shared/use-rate-limit';
 
 import {
   canConfirmRemoval,
@@ -38,7 +37,7 @@ export type TopicEditForm = {
   theory: UploadSlot;
   homework: UploadSlot;
   /** `api:teacher-uploads` cool-down, shared by both slots. */
-  uploadWait: RateLimitWait;
+  uploadWait: RetryWait;
   /** Something differs from the saved topic (a field or a picked replacement file). */
   dirty: boolean;
   /** `checking` — the preview request; `saving` — the update itself. */
@@ -95,7 +94,7 @@ export function useTopicEditForm({
   const [plan, setPlan] = useState<NumbersChangePreview | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [allowAssigned, setAllowAssigned] = useState(false);
-  const uploadWait = useRateLimit();
+  const uploadWait = useRetryWait();
   const theory = useUploadSlot(uploadWait.note);
   const homework = useUploadSlot(uploadWait.note);
 

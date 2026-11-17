@@ -10,7 +10,6 @@ import type { HomeworkDeadlineSummary, StudentStreak } from "../src/api/types";
 import { getDictionary } from "../src/i18n/get-dictionary";
 import {
   buildCalendarCells,
-  correctedNow,
   describeDeadline,
   groupByMskDay,
   isSameMonth,
@@ -20,6 +19,7 @@ import {
   splitUpcoming,
   toDeadlineItems,
 } from "../src/screens/student/study/deadline-model";
+import { correctedNow } from "@/domain/server-clock";
 import {
   NOTE_MAX_LENGTH,
   adoptServerNote,
@@ -29,6 +29,7 @@ import {
   noteStatus,
 } from "../src/screens/student/study/note-model";
 import { hexWithAlpha, streakMotionKind, streakTexts, weekCells } from "../src/screens/student/study/streak-model";
+import { longestWordLength, theoryTitleBasis } from "../src/screens/student/study/theory-layout";
 
 const ru = getDictionary("ru");
 const en = getDictionary("en");
@@ -345,5 +346,49 @@ describe("personal note (S3)", () => {
     it("ignores the news while a write of this editor is in flight or queued", () => {
       assert.equal(adoptServerNote({ ...idle, draft: "новая", writing: true }, "с сервера"), null);
     });
+  });
+});
+
+describe("theory card layout (S2)", () => {
+  // Card-title type and the widths measured in the web build: the button «Открыть» is 112 wide, the row
+  // gap 12, and a card's inner width is the window width minus 66.
+  const FONT = 17;
+  const BUTTON = 112 + 12;
+  const sharesRow = (titles: string[], windowWidth: number, fontScale = 1) => theoryTitleBasis(titles, FONT, fontScale) + BUTTON <= windowWidth - 66;
+
+  it("finds the longest piece a line cannot break", () => {
+    assert.equal(longestWordLength("Производная и исследование функций"), 12);
+    assert.equal(longestWordLength("Логарифмические уравнения"), 15);
+    // A compound word may break at its hyphen.
+    assert.equal(longestWordLength("Дробно-рациональные уравнения"), 12);
+    assert.equal(longestWordLength(""), 0);
+  });
+
+  it("gives the title at least the measured width of its longest word", () => {
+    // Measured in the card-title type: «исследование» 133, «Логарифмические» 174, «Тригонометрические» 200.
+    assert.ok(theoryTitleBasis(["Производная и исследование функций"], FONT, 1) >= 133);
+    assert.ok(theoryTitleBasis(["Логарифмические уравнения"], FONT, 1) >= 174);
+    assert.ok(theoryTitleBasis(["Тригонометрические уравнения"], FONT, 1) >= 200);
+  });
+
+  it("moves the button under the title where the word would not fit beside it", () => {
+    // The audit's case: 320 pt, «исследование» was split in a 130 pt column.
+    assert.equal(sharesRow(["Производная и исследование функций"], 320), false);
+    assert.equal(sharesRow(["Производная и исследование функций"], 360), true);
+    // «Логарифмические» (174) does not fit the 170 pt column of a 360 pt phone; it does at 390.
+    assert.equal(sharesRow(["Логарифмические уравнения"], 360), false);
+    assert.equal(sharesRow(["Логарифмические уравнения"], 390), true);
+    // Short words keep the one-row card even on the narrowest phone.
+    assert.equal(sharesRow(["Текстовые задачи"], 320), true);
+  });
+
+  it("takes one layout for the whole list and follows the OS font scale", () => {
+    const titles = ["Текстовые задачи", "Логарифмические уравнения"];
+    assert.equal(theoryTitleBasis(titles, FONT, 1), theoryTitleBasis(["Логарифмические уравнения"], FONT, 1));
+    assert.equal(sharesRow(titles, 360), false);
+    assert.equal(sharesRow(["Производная и исследование функций"], 360, 1.3), false);
+    // An empty list (or DOCX-only) still has a sane minimum.
+    assert.equal(theoryTitleBasis([], FONT, 1), 120);
+    assert.equal(theoryTitleBasis([], FONT, 0.85), 120);
   });
 });

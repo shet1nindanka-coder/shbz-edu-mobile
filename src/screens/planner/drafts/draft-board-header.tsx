@@ -1,15 +1,15 @@
 import { View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { HomeworkPlanBoardModel } from '@/api/types';
+import { HandoutNotice } from '@/components/lessons';
+import type { Handout } from '@/components/lessons';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { formatDateTime } from '@/domain/dates';
 import { format, plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Card, Chip, Icon, Notice, Spinner, Text } from '@/ui';
 
-import { errorText } from '../shared/error-text';
-import { HandoutNotice } from '../shared/handout-notice';
-import type { Handout } from '../shared/use-handout';
-import { RetryWaitLine } from '../shared/use-retry-wait';
 import type { DraftBoardController } from './use-draft-board';
 
 export type DraftBoardHeaderProps = {

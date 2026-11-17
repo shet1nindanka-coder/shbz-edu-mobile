@@ -3,13 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { HIGHLIGHT_FLASH_MS, qk, useApi } from '@/api';
+import { HIGHLIGHT_FLASH_MS, errorText, qk, useApi } from '@/api';
 import type { ParentCallStudentOverview } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation, useScreenFocused, type AppLink, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, useScreenFocused, type AppLink, type ScreenParams } from '@/navigation';
 import { useCurrentUser } from '@/providers';
-import { errorText } from '@/screens/groups/shared/error-text';
-import { LoadFailure, isLoadFailed } from '@/screens/groups/shared/load-failure';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen } from '@/ui';
@@ -17,7 +16,6 @@ import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen } from '@/
 import { CallRow } from './list/call-row';
 import { SummaryBar } from './list/summary-bar';
 import { buildCallRows, rowIndexOfStudent, type CallListRow } from './logic';
-import { useRefetchOnFocus } from './shared/use-refetch-on-focus';
 import { HistorySheet } from './sheets/history-sheet';
 import { RecordCallSheet, type RecordCallTarget } from './sheets/record-call-sheet';
 

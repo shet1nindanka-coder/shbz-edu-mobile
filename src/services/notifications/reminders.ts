@@ -203,16 +203,30 @@ function textHash(text: string): string {
   return hash.toString(36);
 }
 
-/** What a sync has to do given what is scheduled on the device now. */
+/** The category an identifier of this app was scheduled for, or null for a foreign identifier. */
+export function reminderCategoryOf(identifier: string): string | null {
+  const [prefix, category] = identifier.split(":");
+  return prefix === REMINDER_ID_PREFIX && category ? category : null;
+}
+
+/**
+ * What a sync has to do given what is scheduled on the device now.
+ *
+ * `keep` names the categories whose source data is not known yet (the query has not answered: a cold start
+ * without a connection, a failed first load). "No data yet" is not "nothing wanted": what is already
+ * scheduled for such a category stays untouched until its data arrives.
+ */
 export function diffReminders(
   scheduledIdentifiers: readonly string[],
   desired: readonly LocalReminder[],
+  keep: readonly ReminderCategory[] = [],
 ): { cancel: string[]; schedule: LocalReminder[] } {
   const ours = scheduledIdentifiers.filter((identifier) => identifier.startsWith(`${REMINDER_ID_PREFIX}:`));
   const wanted = new Map(desired.map((reminder) => [reminderIdentifier(reminder), reminder] as const));
   const present = new Set(ours);
+  const kept = new Set<string>(keep);
   return {
-    cancel: ours.filter((identifier) => !wanted.has(identifier)),
+    cancel: ours.filter((identifier) => !wanted.has(identifier) && !kept.has(reminderCategoryOf(identifier) ?? "")),
     schedule: [...wanted.entries()].filter(([identifier]) => !present.has(identifier)).map(([, reminder]) => reminder),
   };
 }

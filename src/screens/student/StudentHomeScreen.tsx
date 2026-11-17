@@ -2,21 +2,21 @@ import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 
 import { qk, useApi } from '@/api';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
+import { correctedNow } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar, useStudentStreak } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
 import { Card, Chip, Enter, Icon, ListRow, Notice, PageHeader, Screen, TextButton, navIcons } from '@/ui';
 
 import { DeadlineCard } from './study/deadline-card';
-import { correctedNow, splitUpcoming, toDeadlineItems, type DeadlineItem } from './study/deadline-model';
+import { splitUpcoming, toDeadlineItems, type DeadlineItem } from './study/deadline-model';
 import { HomeSection } from './study/home-section';
 import { HomeSkeleton } from './study/home-skeleton';
-import { LoadError } from './study/load-error';
 import { RefreshError } from './study/refresh-error';
 import { StreakWidget } from './study/streak-widget';
 import { useNow } from './study/use-now';
-import { useRefetchOnFocus } from './study/use-refetch-on-focus';
 import { useRefresh } from './study/use-refresh';
 
 /**
@@ -56,7 +56,7 @@ export function StudentHomeScreen() {
     <HomeSection title={dict.student.weekly.title} testID="home-streak">
       <StreakWidget streak={streak.data} />
     </HomeSection>
-  ) : streak.isError ? (
+  ) : isLoadFailed(streak) ? (
     <HomeSection title={dict.student.weekly.title} testID="home-streak">
       <Notice
         tone="error"
@@ -136,13 +136,17 @@ export function StudentHomeScreen() {
             </Card>
           </Enter>
         </View>
-      ) : deadlines.isError ? (
-        // No «На главную» here: this is the home screen.
-        <LoadError
-          error={deadlines.error}
-          failedAt={deadlines.errorUpdatedAt}
-          onRetry={refresh}
-          retrying={deadlines.isFetching}
+      ) : isLoadFailed(deadlines) ? (
+        // No «На главную» here: this is the home screen. «Попробовать снова» re-reads the streak as well.
+        <LoadFailure
+          query={{
+            isError: deadlines.isError,
+            error: deadlines.error,
+            failureReason: deadlines.failureReason,
+            fetchStatus: deadlines.fetchStatus,
+            errorUpdatedAt: deadlines.errorUpdatedAt,
+            refetch: refresh,
+          }}
           testID="home-error"
         />
       ) : (

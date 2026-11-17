@@ -1,12 +1,19 @@
-// `shared.fileViewer` — thin route: `?files=<JSON>&index=<n>&title=<text>` (built by `openFiles`).
+// `shared.fileViewer` — thin route: `?files=<JSON>&index=<n>` (built by `openFiles`; file references only).
 import { useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 
-import { fileViewerFilesParam, indexParam, stringParam } from '@/navigation/routes';
-import { FileViewerScreen } from '@/screens/shell';
+import { fileViewerFilesParam, indexParam } from '@/navigation/routes';
+import { FileViewerScreen, ModalRouteFrame } from '@/screens/shell';
 
 export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
 
 export default function FileViewerRoute() {
-  const { files, index, title } = useLocalSearchParams<{ files?: string; index?: string; title?: string }>();
-  return <FileViewerScreen files={fileViewerFilesParam(files)} initialIndex={indexParam(index)} title={stringParam(title)} />;
+  const { files, index } = useLocalSearchParams<{ files?: string; index?: string }>();
+  // Parsed once per param value: the screen keys its work on the identity of the list.
+  const parsed = useMemo(() => fileViewerFilesParam(files), [files]);
+  return (
+    <ModalRouteFrame presentation="fullScreen">
+      <FileViewerScreen files={parsed} initialIndex={indexParam(index)} />
+    </ModalRouteFrame>
+  );
 }

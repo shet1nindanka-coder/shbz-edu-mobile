@@ -8,16 +8,12 @@ const ru = {
   detail: {
     menuAria: "Действия с группой",
     tabsAria: "Разделы группы",
-    tabs: {
-      members: "Участники",
-      statistics: "Статистика",
-      attendance: "Посещаемость",
-      lessons: "Занятия"
-    },
+    // The other three tab labels are site texts: `dict.planner.groups.detail.participants` / `.attendance`
+    // and `dict.students.detail.tabLessons`. The site's section title «Статистика группы» is too long for a tab.
+    statisticsTab: "Статистика",
     renameHint: "Класс и предмет после создания группы не меняются."
   },
   members: {
-    add: "Добавить ученика",
     searchPlaceholder: "Начните вводить имя…",
     searchPrompt: "Поиск идёт по имени среди ваших учеников. Ученик из другой группы будет переведён сюда.",
     // The site says "find a student in the field below": on a phone the search is a sheet behind a button.
@@ -31,7 +27,6 @@ const ru = {
   },
   statistics: {
     openStudentAria: "Открыть карточку ученика {name}",
-    rankAria: "Место {n}",
     reportAria: "Отчёт ученика {name}: {period}"
   },
   attendance: {
@@ -44,7 +39,6 @@ const ru = {
     lessonLabel: "Занятие",
     lessonOption: "{date} · {title}",
     lessonLive: "{date} · {title} · идёт сейчас",
-    openLesson: "Открыть занятие",
     openLessonAria: "Открыть занятие «{title}», {date}",
     cellAria: "{name}, {date}: {mark}",
     markAria: "{name}: {mark}",
@@ -65,16 +59,10 @@ const en: typeof ru = {
   detail: {
     menuAria: "Group actions",
     tabsAria: "Group sections",
-    tabs: {
-      members: "Participants",
-      statistics: "Statistics",
-      attendance: "Attendance",
-      lessons: "Lessons"
-    },
+    statisticsTab: "Statistics",
     renameHint: "Grade and subject cannot be changed after the group is created."
   },
   members: {
-    add: "Add student",
     searchPlaceholder: "Start typing a name…",
     searchPrompt: "The search is by name among your students. A student from another group will be moved here.",
     empty: "The group is empty — add the first student.",
@@ -87,7 +75,6 @@ const en: typeof ru = {
   },
   statistics: {
     openStudentAria: "Open the student card of {name}",
-    rankAria: "Rank {n}",
     reportAria: "Report for {name}: {period}"
   },
   attendance: {
@@ -99,7 +86,6 @@ const en: typeof ru = {
     lessonLabel: "Lesson",
     lessonOption: "{date} · {title}",
     lessonLive: "{date} · {title} · in progress",
-    openLesson: "Open the lesson",
     openLessonAria: "Open the lesson “{title}”, {date}",
     cellAria: "{name}, {date}: {mark}",
     markAria: "{name}: {mark}",

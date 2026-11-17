@@ -1,17 +1,15 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { LessonItemResult, TeacherStudentLesson } from '@/api/types';
 import { POLLING } from '@/api/types/limits';
+import { notePlanRequested, planRequestedAtOf } from '@/components/lessons';
+import { useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-import { useScreenFocused } from '@/navigation';
 // One memory of accepted "Retry" requests for the lesson board and this card: a plan retried on either
 // screen is not shown as "lost" on the other.
-import { notePlanRequested, planRequestedAtOf } from '@/screens/planner/shared/plan-anchors';
 
-import { useRefetchOnFocus } from '../home/use-refetch-on-focus';
-import { errorText } from '../students/error-text';
 import { invalidateStudentData } from './invalidate';
 import {
   lessonPlanState,
@@ -26,8 +24,8 @@ import {
   type LessonPlanState,
   type LessonSetIds,
 } from './lessons-logic';
-import { useNowTick } from './use-now-tick';
-import { useRetryWait } from './use-retry-wait';
+import { useRefetchOnFocus, useScreenFocused } from '@/navigation';
+import { useNowTick } from '@/services/clock';
 
 /** What one lesson is busy with: its set-editing controls are disabled meanwhile. */
 export type LessonBusy = 'items' | 'regenerate';

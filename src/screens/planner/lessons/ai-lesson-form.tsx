@@ -1,16 +1,16 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { View, type ScrollViewInstance } from 'react-native';
 
+import { errorText } from '@/api';
 import type { LessonNewFormModel } from '@/api/types';
 import { META_LIMITS } from '@/api/types/limits';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Checkbox, DateTimeField, Notice, Screen, Select, Text, TextArea, TextField, type SelectOption } from '@/ui';
 
-import { useDateTimeLabels } from '../shared/date-time-labels';
-import { errorText } from '../shared/error-text';
-import { RetryWaitLine, useRetryWait } from '../shared/use-retry-wait';
+import { useDateTimeLabels } from '@/components/date-time';
 import { DurationStepper } from './duration-stepper';
 import { buildAiLessonInput, checkedMemberIds, currentSpeeds, toggleId } from './new-lesson-logic';
 import { TopicsField } from './topics-field';

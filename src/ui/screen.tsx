@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { makeStyles, useTheme } from '@/theme';
 
 import { PageGlow } from './page-glow';
+import { useWindowContentTop } from './window-insets';
 
 export type ScreenProps = {
   children?: ReactNode;
@@ -66,6 +67,7 @@ export function Screen({
   const theme = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  const contentTop = useWindowContentTop();
   const bottom = bottomInset && !footer ? insets.bottom : 0;
   const column: ViewStyle = { width: '100%', maxWidth, alignSelf: 'center' };
   const padding: ViewStyle | null = padded
@@ -122,7 +124,14 @@ export function Screen({
       {keyboardAvoiding ? (
         // `padding` is measured against the real overlap, so it is also right on Android, where an
         // edge-to-edge window no longer resizes for the keyboard. The browser handles it on web.
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
+        // The offset is what sits between the top of the window and this screen's content box (the offline
+        // strip): the view measures itself against its parent and would otherwise leave that much of the
+        // screen behind the keyboard.
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'web' ? undefined : 'padding'}
+          keyboardVerticalOffset={contentTop}
+        >
           {body}
         </KeyboardAvoidingView>
       ) : (

@@ -40,6 +40,9 @@ export function getPendingWrites(): PendingWritesQueue<PendingWriteContext> {
     isRetryable: isNetworkError,
   });
   registerStudentNoteWrite(queue);
+  // Loaded as soon as the queue exists, on every start path: a draft typed offline must be visible (with
+  // its "will be saved" status) after a cold start without a connection, not only once a flush runs.
+  void queue.hydrate();
   return queue;
 }
 
@@ -70,12 +73,16 @@ export function saveStudentNote(homeworkNumberId: string, note: string): Promise
 
 // ───────────────────────────── React binding ─────────────────────────────
 
-/** The write waiting for a connection under `kind + id`, or null. Re-renders when the queue changes. */
+/**
+ * The signed-in user's write waiting for a connection under `kind + id`, or null. Re-renders when the
+ * queue changes. A draft left by another account on this device is never shown (nor sent).
+ */
 export function usePendingWrite<P = unknown>(kind: string, id: string): PendingWrite<P> | null {
   const target = getPendingWrites();
   // The version is the snapshot (a stable number); the entry itself is read during render.
   useSyncExternalStore(target.subscribe, target.version, target.version);
-  return target.get<P>(kind, id);
+  const write = target.get<P>(kind, id);
+  return write && write.userId === currentUserId ? write : null;
 }
 
 /** The student's unsent note draft for a number, or null. */
@@ -87,5 +94,5 @@ export function usePendingStudentNote(homeworkNumberId: string): PendingWrite<St
 export function usePendingWritesCount(): number {
   const target = getPendingWrites();
   useSyncExternalStore(target.subscribe, target.version, target.version);
-  return target.list().length;
+  return target.list().filter((write) => write.userId === currentUserId).length;
 }

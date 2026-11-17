@@ -3,17 +3,17 @@ import { useEffect, useRef } from 'react';
 import type { ScrollViewInstance } from 'react-native';
 
 import { hasErrorCode, qk, useApi } from '@/api';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
+import { useRefetchOnFocus } from '@/navigation';
 import type { ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
 import { Screen } from '@/ui';
 
-import { LoadError } from './study/load-error';
 import { NumberCard } from './study/number-card';
 import { NumberSkeleton } from './study/number-skeleton';
 import { RefreshError } from './study/refresh-error';
-import { useRefetchOnFocus } from './study/use-refetch-on-focus';
 import { useRefresh } from './study/use-refresh';
 
 /** Route params of `student.number` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
@@ -76,8 +76,8 @@ export function StudentNumberScreen({ number }: StudentNumberScreenProps) {
           {detail.isError ? <RefreshError error={detail.error} testID="number-refresh-error" style={styles.notice} /> : null}
           <NumberCard detail={data} onNoteFocus={revealNote} />
         </>
-      ) : detail.isError ? (
-        <LoadError error={detail.error} failedAt={detail.errorUpdatedAt} onRetry={refresh} retrying={detail.isFetching} home testID="number-error" />
+      ) : isLoadFailed(detail) ? (
+        <LoadFailure query={detail} home testID="number-error" />
       ) : (
         <NumberSkeleton />
       )}

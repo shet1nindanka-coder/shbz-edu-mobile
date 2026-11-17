@@ -3,24 +3,25 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
-import { HIGHLIGHT_FLASH_MS, hasErrorCode, qk, useApi } from '@/api';
+import { HIGHLIGHT_FLASH_MS, errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { StudentCheckResultDto, StudentHomeworkNumberDto } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { formatDateTime } from '@/domain/dates';
+import { serverClockOffset } from '@/domain/server-clock';
 import { isHomeworkOverdue } from '@/domain/statuses';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, screenTitle } from '@/screens/shell';
+import { useServerNow } from '@/services/clock';
 import { makeStyles, useTheme } from '@/theme';
-import { Card, Chip, Divider, ErrorState, LoadingState, Notice, Screen, Text } from '@/ui';
+import { Card, Chip, Divider, LoadingState, Notice, Screen, Text } from '@/ui';
 
-import { errorText } from './work/error-text';
 import { HomeworkCheckBlock } from './work/homework-check-block';
 import { HomeworkNumberCard } from './work/homework-number-card';
 import { HomeworkPhotosBlock } from './work/homework-photos-block';
-import { UNAVAILABLE_RECHECK_MS, homeworkDetailMeta, homeworkLabel, isHomeworkCompleted, serverClockOffset } from './work/logic';
+import { UNAVAILABLE_RECHECK_MS, homeworkDetailMeta, homeworkLabel, isHomeworkCompleted } from './work/logic';
 import { useHomeworkCheck } from './work/use-homework-check';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
-import { useServerNow } from './work/use-server-now';
 
 /** Route params of `student.homework` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type StudentHomeworkScreenProps = ScreenParams['student.homework'];
@@ -190,17 +191,8 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
         testID="homework-numbers"
       />
     );
-  } else if (detail.isError && !gone) {
-    body = (
-      <ErrorState
-        title={dict.shells.errorTitle}
-        description={errorText(detail.error, m.common.errors.generic)}
-        retryLabel={dict.common.retry}
-        onRetry={() => void refetch()}
-        retrying={detail.isFetching}
-        testID="homework-error"
-      />
-    );
+  } else if (isLoadFailed(detail) && !gone) {
+    body = <LoadFailure query={detail} testID="homework-error" />;
   } else {
     body = <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="homework-loading" />;
   }

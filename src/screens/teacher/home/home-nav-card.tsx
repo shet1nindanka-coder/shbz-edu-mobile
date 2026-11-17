@@ -1,10 +1,10 @@
 import { View } from 'react-native';
 
+import { useCountUp } from '@/components/count-up';
 import { makeStyles } from '@/theme';
 import { Icon, NavCard, Text } from '@/ui';
 
 import { homeCardA11yLabel, type HomeCard } from './home-cards';
-import { useCountUp } from './use-count-up';
 
 export type HomeNavCardProps = {
   card: HomeCard;

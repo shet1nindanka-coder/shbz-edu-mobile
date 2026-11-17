@@ -1,17 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import type { ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { EmptyState, ErrorState, LoadingState, Notice, Screen, Text } from '@/ui';
+import { EmptyState, LoadingState, Notice, Screen, Text } from '@/ui';
 
 import { DraftForm } from './drafts/draft-form';
 import { draftSourceKey, draftSourceOf, type DraftSource } from './drafts/drafts-logic';
-import { errorText } from './shared/error-text';
-import { isWaitingForNetwork } from './shared/query-state';
 
 /** Route params of `planner.draftNew` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type PlannerDraftNewScreenProps = ScreenParams['planner.draftNew'];
@@ -53,14 +52,7 @@ function DraftNew({ source }: { source: DraftSource }) {
     return (
       <Screen testID="planner-draft-new-screen" header={appBar}>
         {form.isError || isWaitingForNetwork(form) ? (
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={form.isError ? errorText(form.error, dict.shells.errorDescription) : m.common.errors.network}
-            retryLabel={dict.common.retry}
-            onRetry={() => void form.refetch()}
-            retrying={form.isFetching}
-            testID="draft-new-error-state"
-          />
+          <LoadFailure query={form} testID="draft-new-error-state" />
         ) : (
           <LoadingState variant="cards" count={3} cardHeight={96} accessibilityLabel={m.common.a11y.loading} testID="draft-new-loading" />
         )}

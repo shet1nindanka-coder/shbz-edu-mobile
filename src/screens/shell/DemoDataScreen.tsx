@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { API_MEMBERS, API_METHODS } from '@/api/client';
-import { CHECK_ERROR_CODES, type CheckErrorCode, type SolutionVerdict } from '@/api/types';
+import { CHECK_ERROR_CODES, LIMITS, type CheckErrorCode, type SolutionVerdict } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import {
@@ -59,10 +59,15 @@ const LATENCY_OPTIONS: SelectOption<string>[] = [
 
 const FORCED_ERRORS: ForcedError[] = ['sessionExpired', 'unauthorized', 'notFound', 'rateLimited', 'serviceUnavailable', 'network'];
 const PLAN_OUTCOMES: ForcedPlanOutcome[] = ['unavailable', 'studentMissing', 'noCandidates', 'homeworkNoCandidates', 'homeworkParams', 'emptyPlan', 'failed'];
+// `verdicts` is read by index of the numbers the check finds (90-addendum-6 §9), and a check finds at most
+// one number per photo. An "all …" preset therefore names its verdict for every possible index; a shorter
+// list would hand the numbers after it back to the Rule V cycle.
+const allVerdicts = (verdict: SolutionVerdict): SolutionVerdict[] =>
+  Array.from({ length: LIMITS.maxPhotosPerAssignment.max }, () => verdict);
 const VERDICT_PRESETS: Record<string, SolutionVerdict[]> = {
-  'verdicts:correct': ['CORRECT'],
-  'verdicts:incorrect': ['INCORRECT'],
-  'verdicts:uncertain': ['UNCERTAIN'],
+  'verdicts:correct': allVerdicts('CORRECT'),
+  'verdicts:incorrect': allVerdicts('INCORRECT'),
+  'verdicts:uncertain': allVerdicts('UNCERTAIN'),
   'verdicts:mixed': ['CORRECT', 'INCORRECT', 'UNCERTAIN'],
 };
 

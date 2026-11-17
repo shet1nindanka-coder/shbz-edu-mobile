@@ -2,15 +2,14 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { useApi } from '@/api';
+import { errorText, useApi } from '@/api';
 import type { DownloadedFile, ReportPeriod } from '@/api/types';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { makeStyles } from '@/theme';
 import { Notice } from '@/ui';
 
-import { errorText } from '../shared/error-text';
-import { RetryWaitLine, useRetryWait } from '../shared/use-retry-wait';
 
 type ExportJob = { key: string; download: () => Promise<DownloadedFile> };
 

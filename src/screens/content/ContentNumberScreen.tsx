@@ -2,11 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { NumberDetail } from '@/api/types';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { MathContent } from '@/components/math';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
@@ -14,9 +15,8 @@ import { Badge, Card, LoadingState, Notice, Screen, Text, TextButton, type Badge
 
 import { LatexEditorBlock } from './browse/latex-editor-block';
 import { clearOpenedFromEditor, peekOpenedFromEditor, requestEditorFocus } from './shared/editor-links';
-import { errorText } from './shared/error-text';
-import { LoadFailure, loadFailureOf } from './shared/load-failure';
 import { hasLatex, numberFillStatus, type NumberFillStatus } from './shared/number-fill-status';
+import { isTopicLeaving } from './shared/topics-flash';
 
 /** Route params of `content.number` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type ContentNumberScreenProps = ScreenParams['content.number'];
@@ -49,7 +49,12 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
   const data = detail.data;
   const failure = loadFailureOf(detail);
 
-  if (!data && isNotFoundError(detail.error)) return <NotFoundScreen />;
+  // Realtime first; a stale number is asked again when the screen is returned to (00 §2.3).
+  useRefetchOnFocus([detail]);
+
+  // The number or its topic is gone: the not-found state, cached copy or not (90-addendum-1 A.3 rule 6).
+  // (A topic deleted from its editor a moment ago is closing its screens: no "not found" flash on the way.)
+  if (!isTopicLeaving(topicId) && isNotFoundError(detail.error)) return <NotFoundScreen />;
 
   const refresh = () => {
     setRefreshing(true);
@@ -158,7 +163,7 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
           )}
         </View>
       ) : failure ? (
-        <LoadFailure error={failure.error} onRetry={() => void detail.refetch()} retrying={detail.isFetching && !detail.isPaused} testID="number-error" />
+        <LoadFailure query={detail} testID="number-error" />
       ) : (
         <LoadingState variant="cards" count={2} accessibilityLabel={m.common.a11y.loading} testID="number-loading" />
       )}

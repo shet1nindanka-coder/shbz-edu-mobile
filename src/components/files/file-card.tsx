@@ -7,6 +7,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { formatFileSize } from '@/domain/files';
 import { useI18n } from '@/i18n';
+import { Hint } from '@/providers/preferences-provider';
 import { SHARE_IS_DOWNLOAD } from '@/services/files/file-actions';
 import { useFileService } from '@/services/files/file-service-context';
 import { makeStyles } from '@/theme';
@@ -96,9 +97,12 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
           </View>
 
           {kind === 'docx' ? (
-            <Text variant="hint" color="textMuted">
-              {m.common.files.docxHint}
-            </Text>
+            // An explanatory line (`.ui-hint` on the site): hidden when hints are switched off.
+            <Hint>
+              <Text variant="hint" color="textMuted">
+                {m.common.files.docxHint}
+              </Text>
+            </Hint>
           ) : null}
 
           {actions.error ? (

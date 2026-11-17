@@ -2,10 +2,10 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { hasErrorCode, useApi } from '@/api';
+import { errorText, hasErrorCode, useApi } from '@/api';
 import type { ManagedTeacher } from '@/api/types';
 import { format, plural, useI18n } from '@/i18n';
-import { errorText, useLatched } from '@/screens/teacher/students';
+import { useLatched } from '@/screens/teacher/students';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, Notice, Select, Text } from '@/ui';
 

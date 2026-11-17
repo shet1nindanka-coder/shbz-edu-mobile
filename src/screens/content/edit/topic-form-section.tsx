@@ -2,12 +2,12 @@ import { View } from 'react-native';
 
 import type { TopicDetail } from '@/api/types';
 import type { ViewerFile } from '@/components/files';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Card, Text, TextArea, TextField } from '@/ui';
 
 import { NumbersField } from '../shared/numbers-field';
-import { RateLimitLine } from '../shared/use-rate-limit';
 
 import { TopicFileField } from './topic-file-field';
 import type { EditNotice, TopicEditForm } from './use-topic-edit-form';
@@ -74,7 +74,7 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
           {t.files}
         </Text>
         {/* One bucket for both cells, so the wait is shown once, above them. */}
-        <RateLimitLine seconds={form.uploadWait.seconds} testID="edit-upload-wait" />
+        <RetryWaitLine seconds={form.uploadWait.seconds} testID="edit-upload-wait" />
         <TopicFileField
           kind="theory"
           topicId={topic.id}

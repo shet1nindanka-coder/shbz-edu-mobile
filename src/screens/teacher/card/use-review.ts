@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { HomeworkNumberStatus, TeacherHomeworkAssignment, TeacherStudentHomeworks } from '@/api/types';
+import { useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { useScreenFocused } from '@/navigation';
 
-import { errorText } from '../students/error-text';
 import { invalidateStudentData } from './invalidate';
 import {
   ACCEPT_UNDO_MS,
@@ -17,7 +17,6 @@ import {
   type StatusChangeEntry,
   type VerdictChange,
 } from './review-logic';
-import { useRetryWait } from './use-retry-wait';
 
 /** The 10-second "AI verdicts accepted — Undo" toast: what to restore and where the batch came from. */
 export type ReviewUndo = { assignmentId: string; label: string; previous: StatusChangeEntry[] };

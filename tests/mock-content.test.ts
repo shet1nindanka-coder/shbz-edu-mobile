@@ -898,7 +898,8 @@ describe("content: deleteTopic", () => {
     assert.equal((await mock.api.content.listTopics()).length, 6);
     await rejects(mock.api.content.getTopic("top_empty"), "topicNotFound", 404);
 
-    const row = mock.store.auditLogs.all().filter((entry) => entry.action === "topic.delete");
+    // Filtered by target: the seeded journal has a `topic.delete` row of its own (an older topic).
+    const row = mock.store.auditLogs.all().filter((entry) => entry.action === "topic.delete" && entry.targetId === "top_empty");
     assert.equal(row.length, 1);
     assert.equal(row[0]!.summary, "Удалена тема, файлов вычищено: 0");
     // Published without a topic id.
@@ -930,7 +931,7 @@ describe("content: deleteTopic", () => {
     assert.equal((stale.details as { summary: { numbersWithWork: number } }).summary.numbersWithWork, 9);
 
     assert.equal(mock.store.topics.has("top_linear"), true);
-    assert.equal(mock.store.auditLogs.all().some((entry) => entry.action === "topic.delete"), false);
+    assert.equal(mock.store.auditLogs.all().some((entry) => entry.action === "topic.delete" && entry.targetId === "top_linear"), false);
     assert.equal((await stream.content()).includes(null), false);
     stream.unsubscribe();
   });
@@ -964,10 +965,20 @@ describe("content: deleteTopic", () => {
     assert.equal(store.numbers.size, 79 - 8);
     assert.deepEqual((await mock.api.content.listTopics()).map((topic) => topic.id), ["top_quadratic", "top_derivative", "top_log", "top_systems", "top_empty", "top_word"]);
 
-    assert.deepEqual(removed.sort(), ["file_linear_homework", "file_linear_theory"]);
-    assert.equal(store.files.has("file_linear_theory"), false);
+    // The device layer hears about every file row that went away: the topic's own two files and the
+    // solution photos of the homework that was deleted with the topic (kept by its checks' snapshots).
+    assert.deepEqual(
+      removed.filter((fileId) => fileId.startsWith("file_linear_")).sort(),
+      ["file_linear_homework", "file_linear_theory"],
+    );
+    const photos = removed.filter((fileId) => !fileId.startsWith("file_linear_"));
+    assert.ok(photos.length > 0);
+    // Files of other topics are not among them.
+    assert.equal(photos.some((fileId) => /^file_(quadratic|derivative|log|systems|word)_/.test(fileId)), false);
+    assert.equal(new Set(removed).size, removed.length);
+    for (const fileId of removed) assert.equal(store.files.has(fileId), false, fileId);
 
-    const rows = store.auditLogs.all().filter((entry) => entry.action === "topic.delete");
+    const rows = store.auditLogs.all().filter((entry) => entry.action === "topic.delete" && entry.targetId === "top_linear");
     assert.equal(rows.length, 1);
     const row = rows[0]!;
     assert.deepEqual(
@@ -989,7 +1000,7 @@ describe("content: deleteTopic", () => {
     const impact = await mock.api.content.getTopicImpact("top_log");
     await mock.api.content.deleteTopic("top_log", impact.summary.numbersWithWork);
     for (const fileId of ["file_log_theory", "file_log_homework", "file_log_answers", answer.id]) assert.equal(mock.store.files.has(fileId), false, fileId);
-    assert.equal(mock.store.auditLogs.all().find((entry) => entry.action === "topic.delete")!.summary, "Удалена тема, файлов вычищено: 4");
+    assert.equal(mock.store.auditLogs.all().find((entry) => entry.action === "topic.delete" && entry.targetId === "top_log")!.summary, "Удалена тема, файлов вычищено: 4");
   });
 
   it("rejects an unknown topic and is developer-only", async () => {

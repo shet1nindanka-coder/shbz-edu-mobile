@@ -1,5 +1,4 @@
-import { format, useI18n } from '@/i18n';
-import { formatWait } from '@/screens/shell';
+import { useWaitText } from '@/components/retry-wait';
 import { Text } from '@/ui';
 
 /** Outcome of a panel call: the server's `{ ok, message }`, or a failed request shown the same way. */
@@ -20,7 +19,7 @@ export type ResultLineProps = {
  * hint then.
  */
 export function ResultLine({ pendingText, result, waitSeconds = 0, testID }: ResultLineProps) {
-  const { m, locale } = useI18n();
+  const waitText = useWaitText();
   if (pendingText) {
     return (
       <Text variant="caption" color="textMuted" accessibilityLiveRegion="polite" testID={testID}>
@@ -29,7 +28,7 @@ export function ResultLine({ pendingText, result, waitSeconds = 0, testID }: Res
     );
   }
   if (!result) return null;
-  const wait = waitSeconds > 0 ? ` ${format(m.common.errors.retryIn, { time: formatWait(waitSeconds, locale, m.common.errors) })}` : '';
+  const wait = waitSeconds > 0 ? ` ${waitText.retryIn(waitSeconds)}` : '';
   return (
     <Text
       variant="captionMedium"

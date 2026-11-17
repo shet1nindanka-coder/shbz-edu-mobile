@@ -30,6 +30,11 @@ export type ButtonProps = {
    * row it takes its content width.
    */
   fullWidth?: boolean;
+  /**
+   * Let a long label take a second line instead of being cut («Разморозить зависшие проверки» in a card
+   * on a narrow phone or with a large OS font). The button grows by the extra line; default is one line.
+   */
+  wrapLabel?: boolean;
   /** Defaults to `label`. */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -110,6 +115,7 @@ export function Button({
   leftIcon,
   rightIcon,
   fullWidth = false,
+  wrapLabel = false,
   accessibilityLabel,
   accessibilityHint,
   testID,
@@ -153,6 +159,7 @@ export function Button({
         isPrimary && !inactive ? theme.shadows.accentGlow : null,
         !isPrimary && inactive ? { opacity: spec.disabledOpacity } : null,
         fullWidth ? styles.fullWidth : null,
+        wrapLabel ? styles.wrapping : null,
         style,
       ]}
       pressedStyle={{
@@ -163,7 +170,12 @@ export function Button({
       {isPrimary && !inactive ? <AccentGradient style={styles.fill} /> : null}
       {loading ? <Spinner tint={textColor} /> : leftIcon ? <Icon name={leftIcon} size={iconSize} tint={textColor} /> : null}
       <View style={styles.labelWrap}>
-        <Text variant={labelVariant(size, spec.strong)} numberOfLines={1} style={{ color: textColor }}>
+        <Text
+          variant={labelVariant(size, spec.strong)}
+          numberOfLines={wrapLabel ? 2 : 1}
+          align={wrapLabel ? 'center' : undefined}
+          style={{ color: textColor }}
+        >
           {label}
         </Text>
       </View>
@@ -189,4 +201,6 @@ const useStyles = makeStyles((t) => ({
     borderRadius: t.radii.md,
   },
   labelWrap: { flexShrink: 1 },
+  // Two lines need air above and below; a one-line label is centred in the fixed height as before.
+  wrapping: { paddingVertical: t.space.xs },
 }));

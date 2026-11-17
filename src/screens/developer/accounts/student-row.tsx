@@ -21,7 +21,8 @@ export type StudentRowProps = {
 export function StudentRow({ student, ownerName, dirty, onPress }: StudentRowProps) {
   const { dict, m } = useI18n();
   const t = dict.students.studentsManager;
-  const owner = ownerName !== null ? format(m.accounts.row.owner, { name: ownerName }) : null;
+  // The site shows an owner picker in every row; the phone row names the teacher («Учитель: {name}»).
+  const owner = ownerName !== null ? format(dict.planner.calls.teacher, { name: ownerName }) : null;
   const orphan = student.teacherId === null;
   const spoken = [student.name, `${t.loginLabel}: ${student.email}`, orphan ? t.noOwner : null, owner, dirty ? t.dirty : null];
 

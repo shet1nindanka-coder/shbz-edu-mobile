@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import type { StudentCheckDto, StudentCheckResultDto } from '@/api/types';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { formatDateTime } from '@/domain/dates';
 import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
@@ -11,7 +12,6 @@ import { Button, Chip, Notice, Text, TextButton } from '@/ui';
 import { CheckResultRow } from './check-result-row';
 import { countVerdicts } from './logic';
 import type { HomeworkCheckState } from './use-homework-check';
-import { RateLimitLine } from './use-rate-limit';
 
 export type HomeworkCheckBlockProps = {
   /** The latest check of the homework; the student sees no history. */
@@ -61,7 +61,7 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
             dismissLabel={m.common.actions.close}
             testID="homework-check-start-error"
           />
-          <RateLimitLine seconds={limit.seconds} testID="homework-check-wait" />
+          <RetryWaitLine seconds={limit.seconds} testID="homework-check-wait" />
         </View>
       ) : null}
 

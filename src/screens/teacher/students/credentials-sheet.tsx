@@ -3,11 +3,10 @@ import { AccessibilityInfo, Platform, Share, View } from 'react-native';
 
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { BottomSheet, Button, Enter, Icon, PressableScale, Text } from '@/ui';
+import { BottomSheet, Button, Enter, Icon, PressableScale, Text, useCopyFeedback } from '@/ui';
 
 import { buildCredentialLines, credentialsMessage, type CredentialLine } from './credentials-message';
 import { SITE_HOST } from './site-host';
-import { useCopyFeedback } from './use-copy-feedback';
 import { useLatched } from './use-latched';
 
 /** What the sheet shows; exists only in memory, between the create call and «Готово». */

@@ -2,20 +2,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { AttachedPhoto, GetHomeworkResponse, PhotoUpload } from '@/api/types';
 import { PhotoGrid, PhotoSourceSheet, type PhotoGridItem } from '@/components/files';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
+import { mergeQueryData } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Badge, Dialog, Notice, ProgressBar, Text } from '@/ui';
 
-import { mergeQueryData } from './cache';
-import { errorText } from './error-text';
 import { applyDeletedPhoto, applyUploadedPhotos, freePhotoSlots } from './logic';
 import { PickProblemNotice, usePhotoSource } from './use-photo-source';
-import { RateLimitLine, useRateLimit } from './use-rate-limit';
 
 /** How long the "photos added" confirmation stays (the site's `SUCCESS_HOLD_MS`). */
 const SUCCESS_HOLD_MS = 900;
@@ -53,7 +52,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
   const [added, setAdded] = useState(false);
   const [deleting, setDeleting] = useState<AttachedPhoto | null>(null);
   // Upload and delete share one per-user bucket (60 / 60 s).
-  const limit = useRateLimit();
+  const limit = useRetryWait();
 
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -132,7 +131,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
     if (index >= photos.length) return;
     navigation.openFiles(
       photos.map((photo) => ({ id: photo.fileId, originalName: photo.originalName, mimeType: photo.mimeType })),
-      { initialIndex: index, title: m.studentWork.photos.viewerTitle },
+      { initialIndex: index, title: dict.student.photos.title },
     );
   };
 
@@ -161,7 +160,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
       {error ? (
         <View style={styles.notice}>
           <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="homework-photos-error" />
-          <RateLimitLine seconds={limit.seconds} testID="homework-photos-wait" />
+          <RetryWaitLine seconds={limit.seconds} testID="homework-photos-wait" />
         </View>
       ) : null}
       {source.problem ? (

@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { isApiError, isRateLimited, useApi } from '@/api';
+import { useCountdown, useWaitText } from '@/components/retry-wait';
 import { validatePasswordChangeInput } from '@/domain/account-validation';
 import { MAX_PASSWORD_LENGTH, passwordProblemText } from '@/domain/password-policy';
-import { format, useI18n } from '@/i18n';
+import { useI18n } from '@/i18n';
 import { Hint, useSession } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Notice, SectionCard, Text, TextField } from '@/ui';
 
-import { formatWait, useCountdown } from '../use-countdown';
 
 type Result = { tone: 'success' | 'error'; text: string } | null;
 
@@ -24,7 +24,8 @@ type Result = { tone: 'success' | 'error'; text: string } | null;
 export function PasswordSection() {
   const styles = useStyles();
   const api = useApi();
-  const { locale, dict, m } = useI18n();
+  const { dict, m } = useI18n();
+  const waitText = useWaitText();
   const t = dict.settings;
   const { applyRotatedToken } = useSession();
   const [currentPassword, setCurrentPassword] = useState('');
@@ -79,7 +80,7 @@ export function PasswordSection() {
             <Notice tone={result.tone} text={result.text} testID="settings-password-notice" />
             {locked ? (
               <Text variant="caption" color="textMuted" style={styles.wait} testID="settings-password-wait">
-                {format(m.common.errors.retryIn, { time: formatWait(waitSeconds, locale, m.common.errors) })}
+                {waitText.retryIn(waitSeconds)}
               </Text>
             ) : null}
           </View>

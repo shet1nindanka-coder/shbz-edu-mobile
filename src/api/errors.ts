@@ -144,3 +144,21 @@ export function isNotFoundError(error: unknown): error is ApiError {
 export function isRateLimited(error: unknown): error is ApiError & { retryAfterSeconds: number } {
   return isApiError(error) && error.status === 429 && typeof error.retryAfterSeconds === "number";
 }
+
+// ───────────────────────────── reading an error on a screen ─────────────────────────────
+
+/**
+ * Text of a failed call for the user: the server's localised message (a network failure carries the
+ * client's localised message), otherwise the screen's own fallback line from the dictionary.
+ */
+export function errorText(error: unknown, fallback: string): string {
+  return isApiError(error) && error.message ? error.message : fallback;
+}
+
+/**
+ * Seconds the server asked to wait before the call is repeated (`429 rateLimited`, `503 serviceUnavailable`,
+ * `503 queueFull` / `reportsBusy`); 0 when the error names none (90-addendum-1 A.3 rules 3 and 4).
+ */
+export function retryAfterOf(error: unknown): number {
+  return isApiError(error) && typeof error.retryAfterSeconds === "number" && error.retryAfterSeconds > 0 ? error.retryAfterSeconds : 0;
+}

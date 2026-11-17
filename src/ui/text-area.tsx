@@ -1,5 +1,6 @@
 import { useState, type ReactNode, type Ref } from 'react';
 import {
+  Platform,
   TextInput,
   View,
   type StyleProp,
@@ -13,6 +14,7 @@ import { makeStyles, useTheme } from '@/theme';
 
 import { FieldShell } from './internal/field-shell';
 import { InputFrame } from './internal/input-frame';
+import { MAX_FONT_SCALE } from './text';
 
 export type TextAreaProps = Omit<TextInputProps, 'style' | 'editable' | 'multiline'> & {
   label?: string;
@@ -47,11 +49,17 @@ export function TextArea({
   onBlur,
   accessibilityLabel,
   value,
+  onContentSizeChange,
   ...inputProps
 }: TextAreaProps) {
   const theme = useTheme();
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
+  // A native multi-line input grows with its text by itself; a browser <textarea> keeps its height and
+  // scrolls. On web the reported content height becomes the height, so both behave the same. The browser
+  // never reports less than the current height, so an emptied field goes back to its natural size (the
+  // stored height is simply not applied while there is no text).
+  const [webHeight, setWebHeight] = useState<number | null>(null);
 
   const input = (
     <TextInput
@@ -62,9 +70,15 @@ export function TextArea({
       selectionColor={theme.colors.accentSolid}
       cursorColor={theme.colors.accentSolid}
       keyboardAppearance={theme.dark ? 'dark' : 'light'}
+      // Same cap as `Text`, so the typed text and the label above it scale together.
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...inputProps}
       value={value}
       multiline
+      onContentSizeChange={(event) => {
+        if (Platform.OS === 'web') setWebHeight(Math.ceil(event.nativeEvent.contentSize.height));
+        onContentSizeChange?.(event);
+      }}
       editable={!disabled}
       textAlignVertical="top"
       onFocus={(event) => {
@@ -75,7 +89,7 @@ export function TextArea({
         setFocused(false);
         onBlur?.(event);
       }}
-      style={[variant === 'note' ? styles.noteInput : styles.input, inputStyle]}
+      style={[variant === 'note' ? styles.noteInput : styles.input, value && webHeight !== null ? { height: webHeight } : null, inputStyle]}
     />
   );
 

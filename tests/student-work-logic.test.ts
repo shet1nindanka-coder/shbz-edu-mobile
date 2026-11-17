@@ -39,10 +39,10 @@ import {
   nextPollDelay,
   recognizedAnswerOf,
   secondsUntil,
-  serverClockOffset,
   shortenRecognizedAnswer,
-  splitHomeworks
+  splitHomeworks,
 } from "@/screens/student/work/logic";
+import { serverClockOffset } from "@/domain/server-clock";
 
 const ru = getDictionary("ru");
 const en = getDictionary("en");

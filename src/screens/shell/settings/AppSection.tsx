@@ -12,7 +12,7 @@ import { useIsOnline } from '@/services/network';
 import { localNotifications, type ReminderPermissionState } from '@/services/notifications';
 import type { ReminderCategory } from '@/services/preferences';
 import { makeStyles } from '@/theme';
-import { Button, Card, Divider, Icon, ListRow, Notice, SectionCard, Switch, Text, TextButton } from '@/ui';
+import { Button, Card, Dialog, Divider, Icon, ListRow, Notice, SectionCard, Switch, Text, TextButton } from '@/ui';
 
 type ReminderRow = { category: ReminderCategory; label: string; hint: string };
 
@@ -23,7 +23,7 @@ type ReminderRow = { category: ReminderCategory; label: string; hint: string };
  */
 export function AppSection() {
   const styles = useStyles();
-  const { locale, m } = useI18n();
+  const { locale, dict, m } = useI18n();
   const t = m.shell.settings;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
@@ -36,6 +36,7 @@ export function AppSection() {
   const [biometricError, setBiometricError] = useState<string | null>(null);
   const [permission, setPermission] = useState<ReminderPermissionState | null>(null);
   const [cacheCleared, setCacheCleared] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -78,7 +79,14 @@ export function AppSection() {
     if (state.status === 'granted') setReminder(category, true);
   };
 
+  // Offline the saved data is the only thing the app can show: clearing it asks first.
+  const requestClearCache = () => {
+    if (online) clearCache();
+    else setClearConfirmOpen(true);
+  };
+
   const clearCache = () => {
+    setClearConfirmOpen(false);
     queryClient.clear();
     try {
       clearFileCache();
@@ -95,7 +103,7 @@ export function AppSection() {
           { category: 'lessonStart', label: t.reminderLesson, hint: t.reminderLessonHint },
         ]
       : user.role === 'TEACHER'
-        ? [{ category: 'parentCalls', label: t.reminderCalls, hint: t.reminderCallsHint }]
+        ? [{ category: 'parentCalls', label: dict.planner.calls.title, hint: t.reminderCallsHint }]
         : [];
 
   const biometricsReady = biometrics?.status === 'available';
@@ -188,7 +196,7 @@ export function AppSection() {
             label={t.clearCache}
             variant="outline"
             size="sm"
-            onPress={clearCache}
+            onPress={requestClearCache}
             style={[styles.control, styles.button]}
             testID="settings-clear-cache"
           />
@@ -197,7 +205,7 @@ export function AppSection() {
         {user.role === 'STUDENT' || IS_MOCK_BUILD ? (
           <Card variant="soft" padded={false}>
             <Text variant="kickerSm" style={styles.listKicker}>
-              {t.moreKicker}
+              {dict.nav.sections}
             </Text>
             {user.role === 'STUDENT' ? (
               <ListRow
@@ -228,6 +236,16 @@ export function AppSection() {
           </>
         ) : null}
       </View>
+      <Dialog
+        visible={clearConfirmOpen}
+        title={t.clearCacheOfflineTitle}
+        description={t.clearCacheOfflineBody}
+        confirmLabel={t.clearCache}
+        cancelLabel={m.common.actions.cancel}
+        onConfirm={clearCache}
+        onCancel={() => setClearConfirmOpen(false)}
+        testID="settings-clear-cache-confirm"
+      />
     </SectionCard>
   );
 }

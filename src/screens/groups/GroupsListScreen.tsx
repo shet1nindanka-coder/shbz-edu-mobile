@@ -3,20 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { GroupListItem } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
-import { useRefetchOnFocus } from '@/screens/calls/shared/use-refetch-on-focus';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { DetailAppBar } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, IconButton, LoadingState, Notice, Screen } from '@/ui';
 
 import { CreateGroupSheet } from './list/create-group-sheet';
 import { GroupCard } from './list/group-card';
-import { errorText } from './shared/error-text';
-import { LoadFailure, isLoadFailed } from './shared/load-failure';
-import { LIST_SCOPE, clearGroupNotice, postGroupNotice, useGroupNotice } from './shared/notice-store';
+import { GROUPS_LIST_NOTICE, groupNoticeChannel, postGroupNotice, useGroupNotice } from './shared/notice-store';
 
 /**
  * `groups.list` (docs/spec/06-teacher-groups-calls-stats.md §1.1): the teacher's groups under «ещё».
@@ -30,7 +28,7 @@ export function GroupsListScreen() {
   const navigation = useAppNavigation();
   const { dict, m } = useI18n();
   const t = dict.planner.groups.list;
-  const [notice, dismissNotice] = useGroupNotice(LIST_SCOPE);
+  const [notice, dismissNotice] = useGroupNotice(GROUPS_LIST_NOTICE);
   const [createOpen, setCreateOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -47,10 +45,8 @@ export function GroupsListScreen() {
   };
 
   const open = (group: GroupListItem) => {
-    // Notices are one-shot, like the site's redirect parameters: leaving the list drops «Группа удалена»,
-    // and a group opened from its card no longer says «Группа создана».
+    // Notices are one-shot, like the site's redirect parameters: leaving the list drops «Группа удалена».
     dismissNotice();
-    clearGroupNotice(group.id);
     navigation.push({ screen: 'groups.detail', groupId: group.id });
   };
   const compose = (group: GroupListItem) => navigation.open({ screen: 'planner.lessonNew', groupId: group.id });
@@ -139,7 +135,7 @@ export function GroupsListScreen() {
             setCreateOpen(false);
             dismissNotice();
             // The site redirects to the new group with «Группа создана. Добавьте в неё учеников.»
-            postGroupNotice(group.id, 'created');
+            postGroupNotice(groupNoticeChannel(group.id), 'created');
             navigation.push({ screen: 'groups.detail', groupId: group.id });
           }}
         />

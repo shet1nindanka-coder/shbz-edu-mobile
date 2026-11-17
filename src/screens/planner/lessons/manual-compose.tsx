@@ -3,18 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { ComposeBoardTopic } from '@/api/types';
 import { META_LIMITS } from '@/api/types/limits';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Chip, DateTimeField, EmptyState, Notice, Screen, Select, Spinner, Text, TextButton } from '@/ui';
 
-import { useDateTimeLabels } from '../shared/date-time-labels';
-import { errorText } from '../shared/error-text';
-import { RetryWaitLine, useRetryWait } from '../shared/use-retry-wait';
+import { useDateTimeLabels } from '@/components/date-time';
 import { DurationStepper } from './duration-stepper';
 import { buildManualLessonInput, composeStatement, toggleId, type ComposeNumber } from './new-lesson-logic';
 import { NumberSelectCard } from './number-select-card';
@@ -158,6 +157,10 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
               style={styles.footerDate}
             />
           </View>
+          {/* The compact trigger has no helper line of its own; the other start pickers name the zone too. */}
+          <Text variant="caption" color="textMuted" align="right" testID="lesson-compose-time-zone">
+            {m.common.dateTime.moscowTime}
+          </Text>
           <View style={styles.footerRow}>
             <Chip size="row" tone={selectedIds.length > 0 ? 'green' : 'muted'} label={format(t.selected, { n: selectedIds.length })} />
             <Button

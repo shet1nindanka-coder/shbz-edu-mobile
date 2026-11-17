@@ -13,7 +13,6 @@ import type { RealtimeConnectionState, RealtimeEvent } from "../src/api/types";
 import { META_LIMITS } from "../src/api/types";
 import { DAY_MS, HOUR_MS, MINUTE_MS } from "../src/domain/moscow-time";
 import { DEMO_PERSONAS, createMockApiClient } from "../src/mock";
-import { NOT_IMPLEMENTED_MESSAGE, notImplemented, notImplementedSync } from "../src/mock/members/not-implemented";
 import { latencyFor } from "../src/mock/rules";
 import { TEST_T0, createTestMock } from "../src/mock/testing";
 
@@ -54,16 +53,6 @@ describe("MockApiClient: composition", () => {
     }
     assert.equal(total, API_METHOD_COUNT);
     assert.equal(total, 112);
-  });
-
-  it("marks a method that is not implemented yet with internalError", async () => {
-    // Tested on the helper itself, so the test stays valid while the other members get implemented.
-    await assert.rejects(notImplemented("content.getTopic"), (error: unknown) => {
-      assert.ok(error instanceof ApiError);
-      assert.deepEqual([error.code, error.status, error.message, error.details], ["internalError", 500, NOT_IMPLEMENTED_MESSAGE, { method: "content.getTopic" }]);
-      return true;
-    });
-    assert.throws(() => notImplementedSync("planner.getHandoutUrl"), ApiError);
   });
 
   it("never resolves synchronously and applies the deterministic latency", async () => {

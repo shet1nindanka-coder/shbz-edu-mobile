@@ -2,18 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { BackHandler, View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import type { ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { ErrorState, LoadingState, Notice, Screen, Segmented } from '@/ui';
+import { LoadingState, Notice, Screen, Segmented } from '@/ui';
 
 import { AiLessonForm } from './lessons/ai-lesson-form';
 import { ManualCompose } from './lessons/manual-compose';
 import { TargetChooser, type LessonTarget } from './lessons/target-chooser';
-import { errorText } from './shared/error-text';
-import { isWaitingForNetwork } from './shared/query-state';
 
 /** Route params of `planner.lessonNew` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type PlannerLessonNewScreenProps = ScreenParams['planner.lessonNew'];
@@ -93,14 +92,7 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
     return (
       <Screen testID="planner-lesson-new-screen" header={appBar}>
         {form.isError || isWaitingForNetwork(form) ? (
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={form.isError ? errorText(form.error, dict.shells.errorDescription) : m.common.errors.network}
-            retryLabel={dict.common.retry}
-            onRetry={() => void form.refetch()}
-            retrying={form.isFetching}
-            testID="lesson-new-error-state"
-          />
+          <LoadFailure query={form} testID="lesson-new-error-state" />
         ) : (
           <LoadingState variant="cards" count={3} cardHeight={96} accessibilityLabel={m.common.a11y.loading} testID="lesson-new-loading" />
         )}

@@ -83,17 +83,6 @@ export function describeDeadline(item: DeadlineItem, copy: DeadlineCardCopy, loc
   };
 }
 
-/**
- * "Now" corrected by the server clock (09 §6.2 rule 6): the response carried `serverNow` when it was
- * received (`receivedAt`, the query's `dataUpdatedAt`), so the device clock's error is their difference.
- * Falls back to the device clock when either value is missing.
- */
-export function correctedNow(serverNow: string | null | undefined, receivedAt: number, deviceNow: number): number {
-  const server = serverNow ? new Date(serverNow).getTime() : Number.NaN;
-  if (Number.isNaN(server) || !(receivedAt > 0)) return deviceNow;
-  return deviceNow + (server - receivedAt);
-}
-
 // ───────────────────────────── calendar ─────────────────────────────
 
 /** A calendar month; `month` is 1–12. */

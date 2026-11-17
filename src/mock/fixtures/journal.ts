@@ -175,16 +175,13 @@ export function addJournal(b: FixtureBuilder): void {
   // ───────────────────────────── DATA — 20 rows ─────────────────────────────
   // `action` is the site's action name (07 §4.6: `student.create`, `lesson.schedule`, …) — the journal
   // labels it; the template of the text is `text.key` (`student.created`, `lesson.scheduled`, …).
-  // One row still carries the template key as its action — `topic.deleted` (the site writes `topic.delete`):
-  // tests/mock-content.test.ts counts every `topic.delete` row of the store, so renaming it has to go
-  // together with that test.
   // Three old rows written before `meta.i18n` existed: only the Russian summary.
   b.audit({ createdAt: b.at(-14, 10, 5), category: "DATA", action: "student.create", ...ANNA, targetType: "User", targetLabel: "Тестовый Ученик", summary: "Создан ученик Тестовый Ученик" });
   b.audit({ createdAt: b.at(-14, 11, 20), category: "DATA", action: "topic.create", ...DEV, targetType: "Topic", targetLabel: "Пробная тема", summary: "Создана тема «Пробная тема», номеров: 4" });
   b.audit({ createdAt: b.at(-14, 11, 45), category: "DATA", action: "developer.settings_saved", ...DEV, summary: "Настройки сохранены и применены — подействуют в течение 15 секунд." });
 
   b.audit({ createdAt: b.at(-13, 12), category: "DATA", action: "student.delete", ...ANNA, targetType: "User", targetLabel: "Тестовый Ученик", text: { key: "student.deleted", params: { name: "Тестовый Ученик" } } });
-  b.audit({ createdAt: b.at(-13, 12, 30), category: "DATA", action: "topic.deleted", ...DEV, targetType: "Topic", targetLabel: "Пробная тема", text: { key: "topic.deleted", params: { count: 2 } } });
+  b.audit({ createdAt: b.at(-13, 12, 30), category: "DATA", action: "topic.delete", ...DEV, targetType: "Topic", targetLabel: "Пробная тема", text: { key: "topic.deleted", params: { count: 2 } } });
   b.audit({ createdAt: b.at(-12, 10, 40), category: "DATA", action: "student.owner_change", ...DEV, text: { key: "account.owner_changed", params: { count: 1 } } });
   b.audit({ createdAt: b.at(-10, 12, 1), category: "DATA", action: "lesson.schedule", ...ANNA, targetType: "Lesson", targetId: "les_g3", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.scheduled", params: { startsAt: b.at(-8, 17) } } });
   b.audit({ createdAt: b.at(-8, 18, 1), category: "DATA", action: "lesson.auto_results", ...AUTO_FINISH, targetType: "Lesson", targetId: "les_g3", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.auto_results", params: { notSolved: 1, skipped: 9, attendance: 0 } }, meta: { notSolved: 1, skipped: 9, attendance: 0 } });

@@ -1,22 +1,23 @@
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useRef, useState } from 'react';
+import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { TopicListItem } from '@/api/types';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { tabsForRole, useAppNavigation } from '@/navigation';
+import { tabsForRole, useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { useCurrentUser } from '@/providers';
 import { DetailAppBar, ShellAppBar, screenTitle } from '@/screens/shell';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, Screen, Text } from '@/ui';
 
 import { CreateTopicSheet } from './browse/create-topic-sheet';
 import { ReorderSheet } from './browse/reorder-sheet';
 import { TopicCard } from './browse/topic-card';
+import { useListScrollMemory } from './browse/use-list-scroll-memory';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
-import { errorText } from './shared/error-text';
-import { LoadFailure, loadFailureOf } from './shared/load-failure';
 import { pinnedColumn } from './shared/pinned-column';
 import { useTopicsFlash } from './shared/topics-flash';
 
@@ -29,6 +30,7 @@ type ListNotice = { tone: 'success' | 'error'; text: string };
  */
 export function ContentTopicsScreen() {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.topics.list;
@@ -39,16 +41,11 @@ export function ContentTopicsScreen() {
   const isTabRoot = tabsForRole(user.role).some((tab) => tab.section === 'content.topics');
   const title = screenTitle('content.topics', m.shell.tabs);
 
-  const [ownNotice, setOwnNotice] = useState<ListNotice | null>(null);
-  // A topic deleted from its own screen leaves a message for the list (the site's `?deleted=1`).
-  const { flash, clear: clearFlash } = useTopicsFlash();
-  const notice: ListNotice | null =
-    ownNotice ?? (flash ? { tone: 'success', text: flash === 'deleted' ? t.notices.deleted : t.notices.created } : null);
-  const setNotice = (next: ListNotice | null) => {
-    // One banner at a time: a new message replaces a pending one.
-    clearFlash();
-    setOwnNotice(next);
-  };
+  // One banner at a time: a new message replaces the one on screen.
+  const [notice, setNotice] = useState<ListNotice | null>(null);
+  // A topic deleted from its own screen leaves a message for the list (the site's `?deleted=1`). The list
+  // takes it into its own state: it is shown once, to the account that deleted the topic.
+  useTopicsFlash((flash) => setNotice({ tone: 'success', text: flash === 'deleted' ? t.notices.deleted : t.notices.created }));
   const [createOpen, setCreateOpen] = useState(false);
   const [reorderOpen, setReorderOpen] = useState(false);
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
@@ -57,6 +54,13 @@ export function ContentTopicsScreen() {
   const topics = useQuery({ queryKey: qk('content', 'listTopics'), queryFn: () => api.content.listTopics() });
   const list = topics.data;
   const failure = loadFailureOf(topics);
+  // Realtime `topic-content-changed` comes first; a list that stayed mounted under another screen (the
+  // developer's tab root, the teacher's «ещё» stack) also asks again when it is returned to (00 §2.3).
+  useRefetchOnFocus([topics]);
+
+  // Web only (see the hook): the list keeps its place while the screen is covered by another one.
+  const listRef = useRef<FlashListRef<TopicListItem>>(null);
+  const scrollMemory = useListScrollMemory((offset) => listRef.current?.scrollToOffset({ offset, animated: false }));
 
   const refresh = () => {
     setRefreshing(true);
@@ -126,29 +130,48 @@ export function ContentTopicsScreen() {
       }
       // Both placements sit inside a tab navigator: the tab bar owns the bottom inset.
       bottomInset={false}
-      onRefresh={refresh}
+      // The loaded list scrolls by itself (virtualised); the loading and error states use the screen's scroll.
+      scroll={!list}
+      padded={!list}
+      onRefresh={list ? undefined : refresh}
       refreshing={refreshing}
     >
       {list ? (
-        // A plain column, not a virtualised list: the bank holds a few dozen topics at most and the site
-        // shows them all at once (no pagination).
-        <View style={styles.content} testID="topics-list">
-          {header}
-          {list.length === 0 ? (
-            <EmptyState title={t.empty} testID="topics-empty" />
-          ) : (
-            list.map((topic) => (
-              <TopicCard
-                key={topic.id}
-                topic={topic}
-                onOpen={open}
-                onDelete={isDeveloper ? (item) => setDeleting({ id: item.id, title: item.title }) : undefined}
+        // The whole bank arrives in one response and its size is the server's business: the cards are
+        // virtualised, as on the student's theory list of the same topics.
+        <View style={styles.list} onLayout={scrollMemory.onLayout}>
+          <FlashList<TopicListItem>
+            ref={listRef}
+            {...scrollMemory.listProps}
+            data={list}
+            keyExtractor={(topic) => topic.id}
+            renderItem={({ item }) => (
+              <View style={styles.item}>
+                <TopicCard
+                  topic={item}
+                  onOpen={open}
+                  onDelete={isDeveloper ? (target) => setDeleting({ id: target.id, title: target.title }) : undefined}
+                />
+              </View>
+            )}
+            ListHeaderComponent={header}
+            ListEmptyComponent={<EmptyState title={t.empty} testID="topics-empty" />}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refresh}
+                tintColor={theme.colors.accentSolid}
+                colors={[theme.colors.accentSolid]}
+                progressBackgroundColor={theme.colors.cardBg}
               />
-            ))
-          )}
+            }
+            testID="topics-list"
+          />
         </View>
       ) : failure ? (
-        <LoadFailure error={failure.error} onRetry={() => void topics.refetch()} retrying={topics.isFetching && !topics.isPaused} testID="topics-error" />
+        <LoadFailure query={topics} testID="topics-error" />
       ) : (
         <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="topics-loading" />
       )}
@@ -192,9 +215,11 @@ export function ContentTopicsScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: t.space.lg },
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.pageTop, paddingBottom: t.space.pageBottom },
+  item: { paddingBottom: t.space.lg },
   banners: { ...pinnedColumn, gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingTop: t.space.md },
-  header: { gap: t.space.field },
+  header: { gap: t.space.field, paddingBottom: t.space.lg },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
   action: { flexGrow: 1, flexBasis: 140 },
 }));

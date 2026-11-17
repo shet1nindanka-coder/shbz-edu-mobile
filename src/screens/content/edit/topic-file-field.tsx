@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { StoredFileRef, TopicDetail } from '@/api/types';
 import { FileCard, type ViewerFile } from '@/components/files';
 import { useI18n } from '@/i18n';
@@ -11,7 +11,6 @@ import { Button, Dialog, Notice, Text, TextButton } from '@/ui';
 
 import { UploadSlotField } from '../browse/upload-slot-field';
 import type { UploadSlot } from '../browse/use-upload-slot';
-import { errorText } from '../shared/error-text';
 
 import type { EditNotice } from './use-topic-edit-form';
 

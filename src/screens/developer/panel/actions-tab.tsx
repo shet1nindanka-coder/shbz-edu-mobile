@@ -2,13 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { PanelAction } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Card, Dialog, Text } from '@/ui';
 
-import { errorText } from './error-text';
 import { PANEL_ACTION_ROWS, type ActionConfirm, type PanelActionRow } from './logic';
 import { ResultLine, type PanelResult } from './result-line';
 import { useRetryLock } from './use-retry-lock';
@@ -81,6 +80,9 @@ function ActionRow({ row, onSettled }: { row: PanelActionRow; onSettled: (action
         // The other three start on tap, as on the site.
         onPress={confirm ? () => setConfirming(true) : start}
         fullWidth
+        // The names are sentences («Разморозить зависшие проверки»): on a narrow phone or with a large OS
+        // font they take a second line instead of ending in «…».
+        wrapLabel
         testID={`panel-action-${row.action}`}
       />
       {run.isPending || result ? (

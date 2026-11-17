@@ -3,19 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { HomeworkSummaryDto } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
+import { serverClockOffset } from '@/domain/server-clock';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
+import { useServerNow } from '@/services/clock';
 import { makeStyles, useTheme } from '@/theme';
-import { EmptyState, ErrorState, Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Text } from '@/ui';
+import { EmptyState, Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Text } from '@/ui';
 
-import { errorText } from './work/error-text';
 import { HomeworkCard } from './work/homework-card';
-import { buildHomeworkRows, serverClockOffset, type HomeworkListRow } from './work/logic';
+import { buildHomeworkRows, type HomeworkListRow } from './work/logic';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
-import { useServerNow } from './work/use-server-now';
 
 /**
  * `student.homeworks` (docs/spec/03-student-homework-lesson.md §1 H1): every homework issued to the
@@ -152,15 +153,8 @@ export function StudentHomeworksScreen() {
             <Notice tone="warning" text={t.migrationNotice} testID="homeworks-unavailable" />
           )}
         </View>
-      ) : homeworks.isError ? (
-        <ErrorState
-          title={dict.shells.errorTitle}
-          description={errorText(homeworks.error, m.common.errors.generic)}
-          retryLabel={dict.common.retry}
-          onRetry={() => void refetch()}
-          retrying={homeworks.isFetching}
-          testID="homeworks-error"
-        />
+      ) : isLoadFailed(homeworks) ? (
+        <LoadFailure query={homeworks} testID="homeworks-error" />
       ) : (
         <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="homeworks-loading" />
       )}

@@ -1,13 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { DownloadedFile, ReportPeriod } from '@/api/types';
+import { useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 
-import { errorText } from '../students/error-text';
-import { useRetryWait } from './use-retry-wait';
 
 export type StudentReport = {
   /** The period whose report is being built; the blocking progress sheet is shown meanwhile. */

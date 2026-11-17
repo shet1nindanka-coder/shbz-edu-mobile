@@ -1,9 +1,9 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 
+import { errorText } from '@/api';
 import { useI18n } from '@/i18n';
 import { Notice } from '@/ui';
 
-import { errorText } from './error-text';
 
 export type RefreshErrorProps = {
   error: unknown;

@@ -3,11 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { IssueHomeworkRequest } from '@/api/types';
+import { useDateTimeLabels } from '@/components/date-time';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
+import { NumberSelectCard } from '@/components/number-select-card';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import {
@@ -16,7 +20,6 @@ import {
   Chip,
   DateTimeField,
   EmptyState,
-  ErrorState,
   LoadingState,
   Notice,
   Select,
@@ -25,10 +28,7 @@ import {
   TextField,
 } from '@/ui';
 
-import { useRefetchOnFocus } from '../home/use-refetch-on-focus';
-import { errorText, loadFailureOf } from '../students/error-text';
 import { useNoticeScroll } from '../students/use-notice-scroll';
-import { RateLimitLine } from '../students/rate-limit-line';
 import {
   ASSIGN_TITLE_MAX,
   buildIssueRequest,
@@ -39,11 +39,8 @@ import {
   withConditions,
   type AssignNumber,
 } from './assign-logic';
-import { AssignNumberCard } from './assign-number-card';
 import { CardScreen, type CardChrome } from './card-screen';
 import { invalidateStudentData } from './invalidate';
-import { useDateTimeLabels } from './use-date-time-labels';
-import { useRetryWait } from './use-retry-wait';
 import { useStudentGone } from './use-student-gone';
 
 export type AssignTabProps = { studentId: string; chrome: CardChrome };
@@ -156,7 +153,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
       {notice ? (
         <View style={styles.noticeBlock}>
           <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="assign-notice" />
-          {notice.tone === 'error' ? <RateLimitLine seconds={wait.seconds} testID="assign-wait" /> : null}
+          {notice.tone === 'error' ? <RetryWaitLine seconds={wait.seconds} testID="assign-wait" /> : null}
         </View>
       ) : null}
       {board.isError && data ? <Notice tone="error" text={errorText(board.error, m.common.errors.generic)} testID="assign-refresh-error" /> : null}
@@ -184,7 +181,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
           </View>
           <Hint>
             <Text variant="caption" color="textMuted">
-              {`${m.teacher.assign.steps} ${m.common.dateTime.moscowTime}.`}
+              {m.teacher.assign.steps}
             </Text>
           </Hint>
           {needsConditions && conditions.isError ? (
@@ -218,21 +215,14 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
       <EmptyState title={t.noTopics} testID="assign-no-topics" />
     )
   ) : boardFailure ? (
-    <ErrorState
-      title={dict.shells.errorTitle}
-      description={errorText(boardFailure.error, dict.shells.errorDescription)}
-      retryLabel={dict.common.retry}
-      onRetry={() => void board.refetch()}
-      retrying={board.isFetching}
-      testID="assign-error"
-    />
+    <LoadFailure query={board} testID="assign-error" />
   ) : (
     <LoadingState variant="cards" count={4} cardHeight={120} accessibilityLabel={m.common.a11y.loading} testID="assign-loading" />
   );
 
   const footer = topic ? (
     <View style={styles.bar} testID="assign-bar">
-      <View style={styles.barRow}>
+      <View style={[styles.barRow, styles.barRowTop]}>
         <Chip size="row" tone={picked.length > 0 ? 'green' : 'muted'} label={format(t.selected, { n: picked.length })} />
         <DateTimeField
           value={deadline}
@@ -242,6 +232,8 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
           labels={dateTimeLabels}
           locale={locale}
           accessibilityLabel={t.deadlinePlaceholder}
+          // Which zone the deadline is in is not a hint: it stays when hints are off (as on the draft form).
+          helper={m.common.dateTime.moscowTime}
           disabled={issue.isPending}
           testID="assign-deadline"
           style={styles.grow}
@@ -280,12 +272,13 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
         keyExtractor={(number) => number.id}
         renderItem={({ item }) => (
           <View style={styles.item}>
-            <AssignNumberCard
+            <NumberSelectCard
               number={item.number}
               status={item.status}
               selected={picked.includes(item.id)}
               conditionLatex={item.conditionLatex}
-              alreadyAssigned={item.deadlineAt !== null}
+              // The number already sits in a homework with a deadline.
+              footnote={item.deadlineAt !== null ? t.alreadyAssigned : null}
               disabled={issue.isPending}
               onToggle={() => setSelected((current) => toggleSelection(current, item.id))}
               testID={`assign-number-${item.number}`}
@@ -348,6 +341,8 @@ const useStyles = makeStyles((t) => ({
   item: { paddingBottom: t.space.md },
   bar: { gap: t.space.sm },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  // The deadline field carries a helper line: the chip lines up with the field, not with field + helper.
+  barRowTop: { alignItems: 'flex-start' },
   grow: { flex: 1, minWidth: 0 },
   titleButton: { maxWidth: '45%' },
   sheet: { gap: t.space.sm },

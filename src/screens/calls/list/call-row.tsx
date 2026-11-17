@@ -112,10 +112,12 @@ const useStyles = makeStyles((t) => ({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
   name: { flex: 1, minWidth: 0 },
   meta: { gap: t.space.xxs },
-  // One line: «Записать звонок» takes what «История (23)» leaves.
-  actions: { flexDirection: 'row', gap: t.space.sm },
-  record: { flex: 1, minWidth: 0 },
-  history: { flexShrink: 0 },
+  // One line while both labels fit, the spare room shared between the two; on a narrow phone (360 pt,
+  // or 375 pt next to «История (23)») the history button moves to a line of its own instead of cutting
+  // «Записать звонок». Neither button shrinks below its label.
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
+  record: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
+  history: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
   // A developer has the history button alone: it is as wide as its label.
   historyOnly: { alignSelf: 'flex-start' },
 }));

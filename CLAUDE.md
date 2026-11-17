@@ -67,11 +67,16 @@ src/i18n/           `useI18n()` → `{ locale, dict, m }`, provider, locale pref
 src/theme/          Design tokens (light/dark), `useTheme()`, fonts.
 src/ui/             Reusable primitives (Text, Button, Card, Input, Segmented, Sheet, Dialog, Select, Notice,
                     Badge, StatusBadge, ProgressBar, Skeleton, EmptyState, Screen, AppBar…).
-src/components/     Shared composites used by several areas (MathContent, FileCard, NumberCard, …).
+src/components/     Shared composites and hooks used by several areas: math (MathContent), files (FileCard,
+                    FileViewer, PhotoGrid), retry-wait (useRetryWait, RetryWaitLine), load-failure (LoadFailure),
+                    undo-toast, date-time, action-sheet, lessons (handout), progress-history. A helper that two
+                    areas need goes here (or to src/domain / src/services), never into one area's folder.
 src/services/       Device services: session (secure storage), preferences, biometrics, notifications,
-                    files, network/offline, realtime. Each hides platform differences.
+                    files, photos (camera / gallery / document pickers), network/offline, realtime, query
+                    (QueryClient offline rules, pending writes, mergeQueryData), clock, keep-awake. Each hides
+                    platform differences.
 src/navigation/     Screen registry (`ScreenId`), `NavTarget` → route mapping, per-role tab config,
-                    `useAppNavigation()` / `useNavTarget()`.
+                    `useAppNavigation()` / `useNavTarget()`, `useScreenFocused()`, `useRefetchOnFocus()`.
 src/providers/      Composition root (`AppProviders`): `useSession()`, `useCurrentUser()`, `usePreferences()`,
                     `<Hint>`, pending-writes queue (offline note saving), demo backend access.
 src/screens/<area>/ Screen components. Areas: shell, student, teacher, planner, groups, calls, stats,
@@ -126,7 +131,11 @@ Rules:
 - **Math** — conditions and answers are rendered only through `MathContent` (KaTeX, same output as the site).
 - **Web quirk** — inactive tab scenes stay in the DOM on web (inert); Playwright selectors in screenshot
   scripts need `:not([inert] *)`.
-- **Files** — a response never contains a URL; use `FileService` with a `fileId` / `StoredFileRef`.
+- **Files** — a response never contains a URL; use `FileService` with a `fileId` / `StoredFileRef`. Route
+  params are untrusted (every route is a deep link): the file viewer takes file references from its URL and
+  gets a downloaded document's `localUri` only in memory, through `openFiles`.
+- **Overlays** — a `Modal` is a separate native window: it renders `<OverlayCoverSlot />` (the biometric lock
+  cover) and reads `useWindowInsets()`. `BottomSheet` and `FileViewerModal` already do; prefer them.
 - **Lists** — long lists use FlashList; screens respect safe areas via the `Screen` primitive.
 - **Accessibility** — touch targets ≥ 44 pt, `accessibilityRole` / `accessibilityLabel` on controls.
 

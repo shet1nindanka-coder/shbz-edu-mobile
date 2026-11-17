@@ -3,13 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Avatar, ErrorState, Icon, ListRow, LoadingState, Notice, Text, TextField } from '@/ui';
+import { Avatar, Icon, ListRow, LoadingState, Notice, Text, TextField } from '@/ui';
 
-import { errorText } from '../shared/error-text';
-import { isWaitingForNetwork } from '../shared/query-state';
 import { filterByName } from './new-lesson-logic';
 
 export type LessonTarget = { groupId: string } | { studentId: string };
@@ -73,14 +72,7 @@ export function TargetChooser({ onPick }: TargetChooserProps) {
   if (!data) {
     return targets.isError || isWaitingForNetwork(targets) ? (
       <View style={styles.state}>
-        <ErrorState
-          title={dict.shells.errorTitle}
-          description={targets.isError ? errorText(targets.error, dict.shells.errorDescription) : m.common.errors.network}
-          retryLabel={dict.common.retry}
-          onRetry={() => void targets.refetch()}
-          retrying={targets.isFetching}
-          testID="lesson-targets-error"
-        />
+        <LoadFailure query={targets} testID="lesson-targets-error" />
       </View>
     ) : (
       <View style={styles.state}>

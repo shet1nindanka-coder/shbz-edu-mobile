@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { isNotFoundError, qk, useApi } from '@/api';
+import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { StoredFileRef, TopicNumber } from '@/api/types';
 import { FileCard, type ViewerFile } from '@/components/files';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
@@ -16,9 +17,7 @@ import { EmptyState, IconButton, LoadingState, Notice, Screen, Segmented, Text }
 import { TopicNumberCard } from './browse/topic-number-card';
 import { useListScrollMemory } from './browse/use-list-scroll-memory';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
-import { errorText } from './shared/error-text';
-import { LoadFailure, loadFailureOf } from './shared/load-failure';
-import { postTopicsFlash } from './shared/topics-flash';
+import { isTopicLeaving, postTopicDeleted } from './shared/topics-flash';
 
 /** Route params of `content.topic` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type ContentTopicScreenProps = ScreenParams['content.topic'];
@@ -49,6 +48,9 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   const detail = useQuery({ queryKey: qk('content', 'getTopic', topicId), queryFn: () => api.content.getTopic(topicId) });
   const data = detail.data;
   const failure = loadFailureOf(detail);
+  // The screen stays mounted under the editor and the number screen: realtime first, and a stale topic is
+  // asked again when the screen is returned to (00 §2.3).
+  useRefetchOnFocus([detail]);
 
   // Web only (see the hook): the list keeps its place while the screen is covered by another one.
   const listRef = useRef<FlashListRef<TopicNumber>>(null);
@@ -67,8 +69,11 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
     void detail.refetch().finally(() => setRefreshing(false));
   };
 
-  // The topic was deleted (by this developer a moment ago, or by another one): nothing to show.
-  if (!data && !deleted && isNotFoundError(detail.error)) return <NotFoundScreen />;
+  // The topic is gone (deleted by another developer, or from the editor above this screen): a 404 is the
+  // not-found state whether or not a copy is cached (90-addendum-1 A.3 rule 6) — files, numbers and answers
+  // of a deleted topic must not stay on screen. Deleted from this very screen or from its editor a moment
+  // ago, it is already on its way out.
+  if (!deleted && !isTopicLeaving(topicId) && isNotFoundError(detail.error)) return <NotFoundScreen />;
 
   const openFile = (title: string) => (file: ViewerFile) => navigation.openFiles([file], { title });
   const fileOf = (file: StoredFileRef | null): ViewerFile | null => file;
@@ -76,7 +81,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   const topic = data?.topic;
   const header = topic ? (
     <View style={styles.header}>
-      {detail.isError && !deleted ? (
+      {detail.isError && !deleted && !isTopicLeaving(topicId) ? (
         <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="topic-refresh-error" />
       ) : null}
 
@@ -201,7 +206,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
           />
         </View>
       ) : failure ? (
-        <LoadFailure error={failure.error} onRetry={() => void detail.refetch()} retrying={detail.isFetching && !detail.isPaused} testID="topic-error" />
+        <LoadFailure query={detail} testID="topic-error" />
       ) : (
         <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="topic-loading" />
       )}
@@ -214,7 +219,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
             setDeleteOpen(false);
             setDeleted(true);
             // Back to the list, as the site's redirect does; the list shows «Тема успешно удалена».
-            postTopicsFlash('deleted');
+            postTopicDeleted(topicId);
             navigation.open({ screen: 'content.topics' });
           }}
         />

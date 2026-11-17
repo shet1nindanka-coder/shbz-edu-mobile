@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
@@ -93,8 +92,7 @@ export function NotificationsScreen() {
     pendingTarget.current = null;
     // Opening the target also removes this sheet's route; without a target the route simply goes away.
     if (target && role && navigateTo(target, role)) return;
-    if (router.canGoBack()) router.back();
-    else navigation.goHome();
+    navigation.back();
   };
 
   const unreadCount = notifications.data?.unreadCount ?? 0;

@@ -4,9 +4,7 @@ const ru = {
   // The site shows a table row with buttons; a phone row is one touch target that opens a sheet.
   row: {
     teacherActions: "Действия с аккаунтом учителя",
-    studentActions: "Учитель, пароль и удаление аккаунта",
-    // Owner line of a student row: the site shows a picker in every row, the phone shows the name.
-    owner: "Учитель: {name}"
+    studentActions: "Учитель, пароль и удаление аккаунта"
   },
   search: {
     clear: "Очистить поиск"
@@ -20,8 +18,7 @@ const ru = {
 const en: typeof ru = {
   row: {
     teacherActions: "Teacher account actions",
-    studentActions: "Teacher, password and account deletion",
-    owner: "Teacher: {name}"
+    studentActions: "Teacher, password and account deletion"
   },
   search: {
     clear: "Clear search"

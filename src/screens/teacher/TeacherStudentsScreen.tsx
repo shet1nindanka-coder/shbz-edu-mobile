@@ -3,19 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { TeacherStudentListItem } from '@/api/types';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ErrorState, LoadingState, Notice, PageHeader, Screen, Text } from '@/ui';
+import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen, Text } from '@/ui';
 
-import { useRefetchOnFocus } from './home/use-refetch-on-focus';
 import { CreateStudentSheet } from './students/create-student-sheet';
 import { CredentialsSheet, type CreatedCredentials } from './students/credentials-sheet';
 import { DeleteStudentDialog } from './students/delete-student-dialog';
-import { errorText, loadFailureOf } from './students/error-text';
 import { useStudentsListNotice } from './students/list-notice';
 import { ResetPasswordSheet } from './students/reset-password-sheet';
 import { StudentActionsSheet, type StudentAction } from './students/student-actions-sheet';
@@ -155,14 +154,7 @@ export function TeacherStudentsScreen() {
   const body = list ? (
     <EmptyState title={t.empty} testID="students-empty" />
   ) : studentsFailure ? (
-    <ErrorState
-      title={dict.shells.errorTitle}
-      description={errorText(studentsFailure.error, dict.shells.errorDescription)}
-      retryLabel={dict.common.retry}
-      onRetry={() => void students.refetch()}
-      retrying={students.isFetching}
-      testID="students-error"
-    />
+    <LoadFailure query={students} testID="students-error" />
   ) : (
     <LoadingState variant="cards" count={6} cardHeight={70} accessibilityLabel={m.common.a11y.loading} testID="students-loading" />
   );

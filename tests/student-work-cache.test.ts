@@ -8,8 +8,9 @@ import { describe, it } from "node:test";
 
 import { QueryClient } from "@tanstack/query-core";
 
-import { mergeQueryData } from "@/screens/student/work/cache";
-import { decideServerNote, secondsUntil, serverClockOffset } from "@/screens/student/work/logic";
+import { mergeQueryData } from "@/services/query/merge-query-data";
+import { decideServerNote, secondsUntil } from "@/screens/student/work/logic";
+import { serverClockOffset } from "@/domain/server-clock";
 
 type Lesson = { serverNow: string; endsAt: string; closed: number };
 

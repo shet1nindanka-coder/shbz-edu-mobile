@@ -3,25 +3,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { ManagedStudent, ManagedTeacher, OwnerChange } from '@/api/types';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
+import { useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
-import { useRefetchOnFocus } from '@/screens/teacher/home/use-refetch-on-focus';
 import {
   CredentialsSheet,
   DeleteStudentDialog,
-  errorText,
   invalidateStudents,
-  loadFailureOf,
   ResetPasswordSheet,
   useLatched,
   useNoticeScroll,
   type CreatedCredentials,
 } from '@/screens/teacher/students';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ErrorState, LoadingState, Notice, PageHeader, Screen, Segmented, Text } from '@/ui';
+import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen, Segmented, Text } from '@/ui';
 
 import {
   filterAccounts,
@@ -231,8 +230,9 @@ export function DeveloperAccountsScreen() {
         onChange={setTab}
         accessibilityLabel={tabs.tabsAria}
         role="tab"
-        fill
         plain
+        // The labels carry counts: never cut, the bar scrolls if they outgrow the row.
+        scrollable
         testID="accounts-tabs"
       />
       <DirectorySearch tab={tab} value={query} onChange={setQuery} />
@@ -258,14 +258,7 @@ export function DeveloperAccountsScreen() {
       <EmptyState title={manager.notFound} hint={manager.notFoundHint} testID="accounts-no-matches" />
     )
   ) : directoryFailure ? (
-    <ErrorState
-      title={dict.shells.errorTitle}
-      description={errorText(directoryFailure.error, dict.shells.errorDescription)}
-      retryLabel={dict.common.retry}
-      onRetry={() => void directory.refetch()}
-      retrying={directory.isFetching}
-      testID="accounts-error"
-    />
+    <LoadFailure query={directory} testID="accounts-error" />
   ) : (
     <LoadingState variant="cards" count={6} cardHeight={84} accessibilityLabel={m.common.a11y.loading} testID="accounts-loading" />
   );

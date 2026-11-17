@@ -16,10 +16,7 @@ const ru = {
     // A status group has no visible caption on a phone; this is its accessible name.
     statusAria: "Статус номера {n}",
     // The site's review tab hides the statement; on a phone it opens on demand under the number.
-    showCondition: "Условие и ответ",
     hideCondition: "Скрыть условие и ответ",
-    condition: "Условие",
-    answer: "Ответ",
     noCondition: "Условие для этого номера не добавлено.",
     noAnswer: "Ответ для этого номера не добавлен."
   },
@@ -58,10 +55,7 @@ const en: typeof ru = {
   },
   review: {
     statusAria: "Status of problem {n}",
-    showCondition: "Statement and answer",
     hideCondition: "Hide the statement and answer",
-    condition: "Statement",
-    answer: "Answer",
     noCondition: "No statement has been added for this problem.",
     noAnswer: "No answer has been added for this problem."
   },

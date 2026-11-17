@@ -1,16 +1,16 @@
 import { View } from 'react-native';
 
 import type { LessonItemResult, TeacherStudentLesson } from '@/api/types';
+import { HandoutNotice } from '@/components/lessons';
+import type { Handout } from '@/components/lessons';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { formatMsk } from '@/domain/dates';
 import { planErrorText } from '@/domain/plan-error';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { HandoutNotice } from '@/screens/planner/shared/handout-notice';
-import type { Handout } from '@/screens/planner/shared/use-handout';
 import { makeStyles } from '@/theme';
 import { Button, Card, Icon, Notice, PressableScale, Spinner, Text } from '@/ui';
 
-import { RateLimitLine } from '../students/rate-limit-line';
 import { LessonItemRow } from './lesson-item-row';
 import { splitLessonParts, type LessonItem, type LessonPlanState } from './lessons-logic';
 import type { LessonBusy } from './use-student-lessons';
@@ -147,7 +147,7 @@ export function LessonCard({
           {error ? (
             <View style={styles.errorBlock}>
               <Notice tone="error" text={error} onDismiss={onDismissError} dismissLabel={m.common.actions.close} testID={`student-lesson-error-${lesson.id}`} />
-              <RateLimitLine seconds={waitSeconds} />
+              <RetryWaitLine seconds={waitSeconds} />
             </View>
           ) : null}
 

@@ -13,6 +13,7 @@ import {
   selectReminders,
   type ReminderTexts,
 } from '@/services/notifications';
+import type { ReminderCategory } from '@/services/preferences';
 import { useRealtimeBridge } from '@/services/realtime';
 
 import { usePreferences } from './preferences-provider';
@@ -110,8 +111,14 @@ function ReminderSync() {
         ...planLessonReminders(lessonData, now, texts),
         ...planParentCallReminders(callsData, now, texts),
       ];
+      // A category that is wanted but whose query has not answered yet (cold start without a connection,
+      // a failed first load) keeps what is already scheduled: "no data yet" is not "nothing to remind of".
+      const unknown: ReminderCategory[] = [];
+      if (wantHomework && deadlinesData === undefined) unknown.push('homeworkDeadlines');
+      if (wantLesson && lessonData === undefined) unknown.push('lessonStart');
+      if (wantCalls && callsData === undefined) unknown.push('parentCalls');
       await localNotifications.ensureChannel(channelName);
-      if (active) await localNotifications.sync(selectReminders(planned, reminders));
+      if (active) await localNotifications.sync(selectReminders(planned, reminders), unknown);
     })();
     return () => {
       active = false;

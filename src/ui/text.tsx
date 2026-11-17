@@ -51,8 +51,11 @@ function defaultColor(variant: TextVariant): ColorToken {
   return 'label';
 }
 
-// Text may grow with the OS font size, but not without bound: fixed-height controls would clip.
-const MAX_FONT_SCALE = 1.3;
+/**
+ * Text may grow with the OS font size, but not without bound: fixed-height controls would clip. The one
+ * cap of the app — `Text` and every `TextInput` wrapper (typed text and placeholders) use it.
+ */
+export const MAX_FONT_SCALE = 1.3;
 
 /** The app's text primitive: Montserrat, a typography role and a colour token. */
 export function Text({ variant = 'body', color, align, tabular, style, ...rest }: TextProps) {

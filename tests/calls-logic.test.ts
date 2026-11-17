@@ -16,6 +16,7 @@ import {
   callMetaParts,
   earlierHistoryCursor,
   historyButtonLabel,
+  longestWordLength,
   historyEntryTime,
   mergeHistory,
   reminderChip,
@@ -163,3 +164,13 @@ test("historyEntryTime: Moscow wall clock", () => {
   assert.equal(historyEntryTime(entry("c1"), "ru"), "5 ноября в 18:30");
   assert.equal(historyEntryTime(entry("c1"), "en"), "5 November at 18:30");
 });
+
+test("longestWordLength: the word a counter label cannot break, at least 4", () => {
+  // «Просрочено» is one word and must get more room than a label that wraps at its space.
+  assert.equal(longestWordLength("Просрочено"), 10);
+  assert.equal(longestWordLength("Пора позвонить"), 9);
+  assert.equal(longestWordLength("Всего учеников"), 8);
+  assert.equal(longestWordLength("Due"), 4);
+  assert.equal(longestWordLength(""), 4);
+});
+

@@ -2,24 +2,22 @@ import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { View, type ScrollViewInstance } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { DeveloperPanelTab } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { developerPanelTabs } from '@/domain/developer-panel-tabs';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { makeStyles } from '@/theme';
 import { Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Segmented, Text } from '@/ui';
 
 import { ActionsTab } from './panel/actions-tab';
 import { BroadcastTab } from './panel/broadcast-tab';
-import { errorText } from './panel/error-text';
-import { LoadFailure, isLoadFailed } from './panel/load-failure';
 import { panelChips } from './panel/logic';
 import { SettingsSaveBar, SettingsTab } from './panel/settings-tab';
 import { StatusChips } from './panel/status-chips';
 import { StatusTab } from './panel/status-tab';
-import { useRefetchOnFocus } from './panel/use-refetch-on-focus';
 import { useSettingsForm } from './panel/use-settings-form';
 
 /** Route params of `developer.panel` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
@@ -118,7 +116,9 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
           accessibilityLabel={t.tabsAria}
           role="tab"
           plain
-          fill
+          // Four dictionary labels: shown in full on a 360-pt phone and with a large OS font (the bar
+          // scrolls when they cannot fit), never ellipsized.
+          scrollable
           testID="panel-tabs"
         />
 

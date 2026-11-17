@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import type { StudentNumberDetailResponse } from '@/api/types';
 import { MathContent } from '@/components/math';
 import { homeworkStatusShortLabel } from '@/domain/statuses';
-import { useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Card, StatusBadge, Text } from '@/ui';
@@ -34,7 +34,7 @@ export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
         <View style={styles.statusBlock}>
           <View style={styles.titleRow}>
             <Text variant="sectionTitle" accessibilityRole="header" testID="number-card-title">
-              {`№ ${number.number}`}
+              {format(dict.topics.widgets.numberLabel, { number: number.number })}
             </Text>
             <StatusBadge status={number.status} label={homeworkStatusShortLabel(number.status, dict)} />
           </View>

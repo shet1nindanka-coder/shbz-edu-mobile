@@ -2,15 +2,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { GetHomeworkResponse, StudentCheckDto } from '@/api/types';
+import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
+import { mergeQueryData } from '@/services/query';
 
-import { mergeQueryData } from './cache';
-import { errorText } from './error-text';
 import { applyLatestCheck, applyStartedCheck, countVerdicts, isCheckRunning } from './logic';
 import { usePoller } from './use-poller';
-import { useRateLimit, type RateLimitWait } from './use-rate-limit';
 
 export type HomeworkCheckState = {
   /** `PENDING` / `CHECKING` and the status is still being followed. */
@@ -23,7 +22,7 @@ export type HomeworkCheckState = {
   startError: string | null;
   dismissStartError: () => void;
   /** Cool-down after `429 rateLimited` (hourly limit, daily budget) or `503 queueFull`. */
-  limit: RateLimitWait;
+  limit: RetryWait;
 };
 
 /**
@@ -44,7 +43,7 @@ export function useHomeworkCheck(options: {
   const { dict } = useI18n();
   const t = dict.student.check;
   const [startError, setStartError] = useState<string | null>(null);
-  const limit = useRateLimit();
+  const limit = useRetryWait();
 
   const poll = useCallback(async () => {
     const detailKey = qk('studentWork', 'getHomework', assignmentId);

@@ -2,20 +2,18 @@ import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
-import { hasErrorCode, useApi } from '@/api';
+import { errorText, hasErrorCode, useApi } from '@/api';
 import type { AccountCreateInput, CreatedAccount, ManagedTeacher } from '@/api/types';
+import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { generatePasswordFromName } from '@/domain/password-generate';
 import { MAX_PASSWORD_LENGTH } from '@/domain/password-policy';
 import { MAX_LOGIN_LENGTH, MAX_USER_NAME_LENGTH } from '@/domain/text';
 import { useI18n } from '@/i18n';
 import {
-  errorText,
   PasswordFeedback,
   PasswordSuggestion,
-  RateLimitLine,
   secureRandomInt,
   shouldSuggestPassword,
-  useRateLimit,
   type CreatedCredentials,
 } from '@/screens/teacher/students';
 import { makeStyles } from '@/theme';
@@ -63,7 +61,7 @@ export function CreateAccountSheet({ visible, teachers, onClose, onCreated, onTe
   const [loginError, setLoginError] = useState<string | null>(null);
   // `404 teacherNotFound`: shown under the owner picker until another teacher is picked.
   const [teacherError, setTeacherError] = useState<string | null>(null);
-  const limit = useRateLimit();
+  const limit = useRetryWait();
   const loginRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
 
@@ -263,7 +261,7 @@ export function CreateAccountSheet({ visible, teachers, onClose, onCreated, onTe
         {formError ? (
           <View style={styles.error}>
             <Notice tone="error" text={formError} testID="create-account-error" />
-            <RateLimitLine seconds={limit.seconds} testID="create-account-wait" />
+            <RetryWaitLine seconds={limit.seconds} testID="create-account-wait" />
           </View>
         ) : null}
       </View>

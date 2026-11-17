@@ -2,13 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { GroupCandidate, GroupDetail, GroupDetailResponse, GroupMember } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Dialog, EmptyState, Notice, Text } from '@/ui';
 
-import { errorText } from '../shared/error-text';
 import { invalidateGroupMembership } from '../shared/invalidate';
 import { useFlash } from '../shared/use-flash';
 import { AddMemberSheet } from './add-member-sheet';
@@ -115,7 +114,7 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
       ) : null}
 
       <Button
-        label={m.groups.members.add}
+        label={dict.students.list.addStudent}
         accessibilityLabel={t.membersManager.addAria}
         variant="outline"
         leftIcon="userPlus"

@@ -2,6 +2,7 @@ import { View } from 'react-native';
 
 import type { LessonItemDto, LessonItemResult, SolutionVerdict } from '@/api/types';
 import { MathContent } from '@/components/math';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { formatClockTime } from '@/domain/dates';
 import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
@@ -11,7 +12,6 @@ import { Button, Card, Chip, Notice, ProgressBar, Spinner, Text, type ChipTone }
 
 import { isCheckRunning, lessonItemChip } from './logic';
 import { PickProblemNotice, type PickProblem } from './use-photo-source';
-import { RateLimitLine } from './use-rate-limit';
 
 const RESULT_CHIP: Record<LessonItemResult, ChipTone> = { SOLVED: 'green', PARTIAL: 'yellow', NOT_SOLVED: 'red', SKIPPED: 'muted' };
 const VERDICT_CHIP: Record<SolutionVerdict, ChipTone> = { CORRECT: 'green', INCORRECT: 'red', UNCERTAIN: 'muted' };
@@ -124,7 +124,7 @@ export function LessonItemCard({
             dismissLabel={m.common.actions.close}
             testID={`lesson-submit-error-${item.number}`}
           />
-          <RateLimitLine seconds={waitSeconds} />
+          <RetryWaitLine seconds={waitSeconds} />
         </View>
       ) : null}
       {pickProblem ? <PickProblemNotice problem={pickProblem} onDismiss={onDismissPickProblem} /> : null}

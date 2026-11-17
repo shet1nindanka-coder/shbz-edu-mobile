@@ -12,7 +12,6 @@ const ru = {
     historyEmptyAria: "Звонков ещё не было: {name}"
   },
   log: {
-    sheetTitle: "Записать звонок",
     saved: "Звонок записан"
   },
   history: {
@@ -38,7 +37,6 @@ const en: typeof ru = {
     historyEmptyAria: "No calls yet: {name}"
   },
   log: {
-    sheetTitle: "Log a call",
     saved: "Call logged"
   },
   history: {

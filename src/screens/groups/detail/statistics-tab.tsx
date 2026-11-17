@@ -1,15 +1,15 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { GroupMemberRow, GroupStatisticsResponse, ReportPeriod } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { makeStyles, useTheme } from '@/theme';
 import { AccentGradient, Button, Card, Chip, EmptyState, LoadingState, Notice, PressableScale, Text } from '@/ui';
 
 import { RED_ALERT_THRESHOLD, activityLabel, attentionLabels, summaryTiles, type SummaryTile } from '../logic';
-import { errorText } from '../shared/error-text';
-import { LoadFailure, isLoadFailed } from '../shared/load-failure';
 import { CountUp } from './count-up';
 import { ReportExportNotice, studentReportKey, type ReportExport } from './use-report-export';
 
@@ -128,7 +128,7 @@ function MemberRow({ row, leader, divider, report }: { row: GroupMemberRow; lead
   return (
     <View style={[styles.row, divider ? styles.rowDivider : null]} testID={`group-statistics-row-${row.id}`}>
       <View style={styles.nameRow}>
-        <View accessible accessibilityLabel={format(m.groups.statistics.rankAria, { n: row.rank })}>
+        <View accessible accessibilityLabel={format(m.stats.ranking.placeAria, { n: row.rank })}>
           {leader ? (
             <AccentGradient style={styles.rank}>{rank}</AccentGradient>
           ) : (

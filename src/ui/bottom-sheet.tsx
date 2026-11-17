@@ -12,15 +12,16 @@ import {
 } from 'react-native';
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { makeStyles, useTheme } from '@/theme';
 
 import { IconButton } from './icon-button';
-import { absoluteFill } from './internal/layout';
+import { MODAL_ORIENTATIONS, absoluteFill } from './internal/layout';
 import { easing } from './internal/motion';
+import { OverlayCoverSlot, useOverlayCovered } from './overlay-cover';
 import { Text } from './text';
+import { useWindowInsets } from './window-insets';
 
 export type BottomSheetProps = {
   visible: boolean;
@@ -42,7 +43,7 @@ export type BottomSheetProps = {
   footer?: ReactNode;
   /** Share of the window height the sheet may take; default 0.88. */
   maxHeightRatio?: number;
-  /** Called after the exit animation, when the sheet has left the tree. */
+  /** Called one tick after the exit animation, when the sheet has left the tree: the place to open the next sheet or dialog. */
   onClosed?: () => void;
   testID?: string;
   contentStyle?: StyleProp<ViewStyle>;
@@ -75,7 +76,8 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const theme = useTheme();
   const styles = useStyles();
-  const insets = useSafeAreaInsets();
+  // A modal is its own window: the device insets apply, not those of the place the sheet is declared in.
+  const insets = useWindowInsets();
   const reducedMotion = useReducedMotion();
   const window = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
@@ -97,7 +99,10 @@ export function BottomSheet({
     }
     const finish = () => {
       setMounted(false);
-      onClosed?.();
+      // One tick later, so the commit that removes this sheet's modal is over before the owner can ask
+      // for the next one from `onClosed`. On iOS a modal that is asked to appear while another one is
+      // still presented is refused and never shown.
+      if (onClosed) setTimeout(onClosed, 0);
     };
     progress.set(
       withTiming(0, { duration: reducedMotion ? 0 : sheetOut, easing: easing('drawer') }, (finished) => {
@@ -108,8 +113,10 @@ export function BottomSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, mounted, progress, drag, reducedMotion, sheetIn, sheetOut]);
 
+  // Under the lock cover the sheet stays open but nothing may operate it (hardware back included).
+  const covered = useOverlayCovered();
   const requestClose = () => {
-    if (dismissible) onClose();
+    if (dismissible && !covered) onClose();
   };
 
   const pan = usePanGesture({
@@ -157,12 +164,18 @@ export function BottomSheet({
       animationType="none"
       statusBarTranslucent
       navigationBarTranslucent
+      supportedOrientations={[...MODAL_ORIENTATIONS]}
       onRequestClose={requestClose}
     >
       <GestureHandlerRootView style={styles.root}>
+        {/*
+          The keyboard takes the bottom of this box (padding) and the status bar its top, and the sheet may
+          shrink (`flexShrink`), so it always stays inside what is left: the title row keeps its place and
+          the content scrolls. Without the shrink a tall sheet was pushed up past the top of the screen.
+        */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'web' ? undefined : 'padding'}
-          style={[styles.root, wide ? styles.rootWide : styles.rootPhone]}
+          style={[styles.root, wide ? styles.rootWide : styles.rootPhone, { paddingTop: insets.top + (wide ? theme.space.gutter : 0) }]}
         >
           <Animated.View style={[absoluteFill, styles.backdrop, backdropStyle]}>
             <Pressable
@@ -223,6 +236,8 @@ export function BottomSheet({
             {footer ? <View style={[styles.footer, { paddingBottom: bottomPad }]}>{footer}</View> : null}
           </Animated.View>
         </KeyboardAvoidingView>
+        {/* A modal is its own native window: the app-wide cover (biometric lock) is repeated inside it. */}
+        <OverlayCoverSlot />
       </GestureHandlerRootView>
     </Modal>
   );
@@ -234,6 +249,7 @@ const useStyles = makeStyles((t) => ({
   rootWide: { justifyContent: 'center', alignItems: 'center', padding: t.space.gutter },
   backdrop: { backgroundColor: t.colors.overlay },
   sheet: {
+    flexShrink: 1,
     backgroundColor: t.colors.cardBg,
     borderColor: t.colors.cardBorder,
     borderWidth: t.borders.hairline,

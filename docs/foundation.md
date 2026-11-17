@@ -19,6 +19,7 @@ Public API of the shared layers, as reported by the agents that built them. Area
 **`@/api/errors`** (no React):
 - `class ApiError` — `new ApiError({ code, message, status, retryAfterSeconds?, params?, details? })`, `ApiError.fromBody(status, body)`, `ApiError.network(message)`, `.toBody()`.
 - Guards `isApiError`, `isSessionExpired`, `isNetworkError`, `hasErrorCode(e, ...codes)`, `isRoleError`, `isNotFoundError`, `isRateLimited`.
+- Reading an error on a screen: `errorText(error, fallback)` — the server's localised message, else the screen's fallback line; `retryAfterOf(error)` — seconds the server asked to wait (`429` and `503` alike), 0 when it named none. Both are also exported from `@/api`. No area keeps its own copy.
 - Types `AnyApiErrorCode`, `ApiErrorInit`, and re-exports of the code unions.
 
 **`@/api/types`** (no React) — the catalogue of 00 §1:
@@ -81,7 +82,8 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - `limits`: `enforce(scope)`, `check`, `consumeFixed`, `releaseFixed`, `consumeSliding`, `reset`, `consumeBudget`, `releaseBudget`
 - `progress`: `write({source, …, studentId, homeworkNumberId, actor?, references?})`, `ensureRow`, `cleanupEmptyRows`
 - `notify`: `create`, `toItem`, `list`, `markRead`, `markParentCallRemindersRead`
-- `audit.write`, `emit(event)`, `validate`, `cascade.*`, `throwIfAborted(signal)`
+- `audit.write`, `emit(event)`, `validate`, `throwIfAborted(signal)`
+- `cascade.*` — the delete cascades (`deleteStudent`, `deleteTeacher`, `deleteTopic`, `deleteNumber`, `deleteGroup`, `deleteHomework`, `deleteHomeworkCheck`, `deleteLesson`, `deleteParticipant`, `deleteLessonItem`, `deleteLessonSubmission`, `deleteUserSessions`). A cascade that removes file rows reports each removed id to the device layer (`onFileRemoved`), exactly like `files.removeIfUnreferenced` does for one file — a member never has to do it itself.
 - `jobs`: `schedule(kind, refId, delayMs)`, `handle(kind, fn)`, `touch(refId)`, `cancel`, `pending`; timings in `ctx.timings`
 - `files`: `ref`, `storedRef`, `createFromUpload`, `removeIfUnreferenced`, `canRead`, `resolveForRead`, `lookup`
 - `homework`: `issue(input)`, `toError(failure)`, `recomputeDeadlines(studentId, numberIds)`
@@ -89,7 +91,7 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - `documents`: `download(kind, fileName)`, `url(kind, query)`
 - `switches`: `takeNextCheckOutcome()`, `takeNextPlanOutcome()`, `current()`
 
-**`@/mock/members/*`** — `createShell` (implemented); `createStudentStudy`, `createStudentHomeworkLesson`, `createTeacherStudents`, `createDeveloperAccounts`, `createPlanner`, `createGroupsCallsStats`, `createContent`, `createDeveloper` (stubs to replace in place).
+**`@/mock/members/*`** — one file per `ApiClient` member, all implemented: `createShell`, `createStudentStudy`, `createStudentHomeworkLesson`, `createTeacherStudents`, `createDeveloperAccounts`, `createPlanner`, `createGroupsCallsStats`, `createContent`, `createDeveloper`. Every one of the 112 methods answers; there is no "not implemented" path.
 
 **`@/mock/testing`** — `createTestMock(options?)` returns `{ api, clock, storage, ctx, store, signIn(login, password?), signOut, setLocale, setOnline }` on a manual clock with zero latency; `TEST_T0`, `demoPasswordFor`.
 
@@ -99,7 +101,7 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - `shell.logout` without a valid session rejects with `401 sessionExpired` (90-addendum-5 B.6 rule 4) instead of resolving silently.
 - Deferred work is stored as job rows and run lazily at the start of each API call, not by timer callbacks (90-addendum-6 §5 rule 1). A check uses two jobs (`*.begin` at 1 s, `*.finish` at 8 s). The timers of seeded in-flight rows start only when a member calls `ctx.jobs.touch(row.id)` on first read — the core cannot do that itself.
 - Sessions of users that still exist survive both 'Reset demo data' and the automatic 24 h re-seed, so a tester stays signed in. The spec is silent on this.
-- Additions beyond the task list: options `materializeDocument`, `onFileUploaded`, `onFileRemoved`, `reseedAfterMs`, `saveDebounceMs`, `storagePrefix`; `FIXTURES_REVISION` (a stored dataset from other fixtures is re-seeded at start); `controls.listLimiters`, `datasetInfo`, `setAutoReseed`; `DEMO_PERSONAS`; `src/mock/testing.ts`.
+- Additions beyond the task list: options `materializeDocument`, `onFileUploaded`, `onFileRemoved`, `reseedAfterMs`, `saveDebounceMs`, `storagePrefix`; `FIXTURES_REVISION` (a stored dataset from other fixtures is re-seeded at start; bump it with every change of a fixture row); `controls.listLimiters`, `datasetInfo`, `setAutoReseed`; `DEMO_PERSONAS`; `src/mock/testing.ts`.
 - Rules added to the core although the task did not name them, because two or more members share them: the `issueHomework` port with the deadline mirror, lazy lesson finalisation, delete cascades, file read access, and rule V (`verdict-script.ts`).
 - File rows carry a `sample` key (`pdfLong`, `pdfShort`, `docx`, `cheatsheet`, `photo1..8`) rather than a file name under `assets/mock-files/`, to match the mock FileService another agent already built. Declared name, MIME type and size keep the spec's variety (e.g. a PNG row backed by a JPEG sample). Handout URLs are `mock-sample://<sample>?…`.
 - The `api:notifications` limit (60 / 60 s) applies to every role as 00 §2.2 says; the site applies it to students only.
@@ -124,25 +126,32 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - Demo (mock builds): `getDemoBackend()`, `getDemoPersonas()`, `setLoginPrefill()`.
 
 **`@/navigation`** (React) and `@/navigation/routes`, `@/navigation/tabs` (pure)
-- `useAppNavigation()` → `{ canOpen, open, push, replace, back, goHome, openSettings, openNotifications, openNumberSearch, openFiles(files, {initialIndex,title}), openDemoData, openTeacherMore }`. `open(link)` follows the placement rule; `push` / `replace` act in the current stack.
+- `useAppNavigation()` → `{ canOpen, open, push, replace, back, goHome, openSettings, openNotifications, openNumberSearch, openFiles(files, {initialIndex,title}), openDemoData, openTeacherMore }`. `open(link)` follows the placement rule; `push` / `replace` act in the current stack. A screen never imports `expo-router`.
 - `useNavTarget(target)` → `{ canOpen, open }`; when `canOpen` is false render plain text.
+- `useScreenFocused()` — the calling screen is the focused one (tab scenes and screens under a pushed one stay mounted: polling, the lesson "join" call and keep-awake follow focus, not mounting).
+- `useScreenLive()` — focused AND the app is in the foreground (`AppState`): the condition of every interval poll (`enabled` / `refetchInterval`), since TanStack Query's focus manager does not follow `AppState` on React Native.
+- `useRefetchOnFocus(queries, { always? })` — the app's "refetch on focus" (00 §2.3): refetches the stale queries of the list when the screen comes back into focus; `{ always: true }` refetches fresh ones too (screens without a realtime event that the site renders anew on every visit); `useRefetchOnFocus(() => refresh())` runs a custom refresh on every return. Never fires on the first mount.
 - `navigateTo(link, role)`, `navigateHome(role)`, `useTrackPosition()`.
+- `@/navigation/viewer-handoff` (pure): `handOverViewerFiles(files, title?)`, `withHandedOverUris(files)`, `handedOverTitle(files)`, `clearViewerHandoff()` — how a downloaded document (`localUri`) and the viewer title reach the file-viewer route. Route params are untrusted (every route is a deep link), so the URL of the viewer carries file references only; see the decisions below.
 - Types: `AppLink` (`{ screen } & params`, superset of `NavTarget`), `ScreenParams[ScreenId]` (use as screen props), `FileViewerFile`, `AppHref`, `NavigationPlan`.
 - Pure helpers: `routeFor`, `hrefFor`, `hrefToPath`, `planNavigation`, `canOpen`, `homeHref`, `positionOf`, `parseAppLink`, `allRoutePatterns`, `EXTRA_ROUTES`, and the param readers `stringParam`, `requiredParam`, `panelTabParam`, `journalOutcomeParam`, `journalDaysParam`, `fileViewerFilesParam`, `indexParam`.
 - Tabs: `RoleTabBar`, `tabsForRole(role)`, `moreSections(role)`, `navLabel`, `navItemOf`, `MORE_TAB_NAME`.
 - The route table is the comment block at the top of `src/navigation/routes.ts`.
 
 **`@/screens/shell`** (chrome for area screens)
-- `ShellAppBar({ title? })` — tab roots: `<Screen header={<ShellAppBar title={m.shell.tabs.homeworks} />} bottomInset={false}>`; omit `title` on the home tab to show the logo.
+- `ShellAppBar({ title? })` — tab roots: `<Screen header={<ShellAppBar title={m.shell.tabs.homeworks} />} bottomInset={false}>`; omit `title` on the home tab to show the logo. Below 360 pt of window width (scaled by the OS font size) the student's streak pill is left out so the section title stays readable.
 - `DetailAppBar({ title, subtitle?, right?, onBack? })` — pushed screens.
 - `NotFoundScreen({ description? })` — for a detail whose entity is gone.
 - `RouteErrorBoundary` — already re-exported as `ErrorBoundary` by every route file.
 - `PlannerSegments({ active: 'lessons' | 'drafts' })` — root of the teacher's «занятия» section.
 - `StreakBadge({ currentStreak, onPress? })`, `useStudentStreak()`, `useNotifications()`.
-- `useCountdown(untilMs)`, `formatWait(seconds, locale, m.common.errors)` — for `retryAfterSeconds` lockouts.
-- `ScreenPlaceholder`, `screenTitle(screenId, m.shell.tabs)`.
+- `screenTitle(screenId, m.shell.tabs)` — the capitalised section title of a screen for app bars.
+- `ModalRouteFrame({ presentation: 'sheet' | 'fullScreen' })` — wraps the screen of a modal route of the root stack (`number-search`, `notifications`, `file-viewer`): on iOS such a route is a window of its own, so it gets the device insets (0 at the top of a page sheet) and its own slot for the lock cover.
+- The countdown helpers live in `@/components/retry-wait` (below).
 
-**Placeholder screens to replace in place** (keep export name and props)
+**Page header rule of tab roots and pushed lists.** The app bar names the section (`ShellAppBar title={screenTitle(…)}`; the home tab shows the logo), so the body does not repeat it: a `PageHeader` is used only when the site's page title says more than the section name (e.g. «Календарь домашних заданий» under the bar «Дедлайны»), and its `kicker` only when the kicker is not the section name again. A list whose site title equals the section name starts with its content (compose card, segments, list) and no page header. A few existing screens still start differently (a kicker that repeats the bar, or no header where the site title differs); bring a screen in line when you touch it.
+
+**Screens** (export name and props are fixed by the route file that renders them; all implemented)
 - `src/screens/student/`: `StudentHomeScreen`, `StudentLessonScreen`, `StudentHomeworksScreen`, `StudentHomeworkScreen({assignmentId})`, `StudentDeadlinesScreen`, `StudentTheoryScreen`, `StudentInfoScreen`, `StudentNumberScreen({number})`.
 - `src/screens/teacher/`: `TeacherHomeScreen`, `TeacherStudentsScreen`, `TeacherStudentScreen({studentId, segment:'review'|'assign'|'lessons', assignmentId?})`.
 - `src/screens/planner/`: `PlannerLessonsScreen`, `PlannerDraftsScreen`, `PlannerLessonNewScreen({groupId?,studentId?})`, `PlannerLessonBoardScreen({lessonId})`, `PlannerDraftNewScreen({lessonId?,groupId?,studentId?})`, `PlannerDraftBoardScreen({planId})`.
@@ -154,14 +163,33 @@ Public API of the shared layers, as reported by the agents that built them. Area
 
 **Services**
 - `@/services/network`: `isOnline()`, `useIsOnline()`, `subscribeOnline()`, `startNetworkMonitor()`, `OfflineBannerHost`, `setSimulatedOffline()`.
-- `@/services/query`: `createPendingWritesQueue` (usage documented in the file header), `createAppQueryClient`, `createPersistOptions`, `isPersistableQueryKey`, `shouldRetryQuery`.
+- `@/services/query`: `createPendingWritesQueue` (usage documented in the file header), `createAppQueryClient`, `createPersistOptions`, `isPersistableQueryKey`, `shouldRetryQuery`, `failQueriesWaitingWithoutData(client)` (installed by `createAppQueryClient`), `removePersistedQueries(storage)` (sign-out), and `mergeQueryData(queryClient, queryKey, merge)` — folds a mutation or poll answer into a cached GET response WITHOUT moving `dataUpdatedAt` (the server clock is derived from `serverNow` + `dataUpdatedAt`; a plain `setQueryData` would make it run behind).
+- `@/services/clock`: `useNowTick(intervalMs = 30 000)` — the device clock as state, for "overdue" / "N min ago" that move without a refetch; `useServerNow(offsetMs, tickMs)` — the server-corrected clock, with `offsetMs = serverClockOffset(response.serverNow, query.dataUpdatedAt)` from `@/domain/server-clock`.
+- `@/services/notices`: one-shot notices between screens (the site's `?deleted=1` redirect params) — `noticeChannel<K>(name)`, `postOneShotNotice(channel, key)`, `useOneShotNotice(channel, onNotice)` (the receiving screen TAKES the key into its own state: shown once), `clearOneShotNotices()` (called on sign-out, so the next account never sees the previous one's banner). Used by the students list (`postStudentsListNotice`) and the topics list (`postTopicsFlash` / `postTopicDeleted`); pure store in `one-shot-store.ts`.
+- `@/services/keep-awake`: `useKeepScreenAwake(active)` — keeps the screen on while `active` (pass a condition that is false when the screen is not focused); never throws, also on web (Screen Wake Lock where the browser has it).
 - `@/services/realtime`: `useRealtimeBridge(role)`, `useRealtimeState()`, `invalidationPrefixesFor(event, role)`.
-- `@/services/notifications`: `localNotifications` (`supported`, `getPermission`, `requestPermission`, `ensureChannel`, `sync`, `cancelAll`, `listenForOpens`), the pure planners `planHomeworkReminders` / `planLessonReminders` / `planParentCallReminders` / `selectReminders` / `diffReminders`, and `registerRemotePush` / `unregisterRemotePush` (the single remote-push integration point, a no-op today).
+- `@/services/notifications`: `localNotifications` (`supported`, `getPermission`, `requestPermission`, `ensureChannel`, `sync(reminders, keep?)`, `cancelAll`, `listenForOpens`; `keep` names the categories whose data is not known yet — what is scheduled for them is left alone), the pure planners `planHomeworkReminders` / `planLessonReminders` / `planParentCallReminders` / `selectReminders` / `diffReminders`, and `registerRemotePush` / `unregisterRemotePush` (the single remote-push integration point, a no-op today).
 - `@/services/biometrics`: `getBiometricAvailability()`, `authenticateWithBiometrics(prompt)`, `shouldLockOnResume`, `BIOMETRIC_GRACE_MS`.
 - `@/services/preferences`: `createPreferencesStore(storage)` (implements `PreferencesStore` plus `loadAll`, `setBiometricLock`, `setReminder`), `PREFERENCE_KEYS`, defaults and parsers.
 - `@/services/session`: `tokenStorage`, `guardApiClient(client, handlers)`, `createSessionCache`, `parseCachedUser`.
 
-**`m.shell`** (ru + en): `tabs.*` (capitalised section titles), `nav.more`, `launch.*`, `login.*`, `settings.*`, `biometrics.*`, `numberSearch.*`, `reminders.*`, `placeholder.*`, `demo.*`.
+**`m.shell`** (ru + en): `tabs.*` (capitalised section titles), `nav.more`, `launch.*`, `login.*`, `settings.*`, `biometrics.*`, `numberSearch.*`, `reminders.*`, `demo.*`.
+
+**Shared composites and hooks** (`src/components`) — what several areas need lives here, never in one area's folder:
+- `@/components/retry-wait`: `useRetryWait()` → `{ seconds, waiting, note(error) }` — feed every mutation error to `note`; an answer that names `retryAfterSeconds` (`429` or `503`) keeps the control disabled until the wait is over (never retried on the user's behalf). `<RetryWaitLine seconds={wait.seconds} />` — «Повторить можно через 45 секунд.». `useWaitText()` → `{ time(seconds), retryIn(seconds) }`, `useCountdown(untilMs)`, `formatWait(seconds, locale, forms)`, `secondsLeft(until, nowMs)`.
+- `@/components/load-failure`: `<LoadFailure query={query} home? testID />` (or `error` / `failedAt` / `onRetry` / `retrying` for a read that is not one query) — the first-load error shell of every section: site title, the server's text, «Попробовать снова», which comes back only after a named `retryAfterSeconds` has passed; `home` adds «На главную». Helpers: `isLoadFailed(query)`, `loadFailureOf(query)` → `{ error } | null`, `isWaitingForNetwork(query)`. Pattern: `data ? … : isLoadFailed(query) ? <LoadFailure query={query} /> : <LoadingState />`.
+- `@/components/undo-toast`: `<UndoToast text undoLabel onUndo testID />` — the floating "done — Undo" card.
+- `@/components/date-time`: `useDateTimeLabels()` — the `labels` of `DateTimeField`.
+- `@/components/action-sheet`: `<ActionSheet visible title actions={[{ key, label, icon, tone?, disabled?, onPress }]} onClose testID />` — a "⋯" menu as a sheet of rows; choosing a row closes the sheet, and the action runs only after the sheet has left the tree (an action usually opens a dialog, and on iOS a modal asked to appear while another is still presented is never shown).
+- `@/components/lessons`: `useHandout()` + `<HandoutNotice handout />` (the printable handout of a lesson), `handoutFileId` / `handoutFileName` / `handoutMimeType`, `notePlanRequested` / `planRequestedAtOf` (anchors of a plan regeneration) — shared by the planner boards and the «Занятия» tab of the student card.
+- `@/components/progress-history`: `<ProgressHistorySheet studentId homeworkNumberId visible onClose />` — status history of a student's number (homework review, lesson board, developer journal).
+- `@/components/number-select-card`: `<NumberSelectCard number status selected conditionLatex footnote? disabled? onToggle />` — the selectable number card (08 §5.4) of the «Выдать ДЗ» tab and of the manual lesson composer.
+- `@/components/count-up`: `useCountUp(target)` — a statistic that counts up to its value in 600 ms (plain under reduced motion); pure `countUpFrame(target, progress)`.
+- `@/components/math`, `@/components/files` — see "Math, files and photos".
+
+**Reusable area modules.** Two area barrels are public on purpose and may be imported from other areas; everything else inside an area folder is private to it.
+- `@/screens/teacher/students`: the student-account sheets written against a `{ id, name }` target — `CreateStudentSheet`, `CredentialsSheet`, `ResetPasswordSheet`, `DeleteStudentDialog`, `StudentActionsSheet`, `StudentRow`; form helpers `PasswordSuggestion`, `PasswordFeedback`, `canSubmitPassword`, `canSubmitStudentForm`, `passwordFeedback`, `shouldSuggestPassword`, `secureRandomInt`; `PasswordResetSheet` (the one reset-password sheet: `{ target, audience, reset, saveFailedText, isGone, … }`; `ResetPasswordSheet` and the developer's `ResetTeacherPasswordSheet` only bind it); `useLatched(value)` (keeps the last non-null value while a sheet closes), `useNoticeScroll`, `invalidateStudents`, `postStudentsListNotice` / `useStudentsListNotice`, `isStudentGone(error)`, `SITE_HOST`. The developer's accounts screen is built from them.
+- `@/screens/shell`: the chrome listed above.
 
 ### Decisions and deviations from the spec
 
@@ -172,7 +200,12 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - The student card is one screen component (`TeacherStudentScreen` with a `segment` prop) behind three route files (the site's three URLs), shown without a transition; switching segments is a `replace`.
 - The teacher's «ещё» tab has its own root screen at `/teacher/more` (not a registered ScreenId) and nested stacks for topics and groups, so one `push … withAnchor` rebuilds list → detail.
 - While the stored session is being restored the root layout renders the launch screen INSTEAD of the navigator, so guards are first evaluated with the final role and a deep entry lands on its own screen.
-- Added a session state the spec does not have: `restoreFailed` (token present, no answer, nothing cached) with Retry / Sign in again. With a cached user the app opens that user's tree offline and re-validates on reconnect.
+- Added a session state the spec does not have: `restoreFailed` (token present, no answer, nothing cached) with Retry / Sign in again. "Sign in again" gives the stored token up and opens the login screen; the restore is also tried again by itself when the connection returns or the app comes to the foreground. With a cached user the app opens that user's tree offline and re-validates on reconnect.
+- Offline, a read with nothing cached ends in its error state, not in a skeleton: TanStack Query parks the retry of a failed first load until the device is online, so `createAppQueryClient` ends such a query with its network error (`failQueriesWaitingWithoutData`); it is fetched again by itself on reconnect. A refetch over cached data, and a query whose screen still shows placeholder data, keep waiting silently. The spec is silent on this.
+- The queue of unsent writes is loaded together with the stored token, before any role screen mounts, and the hooks show only the signed-in user's entries. Signing out with unsent writes asks first (they are deleted with the session); "Clear cache" asks first while offline. Sign-out removes the persisted query cache from the device explicitly, one tick after the in-memory clear (the persister answers the first "query removed" event with an immediate write).
+- The file-viewer route carries file references only. A `localUri` and the header title are handed to the viewer in memory by `openFiles` (`@/navigation/viewer-handoff`): every route is a deep link (`shbz://file-viewer?…`), and a URI or a title taken from the URL would let another app show arbitrary content inside the app's own viewer. A link that did not come from `openFiles` loads each file by its id through `FileService` (access checked) and shows the file name.
+- The biometric lock cover is drawn by `LockGate` in the root window and published through `setOverlayCover` for every other native window, each of which renders an `<OverlayCoverSlot />`: every `BottomSheet` (so `Dialog`, `Select`, `DateTimeField` too), `FileViewerModal`, and the modal routes (`ModalRouteFrame`). A view of the root window cannot cover a `Modal` or an iOS modal route. Under the cover a sheet ignores "close" requests and the Android back button is consumed.
+- The login error line and the session-expired notice are rendered from the dictionary by their code (`login-error.ts`), not from the stored server message, so they follow the language switch of the login screen.
 - A 403 role refusal triggers at most one `GET /me` per 5 seconds (a burst of 403s is one refresh).
 - Local reminders are a mobile decision throughout (the site has none): all categories default OFF and the OS prompt appears when one is switched on; lead times are 24 h and 2 h before a homework deadline, 10 minutes before and at lesson start, 10:00 Moscow time on the day a parent call becomes due; at most 24 scheduled.
 - Parent-call reminders are scheduled only for calls that will BECOME due in the next 14 days; already due or overdue calls stay in the in-app bell only.
@@ -183,9 +216,9 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - Login: the placeholder `teacher@example.com` is stored in `m.shell.login.loginPlaceholder`; a countdown line is shown under the rate-limit notice; tapping a demo account folds the list so the form is visible.
 - Settings uses the app bar title + kicker instead of a page header and does not embed number search (decision N5 makes it a shell action on tab roots). The password form shows the specific policy problem when the new password is the cause, otherwise the site's combined text.
 - Notifications sheet: 'mark all as read' is a row inside the sheet (the sheet primitive has only a title and close); no pull-to-refresh; the badge 'pop' animation is not implemented.
-- Demo data screen: control labels are plain English literals (the spec says its texts are developer-facing); it adds a 'Simulate offline' switch and an auto-reseed switch beyond §9.3; verdict outcomes are presets rather than free input.
-- Tab bar labels use -0.2 letter spacing and `adjustsFontSizeToFit` (min 0.85) so «дев-панель» fits five tabs at 390 pt.
-- `src/i18n/mobile/shell.ts` was rewritten: the earlier draft keys `shells.*`, `session.*`, `notifications.*`, `about.*` and several `biometrics` / `demo` keys were removed or renamed (site dictionary texts are used instead); `demo.resetData` is kept because `tests/i18n.test.ts` asserts it.
+- Demo data screen: control labels are plain English literals (the spec says its texts are developer-facing); it adds a 'Simulate offline' switch and an auto-reseed switch beyond §9.3; verdict outcomes are presets rather than free input. An "All …" preset names its verdict for every index a check can find (one per photo, up to the photo limit), because `verdicts` is read by index.
+- Tab bar labels use -0.2 letter spacing and `adjustsFontSizeToFit` (min 0.85) so «дев-панель» fits five tabs at 390 pt; the label size also steps down by item width (12 → 11 below 84 pt per item, → 10 below 68 pt), because the web build has no `adjustsFontSizeToFit` and five tabs at 320 pt leave 56 pt per label.
+- `src/i18n/mobile/shell.ts` and `common.ts` hold only keys that a screen reads; a text the site dictionary already has for the same purpose comes from `dict.*` (e.g. the minute forms of a wait are `dict.login.minuteForms`, the «Звонки родителям» reminder row is `dict.planner.calls.title`). `demo.resetData` is asserted by `tests/i18n.test.ts`.
 - `tests/shell-routes.test.ts` references `@types/node/fs.d.ts` by path to read `src/app`; it adds no global types.
 - `src/providers/services.ts` imports `materialiseMockSample` from `@/services/files/mock-sample-store` directly because the barrel does not export it.
 
@@ -206,21 +239,21 @@ Public API of the shared layers, as reported by the agents that built them. Area
 ### `@/ui`
 
 **Text and icons**
-- `Text` — `<Text variant="sectionTitle" color="textMuted" tabular>`; variants are the keys of `typography`.
+- `Text` — `<Text variant="sectionTitle" color="textMuted" tabular>`; variants are the keys of `typography`. OS font scaling is capped at `MAX_FONT_SCALE` (1.3) — in `Text` and in every `TextInput` wrapper (`TextField`, `TextArea`, `SearchField`), so typed text and labels scale together inside fixed-height controls.
 - `Icon` — `<Icon name="bell" size={20} color="kicker" />`; `tint` takes a raw colour. `IconName`, `ICON_NAMES`.
 - `navIcons` — `navIcons.student.homeworks`, `navIcons.teacher.lessons`, `navIcons.developer.panel`, plus `settings`, `notifications`, `search`.
 - `Logo` — `<Logo size={24} variant="default" | "onDark" | "mono" />`.
 
 **Buttons**
-- `Button` — `<Button label onPress variant="primary|outline|dark|danger|dangerSolid|tonal" size="sm|md|lg|field" loading disabled leftIcon rightIcon fullWidth />`.
+- `Button` — `<Button label onPress variant="primary|outline|dark|danger|dangerSolid|tonal" size="sm|md|lg|field" loading disabled leftIcon rightIcon fullWidth wrapLabel />`. One line by default; `wrapLabel` lets a sentence-long label take a second line instead of «…».
 - `IconButton` — `<IconButton icon accessibilityLabel variant="circle|ghost|danger|dangerRaised" active badge={n} />`.
 - `TextButton` — `<TextButton label tone="accent|danger|soft|muted" />`.
 
 **Form fields**
-- `TextField` — `<TextField label value onChangeText error helper disabled left right />`; accepts all TextInput props.
+- `TextField` — `<TextField label value onChangeText error helper disabled left right />`; accepts all TextInput props. `left` takes a bare icon: the field insets it itself.
 - `PasswordField` — TextField plus `showLabel` and `hideLabel`.
-- `TextArea` — `variant="default" | "note"`, `labelAside`.
-- `SearchField` — `<SearchField value onChangeText onSubmit submitLabel error />`.
+- `TextArea` — `variant="default" | "note"`, `labelAside`. Grows with its text on every platform (on web the reported content height becomes the height).
+- `SearchField` — `<SearchField value onChangeText onSubmit submitLabel error />`. The keyboard's search key submits an empty field too, so the owner can show its "enter a value" error; the arrow button appears only with text.
 - `Checkbox` — `<Checkbox checked onChange label />`. `CheckMark` is the non-interactive glyph.
 - `CheckRow` — `<CheckRow label description checked onChange left />`.
 - `Switch` — `<Switch value onValueChange label description trailing />`.
@@ -233,14 +266,14 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - `SectionCard` — `<SectionCard title description action card={...} bare />`.
 - `NavCard` — `<NavCard kicker title stats={[{ label, value }]} meta footer onPress />`.
 - `MetricPill` — `<MetricPill label value tone />`.
-- `PageHeader` — `<PageHeader kicker title description backLabel onBack metrics aside gap />`.
+- `PageHeader` — `<PageHeader kicker title description backLabel onBack metrics aside gap />`. The title dot is tied to the last word and never wraps to a line of its own.
 - `Screen` — `<Screen header={<AppBar />} footer scroll padded refreshing onRefresh keyboardAvoiding bottomInset glow="dashboard|login" />`.
 - `AppBar` — `<AppBar title subtitle left right onBack backLabel border safeTop />`.
 - `ListRow` — `<ListRow title subtitle meta left right chevron onPress divider inset emphasized />`.
 - `Divider`, `Avatar` (`name`, `size`), `TitleDot`, `AccentGradient`, `PageGlow`.
 
 **Selection controls**
-- `Segmented` — `<Segmented options={[{ value, label, shortLabel }]} value onChange fill plain compact role="radio|tab" />`.
+- `Segmented` — `<Segmented options={[{ value, label, shortLabel }]} value onChange fill plain compact scrollable role="radio|tab" />`. `scrollable` is for in-page tabs: looks like `fill` while the labels fit, never cuts a label, and scrolls sideways (selected segment kept in view) on a narrow phone or with a large OS font.
 - `Tabs` — `<Tabs options value onChange fill />`; ink-pill bar, `value={null}` fades the pill, scrolls the active tab into view.
 - `StatusOptionGroup` — `<StatusOptionGroup options={[{ value, label, tone }]} value onChange accessibilityLabel size columns />`; tapping the active option clears it.
 
@@ -251,15 +284,19 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - `CountBadge` — `<CountBadge count max={9} />`.
 - `Notice` — `<Notice tone="error|success|warning" text title action onDismiss dismissLabel />`.
 - `ProgressBar` — `<ProgressBar value size="sm|md|lg" accessibilityLabel />`. `completionPercent(done, total)`.
-- `CopyRow` — `<CopyRow value copiedLabel copiedAnnouncement hint label variant="field|plain" mono />`.
+- `CopyRow` — `<CopyRow value copiedLabel copiedAnnouncement hint label variant="field|plain" mono />`. `useCopyFeedback(holdMs?)` → `{ copied, copy(id, text) }` — the one place that writes to the clipboard (`CopyRow` and every "copy" button use it).
 - `Spinner`, `Skeleton` (`height`, `width`, `radius`, `index`).
 - `LoadingState` — `variant="cards|list|spinner"`, `tabs`, `count`.
 - `EmptyState` — `<EmptyState title hint action variant="panel|plain" />`.
 - `ErrorState` — `<ErrorState title description retryLabel onRetry secondaryLabel onSecondary numeral="404" />`.
 
 **Overlays**
-- `BottomSheet` — `<BottomSheet visible onClose closeLabel title dismissible scroll padded footer onClosed />`.
+- `BottomSheet` — `<BottomSheet visible onClose closeLabel title dismissible scroll padded footer onClosed />`. With the keyboard open the sheet shrinks into the area between the status bar and the keyboard (title row stays, content scrolls). `onClosed` fires one tick after the sheet's modal is removed — open the next sheet or dialog from it, never in the tick that closes the first one (two modals must not overlap on iOS).
 - `Dialog` — `<Dialog visible title kicker description confirmLabel cancelLabel pendingLabel pending confirmDisabled tone="danger|default" onConfirm onCancel>`.
+
+**Windows**
+- `OverlayCoverSlot`, `setOverlayCover(node | null)`, `useOverlayCovered()` — an app-wide cover (the biometric lock) that must be visible above every overlay. A `Modal` is a separate native window, so each one renders the slot as its top-most child; `BottomSheet` and `FileViewerModal` already do. A new `Modal` anywhere in the app must render `<OverlayCoverSlot />` too.
+- `WindowFrameProvider`, `useWindowInsets()`, `useWindowContentTop()`, `<WindowInsetsScope top?>` — the device insets and the height of what the root draws above the content (the offline strip). Content in its own native window uses `useWindowInsets()` instead of `useSafeAreaInsets()` (under the offline strip the tree gets a zero top inset); `Screen` passes `useWindowContentTop()` to its `KeyboardAvoidingView` as the vertical offset.
 
 **Motion and building blocks**
 - `Enter` — `<Enter index={i}>` cascade entry animation.
@@ -276,7 +313,8 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - Notice: success has no visible hairline (`shbz-notice-success`); warning uses the bordered legacy look, since that is the only warning style on the site.
 - ErrorState title is 24/32, the phone size, not the site's desktop 30. PageHeader keeps the site's 40 bottom gap by default (`gap` prop overrides).
 - KeyboardAvoidingView uses `padding` on Android as well as iOS (in Screen and BottomSheet), assuming edge-to-edge windows do not resize for the keyboard. Unverified on a device.
-- Tokens added beyond the §8 paste, all taken from spec values: colours headerBg, menuOverlay, skeletonShineClear, logoDarkBg; gradients.accentMid and gradients.glow; sizes.appBar, wideBreakpoint, dialogMaxWidth; extra typography roles (loginTitle, pageTitle, calendarMonth, errorTitle, bodyBold, smallMedium/Bold/Extra, buttonLgSoft, buttonSm, link, meta, badgeMuted/Strong, captionMedium/Strong/Bold, mono); a few motion durations.
+- Every `Modal` passes all four `supportedOrientations` (iOS): the app is portrait on phones, but an iPad may hold it in any orientation (`supportsTablet`), and a portrait-only modal would be presented sideways.
+- Tokens added beyond the §8 paste, all taken from spec values: colours headerBg, menuOverlay, skeletonShineClear, logoDarkBg, chartGreen (the attendance / statistics chart green, same in both themes); radii `mark` (3, the calendar's rotated deadline square, 08 §5.20) and `swatch` (5, the legend's "today" square); gradients.accentMid and gradients.glow; sizes.appBar, wideBreakpoint, dialogMaxWidth; extra typography roles (loginTitle, pageTitle, calendarMonth, errorTitle, bodyBold, smallMedium/Bold/Extra, buttonLgSoft, buttonSm, link, meta, badgeMuted/Strong, captionMedium/Strong/Bold, mono); a few motion durations.
 - Tab icons are Feather where a matching glyph exists. Three proposals from 01 §1.3 that Feather lacks (calendar-check, id-card, users-group) are drawn as custom SVGs in the same stroke style, as is the site's filled flame.
 - Splash imageWidth is 200 globally, so the wide lockup fits inside Android 12's circular splash mask, and 236 on iOS (about 54% of a 390pt screen; the spec says about 55%).
 - Two test files were added under tests/, outside the listed ownership, because the task requires tests for changes to pass: `theme.test.ts` and `ui-date-time.test.ts`.
@@ -314,6 +352,7 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - `lesson-status`: `deriveLessonStatus(lesson, now)`, `lessonStartRefreshDelay`, `shouldRefreshForLessonStart`. `lesson-live`: `isLessonItemClosed`, `isExtraPartUnlocked`, `canSubmitLessonItem`, `computeIdleLevel`, `computeSpentMinutes`, `decideAutoLessonResult`, `decideEndOfLessonResult`, `LESSON_SUBMISSION_MAX_PHOTOS`.
 - `lesson-plan`: limits (`MIN/MAX_DURATION_MINUTES`, `MIN/MAX_SPEED`, `MAX_GROUP_SIZE`, `MAX_PLAN_ITEMS`, `MAX_TITLE_LENGTH`, `MAX_TEACHER_NOTE_LENGTH`), `normalizePlanParams`, `normalizeSpeed`, `planLessonItemsUpdate`, `collectAvailableNumbers`, candidate builders and response parsers. `homework-plan`: `normalizeHomeworkParams`, `daysUntil`, `pickDominantTopicId` and limits. `plan-error`: `planErrorText(raw, dict.planner.planErrors)`, `planErrorValue(code)`.
 - `attendance`: `nextAttendance`, `summarizeAttendance`, `decideEndOfLessonAttendance`, `formatAttendanceSummary(summary, dict.planner.attendance)`. `report-period`: `academicYearStart`, `reportPeriodStart`, `parseReportPeriod`. `week-buckets`: `mondayOf`, `buildWeekBuckets`, `countByWeek`, `getDayOfWeekIndex`. `group-statistics`: `buildGroupStatistics`, `compareByActivity`.
+- `server-clock`: `serverClockOffset(serverNow, receivedAt)` — how far the server clock is ahead of the device, from a response's `serverNow` and the moment it arrived (`query.dataUpdatedAt`); `correctedNow(serverNow, receivedAt, deviceNow)`. The one implementation for the student, planner and teacher screens (09 §6.2 rule 6).
 - `parent-call-state`: `resolveParentCallReminder`, `shouldCreateParentCallNotification`, `calendarDaysBetween`, `PARENT_CALL_DUE_DAYS`, `PARENT_CALL_OVERDUE_DAYS`, `PARENT_CALL_HISTORY_LIMIT`.
 - `progress-timeline`: `buildProgressTimelineEntries(rows, days, now)`, `buildProgressTimelineView`, `buildTeacherProgressTimeline`, `buildTimelineChartGeometry`, `MAX_TIMELINE_DAYS`. `student-streak`: `buildStudentStreak(entries, locale)`, `computeStudentStreak(rows, now, locale)`, `STREAK_WINDOW_DAYS`. `student-streak-colors`: `getStudentStreakColorMeta`, `STREAK_COLOR_MILESTONES`.
 - `upload-validation`: `validateUploadMetadata(fileName, declaredMime, size, locale)`, `validateUploadedBytes`, `UploadValidationError`, `MAX_UPLOAD_SIZE_BYTES`, `MAX_ORIGINAL_FILE_NAME_LENGTH`. `upload-file-name`: `getSafeUploadFileName`. `file-access`: `canAccessStoredFile`.
@@ -356,7 +395,7 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - Helpers: `cacheFileName`, `extensionForMime`, `fileKindOf`, `hashFileId`, `safeFileId`, `utiForMime`, `pickMockSample`, `pickMockPhoto`, `MOCK_PHOTO_COUNT`; types `FileKind`, `MockFileMeta`, `MockSampleKey`, `MockFileLookup`, `MockFileServiceOptions`.
 
 **`@/components/files`**
-- `ViewerFile = { id, originalName, mimeType, size?, localUri? }` — a stored file, a photo mapped as `{ id: photo.fileId, … }`, or a `DownloadedFile` passed with `localUri`.
+- `ViewerFile = { id, originalName, mimeType, size?, localUri? }` — a stored file, a photo mapped as `{ id: photo.fileId, … }`, or a `DownloadedFile` passed with `localUri`. Open a viewer with `useAppNavigation().openFiles(files, { title })` or `<FileViewerModal />`; never build the `/file-viewer` URL by hand (a `localUri` or a title in the URL is ignored).
 - `FileCard({ title, description?, file: ViewerFile | null, onOpen?, hideShare?, footer?, testID? })`.
 - `FileViewer({ files, initialIndex?, title?, onClose, testID? })` — body of the `shared.fileViewer` route.
 - `FileViewerModal({ visible, ...FileViewerProps })` — the same, opened in place.
@@ -369,6 +408,7 @@ Public API of the shared layers, as reported by the agents that built them. Area
 **`@/services/photos`**
 - `pickFromCamera({ locale? })`, `pickFromLibrary({ multiple?, limit?, locale? })` → `PickResult<PhotoUpload>`.
 - `pickDocument({ locale? })` → `PickResult<FileUpload>` (PDF, DOCX, PNG, JPG).
+- `pickJsonFile()` → `{ status: 'picked', name, text } | { status: 'cancelled' } | { status: 'failed' }` — one JSON / text file read on the device (the AI reply of a topic import).
 - `PickResult<T>` = `picked{files}` | `cancelled` | `denied{permission, canAskAgain}` | `unavailable` | `invalid{message}` | `failed`.
 - `planPhotoResize`, `normalisedPhotoName`, `clampSelectionLimit`, `PHOTO_MAX_SIDE` (2400), `PHOTO_JPEG_QUALITY` (0.8), `PHOTO_MIME_TYPE`, `PHOTO_EXTENSION`, `DOCUMENT_PICKER_MIME_TYPES`.
 
@@ -393,7 +433,8 @@ Public API of the shared layers, as reported by the agents that built them. Area
 - The DOCX sample ships as base64 in `src/services/files/generated/mock-docx.ts` because Metro has no asset loader for `.docx`; the file is also in `assets/mock-files/` as the source.
 - Mock samples beyond the task list: 320 px thumbnails for the eight photos (served for `variant: 'thumb'`) and a typeset `cheatsheet.jpg` for image theory files.
 - PDF sample selection uses the declared size first (≥ 512 KB → the 12-page file), then the id hash, so the fixture's 1.4 MB theory file maps to the long PDF. An explicit `sample` in the lookup wins over both.
-- `source()` returns an empty `uri` for a file the lookup rejects, instead of throwing: it is synchronous and called during render. `download()` rejects with `ApiError 404 fileNotFound`.
+- `source()` returns an empty `uri` for a file the lookup rejects, instead of throwing: it is synchronous and called during render. `download()` rejects with `ApiError 404 fileNotFound`. The on-disk lookup behind it (`resolveLocalFile`) remembers ids it did not find, so rendering a grid of fixture photos does no file-system access after the first pass.
+- On web "open in another app" saves a file the browser cannot show (DOCX) through the download link, so it keeps its original name; PDF and images open in a new tab.
 - `FileCard` shows a file row (type tile, name, type · size) with Open and Share/Download, not the site's inline multi-page preview, per 09 §5.2. Image files keep a fitted preview.
 - PDF on Android is a hand-off page with "Открыть в другом приложении" (no in-app renderer in Expo Go). PDF on web follows the site: iframe on a fine pointer, hand-off (new tab) on touch or when the browser has no PDF viewer.
 - iOS "open in another app" tries Quick Look through `File.preview()` from expo-file-system and falls back to the share sheet; Android uses `expo-intent-launcher` as specified.

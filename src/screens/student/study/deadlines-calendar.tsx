@@ -82,11 +82,11 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
   return (
     <Card padded={12} testID="deadlines-calendar">
       <View style={styles.header}>
-        <IconButton icon="chevronLeft" accessibilityLabel={m.student.calendar.prevMonth} onPress={() => onChangeMonth(-1)} testID="calendar-prev" />
+        <IconButton icon="chevronLeft" accessibilityLabel={dict.topics.widgets.datetime.prevMonth} onPress={() => onChangeMonth(-1)} testID="calendar-prev" />
         <Text variant="calendarMonth" align="center" numberOfLines={1} accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.month} testID="calendar-month">
           {monthLabel}
         </Text>
-        <IconButton icon="chevronRight" accessibilityLabel={m.student.calendar.nextMonth} onPress={() => onChangeMonth(1)} testID="calendar-next" />
+        <IconButton icon="chevronRight" accessibilityLabel={dict.topics.widgets.datetime.nextMonth} onPress={() => onChangeMonth(1)} testID="calendar-next" />
       </View>
 
       <View style={styles.weekdays} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

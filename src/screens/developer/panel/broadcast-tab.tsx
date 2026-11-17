@@ -2,12 +2,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Card, Dialog, IconButton, Segmented, Text, TextArea, TextField } from '@/ui';
 
-import { errorText } from './error-text';
 import {
   BROADCAST_BODY_MAX,
   BROADCAST_TITLE_MAX,

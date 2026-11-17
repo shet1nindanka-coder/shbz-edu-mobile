@@ -19,6 +19,14 @@ const DIRECTORY = 'mock-uploads';
 /** Extensions a stored copy can have — the upload whitelist. */
 const KNOWN_EXTENSIONS = ['.jpg', '.png', '.pdf', '.docx'] as const;
 
+/**
+ * Ids already looked up on disk and not found. `resolveLocalFile` is called during render for every
+ * thumbnail (through `FileService.source`), and almost every id is a fixture file that was never picked on
+ * this device: without this set each render of a photo grid repeated four synchronous disk checks per
+ * thumbnail on the JS thread. An id leaves the set when a file is imported under it.
+ */
+const missing = new Set<string>();
+
 function storeDirectory(): Directory {
   return new Directory(Paths.document, DIRECTORY);
 }
@@ -43,6 +51,7 @@ export async function importLocalFile(fileId: string, file: LocalFile): Promise<
   } catch {
     // Keep the picker's own URI.
   }
+  missing.delete(fileId);
   registerLocalFile(fileId, stored);
   return stored;
 }
@@ -51,6 +60,7 @@ export async function importLocalFile(fileId: string, file: LocalFile): Promise<
 export function resolveLocalFile(fileId: string): LocalFile | null {
   const registered = getRegisteredLocalFile(fileId);
   if (registered) return registered;
+  if (missing.has(fileId)) return null;
   try {
     for (const extension of KNOWN_EXTENSIONS) {
       const candidate = storedFile(fileId, extension);
@@ -68,6 +78,7 @@ export function resolveLocalFile(fileId: string): LocalFile | null {
   } catch {
     // The document directory is unreadable: behave as if nothing was stored.
   }
+  missing.add(fileId);
   return null;
 }
 
@@ -91,6 +102,7 @@ export function forgetLocalFile(fileId: string): void {
  */
 export function forgetAllLocalFiles(): void {
   clearLocalFileRegistry();
+  missing.clear();
   try {
     const directory = storeDirectory();
     if (directory.exists) directory.delete();

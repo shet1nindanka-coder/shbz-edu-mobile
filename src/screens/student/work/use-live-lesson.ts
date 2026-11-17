@@ -1,15 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { ActiveLessonDto, GetLessonResponse, LessonItemDto, PhotoUpload } from '@/api/types';
+import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
+import { mergeQueryData } from '@/services/query';
 
-import { mergeQueryData } from './cache';
-import { errorText } from './error-text';
 import { applyLessonState, applySubmission, hasRunningSubmission } from './logic';
 import { usePoller } from './use-poller';
-import { useRateLimit, type RateLimitWait } from './use-rate-limit';
 
 export type LiveLessonState = {
   /** Sends the photos of one item for checking. */
@@ -24,7 +23,7 @@ export type LiveLessonState = {
   pollBroken: boolean;
   retryPoll: () => void;
   /** Cool-down after `429 rateLimited` (hourly limit, daily budget) or `503 queueFull`. */
-  limit: RateLimitWait;
+  limit: RetryWait;
 };
 
 function withoutKey(record: Record<string, string>, key: string): Record<string, string> {
@@ -51,7 +50,7 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
   // Grows with every accepted submission: the polling loop starts over with a clean failure counter.
   const [submitEpoch, setSubmitEpoch] = useState(0);
-  const limit = useRateLimit();
+  const limit = useRetryWait();
 
   // "I am in class": once per entry into the live lesson, and only while the tab is really in front —
   // the call marks the student present. A failure never blocks the screen (the site swallows it too).

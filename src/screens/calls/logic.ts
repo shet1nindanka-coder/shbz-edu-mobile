@@ -124,3 +124,12 @@ export function mergeHistory(shown: readonly ParentCallEntry[], earlierPages: re
 export function historyEntryTime(entry: Pick<ParentCallEntry, "calledAt">, locale: Locale): string {
   return formatMsk(entry.calledAt, "dayMonthTime", locale) ?? "";
 }
+
+/**
+ * Length of the longest word of a label, at least 4. The summary counters share their row in this
+ * proportion, so a one-word label gets the room it cannot give up by wrapping.
+ */
+export function longestWordLength(label: string): number {
+  return label.split(/\s+/).reduce((longest, word) => Math.max(longest, word.length), 4);
+}
+

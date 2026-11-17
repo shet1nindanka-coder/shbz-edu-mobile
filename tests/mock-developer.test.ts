@@ -1036,12 +1036,13 @@ describe("developer.getJournal", () => {
     assert.equal(pick(english, legacyStudent).action, "student.create");
     assert.equal(pick(english, legacyStudent).actionLabel, "Student created");
     assert.equal(pick(russian, legacyStudent).actionLabel, "Создание ученика");
-    // The one seeded row left with a template key as its action (see src/mock/fixtures/journal.ts): a name
-    // without a label is returned as is and the screen shows the raw name.
+    // Every seeded DATA row uses a name the journal has a label for (none is left with a template key).
     assert.deepEqual(
       russian.filter((entry) => entry.category === "DATA" && entry.actionLabel === null).map((entry) => entry.action),
-      ["topic.deleted"],
+      [],
     );
+    const seededTopicDelete = idOf((row) => row.action === "topic.delete" && row.targetLabel === "Пробная тема");
+    assert.equal(pick(russian, seededTopicDelete).actionLabel, "Удаление темы");
 
     const failedLogin = idOf((row) => row.action === "auth.login" && row.outcome === "failed");
     assert.match(pick(russian, failedLogin).summary!, /^Неудачный вход: \S+@\S+$/);

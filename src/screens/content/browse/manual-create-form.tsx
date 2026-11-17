@@ -1,12 +1,12 @@
 import { View } from 'react-native';
 
+import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Card, Notice, Text, TextArea, TextField } from '@/ui';
 
 import { NumbersField } from '../shared/numbers-field';
-import { RateLimitLine } from '../shared/use-rate-limit';
 
 import { UploadSlotField } from './upload-slot-field';
 import type { ManualCreateState } from './use-manual-create';
@@ -45,7 +45,7 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
         disabled={state.submitting || state.uploadWait.waiting}
         testID="create-homework"
       />
-      <RateLimitLine seconds={state.uploadWait.seconds} testID="create-upload-wait" />
+      <RetryWaitLine seconds={state.uploadWait.seconds} testID="create-upload-wait" />
       <NumbersField
         value={state.numbers}
         onChangeText={state.setNumbers}
@@ -65,7 +65,7 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
       </Hint>
 
       {state.error ? <Notice tone="error" text={state.error} testID="create-error" /> : null}
-      <RateLimitLine seconds={state.createWait.seconds} testID="create-wait" />
+      <RetryWaitLine seconds={state.createWait.seconds} testID="create-wait" />
 
       <Button
         label={state.submitting ? t.submitting : t.submit}

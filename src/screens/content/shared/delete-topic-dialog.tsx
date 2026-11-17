@@ -2,14 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { hasErrorCode, qk, useApi } from '@/api';
+import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { TopicImpact } from '@/api/types';
+import { loadFailureOf } from '@/components/load-failure';
 import { format, plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Dialog, Notice, Spinner, Text, TextButton } from '@/ui';
 
-import { errorText } from './error-text';
-import { loadFailureOf } from './load-failure';
 
 export type DeleteTopicDialogProps = {
   /** The topic to delete; `null` keeps the dialog closed. */

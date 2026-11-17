@@ -12,12 +12,15 @@ import { makeStyles, useTheme } from '@/theme';
 
 import { Icon } from './icon';
 import { PressableScale } from './internal/pressable-scale';
-import { Text } from './text';
+import { MAX_FONT_SCALE, Text } from './text';
 
 export type SearchFieldProps = Omit<TextInputProps, 'style' | 'editable' | 'onSubmitEditing'> & {
   value: string;
   onChangeText: (value: string) => void;
-  /** Called with the current text from the keyboard's search key and from the arrow button. */
+  /**
+   * Called with the current text from the keyboard's search key and from the arrow button. The keyboard
+   * key also submits an empty field, so the owner can answer with its "enter a value" error.
+   */
   onSubmit?: (value: string) => void;
   /** Accessible name of the arrow button (it appears once something is typed). */
   submitLabel: string;
@@ -50,7 +53,8 @@ export function SearchField({
   const theme = useTheme();
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
-  const canSubmit = value.trim().length > 0 && !disabled && !busy;
+  const idle = !disabled && !busy;
+  const canSubmit = value.trim().length > 0 && idle;
 
   return (
     <View style={[styles.wrap, style]}>
@@ -71,8 +75,10 @@ export function SearchField({
           value={value}
           onChangeText={onChangeText}
           editable={!disabled}
+          // Same cap as `Text`: the pill has a fixed height.
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           onSubmitEditing={() => {
-            if (canSubmit) onSubmit?.(value);
+            if (idle) onSubmit?.(value);
           }}
           onFocus={(event) => {
             setFocused(true);

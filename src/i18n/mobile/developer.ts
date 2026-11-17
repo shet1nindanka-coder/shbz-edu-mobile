@@ -1,10 +1,6 @@
 // Mobile-only strings of the developer area (accounts, dev panel, journal).
 // Site texts stay in `dict.planner.devPanel`, `dict.planner.journal`, `dict.students.accounts`.
 const ru = {
-  accounts: {
-    passwordCopied: "Пароль скопирован",
-    credentialsShare: "Поделиться данными для входа"
-  },
   panel: {
     openJournal: "Открыть журнал",
     refreshFailed: "Не удалось обновить данные панели. Показаны прежние значения."
@@ -63,10 +59,6 @@ const ru = {
 };
 
 const en: typeof ru = {
-  accounts: {
-    passwordCopied: "Password copied",
-    credentialsShare: "Share sign-in details"
-  },
   panel: {
     openJournal: "Open the log",
     refreshFailed: "Could not refresh the panel data. Showing the previous values."
@@ -104,7 +96,7 @@ const en: typeof ru = {
     rangeError: "Enter a number from {min} to {max}",
     range: "from {min} to {max}",
     fixErrors: "Correct the marked fields — the settings cannot be saved yet.",
-    unsaved: "You have unsaved changes",
+    unsaved: "There are unsaved changes",
     reset: "Discard changes",
     decrease: "Decrease: {label}",
     increase: "Increase: {label}"
@@ -118,7 +110,7 @@ const en: typeof ru = {
     systemName: "System name",
     collapse: "show less",
     periodForms: ["{n} day", "{n} days"],
-    actionQuoted: "‘{text}’",
+    actionQuoted: "“{text}”",
     loadMoreFailed: "Could not load the next page.",
     refreshFailed: "Could not refresh the log. Showing the previous entries."
   }

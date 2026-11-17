@@ -2,15 +2,16 @@ import { FlashList } from '@shopify/flash-list';
 import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { TeacherStudentLesson } from '@/api/types';
+import { useHandout } from '@/components/lessons';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
-import { useHandout } from '@/screens/planner/shared/use-handout';
 import { makeStyles, useTheme } from '@/theme';
-import { ErrorState, LoadingState, Notice, Text } from '@/ui';
+import { LoadingState, Notice, Text } from '@/ui';
 
-import { errorText, loadFailureOf } from '../students/error-text';
 import { CardScreen, type CardChrome } from './card-screen';
 import { LessonAddSheet } from './lesson-add-sheet';
 import { LessonCard } from './lesson-card';
@@ -80,14 +81,7 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
   );
 
   const body = lessons ? null : listFailure ? (
-    <ErrorState
-      title={dict.shells.errorTitle}
-      description={errorText(listFailure.error, dict.shells.errorDescription)}
-      retryLabel={dict.common.retry}
-      onRetry={() => void list.refetch()}
-      retrying={list.isFetching}
-      testID="student-lessons-error"
-    />
+    <LoadFailure query={list} testID="student-lessons-error" />
   ) : (
     <LoadingState variant="cards" count={3} cardHeight={110} accessibilityLabel={m.common.a11y.loading} testID="student-lessons-loading" />
   );

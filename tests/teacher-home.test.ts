@@ -5,8 +5,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { countUpFrame } from "../src/components/count-up/count-up-frame";
 import { getDictionary } from "../src/i18n/get-dictionary";
-import { buildHomeCards, countUpFrame, homeCardA11yLabel, pickCallCounts } from "../src/screens/teacher/home/home-cards";
+import { buildHomeCards, homeCardA11yLabel, pickCallCounts } from "../src/screens/teacher/home/home-cards";
 
 const stats = { totalTopics: 6, totalNumbers: 62, totalStudents: 11, totalFiles: 9, totalMarked: 140 };
 

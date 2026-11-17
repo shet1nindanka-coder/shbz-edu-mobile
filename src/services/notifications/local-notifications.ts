@@ -86,13 +86,14 @@ export const localNotifications: LocalNotifications = {
     }
   },
 
-  async sync(reminders) {
+  async sync(reminders, keep) {
     try {
       installForegroundHandler();
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       const plan = diffReminders(
         scheduled.map((request) => request.identifier),
         reminders,
+        keep,
       );
       await Promise.all(plan.cancel.map((identifier) => Notifications.cancelScheduledNotificationAsync(identifier)));
       for (const reminder of plan.schedule) await schedule(reminder);

@@ -2,25 +2,26 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { TeacherHomeworkAssignment, TeacherHomeworkCheck } from '@/api/types';
 import { HIGHLIGHT_FLASH_MS } from '@/api/types/limits';
+import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { ProgressHistorySheet } from '@/components/progress-history';
+import { UndoToast } from '@/components/undo-toast';
 import { getFileExtension, getMimeTypeFromExtension } from '@/domain/files';
 import { homeworkAssignmentLabel } from '@/domain/homework-label';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ErrorState, LoadingState, Notice, Text } from '@/ui';
+import { Button, EmptyState, LoadingState, Notice, Text } from '@/ui';
 
-import { errorText, loadFailureOf } from '../students/error-text';
 import { useNoticeScroll } from '../students/use-notice-scroll';
 import { CancelHomeworkDialog } from './cancel-homework-dialog';
 import { CardScreen, type CardChrome } from './card-screen';
 import { DisclosureRow } from './disclosure-row';
 import { ReviewAssignmentCard } from './review-assignment-card';
 import { buildReviewRows, completedAssignmentIds, hasDiagnostics, reviewRowIndex, type ReviewRow } from './review-logic';
-import { UndoToast } from './undo-toast';
-import { useNowTick } from './use-now-tick';
+import { useNowTick } from '@/services/clock';
 import { useReview } from './use-review';
 import { useStudentGone } from './use-student-gone';
 
@@ -160,6 +161,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
           size="sm"
           leftIcon={lessonMode ? 'eye' : 'eyeOff'}
           onPress={() => setLessonMode((value) => !value)}
+          wrapLabel
           testID="review-lesson-mode"
           style={styles.lessonMode}
         />
@@ -172,14 +174,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
       <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="review-empty" />
     ) : null
   ) : homeworksFailure ? (
-    <ErrorState
-      title={dict.shells.errorTitle}
-      description={errorText(homeworksFailure.error, dict.shells.errorDescription)}
-      retryLabel={dict.common.retry}
-      onRetry={() => void homeworks.refetch()}
-      retrying={homeworks.isFetching}
-      testID="review-error"
-    />
+    <LoadFailure query={homeworks} testID="review-error" />
   ) : (
     <LoadingState variant="cards" count={3} cardHeight={150} accessibilityLabel={m.common.a11y.loading} testID="review-loading" />
   );
@@ -283,7 +278,8 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
 const useStyles = makeStyles((t) => ({
   listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.md, paddingBottom: t.space.pageBottom },
   header: { gap: t.space.md, paddingBottom: t.space.md },
-  lessonMode: { alignSelf: 'flex-end' },
+  // Never wider than the row: on a 320 pt phone the label takes a second line instead of running off the left edge.
+  lessonMode: { alignSelf: 'flex-end', maxWidth: '100%' },
   item: { paddingBottom: t.space.md },
   completed: { paddingHorizontal: t.space.md, borderRadius: t.radii.md, backgroundColor: t.colors.tabHover },
 }));

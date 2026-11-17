@@ -16,6 +16,9 @@ const ITEM_HEIGHT = 52;
 // Below this item width the longest labels («статистика», «дев-панель», "homework") would touch their
 // neighbours at the regular size, so the whole bar steps one point down. Wider phones keep 12 pt.
 const COMFORTABLE_ITEM_WIDTH = 84;
+// Five tabs on a 320 pt phone leave about 56 pt per label: «дедлайны» needs one more point off. The size
+// is chosen from the width instead of `adjustsFontSizeToFit` alone, which the web build does not have.
+const NARROW_ITEM_WIDTH = 68;
 
 function iconFor(role: UserRole, tab: TabDefinition): IconName {
   if (tab.labelKey === null) return navIcons.teacher.more;
@@ -66,8 +69,8 @@ export function RoleTabBar({ state, emitter, navigateToTab, insets, role }: Role
   }, [activeIndex, itemWidth, reducedMotion, x, visible, tabSlide, base, x1, y1, x2, y2]);
 
   // One size for every label of the bar (a per-label shrink would make neighbours look unequal).
-  const labelFont =
-    itemWidth > 0 && itemWidth < COMFORTABLE_ITEM_WIDTH ? { fontSize: theme.typography.captionStrong.fontSize - 1 } : null;
+  const labelStep = itemWidth === 0 || itemWidth >= COMFORTABLE_ITEM_WIDTH ? 0 : itemWidth >= NARROW_ITEM_WIDTH ? 1 : 2;
+  const labelFont = labelStep > 0 ? { fontSize: theme.typography.captionStrong.fontSize - labelStep } : null;
 
   const pillStyle = useAnimatedStyle(() => ({ opacity: visible.get(), transform: [{ translateX: x.get() }] }));
 

@@ -2,27 +2,26 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
+import { errorText } from '@/api';
 import type { LessonBoardItem, LessonBoardParticipant } from '@/api/types';
+import { ActionSheet, type SheetAction } from '@/components/action-sheet';
+import { planRequestedAtOf, useHandout } from '@/components/lessons';
+import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { ProgressHistorySheet } from '@/components/progress-history';
+import { UndoToast } from '@/components/undo-toast';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { Dialog, ErrorState, IconButton, LoadingState, Screen } from '@/ui';
+import { Dialog, IconButton, LoadingState, Screen } from '@/ui';
 
 import { BoardHeader } from './lessons/board-header';
 import { participantLive } from './lessons/board-logic';
 import { ManualAddSheet } from './lessons/manual-add-sheet';
 import { ParticipantCard } from './lessons/participant-card';
-import { UndoToast } from './lessons/undo-toast';
 import { useLessonBoard } from './lessons/use-lesson-board';
-import { ActionSheet, type SheetAction } from './shared/action-sheet';
-import { errorText } from './shared/error-text';
-import { planRequestedAtOf } from './shared/plan-anchors';
 import { planStateOf } from './shared/plan-state';
-import { isWaitingForNetwork } from './shared/query-state';
-import { useHandout } from './shared/use-handout';
 
 /** Route params of `planner.lessonBoard` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type PlannerLessonBoardScreenProps = ScreenParams['planner.lessonBoard'];
@@ -68,14 +67,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
     return (
       <Screen testID="planner-lesson-board-screen" header={<DetailAppBar title={dict.planner.lessonDetail.fallbackKicker} />}>
         {board.isError || isWaitingForNetwork(board) ? (
-          <ErrorState
-            title={dict.shells.errorTitle}
-            description={board.isError ? errorText(board.error, dict.shells.errorDescription) : m.common.errors.network}
-            retryLabel={dict.common.retry}
-            onRetry={() => void board.refetch()}
-            retrying={board.isFetching}
-            testID="lesson-board-error"
-          />
+          <LoadFailure query={board} testID="lesson-board-error" />
         ) : (
           <LoadingState variant="cards" count={3} cardHeight={120} accessibilityLabel={m.common.a11y.loading} testID="lesson-board-loading" />
         )}

@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
-import { ScrollView, View, type ScrollViewInstance } from 'react-native';
+import { useState } from 'react';
+import { View } from 'react-native';
 
-import { POLLING, isNotFoundError, qk, useApi } from '@/api';
+import { POLLING, errorText, isNotFoundError, qk, useApi } from '@/api';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, type ScreenParams } from '@/navigation';
-import { useRefetchOnFocus } from '@/screens/calls/shared/use-refetch-on-focus';
+import { useAppNavigation, useRefetchOnFocus, useScreenLive, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
 import { Button, IconButton, LoadingState, Notice, Screen, Segmented } from '@/ui';
@@ -17,9 +17,7 @@ import { MembersTab } from './detail/members-tab';
 import { StatisticsTab } from './detail/statistics-tab';
 import { useReportExport } from './detail/use-report-export';
 import { hasActiveLesson } from './logic';
-import { errorText } from './shared/error-text';
-import { LoadFailure, isLoadFailed } from './shared/load-failure';
-import { LIST_SCOPE, postGroupNotice, useGroupNotice } from './shared/notice-store';
+import { GROUPS_LIST_NOTICE, groupNoticeChannel, postGroupNotice, useGroupNotice } from './shared/notice-store';
 
 /** Route params of `groups.detail` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type GroupDetailScreenProps = ScreenParams['groups.detail'];
@@ -42,15 +40,16 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const { dict, m } = useI18n();
   const t = dict.planner.groups.detail;
   const report = useReportExport();
-  const tabsScroll = useRef<ScrollViewInstance>(null);
   const [tab, setTab] = useState<Tab>('members');
   const [visited, setVisited] = useState<ReadonlySet<Tab>>(new Set<Tab>(['members']));
-  const [createdNotice, dismissCreated] = useGroupNotice(groupId);
+  const [createdNotice, dismissCreated] = useGroupNotice(groupNoticeChannel(groupId));
   const [banner, setBanner] = useState<Banner | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // The group has just been deleted here: nothing may refetch (and answer 404) while the screen leaves.
   const [leaving, setLeaving] = useState(false);
+  // The attendance poll runs only while this screen is on top and the app is in the foreground.
+  const screenLive = useScreenLive();
 
   const group = useQuery({
     queryKey: qk('groups', 'getGroup', groupId),
@@ -68,7 +67,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
     enabled: visited.has('attendance') && !leaving,
     // Students join and submit while a lesson runs: realtime refreshes the table, this is the fallback.
     refetchInterval: (query) =>
-      tab === 'attendance' && !leaving && hasActiveLesson(query.state.data) ? POLLING.lessonLiveMs : false,
+      tab === 'attendance' && !leaving && screenLive && hasActiveLesson(query.state.data) ? POLLING.lessonLiveMs : false,
   });
 
   // Membership has no realtime event (06 §5) and this screen stays mounted under the student card and the
@@ -87,9 +86,6 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const selectTab = (next: Tab) => {
     setTab(next);
     setVisited((current) => (current.has(next) ? current : new Set(current).add(next)));
-    // Keep the chosen segment in view: the four of them are wider than a phone.
-    if (TABS.indexOf(next) >= 2) tabsScroll.current?.scrollToEnd({ animated: true });
-    else tabsScroll.current?.scrollTo({ x: 0, animated: true });
   };
 
   const refresh = () => {
@@ -99,6 +95,13 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
       visited.has('statistics') ? statistics.refetch() : null,
       visited.has('attendance') ? attendance.refetch() : null,
     ]).finally(() => setRefreshing(false));
+  };
+
+  const tabLabels: Record<Tab, string> = {
+    members: t.participants,
+    statistics: m.groups.detail.statisticsTab,
+    attendance: t.attendance,
+    lessons: dict.students.detail.tabLessons,
   };
 
   const composeLink = { screen: 'planner.lessonNew', groupId } as const;
@@ -173,24 +176,19 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
             ) : null}
           </View>
 
-          <ScrollView
-            ref={tabsScroll}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            style={styles.tabsScroll}
-            contentContainerStyle={styles.tabsContent}
-          >
-            <Segmented
-              options={TABS.map((value) => ({ value, label: m.groups.detail.tabs[value] }))}
-              value={tab}
-              onChange={selectTab}
-              accessibilityLabel={m.groups.detail.tabsAria}
-              plain
-              role="tab"
-              testID="group-tabs"
-            />
-          </ScrollView>
+          {/* The kit's in-page tabs: all four fill the row while they fit; on a narrow phone the bar
+              scrolls with the selected tab kept in view and no label is cut. */}
+          <Segmented
+            options={TABS.map((value) => ({ value, label: tabLabels[value] }))}
+            value={tab}
+            onChange={selectTab}
+            accessibilityLabel={m.groups.detail.tabsAria}
+            plain
+            scrollable
+            role="tab"
+            style={styles.tabs}
+            testID="group-tabs"
+          />
 
           {tab === 'members' ? (
             <MembersTab group={data.group} onProfileError={(text) => setBanner({ tone: 'error', text })} />
@@ -208,7 +206,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
               setLeaving(true);
               dismissCreated();
               // The site redirects to the list with «Группа удалена. Ученики остались на платформе.»
-              postGroupNotice(LIST_SCOPE, 'deleted');
+              postGroupNotice(GROUPS_LIST_NOTICE, 'deleted');
               navigation.back();
             }}
             onDeleteFailed={(text) => setBanner({ tone: 'error', text })}
@@ -228,7 +226,6 @@ const useStyles = makeStyles((t) => ({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
   // Each button is as wide as its label; when the two do not fit one line (English) they stack.
   action: { flexGrow: 1 },
-  // The segments may be wider than the screen: they scroll, bleeding into the gutters.
-  tabsScroll: { flexGrow: 0, marginHorizontal: -t.space.gutter },
-  tabsContent: { paddingHorizontal: t.space.gutter },
+  // When the bar scrolls, its viewport keeps the track's rounded corners instead of a square cut.
+  tabs: { borderRadius: t.radii.md },
 }));

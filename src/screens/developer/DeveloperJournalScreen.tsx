@@ -1,19 +1,20 @@
 import { FlashList } from '@shopify/flash-list';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, useApi } from '@/api';
 import type { JournalEntry } from '@/api/types';
+import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { ProgressHistorySheet } from '@/components/progress-history';
 import { format, plural, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
+import { useRefetchOnFocus } from '@/navigation';
 import type { ScreenParams } from '@/navigation';
+import { Hint } from '@/providers';
 import { DetailAppBar } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, Chip, EmptyState, LoadingState, Notice, Screen, Spinner, Text } from '@/ui';
 
-import { errorText } from './panel/error-text';
 import { JournalDetailSheet } from './panel/journal-detail-sheet';
 import { JournalEntryCard } from './panel/journal-entry-card';
 import { JournalFiltersSheet } from './panel/journal-filters-sheet';
@@ -28,8 +29,6 @@ import {
   toJournalQuery,
   type JournalFilters,
 } from './panel/journal-logic';
-import { LoadFailure, isLoadFailed } from './panel/load-failure';
-import { useRefetchOnFocus } from './panel/use-refetch-on-focus';
 
 /** Route params of `developer.journal` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type DeveloperJournalScreenProps = ScreenParams['developer.journal'];
@@ -66,6 +65,8 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   const [detailOpen, setDetailOpen] = useState(false);
   const [history, setHistory] = useState<ProgressRef | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // The history chosen in the detail sheet, waiting for that sheet to finish closing.
+  const queuedHistory = useRef<ProgressRef | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const query = useMemo(() => toJournalQuery(filters), [filters]);
@@ -102,8 +103,17 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
     setDetailOpen(true);
   };
   const openHistory = (ref: ProgressRef) => {
-    // One sheet at a time: the detail leaves, the history takes its place.
+    // One sheet at a time, and strictly one after the other: each sheet is a native modal, and iOS refuses
+    // to present a second one while the first is still on screen (it is never retried). The history is
+    // therefore opened by `onClosed` of the detail sheet, not in the tick that starts its exit.
+    queuedHistory.current = ref;
     setDetailOpen(false);
+  };
+  const onDetailClosed = () => {
+    setDetail(null);
+    const ref = queuedHistory.current;
+    queuedHistory.current = null;
+    if (!ref) return;
     setHistory(ref);
     setHistoryOpen(true);
   };
@@ -259,7 +269,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
         entry={detail}
         visible={detailOpen}
         onClose={() => setDetailOpen(false)}
-        onClosed={() => setDetail(null)}
+        onClosed={onDetailClosed}
         onOpenHistory={openHistory}
       />
       {history ? (

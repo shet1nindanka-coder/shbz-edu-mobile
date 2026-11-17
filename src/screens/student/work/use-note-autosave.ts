@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { errorText } from '@/api';
 import { saveStudentNote, usePendingStudentNote } from '@/providers';
 
-import { errorText } from './error-text';
 import { decideServerNote } from './logic';
 
 /** Typing pause after which the draft is saved (the site's debounce). */

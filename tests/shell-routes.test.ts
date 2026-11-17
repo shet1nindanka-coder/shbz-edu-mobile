@@ -30,6 +30,7 @@ import {
   stringParam,
   type AppLink,
 } from "@/navigation/routes";
+import { clearViewerHandoff, handOverViewerFiles, handedOverTitle, withHandedOverUris } from "@/navigation/viewer-handoff";
 import { MORE_TAB_NAME, moreSections, navItemOf, navLabel, tabsForRole } from "@/navigation/tabs";
 import { resolveHrefTarget } from "@/navigation/targets";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -316,9 +317,17 @@ describe("route params", () => {
     ];
     const href = hrefFor({ screen: "shared.fileViewer", files, initialIndex: 1, title: "Тема" }, "STUDENT");
     assert.equal(href?.pathname, "/file-viewer");
-    assert.deepEqual(fileViewerFilesParam(href?.params?.files), files);
+    // A downloaded document's `localUri` never travels in the URL (a deep link could forge it).
+    const references = [files[0], { id: "f2", originalName: "b.jpg", mimeType: "image/jpeg" }];
+    assert.deepEqual(fileViewerFilesParam(href?.params?.files), references);
+    assert.equal(String(href?.params?.files).includes("file:///"), false);
+    assert.deepEqual(
+      fileViewerFilesParam('[{"id":"x","originalName":"x.jpg","mimeType":"image/jpeg","localUri":"https://example.org/x.jpg"}]'),
+      [{ id: "x", originalName: "x.jpg", mimeType: "image/jpeg" }],
+    );
     assert.equal(indexParam(href?.params?.index), 1);
-    assert.equal(href?.params?.title, "Тема");
+    // Neither does the header title: a link must not be able to put its own words into the viewer's chrome.
+    assert.equal(href?.params?.title, undefined);
     assert.deepEqual(fileViewerFilesParam("not json"), []);
     assert.deepEqual(fileViewerFilesParam('{"id":"x"}'), []);
     assert.deepEqual(fileViewerFilesParam('[{"id":"x"},{"id":"y","originalName":"y","mimeType":"image/png","size":"big"}]'), [
@@ -327,6 +336,31 @@ describe("route params", () => {
     assert.equal(indexParam("-2"), 0);
     assert.equal(indexParam("1.5"), 0);
     assert.equal(indexParam(undefined), 0);
+  });
+
+  it("hands a downloaded document to the viewer in memory, never through the URL", () => {
+    clearViewerHandoff();
+    const forged = [{ id: "report", originalName: "r.pdf", mimeType: "application/pdf", localUri: "https://example.org/evil.pdf" }];
+    // Nothing was handed over: a `localUri` that arrived with the files is dropped.
+    assert.deepEqual(withHandedOverUris(forged), [{ id: "report", originalName: "r.pdf", mimeType: "application/pdf" }]);
+    handOverViewerFiles([
+      { id: "report", originalName: "r.pdf", mimeType: "application/pdf", localUri: "file:///cache/r.pdf" },
+      { id: "stored", originalName: "s.jpg", mimeType: "image/jpeg" },
+    ]);
+    assert.deepEqual(withHandedOverUris([...forged, { id: "stored", originalName: "s.jpg", mimeType: "image/jpeg" }]), [
+      { id: "report", originalName: "r.pdf", mimeType: "application/pdf", localUri: "file:///cache/r.pdf" },
+      { id: "stored", originalName: "s.jpg", mimeType: "image/jpeg" },
+    ]);
+    // The title is handed over for exactly that set of files; another set (a forged link) gets none.
+    const photos = [{ id: "p1", originalName: "1.jpg", mimeType: "image/jpeg" }, { id: "p2", originalName: "2.jpg", mimeType: "image/jpeg" }];
+    handOverViewerFiles(photos, "Квадратные уравнения");
+    assert.equal(handedOverTitle(photos), "Квадратные уравнения");
+    assert.equal(handedOverTitle([photos[0]!]), undefined);
+    assert.equal(handedOverTitle(forged), undefined);
+    handOverViewerFiles(photos);
+    assert.equal(handedOverTitle(photos), undefined);
+    clearViewerHandoff();
+    assert.deepEqual(withHandedOverUris(forged), [{ id: "report", originalName: "r.pdf", mimeType: "application/pdf" }]);
   });
 
   it("validates a link that arrives as plain data (a tapped reminder)", () => {

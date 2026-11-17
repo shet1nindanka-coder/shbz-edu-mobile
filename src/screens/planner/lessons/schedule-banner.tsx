@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Card, DateTimeField, Text } from '@/ui';
 
-import { useDateTimeLabels } from '../shared/date-time-labels';
+import { useDateTimeLabels } from '@/components/date-time';
 
 export type ScheduleBannerProps = {
   pending: boolean;

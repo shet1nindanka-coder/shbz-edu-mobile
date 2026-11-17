@@ -65,7 +65,7 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
       />
       {onOpenLesson ? (
         <TextButton
-          label={m.groups.attendance.openLesson}
+          label={dict.students.lessons.openLesson}
           accessibilityLabel={format(m.groups.attendance.openLessonAria, {
             title: lesson.title,
             date: formatDateTime(lesson.startsAt, locale),

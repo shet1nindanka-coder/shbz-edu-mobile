@@ -17,6 +17,12 @@ export type TheoryCardProps = {
   onDownload: (topic: TheoryTopic) => void;
   /** The download of this card's file is running. */
   downloading: boolean;
+  /**
+   * The width the title keeps beside «Открыть» (`theoryTitleBasis` of the whole list). When the card
+   * cannot give the title this much next to the button, the button moves under the title — a narrower
+   * title column would split a word in the middle.
+   */
+  titleBasis: number;
 };
 
 /** A file the app can show itself (the site's "Открыть"); everything else is "Скачать файл". */
@@ -30,7 +36,7 @@ export function isPreviewableTheory(mimeType: string): boolean {
  * SPEC-GAP: 02 S2a leaves the DOCX strategy open (Q3); the file is downloaded and handed to another app,
  * as 09 §5.2 proposes, straight from the button — there is nothing to preview in a viewer.
  */
-export function TheoryCard({ topic, onOpen, onDownload, downloading }: TheoryCardProps) {
+export function TheoryCard({ topic, onOpen, onDownload, downloading, titleBasis }: TheoryCardProps) {
   const styles = useStyles();
   const { dict, m } = useI18n();
   const t = dict.student.fullscreen;
@@ -38,17 +44,20 @@ export function TheoryCard({ topic, onOpen, onDownload, downloading }: TheoryCar
   if (previewable) {
     return (
       <Card padded={16} testID={`theory-card-${topic.id}`}>
-        {/* One row on a phone: the title, and the single action on the right. */}
+        {/* One row on a phone: the title, and the single action on the right. Where the row is too
+            narrow for both, it wraps: the button takes the next line at full width. */}
         <View style={styles.row}>
-          <Text variant="cardTitle" accessibilityRole="header" style={styles.title}>
+          <Text variant="cardTitle" accessibilityRole="header" style={[styles.title, { flexBasis: titleBasis }]}>
             {topic.title}
           </Text>
-          <Button
-            label={t.open}
-            accessibilityLabel={format(m.student.theory.openAria, { title: topic.title })}
-            onPress={() => onOpen(topic)}
-            testID={`theory-open-${topic.id}`}
-          />
+          <View style={styles.action}>
+            <Button
+              label={t.open}
+              accessibilityLabel={format(m.student.theory.openAria, { title: topic.title })}
+              onPress={() => onOpen(topic)}
+              testID={`theory-open-${topic.id}`}
+            />
+          </View>
         </View>
       </Card>
     );
@@ -78,8 +87,11 @@ export function TheoryCard({ topic, onOpen, onDownload, downloading }: TheoryCar
 }
 
 const useStyles = makeStyles((t) => ({
-  row: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  // `minWidth: 0` lets a very long word wrap instead of pushing the button out of the card.
-  title: { flex: 1, minWidth: 0 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
+  // The title takes all the free width of a shared row (the huge grow factor leaves the button at its
+  // content width); `minWidth: 0` lets a word longer than the whole card still wrap inside it.
+  title: { flexGrow: 9999, flexShrink: 1, minWidth: 0 },
+  // Alone on its line (the wrapped layout) the button stretches across the card: a column stretches its child.
+  action: { flexGrow: 1 },
   column: { gap: t.space.md },
 }));

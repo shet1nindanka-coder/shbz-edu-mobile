@@ -15,7 +15,7 @@
  * │ shell.settings            │ /settings                                     │ root stack, push         │
  * │ shell.notifications       │ /notifications                                │ root stack, sheet        │
  * │ shell.numberSearch        │ /number-search                                │ root stack, modal        │
- * │ shared.fileViewer         │ /file-viewer ?files ?index ?title             │ root stack, full screen  │
+ * │ shared.fileViewer         │ /file-viewer ?files ?index                    │ root stack, full screen  │
  * │ (mock builds) Demo data   │ /demo                                         │ root stack               │
  * ├───────────────────────────┼───────────────────────────────────────────────┼──────────────────────────┤
  * │ student.home              │ /student                                      │ tab 1 «обзор» (stack)    │
@@ -81,7 +81,10 @@ import { DEVELOPER_PANEL_TABS, HOME, isScreenRegisteredFor } from "./registry";
 
 // ───────────────────────────── params ─────────────────────────────
 
-/** A file handed to the viewer: a stored file, a photo, or an already downloaded document (`localUri`). */
+/**
+ * A file handed to the viewer: a stored file, a photo, or an already downloaded document (`localUri`).
+ * `localUri` never travels in the URL: `openFiles` hands it over in memory (`viewer-handoff.ts`).
+ */
 export type FileViewerFile = { id: string; originalName: string; mimeType: string; size?: number; localUri?: string };
 
 /** Route params of every screen (`undefined` = none). These are the props of the screen components. */
@@ -253,9 +256,10 @@ function paramsOf(link: AppLink): Record<string, string> {
   const params: Record<string, string> = {};
   switch (link.screen) {
     case "shared.fileViewer":
-      params.files = JSON.stringify(link.files);
+      // References only: a `localUri` in a URL would let any deep link choose what the viewer shows.
+      params.files = JSON.stringify(link.files.map(({ localUri: _handedOverInMemory, ...reference }) => reference));
       if (link.initialIndex !== undefined && link.initialIndex > 0) params.index = String(Math.floor(link.initialIndex));
-      if (link.title) params.title = link.title;
+      // `title` is not a URL param either (it would be shown in the app's own chrome): `viewer-handoff.ts`.
       break;
     case "student.homework":
       params.assignmentId = link.assignmentId;
@@ -420,7 +424,10 @@ export function journalDaysParam(value: RawParam): number | undefined {
   return Number.isFinite(days) && days >= 0 && days <= 365 ? Math.floor(days) : undefined;
 }
 
-/** Parses the `files` param of the viewer route; anything malformed yields an empty list. */
+/**
+ * Parses the `files` param of the viewer route; anything malformed yields an empty list. A `localUri` in
+ * the param is ignored on purpose (the param is untrusted input, see `viewer-handoff.ts`).
+ */
 export function fileViewerFilesParam(value: RawParam): FileViewerFile[] {
   const raw = stringParam(value);
   if (!raw) return [];
@@ -434,11 +441,10 @@ export function fileViewerFilesParam(value: RawParam): FileViewerFile[] {
   const files: FileViewerFile[] = [];
   for (const item of parsed) {
     if (typeof item !== "object" || item === null) continue;
-    const { id, originalName, mimeType, size, localUri } = item as Record<string, unknown>;
+    const { id, originalName, mimeType, size } = item as Record<string, unknown>;
     if (typeof id !== "string" || typeof originalName !== "string" || typeof mimeType !== "string") continue;
     const file: FileViewerFile = { id, originalName, mimeType };
     if (typeof size === "number" && Number.isFinite(size)) file.size = size;
-    if (typeof localUri === "string" && localUri) file.localUri = localUri;
     files.push(file);
   }
   return files;

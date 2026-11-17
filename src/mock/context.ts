@@ -190,6 +190,21 @@ export function createMockContext(input: CreateMockContextInput): MockContext {
   });
   const emit = (event: RealtimeEventInput) => realtime.publish(event);
 
+  /**
+   * Runs a delete cascade and tells the device layer which file rows it removed (`onFileRemoved`), the
+   * same way `files.removeIfUnreferenced` does for a single file. A cascade deletes file rows by itself
+   * (photos of a deleted homework, files of a deleted topic); without the report the bytes a user picked
+   * on this device would stay in the app's storage with no row pointing at them.
+   */
+  const reportingRemovedFiles = <T>(run: () => T): T => {
+    const onFileRemoved = input.fileHooks?.onFileRemoved;
+    if (!onFileRemoved) return run();
+    const before = store.files.all().map((file) => file.id);
+    const result = run();
+    for (const id of before) if (!store.files.has(id)) onFileRemoved(id);
+    return result;
+  };
+
   const homework = createHomework(core, { q, notify, emit });
   const lessons = createLessons(core, { q, progress, audit, emit });
 
@@ -214,17 +229,17 @@ export function createMockContext(input: CreateMockContextInput): MockContext {
     realtime,
     emit,
     cascade: {
-      deleteStudent: (studentId) => cascade.deleteStudent(store, studentId),
-      deleteTeacher: (teacherId) => cascade.deleteTeacher(store, teacherId, core.nowIso()),
-      deleteTopic: (topicId) => cascade.deleteTopic(store, topicId, core.nowIso()),
-      deleteNumber: (homeworkNumberId) => cascade.deleteNumber(store, homeworkNumberId),
-      deleteGroup: (groupId) => cascade.deleteGroup(store, groupId, core.nowIso()),
-      deleteHomework: (assignmentId) => cascade.deleteHomeworkAssignment(store, assignmentId),
-      deleteHomeworkCheck: (checkId) => cascade.deleteHomeworkCheck(store, checkId),
-      deleteLesson: (lessonId) => cascade.deleteLesson(store, lessonId),
-      deleteParticipant: (participantId) => cascade.deleteLessonParticipant(store, participantId),
-      deleteLessonItem: (itemId) => cascade.deleteLessonItem(store, itemId),
-      deleteLessonSubmission: (submissionId) => cascade.deleteLessonSubmission(store, submissionId),
+      deleteStudent: (studentId) => reportingRemovedFiles(() => cascade.deleteStudent(store, studentId)),
+      deleteTeacher: (teacherId) => reportingRemovedFiles(() => cascade.deleteTeacher(store, teacherId, core.nowIso())),
+      deleteTopic: (topicId) => reportingRemovedFiles(() => cascade.deleteTopic(store, topicId, core.nowIso())),
+      deleteNumber: (homeworkNumberId) => reportingRemovedFiles(() => cascade.deleteNumber(store, homeworkNumberId)),
+      deleteGroup: (groupId) => reportingRemovedFiles(() => cascade.deleteGroup(store, groupId, core.nowIso())),
+      deleteHomework: (assignmentId) => reportingRemovedFiles(() => cascade.deleteHomeworkAssignment(store, assignmentId)),
+      deleteHomeworkCheck: (checkId) => reportingRemovedFiles(() => cascade.deleteHomeworkCheck(store, checkId)),
+      deleteLesson: (lessonId) => reportingRemovedFiles(() => cascade.deleteLesson(store, lessonId)),
+      deleteParticipant: (participantId) => reportingRemovedFiles(() => cascade.deleteLessonParticipant(store, participantId)),
+      deleteLessonItem: (itemId) => reportingRemovedFiles(() => cascade.deleteLessonItem(store, itemId)),
+      deleteLessonSubmission: (submissionId) => reportingRemovedFiles(() => cascade.deleteLessonSubmission(store, submissionId)),
       deleteUserSessions: (userId) => cascade.deleteUserSessions(store, userId),
     },
     switches: {

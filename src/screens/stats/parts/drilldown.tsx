@@ -2,12 +2,10 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { qk, useApi } from '@/api';
+import { errorText, qk, retryAfterOf, useApi } from '@/api';
 import type { HomeworkNumberStatus } from '@/api/types';
+import { RetryWaitLine, useCountdown, useWaitText } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-import { errorText, retryAfterOf } from '@/screens/groups/shared/error-text';
-import { RetryWaitLine } from '@/screens/groups/shared/use-retry-wait';
-import { formatWait, useCountdown } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
 import { ProgressBar, Select, Text, TextButton } from '@/ui';
 
@@ -44,6 +42,7 @@ export function Drilldown({ topics, students }: DrilldownProps) {
   const theme = useTheme();
   const api = useApi();
   const { locale, dict, m } = useI18n();
+  const waitText = useWaitText();
   const t = dict.planner.drilldown;
   const [topicId, setTopicId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -154,7 +153,7 @@ export function Drilldown({ topics, students }: DrilldownProps) {
           <TextButton
             label={dict.common.retry}
             accessibilityLabel={
-              waitSeconds > 0 ? `${dict.common.retry}: ${formatWait(waitSeconds, locale, m.common.errors)}` : dict.common.retry
+              waitSeconds > 0 ? `${dict.common.retry}: ${waitText.time(waitSeconds)}` : dict.common.retry
             }
             onPress={() => void slice.refetch()}
             disabled={waitSeconds > 0}
@@ -170,6 +169,7 @@ const useStyles = makeStyles((t) => ({
   root: { gap: t.space.field },
   notEnough: { paddingVertical: t.space.lg },
   statuses: { flexDirection: 'row', gap: t.space.sm },
-  status: { flex: 1, minWidth: 0, gap: t.space.xxs, paddingVertical: t.space.md, paddingHorizontal: t.space.md, borderRadius: t.radii.lg },
+  // Narrow side paddings: three tiles share a 320 pt phone, and «Зелёные» / «Красные» must stay whole.
+  status: { flex: 1, minWidth: 0, gap: t.space.xxs, paddingVertical: t.space.md, paddingHorizontal: t.space.sm, borderRadius: t.radii.lg },
   retry: { alignItems: 'flex-start', gap: t.space.xs },
 }));

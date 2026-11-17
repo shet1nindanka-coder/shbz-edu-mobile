@@ -1,6 +1,6 @@
 // Web variant of the file actions: "share" saves the file through a download link, "open in another
 // app" opens it in a new tab (the browser's own viewer). Same signatures as the native module.
-import { cacheFileName } from './file-names';
+import { cacheFileName, fileKindOf } from './file-names';
 
 export type FileActionTarget = { uri: string; mimeType: string; name: string };
 
@@ -27,6 +27,11 @@ export async function shareFile(target: FileActionTarget): Promise<FileActionRes
 
 export async function openInAnotherApp(target: FileActionTarget): Promise<FileActionResult> {
   if (typeof window === 'undefined') return { ok: false, reason: 'unavailable' };
+  // A browser shows PDF and images itself. Anything else (DOCX) it can only save, and a file saved from a
+  // new tab gets the address as its name (a blob id). Such a file goes through the download link instead,
+  // which carries the original file name.
+  const kind = fileKindOf(target.mimeType);
+  if (kind !== 'pdf' && kind !== 'image') return shareFile(target);
   const opened = window.open(target.uri, '_blank', 'noopener,noreferrer');
   // With `noopener` browsers return null even on success, so only a thrown error counts as a failure.
   void opened;

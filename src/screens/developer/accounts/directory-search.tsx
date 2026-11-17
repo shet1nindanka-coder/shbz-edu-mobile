@@ -1,5 +1,3 @@
-import { View } from 'react-native';
-
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Icon, IconButton, TextField } from '@/ui';
@@ -33,11 +31,7 @@ export function DirectorySearch({ tab, value, onChange }: DirectorySearchProps) 
       autoComplete="off"
       returnKeyType="search"
       enterKeyHint="search"
-      left={
-        <View style={styles.icon}>
-          <Icon name="search" size={18} color="kicker" />
-        </View>
-      }
+      left={<Icon name="search" size={18} color="kicker" />}
       right={
         value.length > 0 ? (
           <IconButton
@@ -56,6 +50,5 @@ export function DirectorySearch({ tab, value, onChange }: DirectorySearchProps) 
 }
 
 const useStyles = makeStyles((t) => ({
-  icon: { paddingLeft: t.space.lg - t.space.xxs },
   clear: { marginRight: t.space.xxs },
 }));
