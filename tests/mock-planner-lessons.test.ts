@@ -848,6 +848,9 @@ describe("planner.scheduleLesson", () => {
   it("refuses an invalid time, a finished lesson and unknown lessons", async () => {
     const mock = await signedIn(ANNA);
     const p = mock.api.planner;
+    // The seeded journal has its own `lesson.schedule` rows: a refusal must not add one.
+    const scheduleRows = () => auditActions(mock).filter((action) => action === "lesson.schedule").length;
+    const scheduledBefore = scheduleRows();
     assert.equal((await rejects(p.scheduleLesson("les_unscheduled", "когда-нибудь"), "invalidStartsAt", 400)).message, ru.apiPlanner.lessons.invalidStartsAt);
     await rejects(p.scheduleLesson("les_unscheduled", ""), "invalidStartsAt", 400);
     await rejects(p.scheduleLesson("les_unscheduled", undefined as unknown as string), "invalidStartsAt", 400);
@@ -858,9 +861,12 @@ describe("planner.scheduleLesson", () => {
     assert.equal(finished.message, ru.apiPlanner.lesson.alreadyFinished);
 
     await rejects(p.scheduleLesson("hp_ready", iso(DAY_MS)), "lessonNotFound", 404);
+    // The body is read before the lesson is looked up (the site's handler order, 05 §3.3).
+    await rejects(p.scheduleLesson("les_nope", "когда-нибудь"), "invalidStartsAt", 400);
+    await rejects(p.scheduleLesson("les_nope", iso(DAY_MS)), "lessonNotFound", 404);
     await rejects(p.scheduleLesson("les_igor_1", iso(DAY_MS)), "lessonNotFound", 404);
     await rejects(p.scheduleLesson("nope", iso(DAY_MS)), "lessonNotFound", 404);
-    assert.equal(auditActions(mock).includes("lesson.schedule"), false);
+    assert.equal(scheduleRows(), scheduledBefore);
   });
 
   it("reopens a lesson that closed on schedule only when nothing was handed in", async () => {

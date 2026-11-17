@@ -19,6 +19,10 @@ export type AnswersSectionProps = {
   /** 1-based page of the list; the screen keeps it while other sections are shown. */
   page: number;
   onPageChange: (page: number) => void;
+  /** The number the screen was opened for (the site's `?number=N`): its row is ringed. */
+  highlightedId?: string;
+  /** Vertical offset of the ringed row inside this section, once it is laid out (the screen scrolls to it). */
+  onHighlightLayout?: (y: number) => void;
   /** Opens the single-number editor. */
   onOpenNumber: (number: TopicNumber) => void;
 };
@@ -28,7 +32,7 @@ export type AnswersSectionProps = {
  * its phone mapping): the topic's numbers ten per page with their fill badges. A row opens the
  * single-number editor (`content.number`) instead of editing ten LaTeX cards inline.
  */
-export function AnswersSection({ numbers, page, onPageChange, onOpenNumber }: AnswersSectionProps) {
+export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout, onPageChange, onOpenNumber }: AnswersSectionProps) {
   const styles = useStyles();
   const { dict, m } = useI18n();
   const t = dict.topics.edit;
@@ -98,9 +102,11 @@ export function AnswersSection({ numbers, page, onPageChange, onOpenNumber }: An
             <Text variant="smallStrong" tabular testID="answers-range">
               {format(a.shownRange, { start: range.start, end: range.end, total })}
             </Text>
-            <Text variant="caption" color="textMuted" testID="answers-summary">
-              {format(a.savedSummary, { conditions: filled.conditions, answers: filled.answers, total, pageSize: ANSWERS_PAGE_SIZE })}
-            </Text>
+            <Hint>
+              <Text variant="caption" color="textMuted" testID="answers-summary">
+                {format(a.savedSummary, { conditions: filled.conditions, answers: filled.answers, total, pageSize: ANSWERS_PAGE_SIZE })}
+              </Text>
+            </Hint>
             {pageCount > 1 ? pager('top') : null}
           </Card>
 
@@ -108,11 +114,12 @@ export function AnswersSection({ numbers, page, onPageChange, onOpenNumber }: An
             const hasCondition = hasLatex(entry.conditionLatex);
             const hasAnswer = hasLatex(entry.answerLatex);
             const fill = numberFillStatus(entry.conditionLatex, entry.answerLatex);
-            return (
+            const card = (
               <Card
                 key={entry.id}
                 variant="outline"
                 padded={14}
+                selected={entry.id === highlightedId}
                 onPress={() => onOpenNumber(entry)}
                 accessibilityLabel={`${a.cardKicker}: ${format(m.content.edit.openNumber, { number: entry.number })}. ${a.status[fill]}`}
                 style={styles.row}
@@ -132,6 +139,14 @@ export function AnswersSection({ numbers, page, onPageChange, onOpenNumber }: An
                   <Badge tone={hasAnswer ? 'GREEN' : 'none'} label={hasAnswer ? a.hasAnswer : a.noAnswer} />
                 </View>
               </Card>
+            );
+            // Only the ringed row reports where it is; the wrapper keeps the column's spacing.
+            return entry.id === highlightedId && onHighlightLayout ? (
+              <View key={entry.id} onLayout={(event) => onHighlightLayout(event.nativeEvent.layout.y)}>
+                {card}
+              </View>
+            ) : (
+              card
             );
           })}
 

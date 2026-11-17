@@ -14,8 +14,10 @@ import {
   DeleteStudentDialog,
   errorText,
   invalidateStudents,
+  loadFailureOf,
   ResetPasswordSheet,
   useLatched,
+  useNoticeScroll,
   type CreatedCredentials,
 } from '@/screens/teacher/students';
 import { makeStyles, useTheme } from '@/theme';
@@ -95,6 +97,7 @@ export function DeveloperAccountsScreen() {
     queryFn: () => api.accounts.getAccounts(),
   });
   const loaded = directory.data !== undefined;
+  const directoryFailure = loadFailureOf(directory);
   const teachers = directory.data?.teachers ?? NO_TEACHERS;
   const students = directory.data?.students ?? NO_STUDENTS;
   useRefetchOnFocus([directory]);
@@ -111,10 +114,8 @@ export function DeveloperAccountsScreen() {
   };
 
   /** A banner is useless below the fold: bring the list back to its top with it. */
-  const announce = (next: PageNotice) => {
-    setNotice(next);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
+  const announce = (next: PageNotice) => setNotice(next);
+  useNoticeScroll(listRef, notice);
 
   const closeOverlay = () => {
     queued.current = null;
@@ -256,10 +257,10 @@ export function DeveloperAccountsScreen() {
     ) : (
       <EmptyState title={manager.notFound} hint={manager.notFoundHint} testID="accounts-no-matches" />
     )
-  ) : directory.isError ? (
+  ) : directoryFailure ? (
     <ErrorState
       title={dict.shells.errorTitle}
-      description={errorText(directory.error, dict.shells.errorDescription)}
+      description={errorText(directoryFailure.error, dict.shells.errorDescription)}
       retryLabel={dict.common.retry}
       onRetry={() => void directory.refetch()}
       retrying={directory.isFetching}
@@ -416,6 +417,8 @@ export function DeveloperAccountsScreen() {
         onClose={closeOverlay}
         onDone={() => {
           closeOverlay();
+          // 90-addendum-5 B.2.1: the directory is re-read after a student's password reset.
+          invalidate();
           announce({ tone: 'success', text: t.notices.passwordReset });
         }}
         onMissing={(message) => {

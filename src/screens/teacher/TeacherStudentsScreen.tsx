@@ -15,10 +15,12 @@ import { useRefetchOnFocus } from './home/use-refetch-on-focus';
 import { CreateStudentSheet } from './students/create-student-sheet';
 import { CredentialsSheet, type CreatedCredentials } from './students/credentials-sheet';
 import { DeleteStudentDialog } from './students/delete-student-dialog';
-import { errorText } from './students/error-text';
+import { errorText, loadFailureOf } from './students/error-text';
+import { useStudentsListNotice } from './students/list-notice';
 import { ResetPasswordSheet } from './students/reset-password-sheet';
 import { StudentActionsSheet, type StudentAction } from './students/student-actions-sheet';
 import { StudentRow } from './students/student-row';
+import { useNoticeScroll } from './students/use-notice-scroll';
 
 type ListNotice = { tone: 'success' | 'error'; text: string };
 
@@ -62,6 +64,7 @@ export function TeacherStudentsScreen() {
   });
   const list = students.data?.students;
   useRefetchOnFocus([students]);
+  const studentsFailure = loadFailureOf(students);
 
   const refresh = () => {
     setRefreshing(true);
@@ -69,10 +72,11 @@ export function TeacherStudentsScreen() {
   };
 
   /** A banner is useless below the fold: bring the list back to its top with it. */
-  const announce = (next: ListNotice) => {
-    setNotice(next);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
+  const announce = (next: ListNotice) => setNotice(next);
+  useNoticeScroll(listRef, notice);
+
+  // A student deleted from the card: the card returns here and leaves the notice (D3).
+  useStudentsListNotice((key) => announce({ tone: 'success', text: t.notices[key] }));
 
   const closeOverlay = () => {
     queued.current = null;
@@ -150,10 +154,10 @@ export function TeacherStudentsScreen() {
   // never jump, and adding a student does not depend on the list having loaded.
   const body = list ? (
     <EmptyState title={t.empty} testID="students-empty" />
-  ) : students.isError ? (
+  ) : studentsFailure ? (
     <ErrorState
       title={dict.shells.errorTitle}
-      description={errorText(students.error, dict.shells.errorDescription)}
+      description={errorText(studentsFailure.error, dict.shells.errorDescription)}
       retryLabel={dict.common.retry}
       onRetry={() => void students.refetch()}
       retrying={students.isFetching}

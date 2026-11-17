@@ -85,6 +85,10 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   const entries = useMemo(() => mergeJournalPages(pages ?? []), [pages]);
   const filterCount = activeFilterCount(filters);
   const switching = journal.isPlaceholderData;
+  // Offline, the request for a new selection does not start (queries are `offlineFirst`): the rows on
+  // screen belong to the previous selection and will stay until the connection returns — say so instead
+  // of spinning for as long as the phone is offline.
+  const stalled = switching && journal.fetchStatus === 'paused';
 
   const refresh = () => {
     setRefreshing(true);
@@ -106,10 +110,10 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
 
   const actor = filters.actor ? first?.actors.find((candidate) => candidate.id === filters.actor) : undefined;
   const summary: { key: string; label: string; tone: 'muted' | 'red' }[] = [
-    { key: 'period', label: periodLabel(filters.days, t.filters) ?? format(m.developer.journal.period, { n: filters.days }), tone: 'muted' },
+    { key: 'period', label: periodLabel(filters.days, t.filters) ?? plural(locale, filters.days, m.developer.journal.periodForms), tone: 'muted' },
     ...(filters.category ? [{ key: 'category', label: categoryFilterLabel(filters.category, t.filters), tone: 'muted' as const }] : []),
     ...(actor ? [{ key: 'actor', label: actorOptionLabel(actor, t.roles), tone: 'muted' as const }] : []),
-    ...(filters.action.trim() ? [{ key: 'action', label: `«${filters.action.trim()}»`, tone: 'muted' as const }] : []),
+    ...(filters.action.trim() ? [{ key: 'action', label: format(m.developer.journal.actionQuoted, { text: filters.action.trim() }), tone: 'muted' as const }] : []),
     ...(filters.onlyFailed ? [{ key: 'failed', label: t.filters.onlyFailed, tone: 'red' as const }] : []),
   ];
 
@@ -118,7 +122,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
       {first ? (
         <Hint>
           <Text variant="small" color="textMuted" testID="journal-intro">
-            {`${format(t.intro, { days: first.retentionDays })} ${m.common.dateTime.moscowTime}.`}
+            {format(t.intro, { days: first.retentionDays })}
           </Text>
         </Hint>
       ) : null}
@@ -131,7 +135,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           testID="journal-filters-open"
         />
         <View style={styles.total}>
-          {switching ? <Spinner size={14} color="accentSolid" /> : null}
+          {switching && !stalled ? <Spinner size={14} color="accentSolid" /> : null}
           {first ? (
             <Text variant="smallMedium" color="textMuted" tabular testID="journal-total">
               {plural(locale, first.total, m.developer.journal.entryForms)}
@@ -144,6 +148,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           <Chip key={chip.key} label={chip.label} tone={chip.tone} />
         ))}
       </View>
+      {stalled ? <Notice tone="warning" text={m.common.errors.network} testID="journal-offline-notice" /> : null}
       {/* Loaded rows stay on screen when a refresh fails (offline): say so instead of replacing them. */}
       {journal.isError && first && !journal.isFetchNextPageError ? (
         <Notice tone="error" text={errorText(journal.error, m.developer.journal.refreshFailed)} testID="journal-refresh-error" />

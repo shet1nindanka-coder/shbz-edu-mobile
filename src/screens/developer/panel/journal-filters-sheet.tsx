@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import type { AuditCategory, JournalPage } from '@/api/types';
-import { format, useI18n } from '@/i18n';
+import { plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, Select, Switch, TextButton, TextField } from '@/ui';
 
@@ -37,7 +37,7 @@ export type JournalFiltersSheetProps = {
  */
 export function JournalFiltersSheet({ visible, filters, actors, onChange, onClose }: JournalFiltersSheetProps) {
   const styles = useStyles();
-  const { dict, m } = useI18n();
+  const { dict, m, locale } = useI18n();
   const t = dict.planner.journal;
   const f = t.filters;
 
@@ -134,7 +134,7 @@ export function JournalFiltersSheet({ visible, filters, actors, onChange, onClos
           options={periodOptions}
           value={knownPeriod ? filters.days : null}
           onChange={(days) => onChange({ ...filters, days })}
-          placeholder={format(m.developer.journal.period, { n: filters.days })}
+          placeholder={plural(locale, filters.days, m.developer.journal.periodForms)}
           closeLabel={m.common.actions.close}
           size="sm"
           testID="journal-filter-period"

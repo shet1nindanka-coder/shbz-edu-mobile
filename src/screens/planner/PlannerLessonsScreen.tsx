@@ -16,6 +16,7 @@ import { ComposeCard } from './lessons/compose-card';
 import { LessonCard } from './lessons/lesson-card';
 import { buildLessonRows, groupLessons, hasScheduleAdvanced, type LessonListRow } from './lessons/lessons-list-logic';
 import { ActionSheet, type SheetAction } from './shared/action-sheet';
+import { serverClockOffset } from './shared/board-cache';
 import { errorText } from './shared/error-text';
 import { HandoutNotice } from './shared/handout-notice';
 import { isWaitingForNetwork } from './shared/query-state';
@@ -50,8 +51,7 @@ export function PlannerLessonsScreen() {
 
   // "Today" follows the server clock: a wrong device clock must not move lessons between sections.
   const deviceNow = useNowTick(60_000);
-  const clockOffset = data ? Date.parse(data.serverNow) - lessons.dataUpdatedAt : 0;
-  const now = deviceNow + (Number.isFinite(clockOffset) ? clockOffset : 0);
+  const now = deviceNow + serverClockOffset(data?.serverNow, lessons.dataUpdatedAt);
 
   const rows = useMemo(() => (data ? buildLessonRows(groupLessons(data.lessons, now)) : []), [data, now]);
   const stickyIndices = useMemo(() => rows.flatMap((row, index) => (row.type === 'section' ? [index] : [])), [rows]);

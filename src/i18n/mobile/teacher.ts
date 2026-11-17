@@ -9,14 +9,10 @@ const ru = {
     suggestPickHint: "Нажмите, чтобы подставить"
   },
   report: {
-    // The weekly PDF is downloaded and handed to the system viewer instead of opening in a browser tab.
-    preparing: "Готовим отчёт…",
-    ready: "Отчёт готов",
-    open: "Открыть отчёт",
-    share: "Поделиться отчётом"
+    // The PDF is generated for seconds; the site shows nothing meanwhile (the browser downloads it).
+    preparing: "Готовим отчёт…"
   },
   review: {
-    photoOf: "Фото {index} из {total}",
     // A status group has no visible caption on a phone; this is its accessible name.
     statusAria: "Статус номера {n}",
     // The site's review tab hides the statement; on a phone it opens on demand under the number.
@@ -44,10 +40,6 @@ const ru = {
     conditionsFailed: "Условия номеров не загрузились — выбирать номера можно и без них."
   },
   lessons: {
-    // The site removes a problem at once; a stray tap on a phone asks first.
-    removeConfirmTitle: "Убрать № {n} из набора?",
-    removeConfirmDescription: "Итог урока по этому номеру будет удалён вместе с ним. Статус номера в прогрессе ученика не изменится.",
-    removeConfirm: "Убрать",
     bankLoading: "Загружаем номера…",
     bankFailed: "Не удалось загрузить номера. Попробуйте ещё раз.",
     noFreeNumbers: "Все номера этой темы уже в наборе.",
@@ -62,13 +54,9 @@ const en: typeof ru = {
     suggestPickHint: "Tap to use it"
   },
   report: {
-    preparing: "Preparing the report…",
-    ready: "The report is ready",
-    open: "Open the report",
-    share: "Share the report"
+    preparing: "Preparing the report…"
   },
   review: {
-    photoOf: "Photo {index} of {total}",
     statusAria: "Status of problem {n}",
     showCondition: "Statement and answer",
     hideCondition: "Hide the statement and answer",
@@ -92,9 +80,6 @@ const en: typeof ru = {
     conditionsFailed: "The statements did not load — you can still select problems without them."
   },
   lessons: {
-    removeConfirmTitle: "Remove No. {n} from the set?",
-    removeConfirmDescription: "The lesson result for this problem will be deleted with it. The problem's status in the student's progress stays unchanged.",
-    removeConfirm: "Remove",
     bankLoading: "Loading problems…",
     bankFailed: "Could not load the problems. Please try again.",
     noFreeNumbers: "Every problem of this topic is already in the set.",

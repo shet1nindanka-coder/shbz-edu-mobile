@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { isApiError, qk, useApi } from '@/api';
+import { qk, useApi } from '@/api';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { ShellAppBar } from '@/screens/shell';
@@ -12,6 +12,7 @@ import { Enter, ErrorState, LoadingState, Notice, PageHeader, Screen } from '@/u
 import { buildHomeCards, pickCallCounts, type HomeCard } from './home/home-cards';
 import { HomeNavCard } from './home/home-nav-card';
 import { useRefetchOnFocus } from './home/use-refetch-on-focus';
+import { errorText, loadFailureOf } from './students/error-text';
 
 /**
  * `teacher.home` (docs/spec/04-teacher-students.md S1): the teacher's landing tab — three navigation cards
@@ -37,6 +38,7 @@ export function TeacherHomeScreen() {
   });
 
   useRefetchOnFocus([home, callCounts]);
+  const homeFailure = loadFailureOf(home);
 
   const summary = home.data;
   const cards = summary
@@ -74,7 +76,7 @@ export function TeacherHomeScreen() {
           {home.isError ? (
             <Notice
               tone="error"
-              text={isApiError(home.error) ? home.error.message : m.common.errors.generic}
+              text={errorText(home.error, m.common.errors.generic)}
               testID="teacher-home-refresh-error"
             />
           ) : null}
@@ -84,10 +86,10 @@ export function TeacherHomeScreen() {
             </Enter>
           ))}
         </View>
-      ) : home.isError ? (
+      ) : homeFailure ? (
         <ErrorState
           title={dict.shells.errorTitle}
-          description={isApiError(home.error) ? home.error.message : dict.shells.errorDescription}
+          description={errorText(homeFailure.error, dict.shells.errorDescription)}
           retryLabel={dict.common.retry}
           onRetry={() => void home.refetch()}
           retrying={home.isFetching}

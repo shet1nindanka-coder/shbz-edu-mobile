@@ -9,7 +9,8 @@ import { useAppNavigation } from '@/navigation';
 
 import { errorText } from '../shared/error-text';
 import { notePlanRequested, planRequestedAtOf } from '../shared/plan-anchors';
-import { countReady, planSignature, planStateOf, statusSignatureRows } from '../shared/plan-state';
+import { patchKeepingFetchTime, serverClockOffset } from '../shared/board-cache';
+import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
 import { useNowTick } from '../shared/use-now-tick';
 import { useRetryWait } from '../shared/use-retry-wait';
 import {
@@ -56,9 +57,11 @@ export function useLessonBoard(lessonId: string) {
 
   // One clock for stale plans, idle chips and "N min ago": the device clock corrected by the server's.
   const deviceNow = useNowTick(30_000);
-  const rawOffset = data ? Date.parse(data.serverNow) - boardUpdatedAt : 0;
-  const clockOffset = Number.isFinite(rawOffset) ? rawOffset : 0;
+  // `boardUpdatedAt` is the time of the last real read: local patches keep it (see `patchBoard`).
+  const clockOffset = serverClockOffset(data?.serverNow, boardUpdatedAt);
   const now = deviceNow + clockOffset;
+  /** Device time of the latest local patch of the cached board (the poll guard below needs it). */
+  const patchedAt = useRef(0);
 
   const [notice, setNotice] = useState<BoardNotice | null>(null);
   const [busy, setBusy] = useState<Record<string, ParticipantBusy>>({});
@@ -76,7 +79,9 @@ export function useLessonBoard(lessonId: string) {
 
   const patchBoard = useCallback(
     (update: (current: LessonBoardModel) => LessonBoardModel) => {
-      queryClient.setQueryData<LessonBoardModel>(boardKey, (current) => (current ? update(current) : current));
+      // The fetch time stays as it was: the board clock pairs it with `serverNow` of that fetch.
+      patchKeepingFetchTime<LessonBoardModel>(queryClient, boardKey, update);
+      patchedAt.current = Date.now();
     },
     // The key is rebuilt on every render from the same strings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,8 +129,15 @@ export function useLessonBoard(lessonId: string) {
   useEffect(() => {
     if (!polling || !participants || !statusData || boardFetching) return;
     // A status older than the board describes the past (e.g. the moment before an accepted "Retry").
-    if (statusUpdatedAt < boardUpdatedAt) return;
-    if (planSignature(statusSignatureRows(statusData.participants)) !== planSignature(participants)) void refetchBoard();
+    if (statusUpdatedAt < Math.max(boardUpdatedAt, patchedAt.current)) return;
+    // The status endpoint also lists a participant whose student moved to another teacher; the board
+    // hides it (§0.4), so only rows of participants the board shows are compared — otherwise the two
+    // signatures would differ on every tick and the board would be re-read every 2 seconds.
+    const rows = statusRowsOnBoard(
+      statusData.participants,
+      participants.map((participant) => participant.id),
+    );
+    if (planSignature(rows) !== planSignature(participants)) void refetchBoard();
   }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refetchBoard]);
 
   // ───────────────────────────── live activity poll (fallback of the realtime event) ─────────────────────────────

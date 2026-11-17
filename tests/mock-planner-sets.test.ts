@@ -323,6 +323,8 @@ describe("planner.setItemResult", () => {
     assert.equal(missing.message, ru.apiPlanner.lessonResult.itemNotFound);
     await rejects(p.setItemResult("les_live", participantId, item, "SOLVED"), "itemNotFound", 404);
     await rejects(p.setItemResult("les_tomorrow_group", participantId, "li_nope", "SOLVED"), "itemNotFound", 404);
+    // The body is read before the item is looked up (the site's handler order, 05 §3.8).
+    await rejects(p.setItemResult("les_tomorrow_group", participantId, "li_nope", "DONE" as LessonItemResult), "invalidResult", 400);
     // Homework has no lesson results.
     await rejects(p.setItemResult("hp_ready", pid("hp_ready", "ilya"), iid("hp_ready", "ilya", "010211"), "SOLVED"), "itemNotFound", 404);
     await rejects(p.setItemResult("les_igor_1", pid("les_igor_1", "sofia"), iid("les_igor_1", "sofia", "308"), "SOLVED"), "itemNotFound", 404);

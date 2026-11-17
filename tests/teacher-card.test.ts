@@ -36,11 +36,11 @@ import {
   splitLessonParts,
 } from "../src/screens/teacher/card/lessons-logic";
 import {
-  EMPTY_PLACEMENT,
   acceptVerdictChanges,
   applyStatuses,
   buildReviewRows,
   canAcceptVerdicts,
+  completedAssignmentIds,
   chunkChanges,
   countVerdicts,
   hasDiagnostics,
@@ -49,7 +49,6 @@ import {
   isAssignmentOverdue,
   latestDoneCheck,
   patchHomeworkStatuses,
-  reconcilePlacement,
   reviewRowIndex,
   shortenRecognizedAnswer,
   unmarkedCount,
@@ -233,40 +232,41 @@ describe("review: placement of the cards", () => {
   const active = assignment("active", { "1": null });
   const done = assignment("done", { "1": "GREEN" });
 
-  it("takes the server order and folds completed homework on first load", () => {
-    const placement = reconcilePlacement(EMPTY_PLACEMENT, [active, done], 0);
-    assert.deepEqual(placement, { token: 0, order: ["active", "done"], completedIds: ["done"] });
-    const rows = buildReviewRows([active, done], placement, false);
+  it("keeps the server order and folds completed homework under the disclosure", () => {
+    const completed = completedAssignmentIds([active, done]);
+    assert.deepEqual([...completed], ["done"]);
+    const rows = buildReviewRows([active, done], completed, false);
     assert.deepEqual(rows.map((row) => row.key), ["active", "completed-toggle"]);
     assert.equal(reviewRowIndex(rows, "done"), -1);
-    const open = buildReviewRows([active, done], placement, true);
+    const open = buildReviewRows([active, done], completed, true);
     assert.deepEqual(open.map((row) => row.key), ["active", "completed-toggle", "done"]);
     assert.equal(reviewRowIndex(open, "done"), 2);
+    const toggle = open[1];
+    assert.ok(toggle.kind === "completedToggle" && toggle.count === 1 && toggle.open);
   });
 
-  it("keeps a card where it is when it becomes completed or the server re-sorts", () => {
-    const placement = reconcilePlacement(EMPTY_PLACEMENT, [active, done], 0);
-    const completedNow = assignment("active", { "1": "GREEN" });
-    assert.equal(reconcilePlacement(placement, [done, completedNow], 0), placement);
-    const rows = buildReviewRows([done, completedNow], placement, false);
+  it("does not move a card while its mark is only optimistic", () => {
+    // The server still says "not completed"; the displayed homework already carries the in-flight colour.
+    const optimistic = applyStatuses(active, { n1: "GREEN" });
+    const rows = buildReviewRows([optimistic, done], completedAssignmentIds([active, done]), false);
     assert.deepEqual(rows.map((row) => row.key), ["active", "completed-toggle"]);
+    assert.ok(rows[0].kind === "assignment" && rows[0].assignment.solvedCount === 1);
   });
 
-  it("appends new homework and drops cancelled homework", () => {
-    const placement = reconcilePlacement(EMPTY_PLACEMENT, [active, done], 0);
-    const added = assignment("new", { "1": null });
-    assert.deepEqual(reconcilePlacement(placement, [added, active], 0), { token: 0, order: ["active", "new"], completedIds: [] });
-  });
-
-  it("starts over on a manual refresh", () => {
-    const placement = reconcilePlacement(EMPTY_PLACEMENT, [active, done], 0);
+  it("regroups and re-sorts as soon as the server's answer changes", () => {
     const completedNow = assignment("active", { "1": "GREEN" });
-    assert.deepEqual(reconcilePlacement(placement, [done, completedNow], 1), { token: 1, order: ["done", "active"], completedIds: ["done", "active"] });
+    const added = assignment("new", { "1": null });
+    // The settled write is in the cache: the card leaves the active block, the counter grows.
+    const settled = buildReviewRows([completedNow, done], completedAssignmentIds([completedNow, done]), false);
+    assert.deepEqual(settled.map((row) => row.key), ["completed-toggle"]);
+    assert.ok(settled[0].kind === "completedToggle" && settled[0].count === 2);
+    // A refetch brings a new homework first (attention order) and drops a cancelled one.
+    const refetched = buildReviewRows([added, completedNow], completedAssignmentIds([added, completedNow]), true);
+    assert.deepEqual(refetched.map((row) => row.key), ["new", "completed-toggle", "active"]);
   });
 
   it("shows no disclosure without completed homework", () => {
-    const placement = reconcilePlacement(EMPTY_PLACEMENT, [active], 0);
-    assert.deepEqual(buildReviewRows([active], placement, true).map((row) => row.kind), ["assignment"]);
+    assert.deepEqual(buildReviewRows([active], completedAssignmentIds([active]), true).map((row) => row.kind), ["assignment"]);
   });
 });
 

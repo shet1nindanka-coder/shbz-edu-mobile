@@ -11,6 +11,7 @@ import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Badge, Dialog, Notice, ProgressBar, Text } from '@/ui';
 
+import { mergeQueryData } from './cache';
 import { errorText } from './error-text';
 import { applyDeletedPhoto, applyUploadedPhotos, freePhotoSlots } from './logic';
 import { PickProblemNotice, usePhotoSource } from './use-photo-source';
@@ -74,8 +75,8 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
       setPending(files.map((file, index) => ({ key: `pending-${index}-${file.uri}`, uri: file.uri, name: file.name })));
     },
     onSuccess: (result) => {
-      queryClient.setQueryData<GetHomeworkResponse>(detailKey, (detail) =>
-        detail ? applyUploadedPhotos(detail, result.photos, result.photosCount) : detail,
+      mergeQueryData<GetHomeworkResponse>(queryClient, detailKey, (detail) =>
+        applyUploadedPhotos(detail, result.photos, result.photosCount),
       );
       afterListChange();
       setAdded(true);
@@ -100,8 +101,8 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
     mutationFn: (photo: AttachedPhoto) => api.studentWork.deleteHomeworkPhoto(assignmentId, photo.id),
     onMutate: () => setError(null),
     onSuccess: (result, photo) => {
-      queryClient.setQueryData<GetHomeworkResponse>(detailKey, (detail) =>
-        detail ? applyDeletedPhoto(detail, photo.id, result.photosCount) : detail,
+      mergeQueryData<GetHomeworkResponse>(queryClient, detailKey, (detail) =>
+        applyDeletedPhoto(detail, photo.id, result.photosCount),
       );
       afterListChange();
     },

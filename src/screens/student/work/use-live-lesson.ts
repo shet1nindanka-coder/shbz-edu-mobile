@@ -5,6 +5,7 @@ import { hasErrorCode, qk, useApi } from '@/api';
 import type { ActiveLessonDto, GetLessonResponse, LessonItemDto, PhotoUpload } from '@/api/types';
 import { useI18n } from '@/i18n';
 
+import { mergeQueryData } from './cache';
 import { errorText } from './error-text';
 import { applyLessonState, applySubmission, hasRunningSubmission } from './logic';
 import { usePoller } from './use-poller';
@@ -62,8 +63,8 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
     joinedFor.current = lessonId;
     sendJoin(lessonId, {
       onSuccess: ({ joinedAt }) => {
-        queryClient.setQueryData<GetLessonResponse>(qk('studentWork', 'getLiveLesson'), (current) =>
-          current?.active && current.active.lessonId === lessonId
+        mergeQueryData<GetLessonResponse>(queryClient, qk('studentWork', 'getLiveLesson'), (current) =>
+          current.active && current.active.lessonId === lessonId
             ? { ...current, active: { ...current.active, joinedAt } }
             : current,
         );
@@ -93,8 +94,8 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
       throw failure;
     }
     let resultChanged = false;
-    queryClient.setQueryData<GetLessonResponse>(lessonKey, (current) => {
-      if (!current?.active || current.active.lessonId !== lessonId) return current;
+    mergeQueryData<GetLessonResponse>(queryClient, lessonKey, (current) => {
+      if (!current.active || current.active.lessonId !== lessonId) return current;
       const merged = applyLessonState(current, state);
       resultChanged = merged.resultChanged;
       return merged.next;
@@ -124,8 +125,8 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
       setSubmitErrors((current) => withoutKey(current, item.id));
     },
     onSuccess: (result) => {
-      queryClient.setQueryData<GetLessonResponse>(qk('studentWork', 'getLiveLesson'), (current) =>
-        current ? applySubmission(current, result.submission) : current,
+      mergeQueryData<GetLessonResponse>(queryClient, qk('studentWork', 'getLiveLesson'), (current) =>
+        applySubmission(current, result.submission),
       );
       setSubmitEpoch((value) => value + 1);
     },

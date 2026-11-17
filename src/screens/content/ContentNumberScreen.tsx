@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { isNotFoundError, qk, useApi } from '@/api';
@@ -13,6 +13,7 @@ import { makeStyles } from '@/theme';
 import { Badge, Card, LoadingState, Notice, Screen, Text, TextButton, type BadgeTone } from '@/ui';
 
 import { LatexEditorBlock } from './browse/latex-editor-block';
+import { clearOpenedFromEditor, peekOpenedFromEditor, requestEditorFocus } from './shared/editor-links';
 import { errorText } from './shared/error-text';
 import { LoadFailure, loadFailureOf } from './shared/load-failure';
 import { hasLatex, numberFillStatus, type NumberFillStatus } from './shared/number-fill-status';
@@ -39,6 +40,9 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
   const navigation = useAppNavigation();
   const isDeveloper = user.role === 'DEVELOPER';
   const [refreshing, setRefreshing] = useState(false);
+  // Pushed from the editor's statements-and-answers list: that editor is the screen right below this one.
+  const [fromEditor] = useState(() => peekOpenedFromEditor(topicId, number));
+  useEffect(() => clearOpenedFromEditor(), []);
 
   const key = qk('content', 'getNumber', topicId, number);
   const detail = useQuery({ queryKey: key, queryFn: () => api.content.getNumber(topicId, number) });
@@ -61,8 +65,19 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
   // The recorded spelling («010203») comes from the server; the route may carry another spelling of it.
   const recorded = data?.number.number ?? number;
   const fill = data ? numberFillStatus(data.number.conditionLatex, data.number.answerLatex) : 'empty';
-  // The site's back link: a teacher returns to the topic, a developer to its editor.
-  const openTopic = () => navigation.open(isDeveloper ? { screen: 'content.topicEdit', topicId } : { screen: 'content.topic', topicId });
+  // The site's back link (07 §1.4b): a teacher returns to the topic, a developer to the statements-and-answers
+  // section of its editor, on the page of this number. Opened from that very list, the editor is one step
+  // back with its section and page intact — pushing another editor on top would lose both.
+  const openTopic = () => {
+    if (!isDeveloper) {
+      navigation.open({ screen: 'content.topic', topicId });
+    } else if (fromEditor) {
+      navigation.back();
+    } else {
+      requestEditorFocus(topicId, recorded);
+      navigation.open({ screen: 'content.topicEdit', topicId });
+    }
+  };
 
   return (
     <Screen

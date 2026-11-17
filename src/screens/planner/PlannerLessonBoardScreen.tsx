@@ -1,5 +1,5 @@
-import { FlashList } from '@shopify/flash-list';
-import { useState } from 'react';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
 import type { LessonBoardItem, LessonBoardParticipant } from '@/api/types';
@@ -30,8 +30,8 @@ export type PlannerLessonBoardScreenProps = ScreenParams['planner.lessonBoard'];
 /**
  * `planner.lessonBoard` (docs/spec/05-teacher-lessons-plans.md §1.3, §1.4): every student's set with the
  * main and extra parts, the AI-plan state, result marks, and — while the lesson runs — who has joined,
- * what was submitted and who is idle. Secondary actions (handout, answers, homework from results,
- * delete) sit behind "⋯" in the app bar.
+ * what was submitted and who is idle. Secondary actions (handout PDF, print version, answers, homework
+ * from results, delete) sit behind "⋯" in the app bar.
  */
 export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenProps) {
   const styles = useStyles();
@@ -53,7 +53,16 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   const [addFor, setAddFor] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<{ studentId: string; homeworkNumberId: string } | null>(null);
 
-  if (controller.notFound) return <NotFoundScreen />;
+  // The answer to an action is shown at the top of the board; the row that caused it may be far below.
+  const listRef = useRef<FlashListRef<LessonBoardParticipant>>(null);
+  const notice = controller.notice;
+  const handoutFailure = handout.failure;
+  useEffect(() => {
+    if (notice || handoutFailure) listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [notice, handoutFailure]);
+
+  // `404 lessonNotFound`: deleted, or it belongs to another teacher — with the server's own words.
+  if (controller.notFound) return <NotFoundScreen description={errorText(board.error, dict.shells.notFoundDescription)} />;
 
   if (!lesson) {
     return (
@@ -74,11 +83,16 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
     );
   }
 
+  // The site's page header is «{group | "Урок"} · {date} · {n} мин» over the lesson title. The app bar has
+  // one line, where a title such as «Занятие группы · Логарифмические уравнения» is cut, so — as on the
+  // draft board — the bar carries the short label and the kicker, and the board starts with the full title.
   const kicker = [
-    lesson.group?.name ?? dict.planner.lessonDetail.fallbackKicker,
+    lesson.group?.name,
     formatDateTime(lesson.startsAt ?? lesson.createdAt, locale),
     format(dict.planner.common.minutesShort, { n: lesson.durationMinutes }),
-  ].join(' · ');
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
 
   const single = lesson.participants.length === 1;
   const isExpanded = (participantId: string) => toggled[participantId] ?? single;
@@ -104,6 +118,14 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
       icon: 'file',
       disabled: handout.wait.waiting,
       onPress: () => handout.open({ lessonId: lesson.id, createdAt: lesson.createdAt }),
+    },
+    {
+      // The HTML handout (the site's «Для печати»): the system prints it or saves it as a PDF.
+      key: 'print',
+      label: m.planner.lessonBoard.print,
+      icon: 'printer',
+      disabled: handout.wait.waiting,
+      onPress: () => handout.open({ lessonId: lesson.id, createdAt: lesson.createdAt, format: 'html' }),
     },
     {
       key: 'answers',
@@ -160,7 +182,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
       testID="planner-lesson-board-screen"
       header={
         <DetailAppBar
-          title={lesson.title}
+          title={dict.planner.lessonDetail.fallbackKicker}
           subtitle={kicker}
           right={<IconButton icon="more" accessibilityLabel={m.planner.lessonBoard.actions} onPress={() => setMenuOpen(true)} testID="lesson-board-menu" />}
           testID="lesson-board-app-bar"
@@ -170,6 +192,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
       padded={false}
     >
       <FlashList
+        ref={listRef}
         data={lesson.participants}
         keyExtractor={(participant) => participant.id}
         renderItem={renderParticipant}

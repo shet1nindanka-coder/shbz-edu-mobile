@@ -55,8 +55,11 @@ export type StatTile = {
   wide: boolean;
 };
 
-/** The seven stat blocks of the Status tab, in the site's order. */
-export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t: DevPanelDict['status']): StatTile[] {
+/**
+ * The seven stat blocks of the Status tab, in the site's order. `mskMark` («МСК») follows the date-time of
+ * the last retention run: the server prints it in Moscow time whatever the device zone is (07 §7 item 14).
+ */
+export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t: DevPanelDict['status'], mskMark: string): StatTile[] {
   return [
     { key: 'queue', label: t.queue, value: String(stats.queueLength), hint: t.queueHint, wide: false },
     {
@@ -72,7 +75,12 @@ export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t:
     { key: 'files', label: t.files, value: String(stats.filesCount), hint: stats.filesSizeLabel, wide: false },
     { key: 'students', label: t.students, value: String(stats.studentsCount), wide: false },
     { key: 'topics', label: t.topics, value: String(stats.topicsCount), wide: false },
-    { key: 'lastRetention', label: t.lastRetention, value: stats.lastRetentionLabel, wide: true },
+    {
+      key: 'lastRetention',
+      label: t.lastRetention,
+      value: stats.lastRetentionAt ? `${stats.lastRetentionLabel} ${mskMark}` : stats.lastRetentionLabel,
+      wide: true,
+    },
   ];
 }
 
@@ -114,8 +122,11 @@ export function budgetRows(budgets: readonly AiBudgetUsage[] | undefined): Budge
 
 type ActionsDict = DevPanelDict['actions'];
 
-/** Which actions ask before running (the site asks for none; see the SPEC-GAP note in actions-tab.tsx). */
-export type ActionConfirm = 'retention' | 'resetBudget' | 'unfreeze';
+/**
+ * Which actions ask before running. The site asks for none; the spec proposes a confirmation for exactly
+ * these two (07 §1.9 phone mapping, §7 item 12) — see the SPEC-GAP note in actions-tab.tsx.
+ */
+export type ActionConfirm = 'resetBudget' | 'unfreeze';
 
 export type PanelActionRow = {
   action: PanelAction;
@@ -127,7 +138,7 @@ export type PanelActionRow = {
 /** The five service buttons in the site's order. */
 export const PANEL_ACTION_ROWS: readonly PanelActionRow[] = [
   { action: 'test-ai', label: 'testAi', hint: 'testAiHint', confirm: null },
-  { action: 'run-retention', label: 'retention', hint: 'retentionHint', confirm: 'retention' },
+  { action: 'run-retention', label: 'retention', hint: 'retentionHint', confirm: null },
   { action: 'reset-ai-budget', label: 'resetBudget', hint: 'resetBudgetHint', confirm: 'resetBudget' },
   { action: 'unfreeze-checks', label: 'unfreeze', hint: 'unfreezeHint', confirm: 'unfreeze' },
   { action: 'flush-caches', label: 'flush', hint: 'flushHint', confirm: null },

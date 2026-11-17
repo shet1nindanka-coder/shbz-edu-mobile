@@ -39,9 +39,22 @@ export function filterByName<T extends { name: string }>(rows: readonly T[], que
   return rows.filter((row) => row.name.toLocaleLowerCase('ru-RU').includes(needle));
 }
 
-/** Speed of every member as the form holds it: the profile speed, or `null` = "not set". */
-export function initialSpeeds(members: readonly LessonFormMember[]): Record<string, number | null> {
-  return Object.fromEntries(members.map((member) => [member.id, member.speed ?? null]));
+/**
+ * Students the form sends (§1.2.d, §1.6 "all checked"): every CURRENT member except those the teacher
+ * unchecked. The member list is re-read while the form is open (it first renders from the cached answer),
+ * so the default is derived from the list on every render instead of being copied once: a student who
+ * joined the group since the last visit is checked, one who left is not sent.
+ */
+export function checkedMemberIds(members: readonly { id: string }[], uncheckedIds: readonly string[]): string[] {
+  return members.filter((member) => !uncheckedIds.includes(member.id)).map((member) => member.id);
+}
+
+/**
+ * Speeds the form shows and sends: the member's CURRENT profile speed (`null` = "not set") unless the
+ * teacher picked another one for this lesson. Picks of students that are no longer on the list are dropped.
+ */
+export function currentSpeeds(members: readonly LessonFormMember[], picked: Readonly<Record<string, number | null>>): Record<string, number | null> {
+  return Object.fromEntries(members.map((member) => [member.id, member.id in picked ? (picked[member.id] ?? null) : (member.speed ?? null)]));
 }
 
 export type AiFormState = {

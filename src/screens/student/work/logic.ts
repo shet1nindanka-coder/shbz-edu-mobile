@@ -351,6 +351,45 @@ export function secondsUntil(moment: string, serverNowMs: number): number {
   return Math.max(0, Math.ceil((at - serverNowMs) / 1000));
 }
 
+// ───────────────────────────── runtime switches ─────────────────────────────
+
+/**
+ * How often a focused screen re-reads its data while the server reports the AI check as switched off
+ * (`aiCheckAvailable` / `lessonCheckAvailable` false). The control is disabled up front on that flag, so
+ * without a re-read it would stay dead after the switch is turned back on.
+ * SPEC-GAP: the spec gives the flags but no refresh rule; the site re-reads its lesson page every 30 s
+ * around the start (`LESSON_START_CHECK_INTERVAL_MS`), the same interval is used here.
+ */
+export const UNAVAILABLE_RECHECK_MS = 30_000;
+
+// ───────────────────────────── note autosave (H2.c) ─────────────────────────────
+
+/**
+ * What to do with the note of a re-read detail while the card's field is at rest:
+ * - `confirmed` — the server holds what this card saved last (only trimmed): nothing to change;
+ * - `adopt` — the note was changed somewhere else (another device, the number screen): show it;
+ * - `keep` — the field holds something newer than the server: an unsaved edit, a draft waiting for a
+ *   connection, or the server's note is an echo of this card's own EARLIER save (a re-read that started
+ *   before the latest save).
+ * The field is never rewritten with the same text in trimmed form — that would eat the trailing space or
+ * line break the student has just typed (the site's textarea is not touched after mount either).
+ */
+export function decideServerNote(input: {
+  serverNote: string;
+  /** What the field shows. */
+  text: string;
+  /** The last note this card saved or handed to the offline queue (trimmed). */
+  baseline: string;
+  hasPendingWrite: boolean;
+  /** Notes this card saved before `baseline`. */
+  superseded: readonly string[];
+}): 'confirmed' | 'adopt' | 'keep' {
+  const incoming = input.serverNote.trim();
+  if (incoming === input.baseline) return 'confirmed';
+  if (input.hasPendingWrite || input.text.trim() !== input.baseline || input.superseded.includes(incoming)) return 'keep';
+  return 'adopt';
+}
+
 // ───────────────────────────── photos ─────────────────────────────
 
 /** Free slots of a batch: `max − attached − being uploaded`, never negative. */

@@ -216,16 +216,6 @@ export function draftCreatedAt(board: Pick<HomeworkPlanBoardModel, 'participants
 type StatusRow = HomeworkPlanStatus['participants'][number];
 
 /**
- * Status rows of the participants the board shows, as signature rows. The status endpoint also lists a
- * participant whose student moved to another teacher; the board hides it, so it must not take part in
- * the comparison (it would look like a change on every tick).
- */
-export function statusRowsOnBoard(rows: readonly StatusRow[], boardParticipantIds: readonly string[]): (StatusRow & { id: string })[] {
-  const shown = new Set(boardParticipantIds);
-  return rows.filter((row) => shown.has(row.participantId)).map((row) => ({ ...row, id: row.participantId }));
-}
-
-/**
  * The issue stamps as the status endpoint reports them — the STORED values. The board hides the stamp of
  * a homework that was cancelled, so stamps are compared poll to poll, never with the board.
  */

@@ -34,7 +34,9 @@ const JOURNAL_LINK_SLOP = { top: 13, bottom: 13, left: 12, right: 8 };
  *
  * The panel has neither a realtime event nor polling (07 §5): it is read on entry, on every return to the
  * screen, on pull-to-refresh and after each action. `tab` (a notification target, a web address) picks the
- * inner tab on arrival; switching tabs afterwards is local, so the forms keep what was typed.
+ * inner tab on arrival. A tab chosen by hand is written back to the route, so the route always names the
+ * tab on screen and a later arrival at any tab — also the one of the previous arrival — shows that tab
+ * (00 §3.3). Writing the param does not remount the screen: the forms keep what was typed.
  */
 export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
   const styles = useStyles();
@@ -45,8 +47,8 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
   const scrollRef = useRef<ScrollViewInstance>(null);
 
   const routeTab: DeveloperPanelTab = tab ?? 'status';
+  // The local copy answers a tap at once; the route follows (see `selectTab`) and wins when it changes.
   const [active, setActive] = useState<DeveloperPanelTab>(routeTab);
-  // A new arrival with another `tab` (a notification while the panel is mounted) wins over the local choice.
   const [seenRouteTab, setSeenRouteTab] = useState(routeTab);
   if (seenRouteTab !== routeTab) {
     setSeenRouteTab(routeTab);
@@ -69,6 +71,9 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
 
   const selectTab = (next: DeveloperPanelTab) => {
     setActive(next);
+    // Same screen, new `tab` param: the panel is already the focused tab root, so this only updates the
+    // route. Without it a second notification for the route's old tab would change nothing.
+    if (next !== routeTab) navigation.open({ screen: 'developer.panel', tab: next });
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 

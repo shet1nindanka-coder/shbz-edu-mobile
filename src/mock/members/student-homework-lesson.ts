@@ -879,7 +879,9 @@ export function createStudentHomeworkLesson(ctx: MockContext): StudentHomeworkLe
         return errors.fail({ status: 409, code: "alreadyRunning", message: (dict) => dict.apiStudent.homeworkChecks.alreadyRunning });
       }
       // SPEC-GAP: `409 photosChanged` (a photo deleted while the snapshot is written) and `409 concurrentChange`
-      // need two requests racing on the server; the in-process mock is single-threaded and has no switch for them.
+      // need two requests racing on the server; the in-process mock is single-threaded. 90-addendum-5 A.5 marks
+      // them "debug switch", but 90-addendum-6 §2 (CORRECTION to A.6.5 – A.6.6) limits the switches to the fields
+      // of `MockControls` (§9.1), which has none for them — so the mock never produces these two codes.
 
       // The row and the snapshot of the attached photos (upload order) in one transaction.
       const check = store.transaction(() => {

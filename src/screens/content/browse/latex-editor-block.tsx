@@ -142,18 +142,21 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
         <Text variant="hint">{`${manager.latexHintBefore}$...$${manager.latexHintMiddle}$$...$$${manager.latexHintAfter}`}</Text>
       </Hint>
 
-      <View style={styles.preview}>
-        <Text variant="kickerSm">{single.preview}</Text>
-        {hasLatex(draft) ? (
+      {hasLatex(draft) ? (
+        <View style={styles.preview}>
+          <Text variant="kickerSm">{single.preview}</Text>
           <MathPreview value={draft} testID={`latex-${kind}-preview`} />
-        ) : (
+        </View>
+      ) : (
+        // A hint on the site (`ui-hint`): with hints off a blank draft simply has no preview.
+        <Hint>
           <Card variant="soft" dashed padded={14} testID={`latex-${kind}-empty`}>
             <Text variant="small" color="textMuted">
               {texts.empty}
             </Text>
           </Card>
-        )}
-      </View>
+        </Hint>
+      )}
 
       {dirty && !busy ? (
         <View style={styles.dirty}>

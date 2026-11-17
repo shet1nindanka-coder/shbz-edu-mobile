@@ -4,7 +4,7 @@ import type { HomeworkPlanBoardModel } from '@/api/types';
 import { formatDateTime } from '@/domain/dates';
 import { format, plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Chip, Icon, Notice, Spinner, Text } from '@/ui';
+import { Card, Chip, Icon, Notice, Spinner, Text } from '@/ui';
 
 import { errorText } from '../shared/error-text';
 import { HandoutNotice } from '../shared/handout-notice';
@@ -55,14 +55,20 @@ export function DraftBoardHeader({ plan, controller, handout, onOpenSourceLesson
       </View>
 
       {plan.sourceLesson && onOpenSourceLesson ? (
-        <Button
-          label={format(detail.afterLesson, { title: plan.sourceLesson.title })}
+        // Not a `Button`: its label is one line, and «По итогам занятия «Занятие группы · …»» is cut there.
+        <Card
           variant="outline"
-          rightIcon="forward"
+          padded={false}
           onPress={onOpenSourceLesson}
+          accessibilityLabel={format(detail.afterLesson, { title: plan.sourceLesson.title })}
           testID="draft-source-lesson"
           style={styles.source}
-        />
+        >
+          <Text variant="smallStrong" style={styles.sourceText}>
+            {format(detail.afterLesson, { title: plan.sourceLesson.title })}
+          </Text>
+          <Icon name="forward" size={18} color="kicker" />
+        </Card>
       ) : null}
 
       {controller.issuedCount > 0 || controller.pendingCount > 0 ? (
@@ -118,7 +124,15 @@ const useStyles = makeStyles((t) => ({
   titles: { gap: t.space.xs },
   deadline: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.xs },
   deadlineText: { flex: 1 },
-  source: { alignSelf: 'flex-start', maxWidth: '100%' },
+  source: {
+    minHeight: t.sizes.minTouch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: t.space.md,
+    paddingVertical: 10,
+    paddingHorizontal: t.space.lg,
+  },
+  sourceText: { flex: 1, minWidth: 0 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
   progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.minTouch },
   noticeBlock: { gap: t.space.xs },

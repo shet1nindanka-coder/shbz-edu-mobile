@@ -75,7 +75,7 @@ const en: typeof ru = {
   },
   photos: {
     addHint: "Photograph your solution or choose a picture from the gallery",
-    sourceTitle: "Where is the photo?",
+    sourceTitle: "Add a photo",
     added: "Photos added",
     counterA11y: "Photos attached: {count} of {max}",
     uploadProgressA11y: "Uploading photos: {percent}%",

@@ -22,7 +22,7 @@ import { addProgress } from "./progress";
  * Bump whenever the fixture rows change: a dataset stored on a device by an older build is then replaced
  * at the next start instead of living on until the 24-hour re-seed.
  */
-export const FIXTURES_REVISION = 1;
+export const FIXTURES_REVISION = 2;
 
 export type BuildFixturesOptions = {
   /** `store.meta.generation` of the new dataset (the previous one + 1 on a reset). */

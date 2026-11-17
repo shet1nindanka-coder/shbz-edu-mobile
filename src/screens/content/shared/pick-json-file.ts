@@ -17,9 +17,9 @@ const JSON_MIME_TYPES = ['application/json', 'text/plain', 'text/json', 'applica
 
 async function readAssetText(asset: DocumentPicker.DocumentPickerAsset): Promise<string> {
   if (Platform.OS === 'web') {
-    if (asset.file) return asset.file.text();
-    const response = await fetch(asset.uri);
-    return response.text();
+    // The web picker always hands over the browser's `File`; without it there is nothing to read.
+    if (!asset.file) throw new Error('no file');
+    return asset.file.text();
   }
   return new File(asset.uri).text();
 }

@@ -2,9 +2,11 @@
 // Site texts stay in `dict.planner.*`.
 const ru = {
   lessonBoard: {
-    // replaces `dict.planner.lessonBoard.print` («Для печати»): the handout is a PDF opened by the system
+    // replaces `dict.planner.lessonBoard.downloadPdf` («Скачать PDF»): the PDF opens in the file viewer
     handout: "Раздатка (PDF)",
-    handoutPreparing: "Готовим раздатку…",
+    // replaces `dict.planner.lessonBoard.print` («Для печати» opens a browser tab): the HTML handout is
+    // handed to the system, which prints it or saves it as a PDF
+    print: "Версия для печати",
     // replaces `dict.planner.lessonBoard.hotkeysHint` (no keyboard on a phone)
     resultHint: "Отметьте итог по каждому номеру касанием.",
     actions: "Действия с уроком",
@@ -43,10 +45,6 @@ const ru = {
     rendererUnavailable:
       "PDF сейчас не собрать: рендерер на сервере недоступен. Откройте версию для печати и сохраните её как PDF."
   },
-  plan: {
-    generating: "ИИ подбирает номера…",
-    reorderHint: "Удерживайте номер, чтобы изменить порядок."
-  },
   drafts: {
     openDraft: "Открыть черновик «{title}»"
   },
@@ -68,7 +66,7 @@ const ru = {
 const en: typeof ru = {
   lessonBoard: {
     handout: "Handout (PDF)",
-    handoutPreparing: "Preparing the handout…",
+    print: "Print version",
     resultHint: "Tap to mark the result of each problem.",
     actions: "Lesson actions",
     finishTitle: "Finish the lesson?",
@@ -102,10 +100,6 @@ const en: typeof ru = {
     failed: "Could not prepare the handout. Please try again.",
     rendererUnavailable:
       "The PDF cannot be built right now: the server renderer is unavailable. Open the print version and save it as a PDF."
-  },
-  plan: {
-    generating: "AI is picking problems…",
-    reorderHint: "Press and hold a problem to change the order."
   },
   drafts: {
     openDraft: "Open draft “{title}”"

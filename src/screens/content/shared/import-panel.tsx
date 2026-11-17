@@ -194,6 +194,8 @@ function ImportPreviewBlock({ state, preview }: { state: ImportPanelState; previ
       ) : null}
 
       {preview.issues.length > 0 ? <MessageList label={t.issues} lines={preview.issues} danger testID="import-issues" /> : null}
+      {/* The site styles this list as a hint, which leaves a bare label when hints are off; the model's
+          warnings are data of the file, so they stay visible. */}
       {preview.warnings.length > 0 ? <MessageList label={t.warnings} lines={preview.warnings} testID="import-warnings" /> : null}
 
       {preview.sample.length > 0 ? (
@@ -250,7 +252,9 @@ function SampleCard({ entry }: { entry: ImportNumber }) {
           <MathContent value={entry.answerLatex} />
         </>
       ) : (
-        <Text variant="hint">{t.noAnswer}</Text>
+        <Hint>
+          <Text variant="hint">{t.noAnswer}</Text>
+        </Hint>
       )}
     </Card>
   );

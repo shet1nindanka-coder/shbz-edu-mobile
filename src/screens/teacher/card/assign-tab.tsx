@@ -26,7 +26,8 @@ import {
 } from '@/ui';
 
 import { useRefetchOnFocus } from '../home/use-refetch-on-focus';
-import { errorText } from '../students/error-text';
+import { errorText, loadFailureOf } from '../students/error-text';
+import { useNoticeScroll } from '../students/use-notice-scroll';
 import { RateLimitLine } from '../students/rate-limit-line';
 import {
   ASSIGN_TITLE_MAX,
@@ -72,6 +73,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
     queryFn: () => api.teacherStudents.getAssignBoard(studentId),
   });
   useStudentGone(studentId, board.error);
+  const boardFailure = loadFailureOf(board);
   useRefetchOnFocus([board]);
 
   const [topicId, setTopicId] = useState<string | null>(null);
@@ -101,10 +103,8 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const numbers = topic ? withConditions(topic, conditions.data) : NO_NUMBERS;
   const picked = liveSelection(topic, selected);
 
-  const announce = (next: ListNotice) => {
-    setNotice(next);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
+  const announce = (next: ListNotice) => setNotice(next);
+  useNoticeScroll(listRef, notice);
 
   const issue = useMutation({
     mutationFn: (request: IssueHomeworkRequest) => api.teacherStudents.issueHomework(request),
@@ -217,10 +217,10 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
     ) : (
       <EmptyState title={t.noTopics} testID="assign-no-topics" />
     )
-  ) : board.isError ? (
+  ) : boardFailure ? (
     <ErrorState
       title={dict.shells.errorTitle}
-      description={errorText(board.error, dict.shells.errorDescription)}
+      description={errorText(boardFailure.error, dict.shells.errorDescription)}
       retryLabel={dict.common.retry}
       onRetry={() => void board.refetch()}
       retrying={board.isFetching}

@@ -1,8 +1,9 @@
+import { FlashList } from '@shopify/flash-list';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, Button, CheckRow, EmptyState, Text, TextField } from '@/ui';
 
 import { filterRecipients, type BroadcastStudent } from './logic';
@@ -20,14 +21,23 @@ export type RecipientsSheetProps = {
  * Recipient picker of the broadcast (07 §1.9 phone mapping: "student multi-select picker, searchable
  * modal list"). The site offers a search box with a dropdown of 8 matches and removable chips; on a phone
  * the same search filters a checklist, so picked students stay visible and can be unticked in place.
+ * The list is every student of the school, so it is virtualised; the sheet gives it a bounded height.
  */
+
+/** Share of the window the checklist may take; the search field, title and footer need the rest. */
+const LIST_MAX_SHARE = 0.45;
 export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClose }: RecipientsSheetProps) {
   const styles = useStyles();
+  const theme = useTheme();
+  const window = useWindowDimensions();
   const { dict, m } = useI18n();
   const t = dict.planner.devPanel.broadcast;
   const [query, setQuery] = useState('');
   const matches = filterRecipients(students, query);
   const picked = new Set(pickedIds);
+  // A short result is as tall as its rows; a long one scrolls inside the cap.
+  const rowStride = theme.sizes.minTouch + theme.space.xs;
+  const listHeight = Math.min(matches.length * rowStride, Math.round(window.height * LIST_MAX_SHARE));
 
   return (
     <BottomSheet
@@ -36,6 +46,8 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
       onClosed={() => setQuery('')}
       closeLabel={m.common.actions.close}
       title={m.developer.broadcast.pickStudents}
+      // The checklist scrolls by itself (FlashList), not the sheet.
+      scroll={false}
       footer={
         <View style={styles.footer}>
           <Text variant="smallMedium" color="textMuted" style={styles.counter} testID="recipients-sheet-count">
@@ -60,16 +72,26 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
         {matches.length === 0 ? (
           <EmptyState variant="plain" title={dict.planner.common.nobodyFound} testID="recipients-empty" />
         ) : (
-          <View accessibilityRole="list" style={styles.list}>
-            {matches.map((student) => (
-              <CheckRow
-                key={student.id}
-                label={student.name}
-                checked={picked.has(student.id)}
-                onChange={() => onToggle(student.id)}
-                testID={`recipient-${student.id}`}
-              />
-            ))}
+          <View accessibilityRole="list" style={{ height: listHeight }}>
+            <FlashList
+              data={matches}
+              keyExtractor={(student) => student.id}
+              renderItem={({ item }) => (
+                <View style={styles.item}>
+                  <CheckRow
+                    label={item.name}
+                    checked={picked.has(item.id)}
+                    onChange={() => onToggle(item.id)}
+                    testID={`recipient-${item.id}`}
+                  />
+                </View>
+              )}
+              // The ticks live outside the rows.
+              extraData={pickedIds}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              testID="recipients-list"
+            />
           </View>
         )}
       </View>
@@ -79,7 +101,7 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.md, paddingTop: t.space.xs },
-  list: { gap: t.space.xs },
+  item: { paddingBottom: t.space.xs },
   footer: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   counter: { flex: 1 },
 }));

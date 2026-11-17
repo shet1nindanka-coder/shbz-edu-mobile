@@ -1,6 +1,6 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
 import { isNotFoundError, qk, useApi } from '@/api';
@@ -14,6 +14,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, IconButton, LoadingState, Notice, Screen, Segmented, Text } from '@/ui';
 
 import { TopicNumberCard } from './browse/topic-number-card';
+import { useListScrollMemory } from './browse/use-list-scroll-memory';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
 import { errorText } from './shared/error-text';
 import { LoadFailure, loadFailureOf } from './shared/load-failure';
@@ -48,6 +49,10 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   const detail = useQuery({ queryKey: qk('content', 'getTopic', topicId), queryFn: () => api.content.getTopic(topicId) });
   const data = detail.data;
   const failure = loadFailureOf(detail);
+
+  // Web only (see the hook): the list keeps its place while the screen is covered by another one.
+  const listRef = useRef<FlashListRef<TopicNumber>>(null);
+  const scrollMemory = useListScrollMemory((offset) => listRef.current?.scrollToOffset({ offset, animated: false }));
 
   const toggleAnswer = useCallback((homeworkNumberId: string) => {
     setShownAnswers((current) => {
@@ -160,37 +165,41 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
       padded={!topic}
     >
       {topic ? (
-        <FlashList<TopicNumber>
-          data={topic.homeworkNumbers}
-          keyExtractor={(number) => number.id}
-          extraData={shownAnswers}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <TopicNumberCard number={item} answerShown={shownAnswers.has(item.id)} onToggleAnswer={toggleAnswer} />
-            </View>
-          )}
-          ListHeaderComponent={header}
-          ListEmptyComponent={
-            <EmptyState
-              title={dict.topics.viewNumbers.emptyTitle}
-              // The hint points at the «Редактирование» tab, which only a developer has.
-              hint={isDeveloper ? dict.topics.viewNumbers.emptyHint : undefined}
-              testID="topic-numbers-empty"
-            />
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.colors.accentSolid}
-              colors={[theme.colors.accentSolid]}
-              progressBackgroundColor={theme.colors.cardBg}
-            />
-          }
-          testID="topic-numbers-list"
-        />
+        <View style={styles.list} onLayout={scrollMemory.onLayout}>
+          <FlashList<TopicNumber>
+            ref={listRef}
+            {...scrollMemory.listProps}
+            data={topic.homeworkNumbers}
+            keyExtractor={(number) => number.id}
+            extraData={shownAnswers}
+            renderItem={({ item }) => (
+              <View style={styles.item}>
+                <TopicNumberCard number={item} answerShown={shownAnswers.has(item.id)} onToggleAnswer={toggleAnswer} />
+              </View>
+            )}
+            ListHeaderComponent={header}
+            ListEmptyComponent={
+              <EmptyState
+                title={dict.topics.viewNumbers.emptyTitle}
+                // The hint points at the «Редактирование» tab, which only a developer has.
+                hint={isDeveloper ? dict.topics.viewNumbers.emptyHint : undefined}
+                testID="topic-numbers-empty"
+              />
+            }
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refresh}
+                tintColor={theme.colors.accentSolid}
+                colors={[theme.colors.accentSolid]}
+                progressBackgroundColor={theme.colors.cardBg}
+              />
+            }
+            testID="topic-numbers-list"
+          />
+        </View>
       ) : failure ? (
         <LoadFailure error={failure.error} onRetry={() => void detail.refetch()} retrying={detail.isFetching && !detail.isPaused} testID="topic-error" />
       ) : (
@@ -215,6 +224,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
 }
 
 const useStyles = makeStyles((t) => ({
+  list: { flex: 1 },
   listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
   header: { gap: t.space.lg, paddingBottom: t.space.md },
   titleBlock: { gap: t.space.xs },

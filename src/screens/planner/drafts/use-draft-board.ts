@@ -9,7 +9,8 @@ import { useAppNavigation } from '@/navigation';
 
 import { errorText } from '../shared/error-text';
 import { notePlanRequested, planRequestedAtOf } from '../shared/plan-anchors';
-import { countReady, planSignature, planStateOf } from '../shared/plan-state';
+import { patchKeepingFetchTime, serverClockOffset } from '../shared/board-cache';
+import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
 import { useNowTick } from '../shared/use-now-tick';
 import { useRetryWait } from '../shared/use-retry-wait';
 import {
@@ -21,7 +22,6 @@ import {
   issueStampSignature,
   markDraftParticipantPending,
   replaceDraftItems,
-  statusRowsOnBoard,
   toDraftItems,
   type IssueOutcome,
 } from './drafts-logic';
@@ -53,8 +53,10 @@ export function useDraftBoard(planId: string) {
 
   // The stale-plan clock: the device clock corrected by the server's.
   const deviceNow = useNowTick(30_000);
-  const rawOffset = data ? Date.parse(data.serverNow) - boardUpdatedAt : 0;
-  const now = deviceNow + (Number.isFinite(rawOffset) ? rawOffset : 0);
+  // `boardUpdatedAt` is the time of the last real read: local patches keep it (see `patchBoard`).
+  const now = deviceNow + serverClockOffset(data?.serverNow, boardUpdatedAt);
+  /** Device time of the latest local patch of the cached board (the poll guard below needs it). */
+  const patchedAt = useRef(0);
 
   const [notice, setNotice] = useState<DraftNotice | null>(null);
   const [issueFailures, setIssueFailures] = useState<IssueOutcome['failures']>([]);
@@ -69,7 +71,9 @@ export function useDraftBoard(planId: string) {
 
   const patchBoard = useCallback(
     (update: (current: HomeworkPlanBoardModel) => HomeworkPlanBoardModel) => {
-      queryClient.setQueryData<HomeworkPlanBoardModel>(boardKey, (current) => (current ? update(current) : current));
+      // The fetch time stays as it was: the board clock pairs it with `serverNow` of that fetch.
+      patchKeepingFetchTime<HomeworkPlanBoardModel>(queryClient, boardKey, update);
+      patchedAt.current = Date.now();
     },
     // The key is rebuilt on every render from the same strings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,7 +125,7 @@ export function useDraftBoard(planId: string) {
   useEffect(() => {
     if (!polling || !participants || !statusData || boardFetching) return;
     // A status older than the board describes the past (e.g. the moment before an accepted "Regenerate").
-    if (statusUpdatedAt < boardUpdatedAt) return;
+    if (statusUpdatedAt < Math.max(boardUpdatedAt, patchedAt.current)) return;
     const rows = statusRowsOnBoard(
       statusData.participants,
       participants.map((participant) => participant.id),

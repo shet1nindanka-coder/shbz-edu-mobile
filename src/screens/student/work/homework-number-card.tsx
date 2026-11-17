@@ -76,6 +76,7 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
           }
           value={note.text}
           onChangeText={note.onChangeText}
+          onFocus={note.onFocus}
           onBlur={note.onBlur}
           maxLength={noteMaxLength}
           placeholder={t.notePlaceholder}

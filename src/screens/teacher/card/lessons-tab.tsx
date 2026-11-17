@@ -3,19 +3,18 @@ import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
 import type { TeacherStudentLesson } from '@/api/types';
-import { format, useI18n } from '@/i18n';
+import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
 import { useHandout } from '@/screens/planner/shared/use-handout';
 import { makeStyles, useTheme } from '@/theme';
-import { Dialog, ErrorState, LoadingState, Notice, Text } from '@/ui';
+import { ErrorState, LoadingState, Notice, Text } from '@/ui';
 
-import { errorText } from '../students/error-text';
+import { errorText, loadFailureOf } from '../students/error-text';
 import { CardScreen, type CardChrome } from './card-screen';
 import { LessonAddSheet } from './lesson-add-sheet';
 import { LessonCard } from './lesson-card';
 import { LessonComposeCard } from './lesson-compose-card';
-import type { LessonItem } from './lessons-logic';
 import { useStudentGone } from './use-student-gone';
 import { useStudentLessons } from './use-student-lessons';
 
@@ -38,14 +37,12 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
   const controller = useStudentLessons(studentId);
   const { list, lessons } = controller;
   useStudentGone(studentId, list.error);
+  const listFailure = loadFailureOf(list);
   const handout = useHandout();
 
   // Every lesson starts collapsed; local view state is reset when the screen is opened again.
   const [expandedIds, setExpandedIds] = useState<readonly string[]>([]);
   const [addFor, setAddFor] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<{ lesson: TeacherStudentLesson; item: LessonItem } | null>(null);
-  const [shownRemoving, setShownRemoving] = useState(removing);
-  if (removing !== null && removing !== shownRemoving) setShownRemoving(removing);
   const [refreshing, setRefreshing] = useState(false);
 
   const addLesson = lessons?.find((lesson) => lesson.id === addFor) ?? null;
@@ -82,10 +79,10 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
     </View>
   );
 
-  const body = lessons ? null : list.isError ? (
+  const body = lessons ? null : listFailure ? (
     <ErrorState
       title={dict.shells.errorTitle}
-      description={errorText(list.error, dict.shells.errorDescription)}
+      description={errorText(listFailure.error, dict.shells.errorDescription)}
       retryLabel={dict.common.retry}
       onRetry={() => void list.refetch()}
       retrying={list.isFetching}
@@ -119,7 +116,8 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
               onOpen={() => navigation.open({ screen: 'planner.lessonBoard', lessonId: lesson.id })}
               onRetry={() => controller.regenerate(lesson)}
               onResult={(item, result) => controller.markResult(lesson, item, result)}
-              onRemove={(item) => setRemoving({ lesson, item })}
+              // As on the site: the set minus this problem is saved at once (a `409 blockedNumbers` shows in the card).
+              onRemove={(item) => controller.removeItem(lesson, item)}
               onAdd={() => setAddFor(lesson.id)}
               onAssignFromResults={() => navigation.open({ screen: 'planner.draftNew', lessonId: lesson.id, studentId })}
               // Opened from a student's card, the handout holds this student's set only (90-addendum-2 A.2.6).
@@ -154,22 +152,6 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
         onAdd={(homeworkNumberId, toExtra) => {
           if (addLesson) controller.addNumber(addLesson, homeworkNumberId, toExtra);
         }}
-      />
-
-      {/* The site removes at once; a stray tap on a phone would drop the problem together with its result. */}
-      <Dialog
-        visible={removing !== null}
-        kicker={dict.topics.widgets.confirm.kicker}
-        title={format(m.teacher.lessons.removeConfirmTitle, { n: shownRemoving?.item.number ?? '' })}
-        description={m.teacher.lessons.removeConfirmDescription}
-        confirmLabel={m.teacher.lessons.removeConfirm}
-        cancelLabel={dict.topics.widgets.confirm.cancel}
-        onConfirm={() => {
-          if (removing) controller.removeItem(removing.lesson, removing.item);
-          setRemoving(null);
-        }}
-        onCancel={() => setRemoving(null)}
-        testID="student-lesson-remove-dialog"
       />
     </CardScreen>
   );

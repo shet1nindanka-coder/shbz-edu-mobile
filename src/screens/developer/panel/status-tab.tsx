@@ -17,7 +17,7 @@ import { budgetRows, statTiles, type BudgetRow, type StatTile } from './logic';
 export function StatusTab({ data }: { data: DeveloperPanelData }) {
   const styles = useStyles();
   const { dict, m, locale } = useI18n();
-  const tiles = statTiles(data.stats, data.settings, dict.planner.devPanel.status);
+  const tiles = statTiles(data.stats, data.settings, dict.planner.devPanel.status, m.common.dateTime.msk);
   const budgets = budgetRows(data.aiBudgets);
   const first = budgets[0];
 

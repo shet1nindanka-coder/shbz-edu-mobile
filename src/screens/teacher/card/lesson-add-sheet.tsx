@@ -7,7 +7,7 @@ import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, LoadingState, Notice, Select, Text } from '@/ui';
 
-import { errorText } from '../students/error-text';
+import { errorText, loadFailureOf } from '../students/error-text';
 import { freeBankNumbers } from './lessons-logic';
 
 export type LessonAddSheetProps = {
@@ -41,6 +41,7 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
     staleTime: BANK_STALE_MS,
   });
   const topics = bank.data?.topics;
+  const bankFailure = loadFailureOf(bank);
 
   const [pickedTopicId, setPickedTopicId] = useState<string | null>(null);
   const [numberId, setNumberId] = useState<string | null>(null);
@@ -105,10 +106,10 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
               testID="student-lesson-add-number"
             />
           </>
-        ) : bank.isError ? (
+        ) : bankFailure ? (
           <Notice
             tone="error"
-            text={errorText(bank.error, m.teacher.lessons.bankFailed)}
+            text={errorText(bankFailure.error, m.teacher.lessons.bankFailed)}
             action={
               <Button label={m.common.actions.retry} size="sm" variant="outline" loading={bank.isFetching} onPress={() => void bank.refetch()} testID="student-lesson-add-retry" />
             }

@@ -135,9 +135,9 @@ export function ReviewAssignmentCard({
 
       <View style={styles.summary}>
         <View style={styles.chips}>
-          <Chip tone="muted" label={format(t.solved, { solved: assignment.solvedCount, total: assignment.totalNumbers })} />
-          <Chip tone={assignment.redCount > 0 ? 'red' : 'muted'} label={`${t.red} ${assignment.redCount}`} />
-          <Chip tone="muted" label={format(t.unmarked, { n: unmarkedCount(assignment) })} />
+          <Chip tone="muted" label={format(t.solved, { solved: assignment.solvedCount, total: assignment.totalNumbers })} style={styles.summaryChip} />
+          <Chip tone={assignment.redCount > 0 ? 'red' : 'muted'} label={`${t.red} ${assignment.redCount}`} style={styles.summaryChip} />
+          <Chip tone="muted" label={format(t.unmarked, { n: unmarkedCount(assignment) })} style={styles.summaryChip} />
         </View>
         <ProgressBar value={assignment.solvedPercent} accessibilityLabel={format(t.solved, { solved: assignment.solvedCount, total: assignment.totalNumbers })} />
       </View>
@@ -173,7 +173,6 @@ export function ReviewAssignmentCard({
           ) : (
             <Text variant="caption" color="textMuted">
               {t.noPhotos}
-              {lastChecked ? format(t.lastAutoCheck, { date: lastChecked }) : ''}
             </Text>
           )}
 
@@ -244,6 +243,8 @@ const useStyles = makeStyles((t) => ({
   title: { flex: 1, minWidth: 0 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
   summary: { gap: t.space.sm },
+  // Narrower than the default chip so the three counters share one line on a 390 pt phone.
+  summaryChip: { paddingHorizontal: 9 },
   body: { gap: t.space.field },
   block: { gap: t.space.sm },
   errorBlock: { gap: t.space.xs },

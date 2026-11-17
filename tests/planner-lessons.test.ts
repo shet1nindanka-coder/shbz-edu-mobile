@@ -21,7 +21,8 @@ import {
   composeStatement,
   filterByName,
   filterTopics,
-  initialSpeeds,
+  checkedMemberIds,
+  currentSpeeds,
   stepDuration,
   toggleId,
 } from "@/screens/planner/lessons/new-lesson-logic";
@@ -182,10 +183,9 @@ test("buildManualLessonInput: skipPlan with the numbers in the order they were p
   });
 });
 
-test("toggleId keeps the order of selection; initialSpeeds takes the profile speed", () => {
+test("toggleId keeps the order of selection", () => {
   assert.deepEqual(toggleId(toggleId(toggleId([], "b"), "a"), "b"), ["a"]);
   assert.deepEqual(toggleId(["a"], "c"), ["a", "c"]);
-  assert.deepEqual(initialSpeeds([{ id: "s1", name: "A", speed: 6 }, { id: "s2", name: "B", speed: null }]), { s1: 6, s2: null });
 });
 
 test("composeStatement: inlined statements win only for a loaded topic", () => {
@@ -193,4 +193,26 @@ test("composeStatement: inlined statements win only for a loaded topic", () => {
   assert.equal(composeStatement({ conditionsLoaded: true }, { id: "n1", conditionLatex: null }, { n1: "other" }), null);
   assert.equal(composeStatement({ conditionsLoaded: false }, { id: "n1", conditionLatex: null }, { n1: "$y$" }), "$y$");
   assert.equal(composeStatement({ conditionsLoaded: false }, { id: "n1", conditionLatex: null }, undefined), null);
+});
+
+test("checkedMemberIds: every current member is checked unless the teacher unchecked them", () => {
+  const cached = [{ id: "s1" }, { id: "s2" }];
+  assert.deepEqual(checkedMemberIds(cached, []), ["s1", "s2"]);
+  assert.deepEqual(checkedMemberIds(cached, ["s2"]), ["s1"]);
+  // The fresh answer replaces the cached one while the form is open: a new member is checked, a removed
+  // one is not sent, the teacher's own uncheck survives.
+  const fresh = [{ id: "s2" }, { id: "s3" }];
+  assert.deepEqual(checkedMemberIds(fresh, []), ["s2", "s3"]);
+  assert.deepEqual(checkedMemberIds(fresh, ["s2"]), ["s3"]);
+  assert.deepEqual(checkedMemberIds(fresh, ["s1"]), ["s2", "s3"]);
+});
+
+test("currentSpeeds: the current profile speed unless the teacher picked one for this lesson", () => {
+  const cached = [{ id: "s1", name: "A", speed: 4 }, { id: "s2", name: "B", speed: null }];
+  assert.deepEqual(currentSpeeds(cached, {}), { s1: 4, s2: null });
+  // The profile speed changed since the cached answer: the untouched field follows it.
+  const fresh = [{ id: "s1", name: "A", speed: 7 }, { id: "s2", name: "B", speed: 3 }, { id: "s3", name: "C", speed: 9 }];
+  assert.deepEqual(currentSpeeds(fresh, {}), { s1: 7, s2: 3, s3: 9 });
+  // A pick wins, including an explicit "not set"; picks of students no longer listed are dropped.
+  assert.deepEqual(currentSpeeds(fresh, { s1: 2, s2: null, gone: 5 }), { s1: 2, s2: null, s3: 9 });
 });

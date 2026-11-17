@@ -42,6 +42,10 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
         queryKey: qk('content', 'getImportPrompt'),
         queryFn: () => api.content.getImportPrompt(),
         staleTime: 5 * 60 * 1000,
+        // One attempt that always runs: with the app defaults an offline request waits for the connection
+        // (its retry is parked) and never settles, so the bundled prompt below would never be reached.
+        retry: false,
+        networkMode: 'always',
       });
     } catch {
       return TOPIC_IMPORT_PROMPT;

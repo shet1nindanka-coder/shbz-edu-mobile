@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import { useI18n } from '@/i18n';
+import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Card, Text } from '@/ui';
 
@@ -28,9 +29,12 @@ export function LessonComposeCard({ hint, onPress, testID }: LessonComposeCardPr
       </View>
       <View style={styles.texts}>
         <Text variant="bodyBold">{title}</Text>
-        <Text variant="caption" color="textMuted">
-          {hint}
-        </Text>
+        {/* A `.ui-hint` on the site: hidden when hints are off; screen readers still get it as the hint. */}
+        <Hint>
+          <Text variant="caption" color="textMuted">
+            {hint}
+          </Text>
+        </Hint>
       </View>
     </Card>
   );

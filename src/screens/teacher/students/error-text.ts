@@ -16,3 +16,17 @@ export function errorText(error: unknown, fallback: string): string {
 export function isStudentGone(error: unknown): boolean {
   return hasErrorCode(error, 'studentNotFound');
 }
+
+/** The part of a query result `loadFailureOf` reads. */
+type LoadQuery = { isError: boolean; isPaused: boolean; error: unknown; failureReason: unknown };
+
+/**
+ * Why a read without data cannot show any: it failed, or — with no connection — its retry is parked until
+ * the connection returns. TanStack Query keeps such a query `pending`, which would be an endless skeleton
+ * under the offline strip. `null` while the first load is simply running.
+ */
+export function loadFailureOf(query: LoadQuery): { error: unknown } | null {
+  if (query.isError) return { error: query.error };
+  if (query.isPaused) return { error: query.failureReason };
+  return null;
+}

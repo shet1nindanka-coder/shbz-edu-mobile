@@ -1,5 +1,5 @@
 // Pure rules of the "Lessons" segment of the student card (docs/spec/04-teacher-students.md S6, §3.11 –
-// §3.13, §5.2). No React, no RN imports — unit-tested in tests/teacher-card-lessons.test.ts.
+// §3.13, §5.2). No React, no RN imports — unit-tested in tests/teacher-card.test.ts.
 import type { LessonBankTopic, LessonBoardItem, LessonItemResult, LessonPlanStatus, TeacherStudentLesson } from '@/api/types';
 import { LIMITS } from '@/api/types/limits';
 

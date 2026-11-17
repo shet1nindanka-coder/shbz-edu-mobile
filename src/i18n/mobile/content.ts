@@ -19,7 +19,6 @@ const ru = {
     hideText: "скрыть поле"
   },
   reorder: {
-    hint: "Удерживайте тему, чтобы изменить порядок.",
     action: "Порядок тем",
     title: "Порядок тем",
     // replaces `dict.topics.reorder.hint` ("drag a card")
@@ -92,7 +91,6 @@ const en: typeof ru = {
     hideText: "hide the field"
   },
   reorder: {
-    hint: "Press and hold a topic to change the order.",
     action: "Topic order",
     title: "Topic order",
     sheetHint: "Move topics with the arrows and save — students see this order too.",
@@ -120,7 +118,7 @@ const en: typeof ru = {
   topic: {
     hideAnswer: "Hide answer",
     numbersCount: "Total: {count}",
-    openEdit: "Open topic editing"
+    openEdit: "Open the topic editor"
   },
   number: {
     unsaved: "There are unsaved changes",
@@ -132,7 +130,7 @@ const en: typeof ru = {
   },
   edit: {
     sections: { topic: "topic", answers: "statements and answers", import: "import" },
-    sectionsAria: "Sections of topic editing",
+    sectionsAria: "Topic editing sections",
     unsaved: "There are unsaved changes",
     reset: "Restore the saved topic",
     titleRequired: "Enter the topic title.",

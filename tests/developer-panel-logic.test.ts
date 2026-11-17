@@ -69,7 +69,7 @@ test("panelChips: queue is always green, AI turns yellow at 80 %, storage above 
 });
 
 test("statTiles: the seven blocks in the site's order, the bar only on the 24-hour tile", () => {
-  const tiles = statTiles(stats(), settings, ru.status);
+  const tiles = statTiles(stats(), settings, ru.status, "МСК");
   assert.deepEqual(
     tiles.map((tile) => tile.key),
     ["queue", "runs24h", "lessonQueue", "files", "students", "topics", "lastRetention"],
@@ -89,7 +89,10 @@ test("statTiles: the seven blocks in the site's order, the bar only on the 24-ho
     tiles.filter((tile) => tile.wide).map((tile) => tile.key),
     ["lastRetention"],
   );
+  // "Not run yet" is not a time: no zone mark. A date-time is Moscow time and says so.
   assert.equal(tiles[6]?.value, "ещё не выполнялся");
+  const ran = statTiles(stats({ lastRetentionAt: "2026-11-11T08:10:00.000Z", lastRetentionLabel: "11.11.2026, 11:10" }), settings, ru.status, "МСК");
+  assert.equal(ran[6]?.value, "11.11.2026, 11:10 МСК");
 });
 
 test("budgetRows: bucket counters with their own state, in the server's order; an absent list gives none", () => {
@@ -111,14 +114,14 @@ test("budgetRows: bucket counters with their own state, in the server's order; a
   assert.equal(budgetRows([{ ...budgets[0]!, used: 305 }])[0]?.percent, 100);
 });
 
-test("PANEL_ACTION_ROWS: every panel action once, in the site's order; the three that delete or fail something confirm", () => {
+test("PANEL_ACTION_ROWS: every panel action once, in the site's order; only reset budget and unfreeze confirm", () => {
   assert.deepEqual(
     PANEL_ACTION_ROWS.map((row) => row.action),
     [...PANEL_ACTIONS],
   );
   assert.deepEqual(
     PANEL_ACTION_ROWS.filter((row) => row.confirm).map((row) => row.action),
-    ["run-retention", "reset-ai-budget", "unfreeze-checks"],
+    ["reset-ai-budget", "unfreeze-checks"],
   );
   for (const row of PANEL_ACTION_ROWS) {
     assert.equal(typeof ru.actions[row.label], "string");
@@ -188,7 +191,7 @@ test("against the mock: a blank title and an empty selection are refused by the 
 
   // The panel payload feeds the pure helpers as is.
   assert.equal(panelChips(panel.stats, panel.settings, ru).length, 3);
-  assert.equal(statTiles(panel.stats, panel.settings, ru.status).length, 7);
+  assert.equal(statTiles(panel.stats, panel.settings, ru.status, "МСК").length, 7);
   assert.deepEqual(
     budgetRows(panel.aiBudgets).map((row) => row.key),
     ["homework", "lesson", "plans"],

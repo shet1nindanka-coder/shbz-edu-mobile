@@ -37,6 +37,10 @@ export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHead
 
   return (
     <View style={styles.header}>
+      {/* The app bar has one line; the lesson title is shown here in full. */}
+      <Text variant="sectionTitle" accessibilityRole="header" testID="lesson-board-title">
+        {lesson.title}
+      </Text>
       <View style={styles.toolbar}>
         <View
           accessible

@@ -12,7 +12,7 @@ import { useDateTimeLabels } from '../shared/date-time-labels';
 import { errorText } from '../shared/error-text';
 import { RetryWaitLine, useRetryWait } from '../shared/use-retry-wait';
 import { DurationStepper } from './duration-stepper';
-import { buildAiLessonInput, initialSpeeds, toggleId } from './new-lesson-logic';
+import { buildAiLessonInput, checkedMemberIds, currentSpeeds, toggleId } from './new-lesson-logic';
 import { TopicsField } from './topics-field';
 import { useCreateLesson } from './use-create-lesson';
 
@@ -45,8 +45,12 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
   const [startsAt, setStartsAt] = useState('');
   const [topicIds, setTopicIds] = useState<string[]>([]);
   const [teacherNote, setTeacherNote] = useState('');
-  const [studentIds, setStudentIds] = useState<string[]>(() => form.members.map((member) => member.id));
-  const [speeds, setSpeeds] = useState<Record<string, number | null>>(() => initialSpeeds(form.members));
+  // Only the teacher's own changes are state. The defaults ("all members checked", "speed = profile speed")
+  // are derived from the member list, which is re-read after the form has opened from the cached answer.
+  const [uncheckedIds, setUncheckedIds] = useState<string[]>([]);
+  const [pickedSpeeds, setPickedSpeeds] = useState<Record<string, number | null>>({});
+  const studentIds = checkedMemberIds(form.members, uncheckedIds);
+  const speeds = currentSpeeds(form.members, pickedSpeeds);
   const [error, setError] = useState<string | null>(null);
 
   const create = useCreateLesson();
@@ -147,7 +151,7 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
                 <Checkbox
                   label={member.name}
                   checked={studentIds.includes(member.id)}
-                  onChange={() => setStudentIds((current) => toggleId(current, member.id))}
+                  onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
                   testID={`lesson-new-student-${member.id}`}
                   style={styles.studentName}
                 />
@@ -155,7 +159,7 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
                   size="xs"
                   options={speedOptions}
                   value={speeds[member.id] ?? NO_SPEED}
-                  onChange={(value) => setSpeeds((current) => ({ ...current, [member.id]: value === NO_SPEED ? null : value }))}
+                  onChange={(value) => setPickedSpeeds((current) => ({ ...current, [member.id]: value === NO_SPEED ? null : value }))}
                   placeholder={t.speedNotSet}
                   closeLabel={m.common.actions.close}
                   sheetTitle={format(t.speedAria, { name: member.name })}

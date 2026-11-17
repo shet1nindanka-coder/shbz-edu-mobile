@@ -51,6 +51,8 @@ export function ResetPasswordSheet({ student, onClose, onDone, onMissing }: Rese
     onSuccess: (_result, input) => {
       setPassword('');
       setError(null);
+      // 90-addendum-5 B.2.1: the teacher's list is re-read after a reset (the accounts screen adds its own read).
+      void queryClient.invalidateQueries({ queryKey: qk('teacherStudents', 'listStudents') });
       onDone(input.target);
     },
     onError: (failure) => {

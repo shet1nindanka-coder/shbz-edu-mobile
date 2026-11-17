@@ -52,9 +52,10 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
   // The answer to an action is shown at the top of the board; the card that caused it may be far below.
   const listRef = useRef<FlashListRef<HomeworkPlanParticipant>>(null);
   const { notice, issueFailures } = controller;
+  const handoutFailure = handout.failure;
   useEffect(() => {
-    if (notice || issueFailures.length > 0) listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, [notice, issueFailures]);
+    if (notice || issueFailures.length > 0 || handoutFailure) listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [notice, issueFailures, handoutFailure]);
 
   if (controller.notFound) return <NotFoundScreen description={errorText(board.error, dict.shells.notFoundDescription)} />;
 

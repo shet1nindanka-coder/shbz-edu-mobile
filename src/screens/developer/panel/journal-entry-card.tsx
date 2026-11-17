@@ -15,7 +15,8 @@ export type JournalEntryCardProps = {
 };
 
 /**
- * One journal row as a card (07 §1.10 phone mapping): category chip (red when the entry failed) and time,
+ * One journal row as a card (07 §1.10 phone mapping): category chip (red when the entry failed) and time
+ * (Moscow time, marked «МСК» on every card — 07 §7 item 14 — so it reads right in any device zone),
  * the action's label with its system name, who, what, tokens and cost when present, then the error in
  * red — collapsed behind «полностью» when it is longer than 140 characters. A tap opens the detail sheet.
  */
@@ -45,7 +46,7 @@ export function JournalEntryCard({ entry, onOpen }: JournalEntryCardProps) {
         <View style={styles.top}>
           <Chip label={t.categories[entry.category]} tone={failed ? 'red' : 'muted'} />
           <Text variant="caption" tabular style={styles.when}>
-            {formatDateTime(entry.createdAt, locale)}
+            {`${formatDateTime(entry.createdAt, locale)} ${m.common.dateTime.msk}`}
           </Text>
         </View>
 

@@ -1032,9 +1032,16 @@ describe("developer.getJournal", () => {
     assert.equal(pick(english, legacySaved).meta, null);
     const legacyStudent = idOf((row) => row.summary === "Создан ученик Тестовый Ученик");
     assert.equal(pick(english, legacyStudent).summary, "Создан ученик Тестовый Ученик");
-    // The action name has no label in the dictionary: the screen shows the raw name.
-    assert.equal(pick(english, legacyStudent).actionLabel, null);
-    assert.equal(pick(english, legacyStudent).action, "student.created");
+    // Seeded rows carry the site's action names (07 §4.6), so they get their labels.
+    assert.equal(pick(english, legacyStudent).action, "student.create");
+    assert.equal(pick(english, legacyStudent).actionLabel, "Student created");
+    assert.equal(pick(russian, legacyStudent).actionLabel, "Создание ученика");
+    // The one seeded row left with a template key as its action (see src/mock/fixtures/journal.ts): a name
+    // without a label is returned as is and the screen shows the raw name.
+    assert.deepEqual(
+      russian.filter((entry) => entry.category === "DATA" && entry.actionLabel === null).map((entry) => entry.action),
+      ["topic.deleted"],
+    );
 
     const failedLogin = idOf((row) => row.action === "auth.login" && row.outcome === "failed");
     assert.match(pick(russian, failedLogin).summary!, /^Неудачный вход: \S+@\S+$/);
@@ -1042,7 +1049,7 @@ describe("developer.getJournal", () => {
     assert.deepEqual([pick(english, failedLogin).actorName, pick(english, failedLogin).actorRole, pick(english, failedLogin).actionLabel], [null, null, "Sign in"]);
 
     // A date parameter is formatted in Moscow time for the language.
-    const scheduled = idOf((row) => row.action === "lesson.scheduled");
+    const scheduled = idOf((row) => row.action === "lesson.schedule");
     assert.equal(pick(russian, scheduled).summary, "Время урока: 08.11.2026, 17:00");
     assert.equal(pick(english, scheduled).summary, "Lesson time: 08/11/2026, 17:00");
   });

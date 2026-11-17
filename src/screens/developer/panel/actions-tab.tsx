@@ -76,8 +76,9 @@ function ActionRow({ row, onSettled }: { row: PanelActionRow; onSettled: (action
         variant="outline"
         loading={run.isPending}
         disabled={lock.seconds > 0}
-        // SPEC-GAP: the site runs all five without asking. On a phone a stray tap is likelier, so the three
-        // actions that delete or fail something ask first (07 §1.9 phone mapping, §7 item 12).
+        // SPEC-GAP: the site runs all five without asking. On a phone a stray tap is likelier, so the two
+        // actions the spec names — reset budget and unfreeze — ask first (07 §1.9 phone mapping, §7 item 12).
+        // The other three start on tap, as on the site.
         onPress={confirm ? () => setConfirming(true) : start}
         fullWidth
         testID={`panel-action-${row.action}`}
@@ -115,8 +116,6 @@ type ActionTexts = ReturnType<typeof useI18n>['m']['developer']['actions'];
 
 function confirmTexts(kind: ActionConfirm, t: ActionTexts): { title: string; body: string } {
   switch (kind) {
-    case 'retention':
-      return { title: t.retentionTitle, body: t.retentionBody };
     case 'resetBudget':
       return { title: t.resetBudgetTitle, body: t.resetBudgetBody };
     case 'unfreeze':

@@ -1,5 +1,5 @@
 // Pure rules of the "Assign homework" segment of the student card (docs/spec/04-teacher-students.md S5,
-// §3.4). No React, no RN imports — unit-tested in tests/teacher-card-assign.test.ts.
+// §3.4). No React, no RN imports — unit-tested in tests/teacher-card.test.ts.
 import type { AssignBoardTopic, IssueHomeworkRequest } from '@/api/types';
 import { LIMITS } from '@/api/types/limits';
 import { parseMskDateTimeInput } from '@/domain/moscow-time';

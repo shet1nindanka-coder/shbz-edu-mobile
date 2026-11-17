@@ -308,7 +308,7 @@ describe("content: uploadFile", () => {
     assert.equal(file.mimeType, DOCX_MIME);
     assert.equal(file.size, 4096);
     assert.equal(file.uploadedAt, mock.ctx.nowIso());
-    assert.deepEqual(progress, [100]);
+    assert.deepEqual(progress, [25, 50, 75, 100]);
 
     const row = mock.store.files.get(file.id)!;
     assert.deepEqual([row.uploadedById, row.localUri, row.sample], ["usr_dev", "file:///picked/a.docx", null]);
@@ -391,6 +391,40 @@ describe("content: uploadFile", () => {
 
     // Only the two valid uploads created a row.
     assert.equal(mock.store.files.size, before + 2);
+  });
+
+  it("treats progress as advisory: a listener that throws does not fail the upload", async () => {
+    const mock = await devMock();
+    const before = mock.store.files.size;
+    const calls: number[] = [];
+    const file = await mock.api.content.uploadFile(upload("noisy.pdf"), {
+      onProgress: (percent) => {
+        calls.push(percent);
+        throw new Error("listener broke");
+      },
+    });
+    assert.equal(file.originalName, "noisy.pdf");
+    assert.equal(mock.store.files.size, before + 1);
+    assert.deepEqual(calls, [25, 50, 75, 100]);
+  });
+
+  it("can be cancelled while the file is in transit, before anything is stored", async () => {
+    const mock = await devMock();
+    const before = mock.store.files.size;
+    const controller = new AbortController();
+    const progress: number[] = [];
+    await assert.rejects(
+      mock.api.content.uploadFile(upload("half.pdf"), {
+        signal: controller.signal,
+        onProgress: (percent) => {
+          progress.push(percent);
+          if (percent === 50) controller.abort();
+        },
+      }),
+      (error: unknown) => isNetworkError(error),
+    );
+    assert.equal(mock.store.files.size, before);
+    assert.deepEqual(progress, [25, 50]);
   });
 
   it("honours an aborted signal and writes nothing", async () => {

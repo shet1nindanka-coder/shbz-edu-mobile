@@ -24,8 +24,6 @@ const ru = {
   },
   actions: {
     run: "Выполнить",
-    retentionTitle: "Удалить просроченные фото сейчас?",
-    retentionBody: "Фото решений старше срока хранения будут удалены сразу. Восстановить их нельзя.",
     resetBudgetTitle: "Сбросить дневной бюджет ИИ?",
     resetBudgetBody:
       "Счётчик проверок ДЗ за сегодня обнулится, и ученики снова смогут запускать автопроверку. Бюджеты сдач на уроке и ИИ-подбора не изменятся.",
@@ -57,7 +55,8 @@ const ru = {
     openEntry: "Открыть запись: {action}",
     systemName: "Системное имя",
     collapse: "свернуть",
-    period: "{n} дн.",
+    periodForms: ["{n} день", "{n} дня", "{n} дней"],
+    actionQuoted: "«{text}»",
     loadMoreFailed: "Не удалось загрузить следующую страницу.",
     refreshFailed: "Не удалось обновить журнал. Показаны прежние записи."
   }
@@ -87,8 +86,6 @@ const en: typeof ru = {
   },
   actions: {
     run: "Run",
-    retentionTitle: "Delete expired photos now?",
-    retentionBody: "Solution photos older than the retention period will be deleted at once. They cannot be restored.",
     resetBudgetTitle: "Reset the daily AI budget?",
     resetBudgetBody:
       "Today's homework check counter will be reset, so students can start AI checks again. The in-lesson submission and AI selection budgets stay as they are.",
@@ -120,7 +117,8 @@ const en: typeof ru = {
     openEntry: "Open entry: {action}",
     systemName: "System name",
     collapse: "show less",
-    period: "{n} d",
+    periodForms: ["{n} day", "{n} days"],
+    actionQuoted: "‘{text}’",
     loadMoreFailed: "Could not load the next page.",
     refreshFailed: "Could not refresh the log. Showing the previous entries."
   }

@@ -5,9 +5,10 @@ import type { TopicOption } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, CheckRow, EmptyState, Icon, PressableScale, Text, TextField } from '@/ui';
+import { BottomSheet, Button, EmptyState, Icon, PressableScale, Text, TextField } from '@/ui';
 
 import { filterTopics, toggleId } from './new-lesson-logic';
+import { TopicOptionRow } from './topic-option-row';
 
 export type TopicsFieldProps = {
   topics: readonly TopicOption[];
@@ -99,9 +100,9 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
           ) : (
             <View style={styles.options}>
               {matches.map((topic) => (
-                <CheckRow
+                <TopicOptionRow
                   key={topic.id}
-                  label={topic.title}
+                  title={topic.title}
                   checked={value.includes(topic.id)}
                   onChange={() => onChange(toggleId(value, topic.id))}
                   testID={`lesson-topic-option-${topic.id}`}

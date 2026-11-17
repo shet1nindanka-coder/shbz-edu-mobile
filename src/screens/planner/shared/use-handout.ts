@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { hasErrorCode, useApi } from '@/api';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
+import { isOnline } from '@/services/network';
 
 import { errorText } from './error-text';
 import { handoutFileId, handoutFileName, handoutMimeType, type HandoutVariant } from './handout-file';
@@ -48,6 +49,12 @@ export function useHandout(): Handout {
     (request: HandoutRequest) => {
       setFailure(null);
       const format = request.format ?? 'pdf';
+      // The builder makes no request, so it cannot notice a missing connection; the viewer would only
+      // fail later, on the download. Say it here, where the teacher pressed the button.
+      if (!isOnline()) {
+        setFailure({ text: m.common.errors.network, canOpenPrintVersion: false, request });
+        return;
+      }
       try {
         const url = api.planner.getHandoutUrl(request.lessonId, {
           format,

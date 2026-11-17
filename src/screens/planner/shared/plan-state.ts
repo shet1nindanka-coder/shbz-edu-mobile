@@ -79,3 +79,16 @@ export function statusSignatureRows<T extends { participantId: string; planGener
 ): (T & { id: string })[] {
   return rows.map((row) => ({ ...row, id: row.participantId }));
 }
+
+/**
+ * Status rows of the participants the board shows, as signature rows. The status endpoint also lists a
+ * participant whose student moved to another teacher; the board hides it (05 §0.4), so it must not take
+ * part in the comparison (it would look like a change on every tick).
+ */
+export function statusRowsOnBoard<T extends { participantId: string; planGeneratedAt: string | null; planError: string | null }>(
+  rows: readonly T[],
+  boardParticipantIds: readonly string[],
+): (T & { id: string })[] {
+  const shown = new Set(boardParticipantIds);
+  return statusSignatureRows(rows.filter((row) => shown.has(row.participantId)));
+}

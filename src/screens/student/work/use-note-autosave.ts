@@ -3,15 +3,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { saveStudentNote, usePendingStudentNote } from '@/providers';
 
 import { errorText } from './error-text';
+import { decideServerNote } from './logic';
 
 /** Typing pause after which the draft is saved (the site's debounce). */
 export const NOTE_DEBOUNCE_MS = 650;
 /** How long «Сохранено» stays after a successful save. */
 export const NOTE_SAVED_FLASH_MS = 1600;
 
+/** How many of the card's own earlier saves are remembered to recognise a late re-read. */
+const SUPERSEDED_KEPT = 12;
+
 export type NoteAutosave = {
   text: string;
   onChangeText: (value: string) => void;
+  onFocus: () => void;
   onBlur: () => void;
   /** `saving` while a request is in flight, `queued` while the draft waits for a connection, `saved` for 1.6 s. */
   status: 'saving' | 'queued' | 'saved' | null;
@@ -33,12 +38,25 @@ export function useNoteAutosave(homeworkNumberId: string, serverNote: string, sa
   const [baseline, setBaseline] = useState(() => (pending?.payload.note ?? serverNote).trim());
   const [syncedNote, setSyncedNote] = useState(serverNote);
   const [phase, setPhase] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [focused, setFocused] = useState(false);
+  // Notes this card has saved before the current one: a re-read that started before the latest save
+  // brings one of them back, and that echo must not replace the newer text.
+  const [superseded, setSuperseded] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  if (serverNote !== syncedNote) {
-    // The detail was re-read: adopt the server's note unless the student is in the middle of an edit.
+  if (serverNote !== syncedNote && !focused && phase !== 'saving') {
+    // The detail was re-read. The field is never rewritten under the student's hands (the site's textarea
+    // is not either): every save is followed by a re-read that returns the TRIMMED note, and a re-read
+    // that started before the latest save returns an older one — adopting either while the student types
+    // would eat a trailing space or the last words. So the server's note is taken over only when the
+    // field is at rest, holds nothing unsaved, and the note really is another text (another device, the
+    // number screen) rather than an echo of this card's own earlier save.
     setSyncedNote(serverNote);
-    if (!pending && text.trim() === baseline) {
+    const decision = decideServerNote({ serverNote, text, baseline, hasPendingWrite: pending !== null, superseded });
+    if (decision === 'confirmed') {
+      // The server has caught up with this card: whatever arrives from now on is newer than its saves.
+      if (superseded.length > 0) setSuperseded([]);
+    } else if (decision === 'adopt') {
       setText(serverNote);
       setBaseline(serverNote.trim());
     }
@@ -58,10 +76,12 @@ export function useNoteAutosave(homeworkNumberId: string, serverNote: string, sa
     (value: string) => {
       const trimmed = value.trim();
       if (trimmed === latest.current.baseline) return;
+      const previous = latest.current.baseline;
       latest.current = { ...latest.current, baseline: trimmed };
       const mine = (sequence.current += 1);
       if (mounted.current) {
         setBaseline(trimmed);
+        setSuperseded((current) => [...current.filter((note) => note !== trimmed), previous].slice(-SUPERSEDED_KEPT));
         setError(null);
         setPhase('saving');
       }
@@ -95,7 +115,10 @@ export function useNoteAutosave(homeworkNumberId: string, serverNote: string, sa
     [save],
   );
 
+  const onFocus = useCallback(() => setFocused(true), []);
+
   const onBlur = useCallback(() => {
+    setFocused(false);
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = null;
     save(latest.current.text);
@@ -116,5 +139,5 @@ export function useNoteAutosave(homeworkNumberId: string, serverNote: string, sa
   }, [save]);
 
   const status = phase === 'saving' ? 'saving' : pending ? 'queued' : phase === 'saved' ? 'saved' : null;
-  return { text, onChangeText, onBlur, status, error, dismissError: useCallback(() => setError(null), []) };
+  return { text, onChangeText, onFocus, onBlur, status, error, dismissError: useCallback(() => setError(null), []) };
 }

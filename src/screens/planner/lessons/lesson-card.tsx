@@ -45,8 +45,9 @@ export function LessonCard({ lesson, onOpen, onMore }: LessonCardProps) {
     >
       <View style={styles.top}>
         <View style={styles.texts}>
-          {/* One line on the site's wide row; a phone card has the height for two. */}
-          <Text variant="cardTitle" numberOfLines={2}>
+          {/* One line on the site's wide row. A phone card is narrow: «Занятие группы · Логарифмические
+              уравнения» needs three lines, and the topic at the end is what tells two lessons apart. */}
+          <Text variant="cardTitle" numberOfLines={3}>
             {lesson.title}
           </Text>
           <Text variant="caption" color="textMuted" tabular>

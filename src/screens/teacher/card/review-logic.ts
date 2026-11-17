@@ -1,6 +1,6 @@
 // Pure rules of the "Homework review" segment of the student card (docs/spec/04-teacher-students.md S4,
 // §2.3 "Derived on the client", §4.3). No React, no RN imports — unit-tested in
-// tests/teacher-card-review.test.ts.
+// tests/teacher-card.test.ts.
 import type {
   HomeworkNumberStatus,
   SolutionVerdict,
@@ -169,53 +169,33 @@ export function patchHomeworkStatuses(data: TeacherStudentHomeworks, changes: re
 // ───────────────────────────── placement of the cards ─────────────────────────────
 
 /**
- * Where each homework card sits while the screen is open. The server sorts by attention and a completed
- * homework belongs under "Completed"; re-sorting after every mark would move the card the teacher is
- * marking from under the finger, so the placement is taken once per `token` (first load, pull-to-refresh)
- * and only extended for homework that appears later.
+ * Ids of the homework that belongs under "Completed". Taken from the server's answer (the query cache),
+ * not from the colours of writes still in flight: a card stays where it is while its request is on the
+ * way and is regrouped once the write has settled or a refetch has arrived, as the site's refresh does.
  */
-export type ReviewPlacement = { token: number; order: readonly string[]; completedIds: readonly string[] };
-
-export const EMPTY_PLACEMENT: ReviewPlacement = { token: -1, order: [], completedIds: [] };
-
-export function reconcilePlacement(
-  previous: ReviewPlacement,
-  assignments: readonly Pick<TeacherHomeworkAssignment, 'id' | 'totalNumbers' | 'solvedCount'>[],
-  token: number,
-): ReviewPlacement {
-  const fresh = previous.token !== token;
-  const known = new Set(fresh ? [] : previous.order);
-  const present = new Set(assignments.map((assignment) => assignment.id));
-  const kept = fresh ? [] : previous.order.filter((id) => present.has(id));
-  const keptCompleted = fresh ? [] : previous.completedIds.filter((id) => present.has(id));
-  const added = assignments.filter((assignment) => !known.has(assignment.id));
-  const unchanged = !fresh && added.length === 0 && kept.length === previous.order.length;
-  if (unchanged) return previous;
-  return {
-    token,
-    order: [...kept, ...added.map((assignment) => assignment.id)],
-    completedIds: [...keptCompleted, ...added.filter(isAssignmentCompleted).map((assignment) => assignment.id)],
-  };
+export function completedAssignmentIds(
+  serverAssignments: readonly Pick<TeacherHomeworkAssignment, 'id' | 'totalNumbers' | 'solvedCount'>[],
+): ReadonlySet<string> {
+  return new Set(serverAssignments.filter(isAssignmentCompleted).map((assignment) => assignment.id));
 }
 
 export type ReviewRow =
   | { kind: 'assignment'; key: string; assignment: TeacherHomeworkAssignment }
   | { kind: 'completedToggle'; key: string; count: number; open: boolean };
 
-/** Rows of the list: active homework, then the "Completed (n)" disclosure and, when open, its cards. */
+/**
+ * Rows of the list in the server's attention order (04 §4.4): active homework, then the "Completed (n)"
+ * disclosure and, when it is open, its cards.
+ */
 export function buildReviewRows(
   assignments: readonly TeacherHomeworkAssignment[],
-  placement: ReviewPlacement,
+  completedIds: ReadonlySet<string>,
   completedOpen: boolean,
 ): ReviewRow[] {
-  const byId = new Map(assignments.map((assignment) => [assignment.id, assignment]));
-  const completedIds = new Set(placement.completedIds);
   const active: ReviewRow[] = [];
   const completed: ReviewRow[] = [];
-  for (const id of placement.order) {
-    const assignment = byId.get(id);
-    if (!assignment) continue;
-    (completedIds.has(id) ? completed : active).push({ kind: 'assignment', key: id, assignment });
+  for (const assignment of assignments) {
+    (completedIds.has(assignment.id) ? completed : active).push({ kind: 'assignment', key: assignment.id, assignment });
   }
   if (completed.length === 0) return active;
   return [

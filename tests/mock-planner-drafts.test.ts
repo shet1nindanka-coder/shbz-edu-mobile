@@ -300,10 +300,14 @@ describe("planner.createHomeworkPlan", () => {
 
     assert.equal((await rejects(p.createHomeworkPlan(draftInput({ topicId: "top_missing" })), "topicNotFound", 404)).message, ru.apiCommon.topicNotFound);
     await rejects(p.createHomeworkPlan(draftInput({ groupId: "grp_10b" })), "groupNotFound", 404);
-    await rejects(p.createHomeworkPlan(draftInput({ groupId: "grp_missing", topicId: "" })), "groupNotFound", 404);
 
     // A new minute: the create limit is 10 per minute.
     mock.clock.advance(MINUTE_MS);
+    // The site's handler order: the body (400), then the topic (404), then the group (404).
+    await rejects(p.createHomeworkPlan(draftInput({ groupId: "grp_missing", topicId: "" })), "topicAndDeadlineRequired", 400);
+    await rejects(p.createHomeworkPlan(draftInput({ groupId: "grp_missing", deadlineAt: iso(-DAY_MS) })), "topicAndDeadlineRequired", 400);
+    await rejects(p.createHomeworkPlan(draftInput({ groupId: "grp_missing", topicId: "top_missing" })), "topicNotFound", 404);
+    await rejects(p.createHomeworkPlan(draftInput({ groupId: "grp_missing" })), "groupNotFound", 404);
     const nobody = await rejects(p.createHomeworkPlan(draftInput({ studentIds: [] })), "selectAtLeastOneStudent", 400);
     assert.equal(nobody.message, ru.apiPlanner.lessons.selectAtLeastOneStudent);
     await rejects(p.createHomeworkPlan(draftInput({ studentIds: ["usr_sofia", "usr_anna"] })), "selectAtLeastOneStudent", 400);

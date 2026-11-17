@@ -26,11 +26,10 @@ import {
   reasonTone,
   replaceDraftItems,
   sortDrafts,
-  statusRowsOnBoard,
   toDraftItems,
   validateDraftForm,
 } from "@/screens/planner/drafts/drafts-logic";
-import { planSignature } from "@/screens/planner/shared/plan-state";
+import { planSignature, statusRowsOnBoard } from "@/screens/planner/shared/plan-state";
 
 const NOW = Date.parse("2026-11-16T12:00:00.000Z"); // 15:00 Moscow
 const iso = (offsetMs: number) => new Date(NOW + offsetMs).toISOString();

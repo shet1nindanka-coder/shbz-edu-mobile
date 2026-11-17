@@ -6,6 +6,7 @@ import { hasErrorCode, qk, useApi } from '@/api';
 import type { GetHomeworkResponse, StudentCheckDto } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 
+import { mergeQueryData } from './cache';
 import { errorText } from './error-text';
 import { applyLatestCheck, applyStartedCheck, countVerdicts, isCheckRunning } from './logic';
 import { usePoller } from './use-poller';
@@ -60,7 +61,7 @@ export function useHomeworkCheck(options: {
       if (hasErrorCode(failure, 'homeworkNotFound')) onGone();
       throw failure;
     }
-    queryClient.setQueryData<GetHomeworkResponse>(detailKey, (detail) => (detail ? applyLatestCheck(detail, latest) : detail));
+    mergeQueryData<GetHomeworkResponse>(queryClient, detailKey, (detail) => applyLatestCheck(detail, latest));
     const status = latest.check?.status;
     if (status === 'DONE') {
       // Statuses were written and the batch was detached: everything derived from them is stale.
@@ -81,8 +82,8 @@ export function useHomeworkCheck(options: {
     mutationFn: () => api.studentWork.startHomeworkCheck(assignmentId),
     onMutate: () => setStartError(null),
     onSuccess: (result) => {
-      queryClient.setQueryData<GetHomeworkResponse>(qk('studentWork', 'getHomework', assignmentId), (detail) =>
-        detail ? applyStartedCheck(detail, result.check) : detail,
+      mergeQueryData<GetHomeworkResponse>(queryClient, qk('studentWork', 'getHomework', assignmentId), (detail) =>
+        applyStartedCheck(detail, result.check),
       );
       void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
     },

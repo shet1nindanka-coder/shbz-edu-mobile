@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import type { ScoreRow } from '@/domain/exam-scores';
 import { makeStyles } from '@/theme';
@@ -10,7 +10,10 @@ export type ScoreScaleGridProps = {
   highlightPrimary: number;
 };
 
+/** Three columns (02 S5 "Phone translation"); two on the narrowest phones, where «30 → 100» does not fit a third of the row. */
 const COLUMNS = 3;
+const NARROW_COLUMNS = 2;
+const NARROW_BELOW_WIDTH = 360;
 
 function chunk<T>(list: readonly T[], size: number): T[][] {
   const rows: T[][] = [];
@@ -21,9 +24,11 @@ function chunk<T>(list: readonly T[], size: number): T[][] {
 /** «Первичные → тестовые»: a three-column grid of `{raw} → {scaled}` chips (02 S5). */
 export function ScoreScaleGrid({ rows, highlightPrimary }: ScoreScaleGridProps) {
   const styles = useStyles();
+  const window = useWindowDimensions();
+  const columns = window.width < NARROW_BELOW_WIDTH ? NARROW_COLUMNS : COLUMNS;
   return (
     <View style={styles.grid} testID="exam-scale-grid">
-      {chunk(rows, COLUMNS).map((line) => (
+      {chunk(rows, columns).map((line) => (
         <View key={line[0]?.primary} style={styles.line}>
           {line.map((row) => (
             <View
@@ -43,7 +48,7 @@ export function ScoreScaleGrid({ rows, highlightPrimary }: ScoreScaleGridProps) 
             </View>
           ))}
           {/* Fillers keep the chips of an incomplete last line on the column grid. */}
-          {Array.from({ length: COLUMNS - line.length }, (_, index) => (
+          {Array.from({ length: columns - line.length }, (_, index) => (
             <View key={`filler-${index}`} style={styles.filler} />
           ))}
         </View>

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import { useI18n } from '@/i18n';
+import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Card, Notice, Text, TextArea, TextField } from '@/ui';
 
@@ -54,11 +55,14 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
         testID="create-numbers"
       />
 
-      <Card variant="soft" padded={14}>
-        <Text variant="small" color={state.hint === 'ready' ? 'greenText' : 'textMuted'} testID="create-hint">
-          {hint}
-        </Text>
-      </Card>
+      {/* A hint on the site (`ui-hint`): hidden with the hints preference; the button's state says the same. */}
+      <Hint>
+        <Card variant="soft" padded={14}>
+          <Text variant="small" color={state.hint === 'ready' ? 'greenText' : 'textMuted'} testID="create-hint">
+            {hint}
+          </Text>
+        </Card>
+      </Hint>
 
       {state.error ? <Notice tone="error" text={state.error} testID="create-error" /> : null}
       <RateLimitLine seconds={state.createWait.seconds} testID="create-wait" />

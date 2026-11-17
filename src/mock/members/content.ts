@@ -64,6 +64,9 @@ function utf8ByteLength(text: string): number {
   return bytes;
 }
 
+/** Percent values reported while an upload is "in transit"; 100 follows once the file is stored. */
+const UPLOAD_PROGRESS_STEPS = [25, 50, 75] as const;
+
 export function createContent(ctx: MockContext): ContentApi {
   const { store, errors, auth, guard, limits, q } = ctx;
 
@@ -171,6 +174,15 @@ export function createContent(ctx: MockContext): ContentApi {
     } catch (error) {
       if (error instanceof ApiError) throw error;
       return errors.fail(failure);
+    }
+  };
+
+  /** Upload progress is advisory: a listener that throws never fails an upload (nor one already stored). */
+  const reportUploadProgress = (onProgress: ((percent: number) => void) | undefined, percent: number): void => {
+    try {
+      onProgress?.(percent);
+    } catch {
+      // Advisory.
     }
   };
 
@@ -313,7 +325,15 @@ export function createContent(ctx: MockContext): ContentApi {
         return errors.fail({ status: 400, code: "uploadUnsupportedType", message });
       }
 
-      ctx.throwIfAborted(opts?.signal);
+      // The transfer. The mock has no bytes to send, so the bar moves in steps spread over one more slice of
+      // the simulated latency — the upload can be watched and cancelled half-way. Zero latency (tests): no delay.
+      // SPEC-GAP: the spec defines `onProgress` (0..100, bytes sent / total) but no mock timing for it.
+      const stepMs = Math.floor(Math.max(0, store.controls.latency.maxMs) / UPLOAD_PROGRESS_STEPS.length);
+      for (const percent of UPLOAD_PROGRESS_STEPS) {
+        reportUploadProgress(opts?.onProgress, percent);
+        if (stepMs > 0) await ctx.clock.sleep(stepMs);
+        ctx.throwIfAborted(opts?.signal);
+      }
       // The stored name is the trimmed one and the stored type comes from the extension, never from the client.
       const stored = ctx.files.createFromUpload({ uri: file.uri, name: metadata.originalName, mimeType: metadata.mimeType, size }, user.id);
 
@@ -323,7 +343,7 @@ export function createContent(ctx: MockContext): ContentApi {
         ctx.files.removeIfUnreferenced(previousFileId);
       }
 
-      opts?.onProgress?.(100);
+      reportUploadProgress(opts?.onProgress, 100);
       return { id: stored.id, originalName: stored.originalName, mimeType: stored.mimeType, size: stored.size, uploadedAt: stored.uploadedAt };
     },
 

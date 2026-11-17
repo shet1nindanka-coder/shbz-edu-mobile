@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, type ScrollViewInstance } from 'react-native';
 
 import { isNotFoundError, qk, useApi } from '@/api';
@@ -14,17 +14,23 @@ import { Button, IconButton, LoadingState, Notice, Screen, Segmented, Tabs, Text
 
 import { AnswersSection } from './edit/answers-section';
 import { NumbersConfirmDialog } from './edit/numbers-confirm-dialog';
+import { findNumberEntry, pageOfNumber } from './edit/topic-edit';
 import { TopicFormSection } from './edit/topic-form-section';
 import { useTopicEditForm, type EditNotice } from './edit/use-topic-edit-form';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
+import { clearEditorFocus, markOpenedFromEditor, peekEditorFocus } from './shared/editor-links';
 import { errorText } from './shared/error-text';
 import { ImportPanelView } from './shared/import-panel';
 import { LoadFailure, loadFailureOf } from './shared/load-failure';
+import { pinnedColumn } from './shared/pinned-column';
 import { postTopicsFlash } from './shared/topics-flash';
 import { useImportPanel } from './shared/use-import-panel';
 
 /** Route params of `content.topicEdit` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type ContentTopicEditScreenProps = ScreenParams['content.topicEdit'];
+
+/** Space left above the ringed row when the screen scrolls to it. */
+const FOCUS_SCROLL_MARGIN = 12;
 
 type TopicMode = 'view' | 'edit';
 /** The site's long page, split as its phone mapping proposes (07 §1.3): the form, the per-number materials, the import. */
@@ -46,14 +52,20 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   const navigation = useAppNavigation();
   const isDeveloper = user.role === 'DEVELOPER';
 
-  const [section, setSection] = useState<EditSection>('topic');
+  // Opened by «← К теме» of a number reached through number search: the site's `/edit?number=N#topic-answers`
+  // (07 §1.3, §1.4b) — the statements-and-answers section, on the page of that number, the number ringed.
+  const [focusNumber] = useState(() => peekEditorFocus(topicId));
+  useEffect(() => clearEditorFocus(), []);
+  const [section, setSection] = useState<EditSection>(focusNumber === null ? 'topic' : 'answers');
   const [notice, setNotice] = useState<EditNotice | null>(null);
-  const [answersPage, setAnswersPage] = useState(1);
+  // `null` until the user turns a page: the list then opens on the page of the focused number (or the first).
+  const [answersPage, setAnswersPage] = useState<number | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   // Deleted from this screen: it is on its way out, so the 404 of the last refetch is not news.
   const [deleted, setDeleted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
+  const focusScroll = useRef<{ sectionY: number | null; rowY: number | null; done: boolean }>({ sectionY: null, rowY: null, done: false });
 
   const detail = useQuery({
     queryKey: qk('content', 'getTopic', topicId),
@@ -77,9 +89,21 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
     void detail.refetch().finally(() => setRefreshing(false));
   };
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: false });
+  // The ringed number may sit below the fold of its page: once the section and the row know where they
+  // are, the screen scrolls to the row — one time, never against the user's own scrolling later.
+  const placeFocus = (part: 'sectionY' | 'rowY', y: number) => {
+    const focus = focusScroll.current;
+    if (focus.done) return;
+    focus[part] = y;
+    if (focus.sectionY === null || focus.rowY === null) return;
+    focus.done = true;
+    scrollRef.current?.scrollTo({ y: Math.max(0, focus.sectionY + focus.rowY - FOCUS_SCROLL_MARGIN), animated: false });
+  };
   const openFile = (file: ViewerFile, title: string) => navigation.openFiles([file], { title });
 
   const topic = data?.topic;
+  const focused = topic ? findNumberEntry(topic.homeworkNumbers, focusNumber) : null;
+  const shownAnswersPage = answersPage ?? (topic ? pageOfNumber(topic.homeworkNumbers, focusNumber) : null) ?? 1;
   const uploading = form.theory.uploading || form.homework.uploading;
   const formBusy = form.phase !== 'idle';
 
@@ -199,15 +223,23 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
           {section === 'topic' ? <TopicFormSection topic={topic} form={form} onOpenFile={openFile} onNotice={setNotice} /> : null}
 
           {section === 'answers' ? (
-            <AnswersSection
-              numbers={topic.homeworkNumbers}
-              page={answersPage}
-              onPageChange={(page) => {
-                setAnswersPage(page);
-                scrollToTop();
-              }}
-              onOpenNumber={(entry) => navigation.push({ screen: 'content.number', topicId, number: entry.number })}
-            />
+            <View onLayout={focused ? (event) => placeFocus('sectionY', event.nativeEvent.layout.y) : undefined}>
+              <AnswersSection
+                numbers={topic.homeworkNumbers}
+                page={shownAnswersPage}
+                highlightedId={focused?.id}
+                onHighlightLayout={(y) => placeFocus('rowY', y)}
+                onPageChange={(page) => {
+                  setAnswersPage(page);
+                  scrollToTop();
+                }}
+                onOpenNumber={(entry) => {
+                  // The number screen's «← К теме» then steps back here instead of opening a second editor.
+                  markOpenedFromEditor(topicId, entry.number);
+                  navigation.push({ screen: 'content.number', topicId, number: entry.number });
+                }}
+              />
+            </View>
           ) : null}
 
           {section === 'import' ? (
@@ -257,7 +289,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
 
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.lg },
-  banners: { gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingVertical: t.space.md },
+  banners: { ...pinnedColumn, gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingVertical: t.space.md },
   section: { gap: t.space.md },
   sectionHead: { gap: t.space.xxs },
   footer: { gap: t.space.sm },

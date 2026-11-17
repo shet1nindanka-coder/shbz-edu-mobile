@@ -12,12 +12,13 @@ import { useAppNavigation } from '@/navigation';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, ErrorState, LoadingState, Notice, Text } from '@/ui';
 
-import { errorText } from '../students/error-text';
+import { errorText, loadFailureOf } from '../students/error-text';
+import { useNoticeScroll } from '../students/use-notice-scroll';
 import { CancelHomeworkDialog } from './cancel-homework-dialog';
 import { CardScreen, type CardChrome } from './card-screen';
 import { DisclosureRow } from './disclosure-row';
 import { ReviewAssignmentCard } from './review-assignment-card';
-import { EMPTY_PLACEMENT, buildReviewRows, hasDiagnostics, reconcilePlacement, reviewRowIndex, type ReviewRow } from './review-logic';
+import { buildReviewRows, completedAssignmentIds, hasDiagnostics, reviewRowIndex, type ReviewRow } from './review-logic';
 import { UndoToast } from './undo-toast';
 import { useNowTick } from './use-now-tick';
 import { useReview } from './use-review';
@@ -57,6 +58,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const review = useReview(studentId);
   const { homeworks, data, assignments } = review;
   useStudentGone(studentId, homeworks.error);
+  const homeworksFailure = loadFailureOf(homeworks);
   const now = useNowTick(60_000);
   const listRef = useRef<FlashListRef<ReviewRow>>(null);
 
@@ -64,8 +66,6 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const [lessonMode, setLessonMode] = useState(false);
   const [expandedIds, setExpandedIds] = useState<readonly string[]>(assignmentId ? [assignmentId] : []);
   const [completedToggled, setCompletedToggled] = useState<boolean | null>(null);
-  const [placement, setPlacement] = useState(EMPTY_PLACEMENT);
-  const [placementToken, setPlacementToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState<ListNotice | null>(null);
   const [cancelFor, setCancelFor] = useState<TeacherHomeworkAssignment | null>(null);
@@ -88,13 +88,13 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
     if (assignmentId) focusAssignment(assignmentId);
   }
 
-  const nextPlacement = assignments ? reconcilePlacement(placement, assignments, placementToken) : placement;
-  if (nextPlacement !== placement) setPlacement(nextPlacement);
-
-  const completedOpen = completedToggled ?? (focus !== null && nextPlacement.completedIds.includes(focus.id));
+  // Order and grouping follow the server's answer (attention sort, completed under the disclosure); the
+  // colours of writes still in flight do not move a card.
+  const completedIds = useMemo(() => completedAssignmentIds(data?.assignments ?? []), [data]);
+  const completedOpen = completedToggled ?? (focus !== null && completedIds.has(focus.id));
   const rows = useMemo(
-    () => (assignments ? buildReviewRows(assignments, nextPlacement, completedOpen) : NO_ROWS),
-    [assignments, nextPlacement, completedOpen],
+    () => (assignments ? buildReviewRows(assignments, completedIds, completedOpen) : NO_ROWS),
+    [assignments, completedIds, completedOpen],
   );
 
   useEffect(() => {
@@ -120,17 +120,11 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
 
   const refresh = () => {
     setRefreshing(true);
-    void homeworks.refetch().finally(() => {
-      setRefreshing(false);
-      // A manual refresh also takes the server's order and grouping again.
-      setPlacementToken((value) => value + 1);
-    });
+    void homeworks.refetch().finally(() => setRefreshing(false));
   };
 
-  const announce = (next: ListNotice) => {
-    setNotice(next);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  };
+  const announce = (next: ListNotice) => setNotice(next);
+  useNoticeScroll(listRef, notice);
 
   const toggle = (id: string) => setExpandedIds((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
 
@@ -177,10 +171,10 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
     data.assignmentsEnabled ? (
       <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="review-empty" />
     ) : null
-  ) : homeworks.isError ? (
+  ) : homeworksFailure ? (
     <ErrorState
       title={dict.shells.errorTitle}
-      description={errorText(homeworks.error, dict.shells.errorDescription)}
+      description={errorText(homeworksFailure.error, dict.shells.errorDescription)}
       retryLabel={dict.common.retry}
       onRetry={() => void homeworks.refetch()}
       retrying={homeworks.isFetching}

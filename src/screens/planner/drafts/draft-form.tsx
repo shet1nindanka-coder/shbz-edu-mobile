@@ -13,7 +13,7 @@ import { makeStyles } from '@/theme';
 import { Button, CheckRow, DateTimeField, Notice, Screen, Select, Text, TextArea } from '@/ui';
 
 import { DurationStepper } from '../lessons/duration-stepper';
-import { toggleId } from '../lessons/new-lesson-logic';
+import { checkedMemberIds, toggleId } from '../lessons/new-lesson-logic';
 import { useDateTimeLabels } from '../shared/date-time-labels';
 import { errorText } from '../shared/error-text';
 import { useNowTick } from '../shared/use-now-tick';
@@ -45,18 +45,22 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
   const dateTimeLabels = useDateTimeLabels();
   const scrollRef = useRef<ScrollViewInstance>(null);
 
-  const [topicId, setTopicId] = useState<string | null>(() => initialTopicId(form));
+  // Only the teacher's own choices are state. The defaults (the lesson's dominant topic, "all members
+  // checked") are derived from the form data, which is re-read after the form has opened from the cache.
+  const [pickedTopicId, setPickedTopicId] = useState<string | null>(null);
+  const topicId = pickedTopicId && form.topics.some((topic) => topic.id === pickedTopicId) ? pickedTopicId : initialTopicId(form);
   const [deadlineAt, setDeadlineAt] = useState('');
   const [dailyMinutes, setDailyMinutes] = useState<number>(META_LIMITS.homeworkDailyMinutes.default);
   const [teacherNote, setTeacherNote] = useState('');
-  const [studentIds, setStudentIds] = useState<string[]>(() => form.members.map((member) => member.id));
+  const [uncheckedIds, setUncheckedIds] = useState<string[]>([]);
   const [problem, setProblem] = useState<DraftFormProblem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const wait = useRetryWait();
   const now = useNowTick(60_000);
-  // The member list is re-read when the form opens; only students that are still on it are sent.
-  const checkedIds = studentIds.filter((id) => form.members.some((member) => member.id === id));
+  // Every current member except the unchecked ones: a student added since the last visit is checked,
+  // one who left is not sent.
+  const checkedIds = checkedMemberIds(form.members, uncheckedIds);
   const nobodyChecked = checkedIds.length === 0;
   const budget = draftBudget(dailyMinutes, deadlineAt, now);
 
@@ -119,7 +123,7 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
           options={form.topics.map((topic) => ({ value: topic.id, label: topic.title }))}
           value={topicId}
           onChange={(next) => {
-            setTopicId(next);
+            setPickedTopicId(next);
             if (problem === 'pickTopic') setProblem(null);
           }}
           placeholder={dict.topics.widgets.selectPlaceholder}
@@ -182,8 +186,8 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
               <CheckRow
                 key={member.id}
                 label={member.name}
-                checked={studentIds.includes(member.id)}
-                onChange={() => setStudentIds((current) => toggleId(current, member.id))}
+                checked={checkedIds.includes(member.id)}
+                onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
                 testID={`draft-new-student-${member.id}`}
               />
             ))}

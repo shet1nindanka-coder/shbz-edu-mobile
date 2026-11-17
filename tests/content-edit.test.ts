@@ -15,16 +15,26 @@ import {
   countFilled,
   dangerousNumbers,
   draftValue,
+  findNumberEntry,
   isNumbersChangePreview,
   missingRequiredField,
   nextDraft,
   numbersFieldText,
   pageCountOf,
+  pageOfNumber,
   pageRange,
   pageSlice,
   previewFailureAction,
   removalConfirmation,
 } from "../src/screens/content/edit/topic-edit";
+import {
+  clearEditorFocus,
+  clearOpenedFromEditor,
+  markOpenedFromEditor,
+  peekEditorFocus,
+  peekOpenedFromEditor,
+  requestEditorFocus,
+} from "../src/screens/content/shared/editor-links";
 
 const plan = (overrides: Partial<NumbersChangePreview> = {}): NumbersChangePreview => ({
   keptCount: 4,
@@ -157,5 +167,45 @@ describe("statements and answers pages", () => {
       ]),
       { conditions: 2, answers: 2 },
     );
+  });
+
+  it("finds the page of a number by its normalised form, as the site's ?number=N does", () => {
+    const entries = Array.from({ length: 23 }, (_, index) => ({ number: index === 11 ? "0012" : String(index + 1) }));
+    assert.equal(pageOfNumber(entries, "1"), 1);
+    assert.equal(pageOfNumber(entries, "10"), 1);
+    assert.equal(pageOfNumber(entries, "11"), 2);
+    // «12» is recorded as «0012»: both spellings point at the same entry.
+    assert.equal(pageOfNumber(entries, "12"), 2);
+    assert.equal(pageOfNumber(entries, "0012"), 2);
+    assert.equal(findNumberEntry(entries, "012"), entries[11]);
+    assert.equal(pageOfNumber(entries, "23"), 3);
+    assert.equal(pageOfNumber(entries, "24"), null);
+    assert.equal(pageOfNumber(entries, null), null);
+    assert.equal(pageOfNumber(entries, "12a"), null);
+    assert.equal(findNumberEntry([], "1"), null);
+  });
+});
+
+describe("hand-overs between the topic editor and the number screen", () => {
+  it("marks a number as opened from the editor until the number screen clears the mark", () => {
+    assert.equal(peekOpenedFromEditor("top_a", "12"), false);
+    markOpenedFromEditor("top_a", "12");
+    // A render may run twice before it commits: peeking does not consume the mark.
+    assert.equal(peekOpenedFromEditor("top_a", "12"), true);
+    assert.equal(peekOpenedFromEditor("top_a", "12"), true);
+    assert.equal(peekOpenedFromEditor("top_a", "13"), false);
+    assert.equal(peekOpenedFromEditor("top_b", "12"), false);
+    clearOpenedFromEditor();
+    assert.equal(peekOpenedFromEditor("top_a", "12"), false);
+  });
+
+  it("hands the number to show to the editor of the same topic only", () => {
+    assert.equal(peekEditorFocus("top_a"), null);
+    requestEditorFocus("top_a", "0012");
+    assert.equal(peekEditorFocus("top_b"), null);
+    assert.equal(peekEditorFocus("top_a"), "0012");
+    assert.equal(peekEditorFocus("top_a"), "0012");
+    clearEditorFocus();
+    assert.equal(peekEditorFocus("top_a"), null);
   });
 });

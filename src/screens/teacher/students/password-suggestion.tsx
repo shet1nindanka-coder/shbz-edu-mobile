@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 
 import { useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { PressableScale, Text, TextButton } from '@/ui';
 
@@ -43,11 +42,10 @@ export function PasswordSuggestion({ suggestion, onPick, onAnother, onCustom }: 
         <Text variant="bodyStrong" color="textStrong" selectable={false}>
           {suggestion}
         </Text>
-        <Hint>
-          <Text variant="caption" color="kicker">
-            {m.teacher.students.suggestPickHint}
-          </Text>
-        </Hint>
+        {/* Part of the suggestion on the site, not a `.ui-hint`: shown whatever the hints preference is. */}
+        <Text variant="caption" color="kicker">
+          {m.teacher.students.suggestPickHint}
+        </Text>
       </PressableScale>
       <View style={styles.links}>
         <TextButton label={t.another} onPress={onAnother} testID="password-suggestion-another" />

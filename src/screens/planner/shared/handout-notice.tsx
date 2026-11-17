@@ -13,7 +13,7 @@ import { RetryWaitLine } from './use-retry-wait';
  */
 export function HandoutNotice({ handout, testID }: { handout: Handout; testID?: string }) {
   const styles = useStyles();
-  const { dict, m } = useI18n();
+  const { m } = useI18n();
   const failure = handout.failure;
   if (!failure) return null;
   return (
@@ -26,7 +26,7 @@ export function HandoutNotice({ handout, testID }: { handout: Handout; testID?: 
         action={
           failure.canOpenPrintVersion ? (
             <Button
-              label={dict.planner.lessonBoard.print}
+              label={m.planner.lessonBoard.print}
               size="sm"
               variant="outline"
               onPress={() => handout.open({ ...failure.request, format: 'html' })}

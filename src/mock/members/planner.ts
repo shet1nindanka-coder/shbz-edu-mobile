@@ -5,6 +5,10 @@
  *
  * Order inside every method, like the site's route handlers: session and role → rate limit → ownership
  * (a missing or foreign lesson / draft / participant / item is a 404) → input validation → effect.
+ * Three handlers of the site read the body BEFORE they look the row up, and so do these methods (the
+ * errors of 05 §3.3, §3.8, §3.13 are listed in handler order): `scheduleLesson` (400 `invalidStartsAt`
+ * before the 404), `setItemResult` (400 `invalidResult` before the 404) and `createHomeworkPlan`
+ * (400 `topicAndDeadlineRequired` → 404 `topicNotFound` → 404 `groupNotFound` → the student checks).
  *
  * AI plan generation is deferred work: `createLesson`, `createHomeworkPlan` and `regenerateParticipant`
  * schedule one `planGeneration` job per participant (5 / 6 / 7 s by the participant's index in name order);
@@ -896,9 +900,10 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
     async scheduleLesson(lessonId, startsAtInput) {
       const user = auth.requireStaff();
       limits.enforce("api:lesson-schedule");
-      const lesson = ctx.guard.lesson(user, lessonId, "LESSON");
+      // The body is read before the lesson is looked up, as the site's handler does (05 §3.3).
       const startsAt = ctx.validate.instant(startsAtInput);
       if (!startsAt) return errors.fail({ status: 400, code: "invalidStartsAt", message: (dict) => dict.apiPlanner.lessons.invalidStartsAt });
+      const lesson = ctx.guard.lesson(user, lessonId, "LESSON");
       if (lesson.finishedAt) {
         return errors.fail({ status: 409, code: "alreadyFinished", message: (dict) => dict.apiPlanner.lesson.alreadyFinished });
       }
@@ -1083,12 +1088,13 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
     async setItemResult(lessonId, participantId, itemId, result) {
       const user = auth.requireStaff();
       limits.enforce("api:lesson-item-result");
-      const found = ctx.guard.lessonItem(user, lessonId, participantId, itemId);
-      if (!seesStudent(user, found.participant.studentId)) throw errors.notFound("itemNotFound");
+      // The body is read before the item is looked up, as the site's handler does (05 §3.8).
       // `undefined` = the key is missing from the body.
       if (result !== null && !ctx.validate.oneOf<LessonItemResult>(result, LESSON_ITEM_RESULTS)) {
         return errors.fail({ status: 400, code: "invalidResult", message: (dict) => dict.apiPlanner.lessonResult.invalidResult });
       }
+      const found = ctx.guard.lessonItem(user, lessonId, participantId, itemId);
+      if (!seesStudent(user, found.participant.studentId)) throw errors.notFound("itemNotFound");
 
       const { lesson, participant, item } = found;
       // One transaction: the result and the mirrored number status with its history entry. Allowed in any lesson status.
@@ -1209,15 +1215,15 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
       limits.enforce("api:homework-plan");
       const body = (input ?? {}) as Partial<typeof input>;
 
-      const { group, studentIds } = resolveStudents(user, body.groupId, body.studentIds);
-      const topicId = ctx.validate.id(body.topicId);
-      if (topicId && !q.topic(topicId)) throw errors.notFound("topicNotFound");
-      // Exactly one topic and a deadline in the future (the date of the next lesson).
+      // The site's order (05 §3.13): the body first — exactly one topic and a deadline in the future (the
+      // date of the next lesson) — then the topic, then the group, then the students.
       const params = normalizeHomeworkParams(body, ctx.nowDate());
-      const topic = q.topic(params?.topicId);
-      if (!params || !topic) {
+      if (!params) {
         return errors.fail({ status: 400, code: "topicAndDeadlineRequired", message: (dict) => dict.apiPlanner.homeworkPlans.topicAndDeadlineRequired });
       }
+      const topic = q.topic(params.topicId);
+      if (!topic) throw errors.notFound("topicNotFound");
+      const { group, studentIds } = resolveStudents(user, body.groupId, body.studentIds);
       if (studentIds.length === 0) {
         return errors.fail({ status: 400, code: "selectAtLeastOneStudent", message: (dict) => dict.apiPlanner.lessons.selectAtLeastOneStudent });
       }

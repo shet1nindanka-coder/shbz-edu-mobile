@@ -17,7 +17,7 @@ import { errorText } from './work/error-text';
 import { HomeworkCheckBlock } from './work/homework-check-block';
 import { HomeworkNumberCard } from './work/homework-number-card';
 import { HomeworkPhotosBlock } from './work/homework-photos-block';
-import { homeworkDetailMeta, homeworkLabel, isHomeworkCompleted, serverClockOffset } from './work/logic';
+import { UNAVAILABLE_RECHECK_MS, homeworkDetailMeta, homeworkLabel, isHomeworkCompleted, serverClockOffset } from './work/logic';
 import { useHomeworkCheck } from './work/use-homework-check';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
 import { useServerNow } from './work/use-server-now';
@@ -54,25 +54,31 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
   const detail = useQuery({
     queryKey: qk('studentWork', 'getHomework', assignmentId),
     queryFn: ({ signal }) => api.studentWork.getHomework(assignmentId, { signal }),
+    // The start button is off while the AI check is reported as switched off: keep asking.
+    refetchInterval: (query) => (live && query.state.data && !query.state.data.aiCheckAvailable ? UNAVAILABLE_RECHECK_MS : false),
   });
   const data = detail.data;
   const { isStale, refetch } = detail;
 
   // `404 homeworkNotFound`: an unknown id, or a homework the teacher has cancelled — also when it is
-  // discovered by an upload, a delete, a check start or a poll. The list is the place to land on.
+  // discovered by an upload, a check start or a poll. The list is the place to land on (00 §3.3).
+  const [reportedGone, setReportedGone] = useState(false);
+  const leave = useCallback(() => setReportedGone(true), []);
+  const gone = reportedGone || hasErrorCode(detail.error, 'homeworkNotFound');
   const left = useRef(false);
-  const leave = useCallback(() => {
-    if (left.current) return;
+  useEffect(() => {
+    // Only while this screen is in front: a 404 that arrives while the student is on another tab or in
+    // the photo viewer (a realtime re-read, a request that was still in flight) must not pull them here.
+    if (!gone || !live || left.current) return;
     left.current = true;
     queryClient.removeQueries({ queryKey: qk('studentWork', 'getHomework', assignmentId) });
     void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
     void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
-    navigation.replace({ screen: 'student.homeworks' });
-  }, [assignmentId, navigation, queryClient]);
-  const gone = hasErrorCode(detail.error, 'homeworkNotFound');
-  useEffect(() => {
-    if (gone) leave();
-  }, [gone, leave]);
+    // `open`, not `replace`: the tab's stack always holds the list under a detail (its layout anchors
+    // it), so replacing the detail with the list would leave two lists and "back" would show the same
+    // screen again. Opening a tab root returns the stack to that one list.
+    navigation.open({ screen: 'student.homeworks' });
+  }, [assignmentId, gone, live, navigation, queryClient]);
 
   const check = useHomeworkCheck({ assignmentId, check: data?.assignment.latestCheck ?? null, live, onGone: leave });
 

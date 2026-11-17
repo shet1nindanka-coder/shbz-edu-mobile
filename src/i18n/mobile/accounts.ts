@@ -1,9 +1,6 @@
 // Mobile-only strings of the developer's «Аккаунты» screen (teachers, students, ownership, passwords).
 // Site texts stay in `dict.students.*`.
 const ru = {
-  passwordSheet: {
-    title: "Новый пароль"
-  },
   // The site shows a table row with buttons; a phone row is one touch target that opens a sheet.
   row: {
     teacherActions: "Действия с аккаунтом учителя",
@@ -21,9 +18,6 @@ const ru = {
 };
 
 const en: typeof ru = {
-  passwordSheet: {
-    title: "New password"
-  },
   row: {
     teacherActions: "Teacher account actions",
     studentActions: "Teacher, password and account deletion",

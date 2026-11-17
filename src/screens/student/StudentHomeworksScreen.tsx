@@ -169,7 +169,8 @@ export function StudentHomeworksScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
+  // The same top padding as the padded `Screen` of the empty / unavailable states: the header does not jump.
+  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.pageTop, paddingBottom: t.space.pageBottom },
   header: { gap: t.space.field, paddingBottom: t.space.field },
   row: { paddingBottom: t.space.lg },
   archive: {

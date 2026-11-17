@@ -9,7 +9,7 @@ import { ErrorState, LoadingState, Notice, Screen } from '@/ui';
 import { errorText } from './work/error-text';
 import { LessonLive } from './work/lesson-live';
 import { LessonWaiting } from './work/lesson-waiting';
-import { delayUntilLessonEdge, secondsUntil, serverClockOffset } from './work/logic';
+import { UNAVAILABLE_RECHECK_MS, delayUntilLessonEdge, secondsUntil, serverClockOffset } from './work/logic';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
 import { useServerNow } from './work/use-server-now';
 
@@ -65,6 +65,9 @@ export function StudentLessonScreen() {
     // The lesson is derived from the clock and carries runtime switches: a cached answer, however
     // young, is only a placeholder while the tab asks again.
     refetchOnMount: 'always',
+    // The submit buttons are off while the lesson check is reported as switched off: keep asking.
+    refetchInterval: (query) =>
+      live && query.state.data?.active && !query.state.data.lessonCheckAvailable ? UNAVAILABLE_RECHECK_MS : false,
   });
   const data = lesson.data;
   const { refetch } = lesson;
@@ -79,8 +82,13 @@ export function StudentLessonScreen() {
   // from the persisted cache): the tab waits while the re-read is on its way.
   const active = data?.active && secondsUntil(data.active.endsAt, nowMs) > 0 ? data.active : null;
 
+  // The server computes `upcoming` even while a lesson is active (90-addendum-5 A.5.7), so the waiting
+  // state of an expired cached lesson still knows what comes next — unless that has started as well.
+  const upcoming =
+    data?.upcoming && (!data.active || secondsUntil(data.upcoming.startsAt, nowMs) > 0) ? data.upcoming : null;
+
   useLessonEdgeRefresh({
-    moment: data ? (data.active ? data.active.endsAt : (data.upcoming?.startsAt ?? null)) : null,
+    moment: active ? active.endsAt : (upcoming?.startsAt ?? null),
     serverOffsetMs,
     live,
     dataUpdatedAt: lesson.dataUpdatedAt,
@@ -117,7 +125,7 @@ export function StudentLessonScreen() {
       {data ? (
         <>
           {refreshError ? <Notice tone="error" text={refreshError} testID="lesson-refresh-error" /> : null}
-          <LessonWaiting upcoming={data.active ? null : data.upcoming} serverOffsetMs={serverOffsetMs} />
+          <LessonWaiting upcoming={upcoming} serverOffsetMs={serverOffsetMs} />
         </>
       ) : lesson.isError ? (
         <ErrorState

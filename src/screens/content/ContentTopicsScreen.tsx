@@ -17,6 +17,7 @@ import { TopicCard } from './browse/topic-card';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
 import { errorText } from './shared/error-text';
 import { LoadFailure, loadFailureOf } from './shared/load-failure';
+import { pinnedColumn } from './shared/pinned-column';
 import { useTopicsFlash } from './shared/topics-flash';
 
 type ListNotice = { tone: 'success' | 'error'; text: string };
@@ -192,7 +193,7 @@ export function ContentTopicsScreen() {
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.lg },
-  banners: { gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingTop: t.space.md },
+  banners: { ...pinnedColumn, gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingTop: t.space.md },
   header: { gap: t.space.field },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
   action: { flexGrow: 1, flexBasis: 140 },
