@@ -5,7 +5,7 @@ import type { JournalEntry } from '@/api/types';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Card, Chip, PressableScale, Text, TextButton } from '@/ui';
+import { Card, CardPressArea, Chip, Text, TextButton } from '@/ui';
 
 import { collapseError, costText, tokensText, whoText } from './journal-logic';
 
@@ -32,21 +32,24 @@ export function JournalEntryCard({ entry, onOpen }: JournalEntryCardProps) {
   const tokens = tokensText(entry);
   const cost = costText(entry.costRub);
   const error = entry.error ? collapseError(entry.error) : null;
+  const when = `${formatDateTime(entry.createdAt, locale)} ${m.common.dateTime.msk}`;
+  const who = whoText(entry, t.roles);
+  const usage = [tokens ? `${t.colTokens}: ${tokens}` : null, cost ? `${t.colCost}: ${cost}` : null].filter(Boolean).join(' · ');
 
   return (
     <Card padded={false} testID={`journal-entry-${entry.id}`}>
-      <PressableScale
-        accessibilityRole="button"
+      {/* One element for screen readers: everything the eye reads in it is spoken after the action. */}
+      <CardPressArea
         accessibilityLabel={format(m.developer.journal.openEntry, { action })}
+        accessibilityParts={[t.categories[entry.category], when, entry.actionLabel ? entry.action : null, who, entry.progressTarget, entry.summary, usage]}
         onPress={() => onOpen(entry)}
-        scaleTo={0.99}
         style={[styles.main, error ? styles.mainWithError : null]}
         testID={`journal-entry-${entry.id}-open`}
       >
         <View style={styles.top}>
           <Chip label={t.categories[entry.category]} tone={failed ? 'red' : 'muted'} />
           <Text variant="caption" tabular style={styles.when}>
-            {`${formatDateTime(entry.createdAt, locale)} ${m.common.dateTime.msk}`}
+            {when}
           </Text>
         </View>
 
@@ -60,7 +63,7 @@ export function JournalEntryCard({ entry, onOpen }: JournalEntryCardProps) {
           ) : null}
         </View>
 
-        <Text variant="caption">{whoText(entry, t.roles)}</Text>
+        <Text variant="caption">{who}</Text>
 
         {entry.progressTarget || entry.summary ? (
           <View style={styles.what}>
@@ -69,12 +72,12 @@ export function JournalEntryCard({ entry, onOpen }: JournalEntryCardProps) {
           </View>
         ) : null}
 
-        {tokens || cost ? (
+        {usage ? (
           <Text variant="caption" tabular>
-            {[tokens ? `${t.colTokens}: ${tokens}` : null, cost ? `${t.colCost}: ${cost}` : null].filter(Boolean).join(' · ')}
+            {usage}
           </Text>
         ) : null}
-      </PressableScale>
+      </CardPressArea>
 
       {entry.error && error ? (
         <View style={styles.error}>

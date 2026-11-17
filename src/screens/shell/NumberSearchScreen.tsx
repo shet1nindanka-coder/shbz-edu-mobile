@@ -4,7 +4,7 @@ import { View, type TextInputInstance } from 'react-native';
 
 import { isApiError, useApi } from '@/api';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useStillHere } from '@/navigation';
 import { numberFindTarget } from '@/navigation/targets';
 import { Hint, useCurrentUser } from '@/providers';
 import { makeStyles } from '@/theme';
@@ -28,6 +28,9 @@ export function NumberSearchScreen() {
   const t = dict.numberSearch;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
+  // A search the user closed (×, back, swipe-down) is abandoned: its answer must not open a number over
+  // whatever they went to, nor pop an overlay they opened since (`navigateTo` closes the overlay on top).
+  const stillHere = useStillHere();
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const input = useRef<TextInputInstance>(null);
@@ -42,6 +45,7 @@ export function NumberSearchScreen() {
   const search = useMutation({
     mutationFn: (number: string) => api.shell.findNumber(number),
     onSuccess: (result) => {
+      if (!stillHere()) return;
       const target = numberFindTarget(result, user.role);
       if (!target || !navigation.open(target)) {
         setError(t.notFound);
@@ -49,6 +53,7 @@ export function NumberSearchScreen() {
       }
     },
     onError: (failure) => {
+      if (!stillHere()) return;
       setError(numberSearchErrorText(failure, t.notFound));
       refocus();
     },

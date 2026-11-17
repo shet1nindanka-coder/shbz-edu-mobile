@@ -24,8 +24,11 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 }
 
 /**
- * Wraps every method of every member. Synchronous methods (`subscribeRealtime`, `getHandoutUrl`) pass
- * through untouched; a promise is observed, never replaced by a different outcome.
+ * Wraps every method of every member, whatever its shape. A returned promise (or any thenable) is observed
+ * on a side branch, never replaced by a different outcome. A synchronous return passes through untouched,
+ * and a synchronous throw — `planner.getHandoutUrl` checks the session before it builds the URL, and an
+ * HTTP client may validate arguments before it sends anything — is reported the same way and re-thrown
+ * as it is (`shell.subscribeRealtime`, the other synchronous method, never throws by contract).
  */
 export function guardApiClient<T extends ApiClient>(client: T, handlers: SessionErrorHandlers): T {
   const report = (error: unknown) => {
@@ -42,7 +45,13 @@ export function guardApiClient<T extends ApiClient>(client: T, handlers: Session
         continue;
       }
       guarded[name] = (...args: unknown[]) => {
-        const result: unknown = (method as (...a: unknown[]) => unknown).apply(member, args);
+        let result: unknown;
+        try {
+          result = (method as (...a: unknown[]) => unknown).apply(member, args);
+        } catch (error) {
+          report(error);
+          throw error;
+        }
         if (isThenable(result)) {
           // Observe on a side branch: the caller receives the original promise and its original rejection.
           result.then(undefined, report);

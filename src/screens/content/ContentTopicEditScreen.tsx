@@ -7,7 +7,7 @@ import type { ImportTarget } from '@/api/types';
 import type { ViewerFile } from '@/components/files';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, useStillHere, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
@@ -53,6 +53,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   const s = dict.topics.submit;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const isDeveloper = user.role === 'DEVELOPER';
 
   // Opened by «← К теме» of a number reached through number search: the site's `/edit?number=N#topic-answers`
@@ -286,7 +287,8 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
           setDeleted(true);
           // Back to the list, as the site's redirect does; the list shows «Тема успешно удалена».
           postTopicDeleted(topicId);
-          navigation.open({ screen: 'content.topics' });
+          // Answered after the user went elsewhere: the screen shows the gone state on return instead.
+          if (stillHere()) navigation.open({ screen: 'content.topics' });
         }}
       />
     </Screen>

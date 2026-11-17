@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
 import { retryAfterOf } from '@/api/errors';
 
-import { useCountdown } from './use-countdown';
+import { useDurationLock } from './use-wait-clock';
 
 export type RetryWait = {
   /** Seconds until the refused action may be tried again; 0 when nothing is cooling down. */
@@ -27,11 +27,15 @@ export type RetryWait = {
  * sheet, so reopening it still shows the lock and its line.
  */
 export function useRetryWait(): RetryWait {
-  const [until, setUntil] = useState<number | null>(null);
-  const seconds = useCountdown(until);
-  const note = useCallback((error: unknown) => {
-    const wait = retryAfterOf(error);
-    if (wait > 0) setUntil(Date.now() + wait * 1000);
-  }, []);
-  return { seconds, waiting: seconds > 0, note };
+  // A duration, not a deadline on the device clock: setting the clock back must not lengthen the wait.
+  const lock = useDurationLock();
+  const { start } = lock;
+  const note = useCallback(
+    (error: unknown) => {
+      const wait = retryAfterOf(error);
+      if (wait > 0) start(wait);
+    },
+    [start],
+  );
+  return { seconds: lock.seconds, waiting: lock.locked, note };
 }

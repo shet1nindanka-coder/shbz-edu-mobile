@@ -10,8 +10,8 @@ import { serverClockOffset } from '@/domain/server-clock';
 import { format, plural, useI18n } from '@/i18n';
 
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
-import { useStillHere } from '../shared/use-still-here';
-import { useAppNavigation, useRefetchOnFocus, useScreenLive } from '@/navigation';
+import { usePlanProgressObservers } from '../shared/use-plan-progress-observers';
+import { useAppNavigation, useRefetchOnFocus, useScreenLive, useStillHere } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 import { mergeQueryData } from '@/services/query';
 import {
@@ -143,6 +143,13 @@ export function useDraftBoard(planId: string) {
     lastStamps.current = stamps;
     if (stampsMoved || planSignature(rows) !== planSignature(participants)) void refetchBoard();
   }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refetchBoard]);
+
+  // A plan that arrived or failed also changes the drafts list (its «ошибок: N» chip): it is not polled.
+  const invalidateDraftList = useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: qk('planner', 'listHomeworkPlans') }),
+    [queryClient],
+  );
+  usePlanProgressObservers(participants, invalidateDraftList);
 
   // ───────────────────────────── set editing ─────────────────────────────
 

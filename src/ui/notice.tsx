@@ -3,8 +3,10 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles, useTheme, type Theme } from '@/theme';
 
+import { accessibilityLabelOf } from './a11y';
 import { IconButton } from './icon-button';
 import { Text } from './text';
+import { useAnnounce } from './use-announce';
 
 export type NoticeTone = 'error' | 'success' | 'warning';
 
@@ -20,6 +22,12 @@ export type NoticeProps = {
   /** Shows a close button; needs `dismissLabel`. */
   onDismiss?: () => void;
   dismissLabel?: string;
+  /**
+   * What VoiceOver speaks when the notice appears or changes (iOS; Android reads the live region). Default:
+   * `title` and `text` of an error or warning notice. Pass it for a notice whose message is in `children`;
+   * pass `null` for a notice that must stay silent (a countdown that changes every second).
+   */
+  announcement?: string | null;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -39,12 +47,14 @@ function noticeColors(tone: NoticeTone, t: Theme) {
 
 /**
  * Inline banner (`shbz-notice-*`). The site has no toasts: feedback lives at the top of the card it
- * concerns and stays until the state changes. Errors are announced to screen readers.
+ * concerns and stays until the state changes. Errors and warnings are announced to screen readers: a
+ * polite live region on Android, `useAnnounce` on iOS (where live regions do not exist).
  */
-export function Notice({ tone, text, title, children, action, onDismiss, dismissLabel, testID, style }: NoticeProps) {
+export function Notice({ tone, text, title, children, action, onDismiss, dismissLabel, announcement, testID, style }: NoticeProps) {
   const theme = useTheme();
   const styles = useStyles();
   const colors = noticeColors(tone, theme);
+  useAnnounce(announcement === undefined ? (tone === 'success' ? null : accessibilityLabelOf([title, text], '. ')) : announcement);
   return (
     <View
       accessibilityRole={tone === 'error' ? 'alert' : undefined}

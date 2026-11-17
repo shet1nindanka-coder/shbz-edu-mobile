@@ -117,7 +117,9 @@ export function Screen({
       {content}
       {footer ? (
         <View style={[styles.footer, { paddingBottom: theme.space.md + footerInset }]}>
-          <View style={column}>{footer}</View>
+          {/* The gutter sits INSIDE the column, as on the content: on a window wider than the column both
+              boxes are `maxWidth` including the gutter, so the footer lines up with the cards above it. */}
+          <View style={[column, styles.footerColumn]}>{footer}</View>
         </View>
       ) : null}
     </>
@@ -152,9 +154,9 @@ const useStyles = makeStyles((t) => ({
   scrollContent: { flexGrow: 1 },
   footer: {
     paddingTop: t.space.md,
-    paddingHorizontal: t.space.gutter,
     backgroundColor: t.colors.pageBg,
     borderTopWidth: t.borders.hairline,
     borderTopColor: t.colors.headerBorder,
   },
+  footerColumn: { paddingHorizontal: t.space.gutter },
 }));

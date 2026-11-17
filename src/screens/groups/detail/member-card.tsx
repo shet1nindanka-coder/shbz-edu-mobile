@@ -5,7 +5,7 @@ import type { GroupMember, HomeworkNumberStatus } from '@/api/types';
 import { homeworkStatusShortLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Card, Chip, Icon, IconButton, PressableScale, Text, type ChipTone } from '@/ui';
+import { Card, Chip, accessibilityLabelOf, Icon, IconButton, PressableScale, Text, type ChipTone } from '@/ui';
 
 import { speedLabel } from '../logic';
 import { MemberAiEditor } from './member-ai-editor';
@@ -78,9 +78,11 @@ export function MemberCard({ groupId, member, busy, onRemove, onProfileError }: 
 
       <PressableScale
         accessibilityRole="button"
-        accessibilityLabel={format(editing ? m.groups.members.aiProfileCollapseAria : m.groups.members.aiProfileExpandAria, {
-          name: member.name,
-        })}
+        // One element for a screen reader: the folded summary (speed, note) is spoken with its name.
+        accessibilityLabel={accessibilityLabelOf([
+          format(editing ? m.groups.members.aiProfileCollapseAria : m.groups.members.aiProfileExpandAria, { name: member.name }),
+          editing ? null : summary,
+        ])}
         accessibilityState={{ expanded: editing }}
         onPress={() => setEditing((value) => !value)}
         scaleTo={1}

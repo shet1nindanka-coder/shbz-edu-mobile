@@ -10,7 +10,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppServices } from '@/api/client';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import { createMockApiClient, type MockApiClient } from '@/mock';
-import { createMockFileService, forgetLocalFile, importLocalFile, materialiseMockSample, readLocalFileBytes } from '@/services/files';
+import {
+  clearFileCache,
+  createMockFileService,
+  forgetAllLocalFiles,
+  forgetLocalFile,
+  importLocalFile,
+  materialiseMockSample,
+  readLocalFileBytes,
+} from '@/services/files';
 import { isOnline } from '@/services/network';
 import { createPreferencesStore, type AppPreferencesStore, type KeyValueStorage } from '@/services/preferences';
 import { createSessionCache, guardApiClient, type SessionCache, type SessionErrorHandlers } from '@/services/session';
@@ -68,6 +76,12 @@ export function getAppRuntime(): AppRuntime {
       );
     },
     onFileRemoved: (fileId) => forgetLocalFile(fileId),
+    // Fresh fixtures replaced the dataset (automatic re-seed, discarded snapshot, demo reset): no row points
+    // at a picked file or a downloaded copy any more — clean them like the manual reset does.
+    onDatasetReplaced: () => {
+      forgetAllLocalFiles();
+      clearFileCache();
+    },
     // The content of a picked file (file:// / content:// on a phone, blob: on web), so the mock refuses a
     // mislabelled upload like the site's `validateUploadedBytes`.
     readUploadBytes: readLocalFileBytes,
@@ -79,7 +93,13 @@ export function getAppRuntime(): AppRuntime {
       onSessionExpired: (error) => sessionErrorHandlers?.onSessionExpired(error),
       onRoleRefused: (error) => sessionErrorHandlers?.onRoleRefused?.(error),
     }),
-    files: createMockFileService({ lookup: (fileId) => mock.backend.files.lookup(fileId), locale: getRequestLocale }),
+    // A file opened after the session ended is a 401 that signs out, like any API call.
+    files: createMockFileService({
+      lookup: (fileId) => mock.backend.files.access(fileId),
+      locale: getRequestLocale,
+      onSessionExpired: (error) => sessionErrorHandlers?.onSessionExpired(error),
+      ready: () => mock.ready(),
+    }),
     preferences: createPreferencesStore(storage),
     storage,
     sessionCache: createSessionCache(storage),

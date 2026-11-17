@@ -102,6 +102,12 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
   useRefetchOnFocus([current]);
 
   const selectView = (next: StatsView) => {
+    // A view visited before keeps its query mounted, so neither mounting nor focus asks for it again. On
+    // the site every view is its own server render (`?view=`), fresh on each switch, and most of what these
+    // numbers count (parent calls, lessons, groups, plans) publishes no realtime event: the view is re-read
+    // whenever it is opened again; its cached numbers stay on screen meanwhile.
+    const target = next === 'teacher' ? progress : next === 'teachers' ? teachers : platform;
+    if (next !== view && visited.has(next)) void target.refetch();
     setView(next);
     setVisited((seen) => (seen.has(next) ? seen : new Set(seen).add(next)));
   };

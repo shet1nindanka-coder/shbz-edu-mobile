@@ -223,8 +223,8 @@ describe("mock store: persistence", () => {
     for (const value of storage.data.values()) assert.ok(value.length < 500_000);
 
     const loaded = await new MockPersistence(storage).load();
-    assert.ok(loaded);
-    const restored = new MockStore(loaded);
+    assert.equal(loaded.kind, "snapshot");
+    const restored = new MockStore((loaded as Extract<typeof loaded, { kind: "snapshot" }>).snapshot);
     assert.deepEqual(restored.snapshot(), store.snapshot());
     assert.equal(restored.users.get("usr_ilya")!.name, "Сохранённый Илья");
     assert.equal(restored.settings.loginHelpContact, "@changed");
@@ -253,8 +253,8 @@ describe("mock store: persistence", () => {
     assert.deepEqual(written, []);
   });
 
-  it("answers null for a missing, foreign-version, corrupt or torn snapshot", async () => {
-    assert.equal(await new MockPersistence(createMemoryStorage()).load(), null);
+  it("tells nothing stored apart from a foreign-version, corrupt or torn snapshot (kept id counter)", async () => {
+    assert.deepEqual(await new MockPersistence(createMemoryStorage()).load(), { kind: "empty" });
 
     const storage = createMemoryStorage();
     const store = seeded();
@@ -266,21 +266,25 @@ describe("mock store: persistence", () => {
 
     const corrupt = createMemoryStorage(storage.data);
     corrupt.data.set(usersKey, "{not json");
-    assert.equal(await new MockPersistence(corrupt).load(), null);
+    assert.deepEqual(await new MockPersistence(corrupt).load(), { kind: "discarded", idCounter: store.meta.idCounter });
 
     const missing = createMemoryStorage(storage.data);
     missing.data.delete(usersKey);
-    assert.equal(await new MockPersistence(missing).load(), null);
+    assert.deepEqual(await new MockPersistence(missing).load(), { kind: "discarded", idCounter: store.meta.idCounter });
 
     const foreign = createMemoryStorage(storage.data);
     foreign.data.set(manifestKey, JSON.stringify({ ...JSON.parse(storage.data.get(manifestKey)!), version: MOCK_STORE_VERSION + 1 }));
-    assert.equal(await new MockPersistence(foreign).load(), null);
+    assert.deepEqual(await new MockPersistence(foreign).load(), { kind: "discarded", idCounter: store.meta.idCounter });
 
     // A table written by a save whose manifest never landed (the id counter and the rows would disagree).
     const torn = createMemoryStorage(storage.data);
     const table = JSON.parse(storage.data.get(usersKey)!) as { seq: number; rows: unknown[] };
     torn.data.set(usersKey, JSON.stringify({ ...table, seq: table.seq + 1 }));
-    assert.equal(await new MockPersistence(torn).load(), null);
+    assert.deepEqual(await new MockPersistence(torn).load(), { kind: "discarded", idCounter: store.meta.idCounter });
+
+    const unreadableManifest = createMemoryStorage(storage.data);
+    unreadableManifest.data.set(manifestKey, "{not json");
+    assert.deepEqual(await new MockPersistence(unreadableManifest).load(), { kind: "discarded", idCounter: null });
   });
 
   it("survives a failing adapter and retries the same keys with the next save", async () => {
@@ -298,7 +302,7 @@ describe("mock store: persistence", () => {
     persistence.schedule(store);
     await persistence.flush();
     assert.equal(storage.data.size, MOCK_TABLE_NAMES.length + 1);
-    assert.ok(await new MockPersistence(storage).load());
+    assert.equal((await new MockPersistence(storage).load()).kind, "snapshot");
   });
 });
 

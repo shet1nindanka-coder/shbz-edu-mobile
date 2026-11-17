@@ -22,7 +22,7 @@ export type GroupSettingsProps = {
   onDeleted: () => void;
   /** A delete that failed: the dialog is closed, the reason is shown on the screen. */
   onDeleteFailed: (text: string) => void;
-  /** A rename answered `404`: the group is gone (deleted elsewhere) — the screen leaves for the list,
+  /** A rename or a delete answered `404`: the group is gone (deleted elsewhere) — the screen leaves for the list,
    * which says so, as the site's redirect to `?groupError=missing` does. */
   onMissing: () => void;
 };
@@ -93,11 +93,15 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
     },
     onError: (failure) => {
       setDeleteOpen(false);
-      onDeleteFailed(errorText(failure, t.list.notices.save));
+      // 404 groupNotFound: the group was deleted elsewhere. Like the rename (and the site's
+      // deleteGroupAction redirect to `?groupError=missing`), leave for the list, which says so. Re-reading
+      // the group here would only replace the screen with the generic 404 page.
       if (isNotFoundError(failure)) {
         invalidateGroupLists(queryClient);
-        void queryClient.invalidateQueries({ queryKey: qk('groups', 'getGroup', group.id) });
+        onMissing();
+        return;
       }
+      onDeleteFailed(errorText(failure, t.list.notices.save));
     },
   });
 

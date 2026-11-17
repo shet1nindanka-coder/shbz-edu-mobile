@@ -1,5 +1,6 @@
 // Pure helpers of the date-time field. The value is a wall-clock string `YYYY-MM-DDTHH:mm` ("" = no
 // value), exactly as on the site's `ShbzDateTimePicker`; turning it into an instant is the caller's job.
+import { mskDate, mskParts, SCHOOL_TIME_ZONE } from '@/domain/moscow-time';
 
 export type DateTimeParts = { year: number; month: number; day: number; hour: number; minute: number };
 export type DateTimeLocale = 'ru' | 'en';
@@ -19,7 +20,29 @@ export function formatDateTimeValue(parts: DateTimeParts): string {
   return `${String(parts.year).padStart(4, '0')}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
-/** Wall clock → `Date` in the device zone (what the native pickers work with). */
+/**
+ * The zone the native pickers are told to show (`timeZoneName`). The field holds Moscow wall clock on every
+ * device (docs/spec/09-data-i18n-math.md §6.2), so the pickers work in Moscow time too, never in the
+ * device's own zone: a Moscow 02:30 that does not exist in the device zone (its spring-forward hour, e.g.
+ * Europe/Berlin on 29 Mar 2026, or Africa/Cairo at midnight) would otherwise move to 03:30.
+ */
+export const PICKER_TIME_ZONE = SCHOOL_TIME_ZONE;
+
+/** Wall clock → the instant the native picker is given (shown in `PICKER_TIME_ZONE`). */
+export function partsToPickerDate(parts: DateTimeParts): Date {
+  return mskDate(parts);
+}
+
+/** What the native picker returned (an instant) → the wall clock it showed in `PICKER_TIME_ZONE`. */
+export function pickerDateToParts(date: Date): DateTimeParts {
+  const { year, month, day, hour, minute } = mskParts(date);
+  return { year, month, day, hour, minute };
+}
+
+/**
+ * Wall clock → `Date` in the DEVICE zone. Not for the native pickers (see `partsToPickerDate`): a wall
+ * clock inside the device zone's DST gap does not exist there and moves by an hour.
+ */
 export function partsToDate(parts: DateTimeParts): Date {
   return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0, 0);
 }

@@ -3,7 +3,7 @@
 import { Modal, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { OverlayCoverSlot, WindowInsetsScope, coveredAccessibilityProps, useOverlayCovered } from '@/ui';
+import { OverlayCoverSlot, WindowInsetsScope, coveredAccessibilityProps, useCloseOnBlur, useOverlayCovered } from '@/ui';
 
 import { FileViewer, type FileViewerProps } from './file-viewer';
 
@@ -12,6 +12,8 @@ export type FileViewerModalProps = FileViewerProps & { visible: boolean };
 export function FileViewerModal({ visible, onClose, ...viewer }: FileViewerModalProps) {
   // Under the lock cover the viewer stays open but the back button must not close it.
   const covered = useOverlayCovered();
+  // A full-screen window of its own: leaving the screen that opened it closes it (`useCloseOnBlur`).
+  useCloseOnBlur(visible, onClose);
   return (
     <Modal
       visible={visible}

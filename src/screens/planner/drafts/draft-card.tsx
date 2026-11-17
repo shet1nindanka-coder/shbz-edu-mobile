@@ -32,10 +32,15 @@ export function DraftCard({ plan, onOpen }: DraftCardProps) {
     .filter((part): part is string => Boolean(part))
     .join(' · ');
 
+  const errorsLabel = plan.failedCount > 0 ? format(dict.planner.common.errorsCount, { n: plan.failedCount }) : null;
+  const issuedLabel = format(t.issuedOf, { issued: plan.issuedCount, total: plan.participantsCount });
+
   return (
     <Card
       onPress={() => onOpen(plan)}
       accessibilityLabel={format(m.planner.drafts.openDraft, { title: plan.title })}
+      // The card is one element for a screen reader: its chips are spoken with the title.
+      accessibilityParts={[errorsLabel, issuedLabel]}
       accessibilityHint={meta}
       testID={`draft-card-${plan.id}`}
       style={styles.card}
@@ -54,8 +59,8 @@ export function DraftCard({ plan, onOpen }: DraftCardProps) {
         <Icon name="chevronRight" size={18} color="kicker" />
       </View>
       <View style={styles.chips}>
-        {plan.failedCount > 0 ? <Chip tone="red" label={format(dict.planner.common.errorsCount, { n: plan.failedCount })} /> : null}
-        <Chip tone={issuedChipTone(plan)} label={format(t.issuedOf, { issued: plan.issuedCount, total: plan.participantsCount })} />
+        {errorsLabel !== null ? <Chip tone="red" label={errorsLabel} /> : null}
+        <Chip tone={issuedChipTone(plan)} label={issuedLabel} />
       </View>
     </Card>
   );

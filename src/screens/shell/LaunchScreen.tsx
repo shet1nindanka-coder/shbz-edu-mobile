@@ -25,6 +25,7 @@ export function LaunchScreen() {
           retryLabel={dict.common.retry}
           onRetry={retryRestore}
           secondaryLabel={m.shell.launch.signInAgain}
+          // The plain sign-out keeps unsent drafts on the device for their user (sent after signing in again).
           onSecondary={() => void signOut()}
         />
       </Screen>

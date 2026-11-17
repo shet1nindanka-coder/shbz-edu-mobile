@@ -2,15 +2,17 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
-import type { LessonItemResult, TeacherStudentLesson } from '@/api/types';
+import type { LessonBoardModel, LessonItemResult, TeacherStudentLesson } from '@/api/types';
 import { POLLING } from '@/api/types/limits';
 import { notePlanRequested, planRequestedAtOf } from '@/components/lessons';
 import { useRetryWait } from '@/components/retry-wait';
+import { serverClockOffset } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
 // One memory of accepted "Retry" requests for the lesson board and this card: a plan retried on either
 // screen is not shown as "lost" on the other.
 
 import { invalidateStudentData } from './invalidate';
+import { cardPlanRequestMs, noteCardPlanRequest } from './plan-request-anchors';
 import {
   lessonPlanState,
   lessonSetIds,
@@ -189,6 +191,8 @@ export function useStudentLessons(studentId: string) {
     },
     onSuccess: (response, lesson) => {
       notePlanRequested(lesson.participantId, response.planRequestedAt);
+      // The card's own clock is the device's: the same moment, as the device saw it.
+      noteCardPlanRequest(lesson.participantId, response.planRequestedAt, Date.now());
       // Pending again at once; the previous set stays until the new plan replaces it.
       patch((current) => markLessonPending(current, lesson.id));
     },
@@ -216,10 +220,24 @@ export function useStudentLessons(studentId: string) {
     [data, resultOverrides],
   );
 
+  // A Retry accepted on the lesson board is converted to device time with the offset the board itself
+  // used (its cached read), so the board and this card call a plan "lost" at the same moment.
+  const boardOffsetOf = useCallback(
+    (lessonId: string): number | null => {
+      const state = queryClient.getQueryState<LessonBoardModel>(qk('planner', 'getLessonBoard', lessonId));
+      return state?.data ? serverClockOffset(state.data.serverNow, state.dataUpdatedAt) : null;
+    },
+    [queryClient],
+  );
   const planStateOf = useCallback(
     (lesson: TeacherStudentLesson): LessonPlanState =>
-      lessonPlanState(lesson, now, pendingSince.current.get(lesson.id), planRequestedAtOf(lesson.participantId)),
-    [now],
+      lessonPlanState(
+        lesson,
+        now,
+        pendingSince.current.get(lesson.id),
+        cardPlanRequestMs(lesson.participantId, planRequestedAtOf(lesson.participantId), boardOffsetOf(lesson.id), now),
+      ),
+    [now, boardOffsetOf],
   );
 
   return {

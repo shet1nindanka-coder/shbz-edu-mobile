@@ -7,12 +7,12 @@ import { errorText, qk, useApi } from '@/api';
 import type { TopicListItem } from '@/api/types';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { tabsForRole, useAppNavigation, useRefetchOnFocus } from '@/navigation';
+import { tabsForRole, useAppNavigation, useRefetchOnFocus, useStillHere } from '@/navigation';
 import { useCurrentUser } from '@/providers';
 import { DetailAppBar, ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, LoadingState, Notice, Screen, Text } from '@/ui';
+import { Button, EmptyState, LoadingState, Notice, Screen, Text, useTextScale, widthForText } from '@/ui';
 
 import { CreateTopicSheet } from './browse/create-topic-sheet';
 import { ReorderSheet } from './browse/reorder-sheet';
@@ -31,12 +31,17 @@ type ListNotice = { tone: 'success' | 'error'; text: string };
  */
 export function ContentTopicsScreen() {
   const styles = useStyles();
+  // The two actions share a row only while both labels fit: the basis grows with the text, so at a large
+  // OS text size the second button wraps under the first instead of both being cut («Новая те…»).
+  const textScale = useTextScale();
+  const actionBasis = widthForText(ACTION_BASIS, textScale.scale);
   const theme = useTheme();
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.topics.list;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const isDeveloper = user.role === 'DEVELOPER';
   // The developer's first tab; for a teacher the list is pushed from the «ещё» tab.
   const isTabRoot = tabsForRole(user.role).some((tab) => tab.section === 'content.topics');
@@ -94,7 +99,7 @@ export function ContentTopicsScreen() {
             accessibilityLabel={t.createSection}
             leftIcon="plus"
             onPress={() => setCreateOpen(true)}
-            style={styles.action}
+            style={[styles.action, { flexBasis: actionBasis }]}
             testID="topics-create"
           />
           {list && list.length > 1 ? (
@@ -103,7 +108,7 @@ export function ContentTopicsScreen() {
               variant="outline"
               leftIcon="list"
               onPress={() => setReorderOpen(true)}
-              style={styles.action}
+              style={[styles.action, { flexBasis: actionBasis }]}
               testID="topics-reorder"
             />
           ) : null}
@@ -184,8 +189,10 @@ export function ContentTopicsScreen() {
             }}
             onImported={(topicId) => {
               setCreateOpen(false);
-              // A topic created by import has no files: the developer attaches them on the edit screen.
-              navigation.open({ screen: 'content.topicEdit', topicId });
+              // A topic created by import has no files: the developer attaches them on the edit screen. An
+              // import that finished after the user went elsewhere does not pull them back: the list says it.
+              if (stillHere()) navigation.open({ screen: 'content.topicEdit', topicId });
+              else setNotice({ tone: 'success', text: t.notices.created });
             }}
           />
           <ReorderSheet
@@ -211,6 +218,9 @@ export function ContentTopicsScreen() {
   );
 }
 
+/** Width of one action at the default text size: both fit one row of a 360 pt phone. */
+const ACTION_BASIS = 145;
+
 const useStyles = makeStyles((t) => ({
   list: { flex: 1 },
   listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.pageTop, paddingBottom: t.space.pageBottom },
@@ -218,5 +228,5 @@ const useStyles = makeStyles((t) => ({
   banners: { ...pinnedColumn, gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingTop: t.space.md },
   header: { gap: t.space.field, paddingBottom: t.space.lg },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
-  action: { flexGrow: 1, flexBasis: 140 },
+  action: { flexGrow: 1 },
 }));

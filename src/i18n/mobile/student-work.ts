@@ -7,8 +7,9 @@
 // accessible names of native controls).
 const ru = {
   list: {
-    // accessible name of a homework card (the whole card opens the homework)
-    cardA11y: "{title}. {meta}",
+    // spoken status chips of a homework card, grouped by status: «Нужна помощь преподавателя: № 118»
+    numbersGroupA11y: "{status}: {numbers}",
+    numbersUnmarkedA11y: "Не отмечены",
     archiveShowA11y: "Показать выполненные ДЗ: {count}",
     archiveHideA11y: "Скрыть выполненные ДЗ: {count}",
     refreshFailed: "Не удалось обновить список. Показываем сохранённые данные."
@@ -63,7 +64,8 @@ const ru = {
 
 const en: typeof ru = {
   list: {
-    cardA11y: "{title}. {meta}",
+    numbersGroupA11y: "{status}: {numbers}",
+    numbersUnmarkedA11y: "Not marked yet",
     archiveShowA11y: "Show completed homework: {count}",
     archiveHideA11y: "Hide completed homework: {count}",
     refreshFailed: "Could not refresh the list. Showing saved data."

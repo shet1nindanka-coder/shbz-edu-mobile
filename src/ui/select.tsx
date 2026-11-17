@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTimin
 
 import { makeStyles, useTheme, type TextVariant } from '@/theme';
 
+import { withErrorHint } from './a11y';
 import { BottomSheet } from './bottom-sheet';
 import { Icon } from './icon';
 import { FieldShell } from './internal/field-shell';
@@ -85,6 +86,7 @@ export function Select<T extends string | number>({
         accessibilityRole="combobox"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityValue={{ text: selected?.label ?? placeholder }}
+        accessibilityHint={withErrorHint(error, undefined)}
         accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
         onPress={() => setOpen(true)}

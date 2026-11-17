@@ -4,7 +4,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area
 
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Icon, Text, WindowFrameProvider } from '@/ui';
+import { Icon, Text, WindowFrameProvider, useAnnounce } from '@/ui';
 
 import { useIsOnline } from './network-state';
 
@@ -26,6 +26,9 @@ export function OfflineBannerHost({ children }: OfflineBannerHostProps) {
   const styles = useStyles();
   const { m } = useI18n();
   const [stripHeight, setStripHeight] = useState(0);
+  const bannerLabel = `${m.common.offline.banner}. ${m.common.offline.bannerHint}`;
+  // iOS has no live regions: going offline is spoken when the strip appears.
+  useAnnounce(online ? null : bannerLabel);
 
   // The tree shape is the same online and offline: toggling the strip must never remount the navigator.
   return (
@@ -34,7 +37,7 @@ export function OfflineBannerHost({ children }: OfflineBannerHostProps) {
         <View
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          accessibilityLabel={`${m.common.offline.banner}. ${m.common.offline.bannerHint}`}
+          accessibilityLabel={bannerLabel}
           testID="offline-banner"
           onLayout={(event) => setStripHeight(event.nativeEvent.layout.height)}
           style={[styles.strip, { paddingTop: insets.top + 6 }]}

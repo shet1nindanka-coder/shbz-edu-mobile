@@ -5,17 +5,19 @@
 //   useCurrentUser()          the signed-in user (role trees only)
 //   usePreferences()          theme mode, hints, language, app switches + setters
 //   useHintsEnabled(), <Hint> render explanatory lines only when hints are on
-//   saveStudentNote(), usePendingStudentNote(), getPendingWrites(), usePendingWrite()
+//   saveStudentNote(), usePendingStudentNote(), getPendingWrites(), usePendingWrite(), usePendingWriteSending()
 export { IS_MOCK_BUILD } from './app-config';
 export { AppProviders, type AppProvidersProps } from './app-providers';
 export {
   STUDENT_NOTE_WRITE,
   discardStudentNote,
   flushPendingWrites,
+  getPendingStudentNote,
   getPendingWrites,
   saveStudentNote,
   usePendingStudentNote,
   usePendingWrite,
+  usePendingWriteSending,
   usePendingWritesCount,
   usePendingWritesSummary,
   type PendingWriteContext,
@@ -25,7 +27,7 @@ export {
 export { Hint, PreferencesProvider, useHintsEnabled, usePreferences, type PreferencesValue } from './preferences-provider';
 export { getQueryClient } from './query';
 export { getAppRuntime, type AppRuntime } from './services';
-export { SessionProvider, useCurrentUser, useRole, useSession, type SessionStatus, type SessionValue } from './session-provider';
+export { SessionProvider, useCurrentUser, useRole, useSession, type SessionStatus, type SessionValue, type SignOutOptions } from './session-provider';
 export {
   getDemoBackend,
   getDemoPersonas,

@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { isApiError, isRateLimited, useApi } from '@/api';
-import { useCountdown, useWaitText } from '@/components/retry-wait';
+import { useDurationLock, useWaitText } from '@/components/retry-wait';
 import { validatePasswordChangeInput } from '@/domain/account-validation';
 import { MAX_PASSWORD_LENGTH, passwordProblemText } from '@/domain/password-policy';
 import { useI18n } from '@/i18n';
@@ -32,9 +32,10 @@ export function PasswordSection() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [result, setResult] = useState<Result>(null);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
-  const waitSeconds = useCountdown(lockedUntil);
-  const locked = waitSeconds > 0;
+  // A duration, not a deadline on the device clock: setting the clock back must not lengthen the lock.
+  const lock = useDurationLock();
+  const waitSeconds = lock.seconds;
+  const locked = lock.locked;
 
   // Set before the request and cleared when it settles: `isPending` read in a handler is the last render's
   // value, so a second submit (return key + button) in the same frame would pass it.
@@ -52,7 +53,7 @@ export function PasswordSection() {
     onError: (error) => {
       // The fields are kept: the user corrects one of them instead of typing all three again.
       setResult({ tone: 'error', text: isApiError(error) ? error.message : m.common.errors.generic });
-      if (isRateLimited(error)) setLockedUntil(Date.now() + error.retryAfterSeconds * 1000);
+      if (isRateLimited(error)) lock.start(error.retryAfterSeconds);
     },
     onSettled: () => {
       inFlight.current = false;
@@ -83,8 +84,10 @@ export function PasswordSection() {
     <SectionCard title={t.changePassword}>
       <View style={styles.form}>
         {result ? (
-          <View accessibilityLiveRegion="polite">
-            <Notice tone={result.tone} text={result.text} testID="settings-password-notice" />
+          // The notice announces itself (also the success, which a VoiceOver user must hear: iOS has no live
+          // regions); the countdown under it must not be spoken at every tick.
+          <View>
+            <Notice tone={result.tone} text={result.text} announcement={result.text} testID="settings-password-notice" />
             {locked ? (
               <Text variant="caption" color="textMuted" style={styles.wait} testID="settings-password-wait">
                 {waitText.retryIn(waitSeconds)}

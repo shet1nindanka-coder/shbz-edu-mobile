@@ -24,6 +24,11 @@ export type SessionStatus =
   | 'signedOut'
   | 'signedIn';
 
+export type SignOutOptions = {
+  /** Also delete the unsent writes of this device. Destructive: only after an explicit confirmation. */
+  discardUnsentWrites?: boolean;
+};
+
 export type SessionValue = {
   status: SessionStatus;
   user: AuthenticatedUser | null;
@@ -34,8 +39,13 @@ export type SessionValue = {
   dismissNotice: () => void;
   /** Rejects with the `ApiError` of `POST /auth/login`; on success the role's tree replaces the auth stack. */
   signIn: (input: LoginRequest) => Promise<AuthenticatedUser>;
-  /** Deletes this session on the server (best effort) and everything it left on the device. */
-  signOut: () => Promise<void>;
+  /**
+   * Deletes this session on the server (best effort) and everything it left on the device — except the
+   * unsent writes (note drafts): they stay tied to this user (as after an expiry), are sent when the same
+   * user signs in again and are dropped when another account signs in. Only `discardUnsentWrites: true`
+   * deletes them; pass it only after the user confirmed losing them (Settings names them first).
+   */
+  signOut: (options?: SignOutOptions) => Promise<void>;
   /** After `PATCH /me`: the header and settings show the new name at once. */
   applyUser: (user: AuthenticatedUser) => void;
   /** After `POST /me/password`: the rotated token replaces the stored one. */
@@ -58,13 +68,14 @@ const ROLE_REFRESH_MIN_INTERVAL_MS = 5000;
  * so the teacher who signs in next still sees the photo the student handed in. Access to them is decided
  * by the mock backend per signed-in user; they go away with a reset of the demo dataset.
  */
-async function clearSessionData(options: { keepPendingWrites?: boolean } = {}): Promise<void> {
+async function clearSessionData(options: { keepPendingWrites: boolean }): Promise<void> {
   const runtime = getAppRuntime();
   runtime.setSessionToken(null);
-  // A forced expiry is not the user's choice to lose unsent drafts: they stay on the device, tied to their
-  // user, and are sent when the same user signs in again (another account drops them). Only an explicit
-  // sign-out, which asks first, deletes them.
-  const keepPendingWrites = options.keepPendingWrites === true;
+  // Neither a forced expiry nor a plain sign-out (the lock screen's «use password», «sign in again» after a
+  // failed start) is the user's choice to lose unsent drafts: they stay on the device, tied to their user,
+  // and are sent when the same user signs in again (another account drops them). Only a sign-out that asked
+  // first deletes them — the caller has to say so.
+  const { keepPendingWrites } = options;
   if (!keepPendingWrites) setPendingWritesUser(null);
   getQueryClient().clear();
   clearViewerHandoff();
@@ -74,6 +85,8 @@ async function clearSessionData(options: { keepPendingWrites?: boolean } = {}): 
   } catch {
     // The cache directory may not exist yet.
   }
+  // `tokenStorage.clear()` falls back to overwriting the token and then to a signed-out marker that the
+  // next start honours, so a sign-out never leaves a token that restores the session.
   await Promise.all([tokenStorage.clear(), runtime.sessionCache.clear(), keepPendingWrites ? Promise.resolve() : getPendingWrites().clear(), localNotifications.removeAll()]);
   // The cache in memory is empty already; its copy on disk is removed now, not left to the persister's
   // throttled write a second later. The removal is issued one tick after `clear()`: the persister answers
@@ -273,8 +286,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [enter],
   );
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (options: SignOutOptions = {}) => {
     // Also from `restoreFailed` ("Sign in again" on the launch screen): the stored token is given up there.
+    const discardUnsentWrites = options.discardUnsentWrites === true;
     const { status } = stateRef.current;
     if ((status !== 'signedIn' && status !== 'restoreFailed') || signingOut.current) return;
     signingOut.current = true;
@@ -286,7 +300,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       stateRef.current = { ...stateRef.current, status: 'signedOut' };
       unconfirmed.current = false;
-      await clearSessionData();
+      // Kept drafts — queued ones and those the editors flush as the tree unmounts — stay this user's.
+      if (!discardUnsentWrites) holdPendingWritesForExpiredSession();
+      await clearSessionData({ keepPendingWrites: !discardUnsentWrites });
       signingOut.current = false;
       setState({ status: 'signedOut', user: null, restored: false, notice: null });
     }

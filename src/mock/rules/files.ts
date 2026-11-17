@@ -6,7 +6,8 @@
  *
  * Access: a DEVELOPER reads everything; a TEACHER reads topic files, own uploads and solution photos of own
  * students / of lessons they teach; a STUDENT reads topic theory and homework files and OWN photos only —
- * never an answers file. A missing or not permitted file is the same `404 fileNotFound`.
+ * never an answers file. A missing or not permitted file is the same `404 fileNotFound`; no valid session
+ * is `401 sessionExpired` (the site's /files/[fileId] answers 401 without a user), which signs the user out.
  */
 import type { FileRef, FileUpload, StoredFileRef } from "@/api/types";
 import { canAccessStoredFile } from "@/domain/file-access";
@@ -59,9 +60,11 @@ export interface MockFiles {
   resolveForRead(fileId: string): MockStoredFile;
   /**
    * The same check without exceptions — the `lookup` option of `createMockFileService`: metadata of a file
-   * the signed-in user may read, or null when it does not exist, is not theirs, or nobody is signed in
-   * (all three are a `404 fileNotFound` for the caller, deliberately indistinguishable).
+   * the signed-in user may read, `"sessionExpired"` when there is no valid session (401, the FileService
+   * signs the user out), or null when the file does not exist or is not theirs (404, deliberately the same).
    */
+  access(fileId: string): MockFileInfo | "sessionExpired" | null;
+  /** `access` for tests and backend code that only need the readable metadata: null for every refusal. */
   lookup(fileId: string): MockFileInfo | null;
 }
 
@@ -136,6 +139,18 @@ export function createFiles(core: MockCore, auth: MockAuth, hooks: MockFileHooks
     });
   };
 
+  /** Metadata of a file `user` may read; null when it does not exist or is not theirs. */
+  const readable = (user: MockUser, fileId: string): MockFileInfo | null => {
+    const file = get(fileId);
+    if (!file || !canRead(user, fileId)) return null;
+    return {
+      mimeType: file.mimeType,
+      originalName: file.originalName,
+      size: file.size,
+      ...(file.sample ? { sample: file.sample } : {}),
+    };
+  };
+
   return {
     get,
     ref(fileId) {
@@ -179,16 +194,14 @@ export function createFiles(core: MockCore, auth: MockAuth, hooks: MockFileHooks
       if (!file || !canRead(user, fileId)) throw errors.notFound("fileNotFound");
       return file;
     },
+    access(fileId) {
+      const user = auth.currentUser();
+      if (!user) return "sessionExpired";
+      return readable(user, fileId);
+    },
     lookup(fileId) {
       const user = auth.currentUser();
-      const file = get(fileId);
-      if (!user || !file || !canRead(user, fileId)) return null;
-      return {
-        mimeType: file.mimeType,
-        originalName: file.originalName,
-        size: file.size,
-        ...(file.sample ? { sample: file.sample } : {}),
-      };
+      return user ? readable(user, fileId) : null;
     },
   };
 }

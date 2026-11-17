@@ -25,6 +25,14 @@ export const PERSIST_BUSTER = "shbz-query-v1";
 
 export const PERSIST_STORAGE_KEY = "shbz-query-cache";
 
+/**
+ * Size budget of the persisted cache, UTF-8 bytes. Android's legacy AsyncStorage database holds 6 MB in
+ * total (shared with the mock store and the preferences), so the cache never takes more than this; a single
+ * query above `PERSIST_MAX_QUERY_BYTES` (a huge imported topic) stays in memory only.
+ */
+export const PERSIST_MAX_BYTES = 1536 * 1024;
+export const PERSIST_MAX_QUERY_BYTES = 768 * 1024;
+
 /** Members whose data never goes to disk. */
 const MEMORY_ONLY_MEMBERS: ReadonlySet<ApiMember> = new Set<ApiMember>(["accounts", "developer"]);
 

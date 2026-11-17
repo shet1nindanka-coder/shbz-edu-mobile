@@ -37,8 +37,12 @@ export function viewerFileKind(file: Pick<ViewerFile, 'mimeType'>): FileKind {
 /** What `FileService.describe` answered for a file the viewer knows by id alone (`useDescribedFiles`). */
 export type FileDescription =
   | { status: 'ready'; ref: FileRef }
-  /** `notFound` — the service answered `404 fileNotFound` (missing or not readable): nothing to retry. */
-  | { status: 'failed'; notFound: boolean };
+  /**
+   * `notFound` — the service answered `404 fileNotFound` (missing or not readable): nothing to retry.
+   * Otherwise (no connection, 429, 5xx) `message` is the server's localized text, when there is one, and
+   * the description is asked again on the page's retry and when the connection returns.
+   */
+  | { status: 'failed'; notFound: boolean; message?: string | null };
 
 /**
  * A file known by id alone, typed from the stored file instead of its link: the stored name, type and size

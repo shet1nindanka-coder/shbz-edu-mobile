@@ -81,6 +81,33 @@ export function homeworkListMeta(
   );
 }
 
+const STATUS_ORDER: readonly HomeworkNumberStatus[] = ['GREEN', 'YELLOW', 'RED'];
+
+/**
+ * The traffic-light chips of a list card as spoken text, one piece per status in the site's order
+ * (green, yellow, red, then the unmarked ones): «Нужна помощь преподавателя: № 118».
+ *
+ * WHY: the card is one pressable element for screen readers (iOS hides its descendants), so the colours a
+ * sighted student reads off the chips have to be in its name; grouping keeps a long homework short to hear.
+ */
+export function homeworkNumbersA11yParts(
+  numbers: readonly { number: string; status: HomeworkNumberStatus | null }[],
+  texts: { group: string; numberLabel: string; unmarked: string; statuses: Record<HomeworkNumberStatus, string> },
+): string[] {
+  const groups: { label: string; status: HomeworkNumberStatus | null }[] = [
+    ...STATUS_ORDER.map((status) => ({ label: texts.statuses[status], status })),
+    { label: texts.unmarked, status: null },
+  ];
+  const parts: string[] = [];
+  for (const group of groups) {
+    const members = numbers.filter((number) => (number.status ?? null) === group.status);
+    if (members.length === 0) continue;
+    const list = members.map((number) => format(texts.numberLabel, { number: number.number })).join(', ');
+    parts.push(format(texts.group, { status: group.label, numbers: list }));
+  }
+  return parts;
+}
+
 /**
  * Meta line of the detail header (03 §1 H2): «Дедлайн до {date} · » + «Выполнено {solved} из {total}».
  * `deadlineDateTime` is the already formatted date and time, or null.

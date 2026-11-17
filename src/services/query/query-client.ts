@@ -12,7 +12,6 @@
  *   can say so. A mutation is NEVER retried automatically (CLAUDE.md "Errors"). The one exception with a
  *   retry — the student's note — goes through the pending-writes queue (`pending-writes.ts`).
  */
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { CancelledError, QueryClient, defaultShouldDehydrateQuery, onlineManager } from '@tanstack/react-query';
 import type { PersistQueryClientProviderProps } from '@tanstack/react-query-persist-client';
 
@@ -22,11 +21,11 @@ import type { KeyValueStorage } from '../preferences';
 import {
   PERSIST_BUSTER,
   PERSIST_MAX_AGE_MS,
-  PERSIST_STORAGE_KEY,
   QUERY_GC_TIME_MS,
   QUERY_STALE_TIME_MS,
   isPersistableQueryKey,
 } from './persist-policy';
+import { createQueryPersister, removePersistedQueryCache } from './query-persister';
 
 /** One retry, and only for failures that a second attempt can fix (no response, 503). */
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
@@ -112,17 +111,18 @@ export function markRestoredQueriesStale(client: QueryClient, restoredBefore: nu
  * the app is closed inside that second. Sign-out awaits this instead of relying on the next write.
  */
 export async function removePersistedQueries(storage: KeyValueStorage): Promise<void> {
-  try {
-    await storage.removeItem(PERSIST_STORAGE_KEY);
-  } catch {
-    // Nothing stored, or the storage is unavailable: the next throttled write stores the empty cache.
-  }
+  // Every piece of the chunked value goes; a storage failure is swallowed (the next throttled write stores
+  // the empty cache).
+  await removePersistedQueryCache(storage);
 }
 
-/** `persistOptions` of `PersistQueryClientProvider`: AsyncStorage persister + the dehydration policy. */
+/**
+ * `persistOptions` of `PersistQueryClientProvider`: the chunked, size-capped AsyncStorage persister
+ * (`query-persister.ts`) + the dehydration policy.
+ */
 export function createPersistOptions(storage: KeyValueStorage): PersistQueryClientProviderProps['persistOptions'] {
   return {
-    persister: createAsyncStoragePersister({ storage, key: PERSIST_STORAGE_KEY, throttleTime: 1000 }),
+    persister: createQueryPersister(storage),
     maxAge: PERSIST_MAX_AGE_MS,
     buster: PERSIST_BUSTER,
     dehydrateOptions: {

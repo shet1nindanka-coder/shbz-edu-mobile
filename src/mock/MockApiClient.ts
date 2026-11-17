@@ -79,6 +79,14 @@ export type MockApiClientOptions = {
   /** Device hook: a file row was removed because nothing references it (wire it to `forgetLocalFile`). */
   onFileRemoved?: (fileId: string) => void;
   /**
+   * Device hook: the whole dataset was replaced by fresh fixtures — an automatic re-seed (24 h age, another
+   * fixtures revision, a dataset "from the future"), a stored dataset that had to be discarded (torn save,
+   * unreadable table), nothing stored at all, or a demo reset. No row references a file picked on this
+   * device any more: wire it to `forgetAllLocalFiles` + `clearFileCache`, exactly what the manual reset
+   * cleans. NOT called when the storage could not be read (the stored dataset and its files are kept).
+   */
+  onDatasetReplaced?: () => void;
+  /**
    * Device hook: the bytes of a picked file, so uploads are checked like the site's `validateUploadedBytes`
    * (declared size, magic bytes of the extension). Resolve to null when the URI cannot be read — the check
    * is then skipped. Default: `readPickedFileBytes` (web `blob:` / `data:` URLs only); on native wire it to
@@ -252,27 +260,65 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
     snapshot.meta.idCounter = Math.max(snapshot.meta.idCounter, store.meta.idCounter);
     store.restore(snapshot);
     ctx.notify.resetThrottles();
+    datasetReplaced();
+  };
+
+  /** Every file row is gone: the device-side copies of picked files go too (see `onDatasetReplaced`). */
+  const datasetReplaced = (): void => {
+    try {
+      options.onDatasetReplaced?.();
+    } catch {
+      // A cleanup failure never blocks the dataset.
+    }
+  };
+
+  /** Fresh fixtures in place of a stored dataset that cannot be used; its id counter survives when known. */
+  const seedFresh = (storedCounter: unknown): void => {
+    const fresh = buildFixtures(clock.now(), { latency: defaultLatency });
+    if (typeof storedCounter === "number" && Number.isSafeInteger(storedCounter)) fresh.meta.idCounter = Math.max(fresh.meta.idCounter, storedCounter);
+    store.restore(fresh);
+    datasetReplaced();
   };
 
   const load = async (): Promise<void> => {
-    const snapshot = await persistence.load();
-    if (snapshot) {
-      try {
-        store.restore(snapshot);
-        // Loading is not a change: nothing to write back.
+    const result = await persistence.load();
+    switch (result.kind) {
+      case "snapshot": {
+        const { snapshot } = result;
+        try {
+          store.restore(snapshot);
+          // Loading is not a change: nothing to write back.
+          store.takeDirty();
+          const age = clock.now() - store.meta.t0;
+          const stale = reseedAfterMs !== null && store.meta.autoReseed && age > reseedAfterMs;
+          // A dataset "from the future" (the device clock went back) or seeded from other fixtures is as
+          // unusable as an old one.
+          if (stale || age < 0 || store.meta.fixtures !== FIXTURES_REVISION) reseed(store.meta.generation + 1, store.meta.autoReseed);
+        } catch {
+          // A snapshot that violates the schema (e.g. written by a buggy build) is discarded. Its id counter
+          // is kept when readable, so ids handed out before (device-side file copies) never repeat.
+          seedFresh((snapshot.meta as { idCounter?: unknown } | undefined)?.idCounter);
+        }
+        break;
+      }
+      case "discarded":
+        // A torn save, another store version, a table that does not parse: re-seeded like a broken
+        // snapshot, keeping the stored id counter when the manifest still had one.
+        seedFresh(result.idCounter);
+        break;
+      case "empty":
+        // Nothing stored: the store already holds fresh fixtures. Copies a previous install / cleared
+        // dataset left on the device would otherwise reappear under the restarted ids.
+        datasetReplaced();
+        break;
+      case "failed": {
+        // The storage could not be read: the stored dataset may be intact at the next start, so this run
+        // works on fixtures in memory and never writes over it (saves stay suspended until a demo reset).
+        // Its ids must not collide with ids of the stored dataset (device-side file copies are keyed by
+        // id), whose counter is unknown: start this run's counter far above any realistic one.
+        store.patchMeta({ idCounter: Math.max(store.meta.idCounter, Math.floor(clock.now() / 1000)) });
         store.takeDirty();
-        const age = clock.now() - store.meta.t0;
-        const stale = reseedAfterMs !== null && store.meta.autoReseed && age > reseedAfterMs;
-        // A dataset "from the future" (the device clock went back) or seeded from other fixtures is as
-        // unusable as an old one.
-        if (stale || age < 0 || store.meta.fixtures !== FIXTURES_REVISION) reseed(store.meta.generation + 1, store.meta.autoReseed);
-      } catch {
-        // A snapshot that violates the schema (e.g. written by a buggy build) is discarded. Its id counter
-        // is kept when readable, so ids handed out before (device-side file copies) never repeat.
-        const fresh = buildFixtures(clock.now(), { latency: defaultLatency });
-        const storedCounter = (snapshot.meta as { idCounter?: unknown } | undefined)?.idCounter;
-        if (typeof storedCounter === "number" && Number.isSafeInteger(storedCounter)) fresh.meta.idCounter = Math.max(fresh.meta.idCounter, storedCounter);
-        store.restore(fresh);
+        break;
       }
     }
     persistence.schedule(store);
@@ -304,9 +350,11 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
       try {
         await persistence.settled();
         externalWrite = false;
-        const snapshot = await persistence.load();
-        // Null: the other writer is in the middle of its next save; its manifest event marks us again.
-        if (!snapshot) return;
+        const result = await persistence.load({ suspendOnFailure: false });
+        // Anything but a snapshot: the other writer is in the middle of its next save (its manifest event
+        // marks us again), or the read failed (saves stay suspended; the own copy stays in memory).
+        if (result.kind !== "snapshot") return;
+        const { snapshot } = result;
         const previous = store.snapshot();
         try {
           store.restore(snapshot);
@@ -475,6 +523,8 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
     },
     async resetDemoData() {
       await ready;
+      // An explicit reset replaces whatever is stored, even a dataset this run could not read.
+      persistence.resumeSaves();
       applyControl(() => {
         reseed(store.meta.generation + 1, store.meta.autoReseed);
         ctx.realtime.sessionChanged();
@@ -497,6 +547,7 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
       ageMs: Math.max(0, clock.now() - store.meta.t0),
       generation: store.meta.generation,
       autoReseed: store.meta.autoReseed,
+      storageReadFailed: persistence.suspended,
     }),
     setAutoReseed(enabled) {
       applyControl(() => store.patchMeta({ autoReseed: enabled }));

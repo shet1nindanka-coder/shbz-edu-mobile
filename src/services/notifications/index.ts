@@ -2,6 +2,7 @@
 // where remote push will be registered.
 export { localNotifications, REMINDER_CHANNEL_ID } from './local-notifications';
 export type { ExactTimingState, LocalNotifications, ReminderPermission, ReminderPermissionState } from './local-notifications.types';
+export { permissionStateOf, type NativePermissionAnswer } from './permission-state';
 export { registerRemotePush, unregisterRemotePush, type RemotePushContext, type RemotePushRegistration } from './push-registration';
 export {
   HOMEWORK_LEAD_TIMES_MS,
@@ -16,6 +17,7 @@ export {
   planLessonReminders,
   planParentCallReminders,
   reminderIdentifier,
+  remindersToRearm,
   selectReminders,
   type LocalReminder,
   type ReminderFormatters,

@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "ШБЗ Школа",
+    "NSCameraUsageDescription": "The camera is used to photograph your solution and send it for checking.",
+    "NSPhotoLibraryUsageDescription": "Photo access is used to attach a picture of your solution from the gallery.",
+    "NSFaceIDUsageDescription": "Face ID lets you open ШБЗ Школа without your password when biometric sign-in is turned on."
+  }
+}

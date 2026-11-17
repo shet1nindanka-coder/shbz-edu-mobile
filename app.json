@@ -7,6 +7,10 @@
     "icon": "./assets/images/icon.png",
     "scheme": "shbz",
     "userInterfaceStyle": "automatic",
+    "locales": {
+      "ru": "./locales/ru.json",
+      "en": "./locales/en.json"
+    },
     "ios": {
       "bundleIdentifier": "ru.shbz.edu",
       "supportsTablet": true,
@@ -43,7 +47,12 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "sitemap": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

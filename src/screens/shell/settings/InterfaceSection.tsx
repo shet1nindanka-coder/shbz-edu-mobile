@@ -4,9 +4,12 @@ import type { HintsMode, Locale, ThemeMode } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { Hint, usePreferences } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Card, SectionCard, Segmented, Text } from '@/ui';
+import { Card, SectionCard, Segmented, Text, widthForText } from '@/ui';
 
-/** Below this width «Системная» does not fit a segment: the site's short label is used. */
+/**
+ * Below this width (at the default text size) «Системная» does not fit a segment: the site's short label is
+ * used. The threshold grows with the OS font scale — at 1.2 the full labels need 1.2 × as much room.
+ */
 const NARROW_WIDTH = 360;
 
 /**
@@ -17,7 +20,7 @@ export function InterfaceSection() {
   const styles = useStyles();
   const { dict } = useI18n();
   const t = dict.interface;
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const { preferences, localePending, setLocale, setThemeMode, setHints } = usePreferences();
 
   return (
@@ -50,7 +53,7 @@ export function InterfaceSection() {
           <Text variant="kickerSm">{t.theme.label}</Text>
           <Segmented<ThemeMode>
             fill
-            compact={width < NARROW_WIDTH}
+            compact={width < widthForText(NARROW_WIDTH, fontScale)}
             options={[
               { value: 'system', label: t.theme.system, shortLabel: t.theme.systemShort },
               { value: 'light', label: t.theme.light },

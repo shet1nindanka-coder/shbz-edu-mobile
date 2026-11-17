@@ -44,6 +44,12 @@ export async function importLocalFile(fileId: string, file: LocalFile): Promise<
   try {
     const directory = storeDirectory();
     if (!directory.exists) directory.create({ intermediates: true, idempotent: true });
+    // A copy under another extension (an id an earlier dataset used for another kind of file) would be
+    // found first by `resolveLocalFile` after a restart: every copy of the id goes.
+    for (const extension of KNOWN_EXTENSIONS) {
+      const stale = storedFile(fileId, extension);
+      if (stale.exists) stale.delete();
+    }
     const target = storedFile(fileId, extensionForMime(file.mimeType) || '.bin');
     if (target.exists) target.delete();
     await new File(file.uri).copy(target);

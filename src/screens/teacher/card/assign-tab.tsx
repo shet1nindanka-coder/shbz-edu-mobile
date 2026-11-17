@@ -243,7 +243,9 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
           disabled={issue.isPending}
           onPress={() => setTitleOpen(true)}
           testID="assign-title-open"
-          style={styles.titleButton}
+          // The cap keeps a long typed title from squeezing «Выдать»; the short default label never needs it,
+          // and capped it was cut to «Назван…» from text size 1.15.
+          style={title.trim() ? styles.titleButton : null}
         />
         <Button
           label={issue.isPending ? t.assigning : t.assign}

@@ -5,10 +5,10 @@ import { BackHandler, View } from 'react-native';
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import type { ScreenParams } from '@/navigation';
+import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { LoadingState, Notice, Screen, Segmented } from '@/ui';
+import { ErrorState, LoadingState, Notice, Screen, Segmented } from '@/ui';
 
 import { AiLessonForm } from './lessons/ai-lesson-form';
 import { ManualCompose } from './lessons/manual-compose';
@@ -74,6 +74,7 @@ export function PlannerLessonNewScreen({ groupId, studentId, onInnerStepChange }
 function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => void }) {
   const styles = useStyles();
   const api = useApi();
+  const navigation = useAppNavigation();
   const { dict, m } = useI18n();
   const t = dict.planner.lessonNew;
   const compose = dict.planner.lessonCompose;
@@ -99,7 +100,24 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
 
   if (!data) {
     // `404 groupNotFound` / `404 studentNotFound`: the group or the student is gone, or belongs to someone else.
-    if (form.isError && isNotFoundError(form.error)) return <NotFoundScreen description={errorText(form.error, dict.shells.notFoundDescription)} />;
+    if (form.isError && isNotFoundError(form.error)) {
+      const description = errorText(form.error, dict.shells.notFoundDescription);
+      // Opened from the route: the shell's 404 page. Picked on the chooser: the route has turned the iOS back
+      // gesture off, so the 404 keeps the app bar whose arrow returns to the chooser (as Android's back does).
+      if (!onBack) return <NotFoundScreen description={description} />;
+      return (
+        <Screen testID="planner-lesson-new-screen" header={appBar} scroll={false} contentContainerStyle={styles.center}>
+          <ErrorState
+            numeral="404"
+            title={dict.shells.notFoundTitle}
+            description={description}
+            retryLabel={dict.common.home}
+            onRetry={navigation.goHome}
+            testID="lesson-new-not-found"
+          />
+        </Screen>
+      );
+    }
     return (
       <Screen testID="planner-lesson-new-screen" header={appBar}>
         {form.isError || isWaitingForNetwork(form) ? (
@@ -144,4 +162,5 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
 
 const useStyles = makeStyles((t) => ({
   top: { gap: t.space.md },
+  center: { justifyContent: 'center' },
 }));

@@ -82,6 +82,10 @@ export function MemberAiEditor({ groupId, member, onDetachedError }: MemberAiEdi
     savedNote: member.aiNote ?? '',
     // The note of the request in flight: "Done" on the keyboard is followed by a blur, which must not send it twice.
     sendingNote: null as string | null,
+    // Number of the latest request of this editor. Every request carries both fields as they were when it
+    // was made, so only the outcome of the latest one says what the editor must show: an earlier refusal
+    // followed by a queued request that is saved must not roll the select back.
+    latest: 0,
   });
   // Requests of one editor go out one after another, so an earlier one can never overwrite a later one.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -93,31 +97,46 @@ export function MemberAiEditor({ groupId, member, onDetachedError }: MemberAiEdi
   };
 
   const save = useMutation({
-    mutationFn: send,
+    mutationFn: ({ request }: { request: AiProfileRequest; seq: number }) => send(request),
     onMutate: () => {
       setError(null);
       flash.start();
     },
-    onSuccess: (profile, input) => {
-      flash.finish(true);
+    onSuccess: (profile, { request, seq }) => {
+      // What the server holds now, whichever request this was.
       live.current.savedSpeed = profile.speed;
-      live.current.savedNote = input.aiNote ?? '';
+      live.current.savedNote = request.aiNote ?? '';
       patchMemberProfile(queryClient, groupId, profile.studentId, { speed: profile.speed, aiNote: profile.aiNote });
       invalidateGroupLists(queryClient);
+      // A later request is queued: it decides what is shown.
+      if (seq !== live.current.latest) return;
+      flash.finish(true);
+      // The latest request carried everything on screen: an earlier refusal is no longer true.
+      setError(null);
+      live.current.speed = profile.speed;
+      setSpeed(profile.speed);
     },
-    onError: (failure) => {
+    onError: (failure, { seq }) => {
+      // The student was deleted or moved to another teacher: the card itself is no longer true.
+      if (isNotFoundError(failure)) invalidateGroupMembership(queryClient);
+      // A later request is queued with the values on screen: it decides what is shown.
+      if (seq !== live.current.latest) return;
       flash.finish(false);
-      // The select must not show a speed the server refused; the typed note stays for another try.
+      // The select must not show a speed the server refused: it goes back to the last speed the server
+      // confirmed (the next note save sends that one). The typed note stays for another try.
       live.current.speed = live.current.savedSpeed;
       setSpeed(live.current.savedSpeed);
       setError(errorText(failure, saveFailedText));
-      // The student was deleted or moved to another teacher: the card itself is no longer true.
-      if (isNotFoundError(failure)) invalidateGroupMembership(queryClient);
     },
-    onSettled: (_profile, _failure, input) => {
-      if (live.current.sendingNote === (input.aiNote ?? '')) live.current.sendingNote = null;
+    onSettled: (_profile, _failure, { request }) => {
+      if (live.current.sendingNote === (request.aiNote ?? '')) live.current.sendingNote = null;
     },
   });
+
+  const submit = (request: AiProfileRequest) => {
+    live.current.latest += 1;
+    save.mutate({ request, seq: live.current.latest });
+  };
 
   // What the unmount hand-off needs, as of the last render (it must not re-run when a prop changes).
   const handOff = useRef({ send, queryClient, groupId, studentId, saveFailedText, onDetachedError });
@@ -172,14 +191,14 @@ export function MemberAiEditor({ groupId, member, onDetachedError }: MemberAiEdi
     setSpeed(next);
     const aiNote = aiNoteForRequest(note);
     live.current.sendingNote = aiNote ?? '';
-    save.mutate({ speed: next, aiNote });
+    submit({ speed: next, aiNote });
   };
 
   const commitNote = () => {
     const next = aiNoteForRequest(note) ?? '';
     if (next === (live.current.sendingNote ?? live.current.savedNote)) return;
     live.current.sendingNote = next;
-    save.mutate({ speed, aiNote: next === '' ? null : next });
+    submit({ speed: live.current.speed, aiNote: next === '' ? null : next });
   };
 
   return (

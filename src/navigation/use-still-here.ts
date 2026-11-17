@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { useScreenFocused } from '@/navigation';
+import { useScreenFocused } from './navigate';
 
 /**
  * Whether the screen that called the hook is still mounted and on top. A mutation's hook-level `onSuccess`

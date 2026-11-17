@@ -1,7 +1,7 @@
 // Pure rules of the lesson board (docs/spec/05-teacher-lessons-plans.md §1.3, §4.8, §5.3): parts of a set,
 // live monitoring numbers, set editing payloads and the schedule timers. No React, no RN imports —
 // unit-tested in tests/planner-board.test.ts.
-import type { LessonBankTopic, LessonBoardItem, LessonBoardModel, LessonBoardParticipant } from '@/api/types';
+import type { LessonBankTopic, LessonBoardItem, LessonBoardModel, LessonBoardParticipant, LessonItemResult } from '@/api/types';
 import { computeIdleLevel, computeSpentMinutes, type IdleLevel } from '@/domain/lesson-live';
 import { deriveLessonStatus, MAX_TIMER_DELAY_MS, type DerivedLessonStatus } from '@/domain/lesson-status';
 
@@ -76,6 +76,25 @@ export function patchBoardItem(
         : participant,
     ),
   };
+}
+
+/** Result marks sent and not yet answered, by item id. */
+export type PendingResults = Readonly<Record<string, { participantId: string; result: LessonItemResult | null }>>;
+
+/**
+ * The board as the teacher must see it while result marks are in flight: a board read that left the server
+ * before a mark was written (a realtime refresh of the previous mark, a poll) does not switch the
+ * optimistic traffic light off until that mark's own request has settled.
+ */
+export function applyPendingResults(board: LessonBoardModel, pending: PendingResults): LessonBoardModel {
+  let next = board;
+  for (const [itemId, mark] of Object.entries(pending)) {
+    const participant = next.participants.find((row) => row.id === mark.participantId);
+    const item = participant?.items.find((row) => row.id === itemId);
+    if (!item || item.result === mark.result) continue;
+    next = patchBoardItem(next, mark.participantId, itemId, { result: mark.result });
+  }
+  return next;
 }
 
 /** A regenerate was accepted: the participant is pending again; its set and summary stay until the new plan arrives. */

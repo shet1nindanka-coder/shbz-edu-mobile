@@ -46,6 +46,8 @@ export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: Not
         <Notice
           tone="error"
           text={errorMessage}
+          // The countdown in the text changes every second: VoiceOver speaks only the message, once.
+          announcement={editor.error?.message ?? null}
           action={
             // Never sent again by itself: the student decides, and only once a rate-limit wait is over.
             wait > 0 ? undefined : <TextButton label={m.common.actions.retry} tone="danger" onPress={editor.retry} testID="number-note-retry" />

@@ -9,7 +9,7 @@ import { planErrorText } from '@/domain/plan-error';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, Card, Icon, Notice, PressableScale, Spinner, Text } from '@/ui';
+import { Button, Card, CardPressArea, Icon, Notice, Spinner, Text } from '@/ui';
 
 import { LessonItemRow } from './lesson-item-row';
 import { splitLessonParts, type LessonItem, type LessonPlanState } from './lessons-logic';
@@ -112,11 +112,12 @@ export function LessonCard({
 
   return (
     <Card style={styles.card} testID={`student-lesson-${lesson.id}`}>
-      <PressableScale
-        accessibilityRole="button"
+      {/* One element for screen readers: the date, duration and status are spoken with the title — lessons of
+          the same group and topic share it. */}
+      <CardPressArea
         accessibilityLabel={format(expanded ? m.teacher.card.collapse : m.teacher.card.expand, { title: lesson.title })}
-        accessibilityState={{ expanded }}
-        scaleTo={1}
+        accessibilityParts={[meta]}
+        expanded={expanded}
         onPress={onToggle}
         testID={`student-lesson-toggle-${lesson.id}`}
         style={styles.header}
@@ -130,7 +131,7 @@ export function LessonCard({
         <Text variant="caption" color="textMuted" tabular>
           {meta}
         </Text>
-      </PressableScale>
+      </CardPressArea>
 
       <Button
         label={t.openLesson}

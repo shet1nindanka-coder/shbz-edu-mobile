@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, View } from 'react-native';
 
 import { format, plural, useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint, IS_MOCK_BUILD, useCurrentUser, usePendingWritesSummary, usePreferences } from '@/providers';
 import { authenticateWithBiometrics, getBiometricAvailability, type BiometricAvailability } from '@/services/biometrics';
 import { clearFileCache } from '@/services/files';
@@ -40,28 +40,39 @@ export function AppSection() {
   const [cacheCleared, setCacheCleared] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
-  useEffect(() => {
-    let active = true;
+  // Bumped by every read: an older read that resolves after a newer one must not overwrite it.
+  const permissionSeq = useRef(0);
+  const mounted = useRef(true);
+
+  // The notification permission, the biometric enrolment and the exact-alarm access can all change in the
+  // system settings — the screen's own notices send the user there — while this screen stays mounted.
+  const readDeviceState = useCallback(() => {
     void getBiometricAvailability().then((value) => {
-      if (active) setBiometrics(value);
+      if (mounted.current) setBiometrics(value);
     });
+    const seq = ++permissionSeq.current;
     void localNotifications.getPermission().then((value) => {
-      if (active) setPermission(value);
+      if (mounted.current && seq === permissionSeq.current) setPermission(value);
     });
-    const readExactTiming = () =>
-      void localNotifications.getExactTiming().then((value) => {
-        if (active) setExactTiming(value);
-      });
-    readExactTiming();
-    // The access may be granted or revoked in the system settings while this screen stays open.
+    void localNotifications.getExactTiming().then((value) => {
+      if (mounted.current) setExactTiming(value);
+    });
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    readDeviceState();
+    // Back from the system settings (or any other app).
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') readExactTiming();
+      if (next === 'active') readDeviceState();
     });
     return () => {
-      active = false;
+      mounted.current = false;
       subscription.remove();
     };
-  }, []);
+  }, [readDeviceState]);
+  // Back on this screen from one pushed above it.
+  useRefetchOnFocus(readDeviceState);
 
   const allowExactTiming = async () => {
     setExactTiming(await localNotifications.requestExactTiming());
@@ -89,7 +100,8 @@ export function AppSection() {
       setReminder(category, false);
       return;
     }
-    // The OS prompt appears the first time a category is switched on, never at start-up.
+    // The OS prompt appears the first time a category is switched on, never at start-up. Its answer is the
+    // newest state (a re-read on the return from the prompt reads the same).
     const state = permission?.status === 'granted' ? permission : await localNotifications.requestPermission();
     setPermission(state);
     if (state.status === 'granted') setReminder(category, true);
@@ -130,7 +142,11 @@ export function AppSection() {
         ? m.shell.biometrics.unavailable
         : m.shell.biometrics.hint;
   const remindersSupported = localNotifications.supported && permission?.status !== 'unavailable';
+  // Refused for good: only the device settings can allow it. Not asked yet (Android 13+ reports that as
+  // "denied" too, see `permissionStateOf`) is not a refusal: a tap on a switch shows the OS prompt.
   const remindersDenied = permission?.status === 'denied';
+  // A switch is on only while reminders can actually be delivered (the stored wish may outlive a revoke).
+  const remindersAllowed = permission === null || permission.status === 'granted';
   // Android 12+ without the "alarms & reminders" access: the OS may deliver a reminder late.
   const remindersInexact =
     exactTiming?.status === 'denied' &&
@@ -172,7 +188,7 @@ export function AppSection() {
                 trailing
                 label={row.label}
                 description={row.hint}
-                value={preferences.reminders[row.category] && remindersSupported && !remindersDenied}
+                value={preferences.reminders[row.category] && remindersSupported && remindersAllowed}
                 disabled={!remindersSupported}
                 onValueChange={(value) => void toggleReminder(row.category, value)}
                 testID={`settings-reminder-${row.category}`}

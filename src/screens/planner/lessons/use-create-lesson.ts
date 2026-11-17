@@ -2,10 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { qk, useApi } from '@/api';
 import type { CreateLessonInput } from '@/api/types';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useStillHere } from '@/navigation';
 
 import { invalidateAroundLesson } from '../shared/invalidate';
-import { useStillHere } from '../shared/use-still-here';
 
 /**
  * `POST /teacher/lessons`. The lesson exists for EVERY `plan` outcome (queued, skipped, unavailable,

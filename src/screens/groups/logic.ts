@@ -233,6 +233,25 @@ export function applyAttendanceMark(
   };
 }
 
+/**
+ * The table as the teacher must see it while marks are in flight (participant id → the mark sent): a
+ * read that left the server before a mark was written (the live poll, a realtime refresh) does not switch
+ * the optimistic mark back until that mark's own request has settled.
+ */
+export function applyPendingMarks(
+  response: GroupAttendanceResponse,
+  pending: Readonly<Record<string, AttendanceStatus>>,
+): GroupAttendanceResponse {
+  let next = response;
+  for (const [participantId, attendance] of Object.entries(pending)) {
+    const shown = next.lessons.some((lesson) =>
+      lesson.participants.some((participant) => participant.participantId === participantId && participant.attendance !== attendance),
+    );
+    if (shown) next = applyAttendanceMark(next, participantId, attendance);
+  }
+  return next;
+}
+
 /** A lesson of the group is running now: the table is refreshed on a timer while this is true. */
 export function hasActiveLesson(response: Pick<GroupAttendanceResponse, "lessons"> | undefined): boolean {
   return Boolean(response?.lessons.some((lesson) => lesson.status === "ACTIVE"));

@@ -10,6 +10,7 @@ import { serverClockOffset } from "@/domain/server-clock";
 import {
   countReady,
   planAnchorMs,
+  planProgressMoved,
   planSignature,
   planStateOf,
   statusRowsOnBoard,
@@ -158,4 +159,13 @@ test("mergeQueryData: a local patch of the board does not move its fetch time", 
   const moved = queryClient.getQueryState<Board>(key);
   assert.ok(serverClockOffset(moved?.data?.serverNow, moved?.dataUpdatedAt ?? 0) < -11 * MINUTE);
   queryClient.clear();
+});
+
+test("planProgressMoved: the first signature initialises, a later different one tells the observers", () => {
+  const pending = planSignature([{ id: "p1", planGeneratedAt: null, planError: null }]);
+  const ready = planSignature([{ id: "p1", planGeneratedAt: "2026-11-17T10:00:00.000Z", planError: null }]);
+  assert.equal(planProgressMoved(null, pending), false);
+  assert.equal(planProgressMoved(pending, pending), false);
+  assert.equal(planProgressMoved(pending, ready), true);
+  assert.equal(planProgressMoved(pending, null), false);
 });

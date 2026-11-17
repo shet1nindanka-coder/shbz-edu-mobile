@@ -1,4 +1,4 @@
-import { Text } from '@/ui';
+import { Text, useAnnounce } from '@/ui';
 
 /** Outcome of a panel call: the server's `{ ok, message }`, or a failed request shown the same way. */
 export type PanelResult = { ok: boolean; message: string };
@@ -16,6 +16,8 @@ export type ResultLineProps = {
  * hint then.
  */
 export function ResultLine({ pendingText, result, testID }: ResultLineProps) {
+  // The outcome appears under the button without moving the focus: spoken on iOS (Android has the live region).
+  useAnnounce(pendingText ? null : result?.message);
   if (pendingText) {
     return (
       <Text variant="caption" color="textMuted" accessibilityLiveRegion="polite" testID={testID}>

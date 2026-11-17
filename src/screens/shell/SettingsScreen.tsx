@@ -35,8 +35,9 @@ export function SettingsScreen() {
     if (signingOut) return;
     setConfirmOpen(false);
     setSigningOut(true);
-    // The role tree unmounts when the session ends; there is no state to reset afterwards.
-    void signOut();
+    // The role tree unmounts when the session ends; there is no state to reset afterwards. This sign-out
+    // deletes the unsent changes: they were named in the confirmation (or there are none).
+    void signOut({ discardUnsentWrites: true });
   };
 
   // Nothing typed offline is lost silently: unsent changes are named before they are deleted.

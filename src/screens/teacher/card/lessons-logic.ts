@@ -93,29 +93,55 @@ export function markLessonPending(data: LessonsData, lessonId: string): LessonsD
 
 export type LessonPlanState = 'ready' | 'pending' | 'stale' | 'failed';
 
-function epoch(value: string | null | undefined): number {
-  return value ? Date.parse(value) : Number.NaN;
-}
-
 /**
  * State of this student's plan in a lesson. A plan that has been "running" for more than 15 minutes was
  * lost (the server does not expose the queue time). Like the site's lessons tab (04 §5.2), the anchor is
  * when THIS client first saw the lesson pending (`pendingSince`, epoch ms) — never `lesson.createdAt`, so a
  * plan still being built after an app restart or a retry made elsewhere shows the spinner — or the latest
  * "Retry" the app had accepted for this participant, whichever is later. Not seen yet → pending.
+ *
+ * Every term is DEVICE time: `now`, `pendingSince` and `requestedAt` (the accepted Retry converted with
+ * `planRequestDeviceAnchor`). Comparing the server's `planRequestedAt` with the device clock would let a
+ * device that runs behind the server keep the spinner for 15 minutes plus the skew, while the lesson
+ * board — which corrects its clock by the server's — already says the plan was lost (09 §6.2 rule 6).
  */
 export function lessonPlanState(
   lesson: Pick<TeacherStudentLesson, 'planPending' | 'planError'>,
   now: number,
   pendingSince: number | undefined,
-  planRequestedAt?: string | null,
+  requestedAt?: number,
 ): LessonPlanState {
   if (lesson.planError !== null) return 'failed';
   if (!lesson.planPending) return 'ready';
   const seen = pendingSince ?? Number.NaN;
-  const requested = epoch(planRequestedAt);
+  const requested = requestedAt ?? Number.NaN;
   const anchor = Number.isNaN(requested) ? seen : Number.isNaN(seen) ? requested : Math.max(seen, requested);
   return !Number.isNaN(anchor) && now - anchor > LIMITS.stalePlanMs ? 'stale' : 'pending';
+}
+
+/** An accepted "Retry" (`raw` = the server's `planRequestedAt`) and the same moment on the device clock. */
+export type PlanRequestAnchor = { raw: string; deviceMs: number };
+
+/**
+ * Converts the server's `planRequestedAt` into device time, once per accepted Retry (`previous` is kept
+ * while `raw` is unchanged). With the server-clock offset the lesson board used (`serverOffsetMs`, server
+ * minus device) the result is exactly the board's anchor, so the two screens turn "lost" together. Without
+ * one (the board was never read, or its cache is gone) the moment the card first saw the Retry
+ * (`observedAt`) is used: never before the real request, so the card can only be late, never early — the
+ * same guarantee as `pendingSince`. A Retry made on the card itself is stamped with the device time at which
+ * the response arrived (`{ raw, deviceMs: Date.now() }`) and never goes through here.
+ */
+export function planRequestDeviceAnchor(
+  previous: PlanRequestAnchor | undefined,
+  raw: string | null,
+  serverOffsetMs: number | null,
+  observedAt: number,
+): PlanRequestAnchor | undefined {
+  if (raw === null) return undefined;
+  if (previous && previous.raw === raw) return previous;
+  const server = Date.parse(raw);
+  if (Number.isNaN(server)) return undefined;
+  return { raw, deviceMs: serverOffsetMs === null ? observedAt : server - serverOffsetMs };
 }
 
 /**

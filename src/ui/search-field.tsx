@@ -10,9 +10,11 @@ import {
 
 import { makeStyles, useTheme } from '@/theme';
 
+import { withErrorHint } from './a11y';
 import { Icon } from './icon';
 import { PressableScale } from './internal/pressable-scale';
 import { MAX_FONT_SCALE, Text } from './text';
+import { useAnnounce } from './use-announce';
 
 export type SearchFieldProps = Omit<TextInputProps, 'style' | 'editable' | 'onSubmitEditing'> & {
   value: string;
@@ -47,10 +49,13 @@ export function SearchField({
   onFocus,
   onBlur,
   accessibilityLabel,
+  accessibilityHint,
   placeholder,
   ...inputProps
 }: SearchFieldProps) {
   const theme = useTheme();
+  // iOS has no live regions: the error under the pill is spoken when it appears.
+  useAnnounce(error);
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
   const idle = !disabled && !busy;
@@ -63,6 +68,7 @@ export function SearchField({
         <TextInput
           ref={ref}
           accessibilityLabel={accessibilityLabel ?? placeholder}
+          accessibilityHint={withErrorHint(error, accessibilityHint)}
           placeholder={placeholder}
           placeholderTextColor={theme.colors.placeholder}
           selectionColor={theme.colors.accentSolid}

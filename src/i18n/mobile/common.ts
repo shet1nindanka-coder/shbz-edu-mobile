@@ -4,6 +4,7 @@
 const ru = {
   actions: {
     retry: "Повторить",
+    ok: "ОК",
     cancel: "Отмена",
     close: "Закрыть",
     done: "Готово",
@@ -74,6 +75,7 @@ const ru = {
 const en: typeof ru = {
   actions: {
     retry: "Retry",
+    ok: "OK",
     cancel: "Cancel",
     close: "Close",
     done: "Done",

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
@@ -14,7 +14,7 @@ import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, Segmented, Text } from '@/ui';
 
-import { applyAttendanceMark, type AttendanceCell } from '../logic';
+import { applyAttendanceMark, applyPendingMarks, type AttendanceCell } from '../logic';
 import { AttendanceLessonList } from './attendance-lesson-list';
 import { AttendanceMarkSheet, type AttendanceMarkTarget } from './attendance-mark-sheet';
 import { AttendanceTable } from './attendance-table';
@@ -53,6 +53,8 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
   const [error, setError] = useState<string | null>(null);
   const [markTarget, setMarkTarget] = useState<AttendanceMarkTarget | null>(null);
   const [markOpen, setMarkOpen] = useState(false);
+  // Marks in flight (participant id → mark): shown over every read of the table until they settle.
+  const [pending, setPending] = useState<Readonly<Record<string, AttendanceStatus>>>({});
 
   const key = qk('groups', 'getGroupAttendance', groupId, ATTENDANCE_PERIOD);
   const patch = (participantId: string, value: AttendanceStatus) =>
@@ -72,12 +74,19 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
     onMutate: async (input) => {
       setError(null);
       setSaving(input.participantId, true);
+      // A read that leaves the server before the write (the live poll, a realtime refresh) must not switch
+      // the optimistic mark back either: the mark is shown on top of every read until it settles.
+      setPending((current) => ({ ...current, [input.participantId]: input.attendance }));
       // A refetch that started before the tap must not overwrite the optimistic mark.
       await queryClient.cancelQueries({ queryKey: key });
       patch(input.participantId, input.attendance);
     },
-    onSuccess: (result, input) => {
+    onSuccess: async (result, input) => {
+      // A read still in flight may predate the write: dropped, and the table is read again after it.
+      const reading = queryClient.isFetching({ queryKey: key }) > 0;
+      if (reading) await queryClient.cancelQueries({ queryKey: key });
       patch(input.participantId, result.attendance);
+      if (reading) void queryClient.invalidateQueries({ queryKey: key });
       // The lesson board shows the same marks.
       void queryClient.invalidateQueries({ queryKey: qk('planner', 'getLessonBoard', input.lessonId) });
       void queryClient.invalidateQueries({ queryKey: qk('planner', 'getLessonLive', input.lessonId) });
@@ -90,7 +99,15 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
       // The participant is gone (lesson deleted, student moved to another teacher): reload the table.
       if (isNotFoundError(failure)) void queryClient.invalidateQueries({ queryKey: key });
     },
-    onSettled: (_result, _failure, input) => setSaving(input.participantId, false),
+    onSettled: (_result, _failure, input) => {
+      setSaving(input.participantId, false);
+      setPending((current) => {
+        if (!(input.participantId in current)) return current;
+        const next = { ...current };
+        delete next[input.participantId];
+        return next;
+      });
+    },
   });
 
   const send = (lessonId: string, cell: AttendanceCell, value: AttendanceStatus) => {
@@ -98,7 +115,8 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
     mark.mutate({ lessonId, participantId: cell.participantId, attendance: value, previous: cell.attendance });
   };
 
-  const data = attendance.data;
+  const loaded = attendance.data;
+  const data = useMemo(() => (loaded ? applyPendingMarks(loaded, pending) : undefined), [loaded, pending]);
   if (!data) {
     return isLoadFailed(attendance) ? (
       <LoadFailure query={attendance} testID="group-attendance-error" />

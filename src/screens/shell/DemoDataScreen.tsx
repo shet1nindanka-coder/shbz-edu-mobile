@@ -205,6 +205,15 @@ export function DemoDataScreen() {
             <Text variant="small" color="textMuted" testID="demo-dataset-age">
               {`Seeded ${formatAge(Math.max(0, now - new Date(dataset.t0).getTime()))} ago · generation ${dataset.generation}`}
             </Text>
+            {dataset.storageReadFailed ? (
+              // Developer-only control copy, in English like the rest of this block.
+              <Notice
+                tone="warning"
+                title="The stored dataset could not be read"
+                text="This run works on fresh fixtures in memory and saves nothing, so the stored data is not overwritten. Reset the demo data to replace what is stored and save again."
+                testID="demo-storage-read-failed"
+              />
+            ) : null}
             <Switch
               trailing
               label="Re-seed automatically after 24 h"

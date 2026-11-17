@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { LessonBoardItem, LessonBoardModel, LessonBoardSubmission } from "@/api/types";
 import {
+  applyPendingResults,
   availableNumbers,
   hasScheduleMovedOn,
   itemOrdinal,
@@ -229,4 +230,21 @@ test("handout names: the site's file names by the Moscow day of creation", () =>
   assert.notEqual(handoutFileId("les", {}), handoutFileId("les", { answers: true }));
   assert.notEqual(handoutFileId("les", {}), handoutFileId("les", { studentId: "s1" }));
   assert.notEqual(handoutFileId("les", {}), handoutFileId("les", { format: "html" }));
+});
+
+test("applyPendingResults: a board read that predates a mark in flight keeps the optimistic mark (#222)", () => {
+  const read = board();
+  // Nothing in flight: the read is shown as it is (same object, nothing re-rendered).
+  assert.equal(applyPendingResults(read, {}), read);
+  const shown = applyPendingResults(read, { "2": { participantId: "p1", result: "SOLVED" } });
+  assert.equal(shown.participants[0]?.items[1]?.result, "SOLVED");
+  assert.equal(shown.participants[0]?.items[0]?.result, null);
+  assert.equal(read.participants[0]?.items[1]?.result, null);
+  // A read that already carries the mark, or an item that is gone, changes nothing.
+  const fresh = board({ participants: [{ ...read.participants[0]!, items: [item("1"), item("2", { result: "SOLVED" })] }] });
+  assert.equal(applyPendingResults(fresh, { "2": { participantId: "p1", result: "SOLVED" } }), fresh);
+  assert.equal(applyPendingResults(read, { gone: { participantId: "p1", result: "PARTIAL" } }), read);
+  // Clearing a mark is a pending value too.
+  const cleared = applyPendingResults(fresh, { "2": { participantId: "p1", result: null } });
+  assert.equal(cleared.participants[0]?.items[1]?.result, null);
 });

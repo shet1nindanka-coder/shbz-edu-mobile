@@ -11,17 +11,19 @@ import { format, useI18n } from '@/i18n';
 
 import { invalidateAroundLesson } from '../shared/invalidate';
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
-import { useStillHere } from '../shared/use-still-here';
-import { useAppNavigation, useRefetchOnFocus, useScreenLive } from '@/navigation';
+import { usePlanProgressObservers } from '../shared/use-plan-progress-observers';
+import { useAppNavigation, useRefetchOnFocus, useScreenLive, useStillHere } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 import { mergeQueryData } from '@/services/query';
 import {
+  applyPendingResults,
   hasScheduleMovedOn,
   markParticipantPending,
   nextScheduleRefreshDelay,
   patchBoardItem,
   replaceParticipantItems,
   setIdsOf,
+  type PendingResults,
   withNumber,
   withoutNumber,
   type SetIds,
@@ -51,8 +53,16 @@ export function useLessonBoard(lessonId: string) {
   const t = dict.planner.lessonBoard;
   const boardKey = qk('planner', 'getLessonBoard', lessonId);
 
+  // Result marks in flight: every board read is shown with them on top until their requests settle.
+  const [pendingResults, setPendingResults] = useState<PendingResults>({});
+  const withPendingResults = useCallback((model: LessonBoardModel) => applyPendingResults(model, pendingResults), [pendingResults]);
   // Opening the board runs the lazy finalisation of this lesson on the server, so it is always re-read.
-  const board = useQuery({ queryKey: boardKey, queryFn: () => api.planner.getLessonBoard(lessonId), refetchOnMount: 'always' });
+  const board = useQuery({
+    queryKey: boardKey,
+    queryFn: () => api.planner.getLessonBoard(lessonId),
+    refetchOnMount: 'always',
+    select: withPendingResults,
+  });
   // The board stays mounted under the screens it opens (a new homework draft, the photo viewer): what went
   // stale meanwhile is re-read when it comes back (00 §2.3 "refetch on focus" — the realtime fallback).
   useRefetchOnFocus([board]);
@@ -141,6 +151,10 @@ export function useLessonBoard(lessonId: string) {
     );
     if (planSignature(rows) !== planSignature(participants)) void refetchBoard();
   }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refetchBoard]);
+
+  // A plan that arrived or failed (seen by the poll, a realtime refresh or a refetch on focus) also changes
+  // the lessons list's «подбор идёт», the student card's lessons tab and the group pages.
+  usePlanProgressObservers(participants, invalidateAround);
 
   // ───────────────────────────── live activity poll (fallback of the realtime event) ─────────────────────────────
 
@@ -289,14 +303,18 @@ export function useLessonBoard(lessonId: string) {
   const markResult = useMutation({
     mutationFn: (input: { participantId: string; itemId: string; result: LessonItemResult | null }) =>
       api.planner.setItemResult(lessonId, input.participantId, input.itemId, input.result),
-    onMutate: (input) => {
+    onMutate: async (input) => {
+      // Optimistic: the traffic light lights up at once, the server catches up. A board read that may
+      // have left before this write cannot switch it off: it is shown with the pending mark on top.
+      setPendingResults((current) => ({ ...current, [input.itemId]: { participantId: input.participantId, result: input.result } }));
+      setSavingItemIds((current) => [...current, input.itemId]);
+      // A read already in flight is dropped (the realtime refresh of this mark re-reads the board).
+      await queryClient.cancelQueries({ queryKey: boardKey });
       const previous = queryClient
         .getQueryData<LessonBoardModel>(boardKey)
         ?.participants.find((participant) => participant.id === input.participantId)
         ?.items.find((item) => item.id === input.itemId);
-      // Optimistic: the traffic light lights up at once, the server catches up.
       patchBoard((current) => patchBoardItem(current, input.participantId, input.itemId, { result: input.result }));
-      setSavingItemIds((current) => [...current, input.itemId]);
       setItemErrors((current) => {
         if (!(input.itemId in current)) return current;
         const next = { ...current };
@@ -305,8 +323,13 @@ export function useLessonBoard(lessonId: string) {
       });
       return { previous: previous ? { result: previous.result, studentStatus: previous.studentStatus } : null };
     },
-    onSuccess: (saved, input) => {
+    onSuccess: async (saved, input) => {
+      // A read that left the server before this write would show the old mark once the overlay is gone:
+      // it is dropped and the board is read again after the write.
+      const reading = queryClient.isFetching({ queryKey: boardKey }) > 0;
+      if (reading) await queryClient.cancelQueries({ queryKey: boardKey });
       patchBoard((current) => patchBoardItem(current, input.participantId, input.itemId, { result: saved.result, studentStatus: saved.studentStatus }));
+      if (reading) void refetchBoard();
       // The result is mirrored onto the student's number status and appended to its history.
       invalidateAround();
     },
@@ -321,7 +344,15 @@ export function useLessonBoard(lessonId: string) {
       setItemErrors((current) => ({ ...current, [input.itemId]: errorText(error, t.saveResultFailed) }));
       void refetchBoard();
     },
-    onSettled: (_result, _error, input) => setSavingItemIds((current) => current.filter((id) => id !== input.itemId)),
+    onSettled: (_result, _error, input) => {
+      setSavingItemIds((current) => current.filter((id) => id !== input.itemId));
+      setPendingResults((current) => {
+        if (!(input.itemId in current)) return current;
+        const next = { ...current };
+        delete next[input.itemId];
+        return next;
+      });
+    },
   });
 
   const schedule = useMutation({

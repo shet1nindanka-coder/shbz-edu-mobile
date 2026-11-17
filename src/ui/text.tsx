@@ -2,6 +2,8 @@ import { Text as RNText, type TextProps as RNTextProps, type TextStyle } from 'r
 
 import { useTheme, type ColorToken, type TextVariant } from '@/theme';
 
+import { MAX_FONT_SCALE } from './font-scale';
+
 export type TextProps = RNTextProps & {
   /** Typography role; see `typography` in the theme. Default `body`. */
   variant?: TextVariant;
@@ -51,11 +53,8 @@ function defaultColor(variant: TextVariant): ColorToken {
   return 'label';
 }
 
-/**
- * Text may grow with the OS font size, but not without bound: fixed-height controls would clip. The one
- * cap of the app — `Text` and every `TextInput` wrapper (typed text and placeholders) use it.
- */
-export const MAX_FONT_SCALE = 1.3;
+// The cap lives with the other pure font-scale helpers; `Text` is where most code imports it from.
+export { MAX_FONT_SCALE };
 
 /** The app's text primitive: Montserrat, a typography role and a colour token. */
 export function Text({ variant = 'body', color, align, tabular, style, ...rest }: TextProps) {

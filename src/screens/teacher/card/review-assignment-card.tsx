@@ -8,7 +8,7 @@ import { homeworkAssignmentLabel } from '@/domain/homework-label';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, Card, Chip, Icon, Notice, PressableScale, ProgressBar, Text } from '@/ui';
+import { Button, Card, CardPressArea, Chip, Icon, Notice, ProgressBar, Text } from '@/ui';
 
 import { ReviewCheckHistory } from './review-check-history';
 import { ReviewInjectionBanner } from './review-injection-banner';
@@ -102,11 +102,12 @@ export function ReviewAssignmentCard({
     <Card selected={highlighted} style={styles.card} testID={`review-assignment-${assignment.id}`}>
       {injections.length > 0 ? <ReviewInjectionBanner results={injections} testID={`review-injection-${assignment.id}`} /> : null}
 
-      <PressableScale
-        accessibilityRole="button"
+      {/* One element for screen readers: the chips, the topic and the dates are spoken with the label —
+          they are what tells several homeworks of the same number apart. */}
+      <CardPressArea
         accessibilityLabel={format(expanded ? m.teacher.card.collapse : m.teacher.card.expand, { title: label })}
-        accessibilityState={{ expanded }}
-        scaleTo={1}
+        accessibilityParts={[completed ? t.completed : null, overdue ? t.overdue : null, assignment.topicTitle, dates]}
+        expanded={expanded}
         onPress={onToggle}
         testID={`review-assignment-toggle-${assignment.id}`}
         style={styles.header}
@@ -131,7 +132,7 @@ export function ReviewAssignmentCard({
             {dates}
           </Text>
         ) : null}
-      </PressableScale>
+      </CardPressArea>
 
       <View style={styles.summary}>
         <View style={styles.chips}>

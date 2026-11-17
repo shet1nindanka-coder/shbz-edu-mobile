@@ -7,6 +7,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { PressableScale } from './internal/pressable-scale';
 import { useSlidingIndicator } from './internal/sliding-indicator';
 import { Text } from './text';
+import { useTextScale } from './use-text-scale';
 
 export type SegmentedOption<T extends string> = {
   value: T;
@@ -35,7 +36,11 @@ export type SegmentedProps<T extends string> = {
    * While they fit, the bar looks like `fill`. For in-page tabs, whose labels come from the dictionary.
    */
   scrollable?: boolean;
-  /** Use `shortLabel`s. */
+  /**
+   * Use `shortLabel`s. Decide it from the room the labels need at the CURRENT text size, not from the
+   * window alone: `compact={width < widthForText(360, fontScale)}`. Fixed-width labels that still do not
+   * fit shrink back towards the default size instead of being cut (`adjustsFontSizeToFit`, native).
+   */
   compact?: boolean;
   /** `radio` for a setting (default), `tab` when the control switches the content below. */
   role?: 'radio' | 'tab';
@@ -64,6 +69,7 @@ export function Segmented<T extends string>({
 }: SegmentedProps<T>) {
   const theme = useTheme();
   const styles = useStyles();
+  const { minimumFontScale } = useTextScale();
   const activeIndex = options.findIndex((option) => option.value === value);
   const { onItemLayout, indicatorStyle } = useSlidingIndicator(activeIndex);
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -118,6 +124,10 @@ export function Segmented<T extends string>({
             <Text
               variant="segment"
               numberOfLines={1}
+              // A segment of a scrollable bar is as wide as its label; the others share a fixed row and
+              // would cut a label drawn at a large OS font size («Системн…»): it shrinks instead.
+              adjustsFontSizeToFit={!scrollable}
+              minimumFontScale={minimumFontScale}
               color={selected ? (plain ? 'textStrong' : 'accentSolid') : 'segText'}
             >
               {compact && option.shortLabel ? option.shortLabel : option.label}

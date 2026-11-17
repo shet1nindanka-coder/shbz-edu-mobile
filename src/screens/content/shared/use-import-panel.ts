@@ -1,12 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { isApiError, isNetworkError, isNotFoundError, qk, useApi } from '@/api';
 import type { ImportApplyResult, ImportPreview, ImportTarget } from '@/api/types';
 import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { pickJsonFile } from '@/services/photos';
+
+import { readClipboardText } from './clipboard-paste';
 
 /** How long the load tile shows «Файл добавлен» (the site's `SUCCESS_HOLD_MS`). */
 const SUCCESS_HOLD_MS = 900;
@@ -179,16 +182,15 @@ export function useImportPanel({ target, onCreated }: ImportPanelOptions): Impor
     },
     pasteFromClipboard: () => {
       if (busy) return;
-      void Clipboard.getStringAsync()
-        .then((value) => {
-          if (value.trim().length === 0) {
-            setError(m.content.importPanel.clipboardEmpty);
-            return;
-          }
-          load(value, null);
+      void readClipboardText(Platform.OS, Clipboard).then((pasted) => {
+        if (pasted.kind === 'text') {
+          load(pasted.text, null);
           flash();
-        })
-        .catch(() => setError(m.content.importPanel.clipboardDenied));
+          return;
+        }
+        const panel = m.content.importPanel;
+        setError(pasted.kind === 'empty' ? panel.clipboardEmpty : pasted.kind === 'refused' ? panel.pasteRefused : panel.clipboardDenied);
+      });
     },
     changeText: (value) => load(value, null),
     toggleText: () => setTextOpen((open) => !open),

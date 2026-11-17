@@ -3,4 +3,6 @@
 export { RetryWaitLine, type RetryWaitLineProps } from './retry-wait-line';
 export { formatWait, secondsLeft, useCountdown, type WaitForms } from './use-countdown';
 export { useRetryWait, type RetryWait } from './use-retry-wait';
+export { useDurationLock, useWaitClock, type DurationLock, type WaitStart } from './use-wait-clock';
+export { advanceWaitClock, startWaitClock, waitClockSeconds, type WaitClock } from './wait-clock';
 export { useWaitText } from './use-wait-text';

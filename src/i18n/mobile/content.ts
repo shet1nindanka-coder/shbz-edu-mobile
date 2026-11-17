@@ -16,6 +16,8 @@ const ru = {
     // replaces `dict.topics.importPrompt.clipboardDenied` ("the browser blocked…")
     clipboardDenied: "Не удалось получить доступ к буферу обмена.",
     clipboardEmpty: "В буфере обмена нет текста.",
+    // iOS: the clipboard holds text but the read came back empty — the system paste prompt was refused
+    pasteRefused: "Не удалось вставить текст из буфера обмена. Если система спрашивает разрешение — разрешите вставку.",
     hideText: "скрыть поле"
   },
   reorder: {
@@ -88,6 +90,7 @@ const en: typeof ru = {
     sharePrompt: "Share the prompt",
     clipboardDenied: "Could not access the clipboard.",
     clipboardEmpty: "The clipboard has no text.",
+    pasteRefused: "Could not paste text from the clipboard. If the system asks for permission, allow pasting.",
     hideText: "hide the field"
   },
   reorder: {

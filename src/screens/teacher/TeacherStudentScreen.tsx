@@ -10,10 +10,10 @@ import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, useScreenFocused, useStillHere, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen, screenTitle } from '@/screens/shell';
 import { makeStyles } from '@/theme';
-import { BottomSheet, IconButton, LoadingState, Notice, Screen, Segmented, Spinner, Text } from '@/ui';
+import { BottomSheet, Button, IconButton, LoadingState, Notice, Screen, Segmented, Spinner, Text } from '@/ui';
 
 import { AssignTab } from './card/assign-tab';
 import type { CardChrome } from './card/card-screen';
@@ -51,6 +51,8 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
   const styles = useStyles();
   const api = useApi();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
+  const focused = useScreenFocused();
   const { dict, m } = useI18n();
   const t = dict.students.detail;
   const notices = dict.students.list.notices;
@@ -145,6 +147,19 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
         {notice ? (
           <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="student-card-notice" />
         ) : null}
+        {report.ready ? (
+          <Notice
+            tone="success"
+            text={format(m.teacher.report.ready, { title: report.ready.title })}
+            // It appears without the teacher's action on this screen: VoiceOver says it, but only once the card
+            // is in front again (it is set while the teacher is elsewhere and the card stays mounted).
+            announcement={focused ? format(m.teacher.report.ready, { title: report.ready.title }) : null}
+            onDismiss={report.dismissReady}
+            dismissLabel={m.common.actions.close}
+            action={<Button label={m.teacher.report.open} size="sm" variant="outline" onPress={report.openReady} testID="student-report-ready-open" />}
+            testID="student-report-ready"
+          />
+        ) : null}
         {report.error ? (
           <Notice tone="error" text={report.error} onDismiss={report.dismissError} dismissLabel={m.common.actions.close} testID="student-report-error" />
         ) : null}
@@ -182,7 +197,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
       <BottomSheet
         visible={report.pendingPeriod !== null}
         onClose={() => undefined}
-        onClosed={report.openReady}
+        onClosed={report.onProgressClosed}
         closeLabel={m.common.actions.close}
         dismissible={false}
         showClose={false}
@@ -212,7 +227,9 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
           setDeleted(true);
           // D3: back to the students list, which shows «Ученик удалён…».
           postStudentsListNotice('studentDeleted');
-          navigation.open({ screen: 'teacher.students' });
+          // The delete answered after the teacher went elsewhere: the card shows the gone state on return,
+          // nobody is pulled away from where they are now.
+          if (stillHere()) navigation.open({ screen: 'teacher.students' });
         }}
         onMissing={() => setOverlay(null)}
       />

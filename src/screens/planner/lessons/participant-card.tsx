@@ -5,7 +5,7 @@ import { RetryWaitLine } from '@/components/retry-wait';
 import { formatClockTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, Chip, Icon, PressableScale, Spinner, Text } from '@/ui';
+import { Button, Card, CardPressArea, Chip, Icon, Spinner, Text } from '@/ui';
 
 import type { PlanState } from '../shared/plan-state';
 import { PlanStatusBlock } from '../shared/plan-status-block';
@@ -76,6 +76,17 @@ export function ParticipantCard({
   const idle = live.idle && live.idle.level !== 'ok' ? live.idle : null;
   const failed = planState.failed || planState.stale;
   const resultsBlocked = resultWaitSeconds > 0;
+  // What the header shows, also spoken with its name: the header is one element for a screen reader.
+  const tasksLabel = !planState.pending ? format(dict.planner.homeworkPlans.board.tasksCount, { n: participant.items.length }) : null;
+  const selectingLabel = planState.pending && !expanded ? t.aiSelecting : null;
+  const failedLabel = failed ? common.error : null;
+  const submittedLabel = isLive ? format(t.submitted, { done: live.submittedCount, total: live.totalCount }) : null;
+  const idleLabel = isLive && idle ? format(t.noSubmissions, { n: idle.idleMinutes }) : null;
+  const presenceLabel = isLive
+    ? participant.joinedAt
+      ? format(t.inClassSince, { time: formatClockTime(participant.joinedAt, locale) })
+      : t.notOpened
+    : null;
 
   const renderItem = (item: LessonBoardItem, index: number) => (
     <ItemRow
@@ -102,11 +113,10 @@ export function ParticipantCard({
       style={[styles.card, idle?.level === 'alert' ? { borderColor: theme.colors.dangerBorder } : null]}
       testID={`lesson-participant-${participant.id}`}
     >
-      <PressableScale
-        accessibilityRole="button"
+      <CardPressArea
         accessibilityLabel={format(expanded ? m.planner.lessonBoard.collapse : m.planner.lessonBoard.expand, { name: participant.studentName })}
-        accessibilityState={{ expanded }}
-        scaleTo={1}
+        accessibilityParts={[tasksLabel, selectingLabel, failedLabel, submittedLabel, idleLabel, presenceLabel]}
+        expanded={expanded}
         onPress={onToggle}
         testID={`lesson-participant-toggle-${participant.id}`}
         style={styles.header}
@@ -118,9 +128,9 @@ export function ParticipantCard({
           <Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={18} color="kicker" />
         </View>
         <View style={styles.headerMeta}>
-          {!planState.pending ? (
-            <Chip tone="muted" label={format(dict.planner.homeworkPlans.board.tasksCount, { n: participant.items.length })} />
-          ) : !expanded ? (
+          {tasksLabel !== null ? (
+            <Chip tone="muted" label={tasksLabel} />
+          ) : selectingLabel !== null ? (
             // The open card says the same in its body.
             <View style={styles.selecting}>
               <Spinner size={14} color="accentSolid" />
@@ -129,20 +139,16 @@ export function ParticipantCard({
               </Text>
             </View>
           ) : null}
-          {failed ? <Chip tone="red" label={common.error} /> : null}
-          {isLive ? (
-            <>
-              <Chip tone="muted" label={format(t.submitted, { done: live.submittedCount, total: live.totalCount })} />
-              {idle ? <Chip tone={idle.level === 'alert' ? 'red' : 'yellow'} label={format(t.noSubmissions, { n: idle.idleMinutes })} /> : null}
-            </>
-          ) : null}
+          {failedLabel !== null ? <Chip tone="red" label={failedLabel} /> : null}
+          {submittedLabel !== null ? <Chip tone="muted" label={submittedLabel} /> : null}
+          {idleLabel !== null && idle ? <Chip tone={idle.level === 'alert' ? 'red' : 'yellow'} label={idleLabel} /> : null}
         </View>
-        {isLive ? (
+        {presenceLabel !== null ? (
           <Text variant="caption" color="textSoft" tabular>
-            {participant.joinedAt ? format(t.inClassSince, { time: formatClockTime(participant.joinedAt, locale) }) : t.notOpened}
+            {presenceLabel}
           </Text>
         ) : null}
-      </PressableScale>
+      </CardPressArea>
 
       {expanded ? (
         <View style={styles.body}>

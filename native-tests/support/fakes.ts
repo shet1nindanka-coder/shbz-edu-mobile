@@ -17,7 +17,18 @@ type DeviceState = {
   network: { type: string; isConnected: boolean; isInternetReachable: boolean };
   notifications: {
     status: 'granted' | 'denied' | 'undetermined';
-    scheduled: { identifier: string; content: Record<string, unknown>; trigger: unknown }[];
+    /**
+     * Whether the OS would still show its prompt (default true). iOS answers false after a refusal, Android
+     * after the second one; Android 13+ reports a never-asked permission as `denied` with true. With false
+     * a request shows nothing and answers the same refusal (expo-modules-core PermissionsService).
+     */
+    canAskAgain?: boolean;
+    /**
+     * `alarm` — how the OS alarm behind the request was set: like ExpoSchedulingDelegate.setupAlarm, the mode
+     * is read once, at scheduling time, from canScheduleExactAlarms(). `cancelled` (set by a test) = the OS
+     * dropped the alarm (exact alarms when the access is revoked) while expo's store still lists the request.
+     */
+    scheduled: { identifier: string; content: Record<string, unknown>; trigger: unknown; alarm?: 'exact' | 'inexact' | 'cancelled' }[];
     channels: ({ id: string } & Record<string, unknown>)[];
     /** Delivered notifications still in the tray (request identifier + content). */
     presented: { identifier: string; content: Record<string, unknown> }[];
@@ -123,9 +134,15 @@ export function expoNativeModuleFakes(): Record<string, Record<string, unknown>>
       isAirplaneModeEnabledAsync: async () => false,
     },
     ExpoNotificationPermissionsModule: {
-      getPermissionsAsync: async () => permission(device().notifications.status === 'granted', device().notifications.status),
+      getPermissionsAsync: async () => {
+        const { status, canAskAgain } = device().notifications;
+        return { ...permission(status === 'granted', status), canAskAgain: canAskAgain ?? true };
+      },
       requestPermissionsAsync: async () => {
-        device().notifications.status = 'granted';
+        const state = device().notifications;
+        device().calls.push({ name: 'Notifications.requestPermissionsAsync', args: [] });
+        if (state.canAskAgain === false && state.status !== 'granted') return { ...permission(false, state.status), canAskAgain: false };
+        state.status = 'granted';
         return permission(true);
       },
       getExactAlarmPermissionsAsync: async () => {
@@ -155,10 +172,12 @@ export function expoNativeModuleFakes(): Record<string, Record<string, unknown>>
       },
     },
     ExpoNotificationScheduler: {
-      getAllScheduledNotificationsAsync: async () => [...device().notifications.scheduled],
+      // The module answers with requests only (no alarm state).
+      getAllScheduledNotificationsAsync: async () => device().notifications.scheduled.map(({ identifier, content, trigger }) => ({ identifier, content, trigger })),
       scheduleNotificationAsync: async (identifier: string, content: Record<string, unknown>, trigger: unknown) => {
         const state = device().notifications;
-        state.scheduled = [...state.scheduled.filter((entry) => entry.identifier !== identifier), { identifier, content: { ...content }, trigger }];
+        const alarm = state.exactAlarm === 'granted' ? 'exact' : 'inexact';
+        state.scheduled = [...state.scheduled.filter((entry) => entry.identifier !== identifier), { identifier, content: { ...content }, trigger, alarm }];
         return identifier;
       },
       cancelScheduledNotificationAsync: async (identifier: string) => {

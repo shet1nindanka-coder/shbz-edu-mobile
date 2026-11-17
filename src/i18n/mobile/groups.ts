@@ -44,7 +44,17 @@ const ru = {
     markAria: "{name}: {mark}",
     markSheetHint: "{date} · {title}",
     notParticipatedLegend: "«·» — {text}",
-    reportAria: "Отчёт о посещаемости (PDF): {period}"
+    reportAria: "Отчёт о посещаемости (PDF): {period}",
+    // Title of the file viewer: the server's file name is Russian and long; the title stands alone.
+    reportTitle7d: "Посещаемость: 7 дней",
+    reportTitle30d: "Посещаемость: 30 дней",
+    reportTitleYear: "Посещаемость: учебный год"
+  },
+  report: {
+    // A report finished after the teacher left the group screen: it is not opened over the screen they
+    // went to, it waits here until they open it.
+    ready: "Отчёт готов: {title}",
+    open: "Открыть отчёт"
   },
   lessons: {
     openAria: "Открыть занятие «{title}»"
@@ -91,7 +101,14 @@ const en: typeof ru = {
     markAria: "{name}: {mark}",
     markSheetHint: "{date} · {title}",
     notParticipatedLegend: "“·” — {text}",
-    reportAria: "Attendance report (PDF): {period}"
+    reportAria: "Attendance report (PDF): {period}",
+    reportTitle7d: "Attendance: 7 days",
+    reportTitle30d: "Attendance: 30 days",
+    reportTitleYear: "Attendance: school year"
+  },
+  report: {
+    ready: "The report is ready: {title}",
+    open: "Open the report"
   },
   lessons: {
     openAria: "Open the lesson “{title}”"

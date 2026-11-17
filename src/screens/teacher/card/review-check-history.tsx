@@ -6,7 +6,7 @@ import { PhotoThumb } from '@/components/files';
 import { formatRunDateTime } from '@/domain/dates';
 import { format, plural, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Chip, Icon, PressableScale, Text, type ChipTone } from '@/ui';
+import { accessibilityLabelOf, Chip, Icon, PressableScale, Text, type ChipTone } from '@/ui';
 
 import { DisclosureRow } from './disclosure-row';
 import { checkMoment, countVerdicts } from './review-logic';
@@ -91,7 +91,15 @@ export function ReviewCheckHistory({ checks, currentId, onOpenPhoto, testID }: R
                   {expandable ? (
                     <PressableScale
                       accessibilityRole="button"
-                      accessibilityLabel={`${formatRunDateTime(checkMoment(check), locale) ?? ''}. ${t.showVerdicts}`}
+                      // One element for screen readers: the badges and the verdict counts are spoken too.
+                      accessibilityLabel={accessibilityLabelOf([
+                        formatRunDateTime(checkMoment(check), locale),
+                        check.id === currentId ? t.current : null,
+                        check.status === 'FAILED' ? t.failed : null,
+                        running ? t.running : null,
+                        ...VERDICT_ORDER.map((verdict) => (counts[verdict] > 0 ? format(countLabel[verdict], { n: counts[verdict] }) : null)),
+                        t.showVerdicts,
+                      ])}
                       accessibilityState={{ expanded }}
                       scaleTo={1}
                       onPress={() => toggleRun(check.id)}

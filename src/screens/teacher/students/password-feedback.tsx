@@ -1,6 +1,6 @@
 import { passwordProblemText } from '@/domain/password-policy';
 import { useI18n } from '@/i18n';
-import { Text } from '@/ui';
+import { Text, useAnnounce } from '@/ui';
 
 import { passwordFeedback } from './account-form';
 
@@ -18,6 +18,8 @@ export type PasswordFeedbackProps = {
 export function PasswordFeedback({ password, okText, testID }: PasswordFeedbackProps) {
   const { dict } = useI18n();
   const feedback = passwordFeedback(password);
+  // The first problem changes while typing; VoiceOver hears it only when it changes (Android: live region).
+  useAnnounce(feedback.kind === 'problem' ? passwordProblemText(feedback.problem, dict.passwordPolicy) : null);
   if (feedback.kind === 'empty') return null;
   if (feedback.kind === 'problem') {
     return (

@@ -87,14 +87,23 @@ export const STUDENT_NOTE_WRITE = 'studentStudy.saveNumberNote';
 export type StudentNotePayload = { note: string };
 export type StudentNoteResult = Res<SaveNoteResponse>;
 
+/** The only payload shape of a note write; a stored entry of another shape is dropped when read. */
+export function isStudentNotePayload(payload: unknown): payload is StudentNotePayload {
+  return typeof payload === 'object' && payload !== null && typeof (payload as { note?: unknown }).note === 'string';
+}
+
 function registerStudentNoteWrite(target: PendingWritesQueue<PendingWriteContext>): void {
-  target.register<StudentNotePayload, StudentNoteResult>(STUDENT_NOTE_WRITE, async (write, { api, queryClient }) => {
-    const saved = await api.studentStudy.saveNumberNote(write.id, write.payload.note);
-    // The note is shown on the number screen and inside a homework.
-    void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getNumberDetail') });
-    void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'getHomework') });
-    return saved;
-  });
+  target.register<StudentNotePayload, StudentNoteResult>(
+    STUDENT_NOTE_WRITE,
+    async (write, { api, queryClient }) => {
+      const saved = await api.studentStudy.saveNumberNote(write.id, write.payload.note);
+      // The note is shown on the number screen and inside a homework.
+      void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getNumberDetail') });
+      void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'getHomework') });
+      return saved;
+    },
+    isStudentNotePayload,
+  );
 }
 
 /**
@@ -130,9 +139,29 @@ export function usePendingWrite<P = unknown>(kind: string, id: string): PendingW
   return write && write.userId === currentUserId ? write : null;
 }
 
-/** The student's unsent note draft for a number, or null. */
+/**
+ * True while a request for `kind + id` is in flight (sent by any editor or by a flush). A waiting entry that
+ * is not being sent is waiting for its next try.
+ */
+export function usePendingWriteSending(kind: string, id: string): boolean {
+  const target = getPendingWrites();
+  useSyncExternalStore(target.subscribe, target.version, target.version);
+  return target.isSending(kind, id);
+}
+
+/** The student's unsent note draft for a number, or null (also for an entry of an unreadable shape). */
 export function usePendingStudentNote(homeworkNumberId: string): PendingWrite<StudentNotePayload> | null {
-  return usePendingWrite<StudentNotePayload>(STUDENT_NOTE_WRITE, homeworkNumberId);
+  const write = usePendingWrite<unknown>(STUDENT_NOTE_WRITE, homeworkNumberId);
+  return write && isStudentNotePayload(write.payload) ? (write as PendingWrite<StudentNotePayload>) : null;
+}
+
+/**
+ * The same entry read now, outside render: an editor decides against the queue's CURRENT entry (another
+ * editor of the number may have replaced it since the last render).
+ */
+export function getPendingStudentNote(homeworkNumberId: string): PendingWrite<StudentNotePayload> | null {
+  const write = getPendingWrites().get<unknown>(STUDENT_NOTE_WRITE, homeworkNumberId);
+  return write && write.userId === currentUserId && isStudentNotePayload(write.payload) ? (write as PendingWrite<StudentNotePayload>) : null;
 }
 
 /**

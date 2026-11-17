@@ -2,12 +2,16 @@ import type { ReminderCategory } from '../preferences';
 
 import type { LocalReminder, ReminderLink } from './reminders';
 
-/** `unavailable` — the platform cannot show local notifications (web). */
+/**
+ * `undetermined` — not allowed yet, the OS prompt can still be shown (never asked; on Android 13+ also after
+ * one refusal). `denied` — refused for good: only the device settings can allow it. `unavailable` — the
+ * platform cannot show local notifications (web). See `permissionStateOf`.
+ */
 export type ReminderPermission = 'granted' | 'denied' | 'undetermined' | 'unavailable';
 
 export type ReminderPermissionState = {
   status: ReminderPermission;
-  /** False once the OS will no longer show its prompt — the user has to open the device settings. */
+  /** False once the OS will no longer show its prompt — the user has to open the device settings (`denied`). */
   canAskAgain: boolean;
 };
 
@@ -42,6 +46,11 @@ export interface LocalNotifications {
    * so nothing of the previous account stays visible or tappable.
    */
   removeAll(): Promise<void>;
+  /**
+   * Reads the exact-timing access. When it changed since the last read (granted or revoked in the system
+   * settings), the reminders already scheduled are set again in the new mode — the service also does this
+   * by itself whenever the app returns to the foreground, and once per run for alarms of an earlier run.
+   */
   getExactTiming(): Promise<ExactTimingState>;
   /**
    * Opens the system page that grants exact timing and resolves when the user is back. When it was

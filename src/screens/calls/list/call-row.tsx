@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTimin
 import type { ParentCallStudentOverview } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, Chip, Text } from '@/ui';
+import { Button, Card, Chip, Text, useTextScale } from '@/ui';
 
 import { callMetaLine, historyButtonLabel, reminderChip, teacherLine } from '../logic';
 
@@ -31,6 +31,9 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, recordDi
   const styles = useStyles();
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
+  // Large text: the reminder chip («Созвонились недавно») would leave the name a third of the row and cut
+  // the surname; the chip moves under a name that does not fit next to it instead.
+  const { large } = useTextScale();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.calls;
   const chip = reminderChip(student.reminder.state, t);
@@ -50,8 +53,8 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, recordDi
         testID={highlighted ? `call-row-highlight-${student.studentId}` : undefined}
       />
       <View style={styles.body}>
-        <View style={styles.head}>
-          <Text variant="bodyBold" numberOfLines={2} style={styles.name}>
+        <View style={[styles.head, large ? styles.headWrap : null]} testID={`call-row-head-${student.studentId}`}>
+          <Text variant="bodyBold" numberOfLines={2} style={large ? styles.nameWrap : styles.name}>
             {student.studentName}
           </Text>
           <Chip tone={chip.tone} label={chip.label} />
@@ -111,6 +114,9 @@ const useStyles = makeStyles((t) => ({
   },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
   name: { flex: 1, minWidth: 0 },
+  headWrap: { flexWrap: 'wrap' },
+  // Its own width while it fits beside the chip, the whole row (and the chip on the next line) when not.
+  nameWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 },
   meta: { gap: t.space.xxs },
   // One line while both labels fit, the spare room shared between the two; on a narrow phone (360 pt,
   // or 375 pt next to «История (23)») the history button moves to a line of its own instead of cutting

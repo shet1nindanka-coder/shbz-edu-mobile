@@ -3,7 +3,7 @@ import { AccessibilityInfo, Platform, Share, View } from 'react-native';
 
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { BottomSheet, Button, Enter, Icon, isOverlayCovered, PressableScale, Text, useCopyFeedback } from '@/ui';
+import { announceOnIOS, BottomSheet, Button, Enter, Icon, isOverlayCovered, PressableScale, Text, useCopyFeedback } from '@/ui';
 
 import { buildCredentialLines, credentialsMessage, type CredentialLine } from './credentials-message';
 import { SITE_HOST } from './site-host';
@@ -53,8 +53,12 @@ export function CredentialsSheet({ credentials, title, onClose }: CredentialsShe
   const message = credentialsMessage(lines);
 
   const announce = (text: string) => {
+    // On Android the feedback line below is a live region and speaks a new text by itself. The same text set
+    // again (the same line copied twice) does not change the node, so the live region stays silent: that
+    // repeat is spoken directly.
+    if (Platform.OS === 'android' && text === feedback) AccessibilityInfo.announceForAccessibility(text);
     setFeedback(text);
-    AccessibilityInfo.announceForAccessibility(text);
+    announceOnIOS(text);
   };
 
   const copyLine = async (line: CredentialLine) => {

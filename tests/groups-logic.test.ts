@@ -12,6 +12,7 @@ import {
   activityLabel,
   aiNoteForRequest,
   applyAttendanceMark,
+  applyPendingMarks,
   attendanceTotalText,
   attentionLabels,
   defaultAttendanceLessonId,
@@ -256,4 +257,13 @@ test("hasActiveLesson and defaultAttendanceLessonId: the running lesson wins, el
   ];
   assert.equal(defaultAttendanceLessonId(live), "l2");
   assert.equal(hasActiveLesson({ lessons: [{ ...attendance.lessons[0]!, status: "ACTIVE" }] }), true);
+});
+
+test("applyPendingMarks: a table read that predates a mark in flight keeps the optimistic mark (#222)", () => {
+  assert.equal(applyPendingMarks(attendance, {}), attendance);
+  const shown = applyPendingMarks(attendance, { p2: "EXCUSED" });
+  assert.equal(shown.lessons[1]?.participants[0]?.attendance, "EXCUSED");
+  // Already shown, or an unknown participant: the read is kept as it is.
+  assert.equal(applyPendingMarks(attendance, { p2: "ABSENT" }), attendance);
+  assert.equal(applyPendingMarks(attendance, { nobody: "LATE" }), attendance);
 });

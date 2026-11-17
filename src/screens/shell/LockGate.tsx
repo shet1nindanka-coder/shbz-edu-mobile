@@ -44,6 +44,7 @@ export function LockGate({ children }: { children: ReactNode }) {
   const { status, user, restored, signOut } = useSession();
   const enabled = preferences.biometricLock && Platform.OS !== 'web';
   const signedIn = status === 'signedIn';
+  // Re-authenticating is not a choice to lose unsent drafts: the plain sign-out keeps them for this user.
   const usePassword = useCallback(() => void signOut(), [signOut]);
   // The published cover (lock or privacy view): the navigator under it leaves the accessibility tree.
   const covered = useOverlayCovered();
@@ -94,13 +95,17 @@ function LockController({
   // again (a quick switch) must not take the privacy cover down.
   const appStateSeq = useRef(0);
   const available = useRef(false);
+  // The first availability check (two native round trips). The prompt waits for it: with nothing enrolled
+  // the system would otherwise show the device passcode / PIN prompt over an app that the answer is about
+  // to unlock, and that prompt cannot be taken back (iOS has no cancel).
+  const firstCheck = useRef<Promise<void> | null>(null);
   const prompting = useRef(false);
   const active = locked && enabled;
 
   useEffect(() => {
     if (!enabled) return;
     let mounted = true;
-    void getBiometricAvailability().then((availability) => {
+    firstCheck.current = getBiometricAvailability().then((availability) => {
       if (!mounted) return;
       available.current = availability.status === 'available';
       // Nothing enrolled any more: the switch is ignored rather than locking the user out.
@@ -150,6 +155,14 @@ function LockController({
     prompting.current = true;
     setPending(true);
     setFailure(null);
+    // Availability is known before the first prompt (a cold start fires this one tick after mount).
+    if (firstCheck.current) await firstCheck.current;
+    if (!available.current) {
+      prompting.current = false;
+      setPending(false);
+      setLocked(false);
+      return;
+    }
     const result = await authenticateWithBiometrics({ promptMessage, cancelLabel });
     if (!result.ok && result.reason === 'unavailable') {
       // The device can no longer authenticate (passcode or enrolment removed). Re-checked rather than

@@ -12,6 +12,7 @@ import {
 
 import { makeStyles, useTheme } from '@/theme';
 
+import { withErrorHint } from './a11y';
 import { FieldShell } from './internal/field-shell';
 import { InputFrame } from './internal/input-frame';
 import { MAX_FONT_SCALE } from './text';
@@ -48,6 +49,7 @@ export function TextArea({
   onFocus,
   onBlur,
   accessibilityLabel,
+  accessibilityHint,
   value,
   onContentSizeChange,
   ...inputProps
@@ -65,6 +67,8 @@ export function TextArea({
     <TextInput
       ref={ref}
       accessibilityLabel={accessibilityLabel ?? label}
+      // The inline error belongs to the field: focusing it after a refused save reads it.
+      accessibilityHint={withErrorHint(error, accessibilityHint)}
       accessibilityState={{ disabled }}
       placeholderTextColor={theme.colors.placeholder}
       selectionColor={theme.colors.accentSolid}

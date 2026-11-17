@@ -2,7 +2,7 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { makeStyles, useTheme } from '@/theme';
-import { Enter, Text, TextButton } from '@/ui';
+import { Enter, Text, TextButton, accessibilityLabelOf, useAnnounce } from '@/ui';
 
 export type UndoToastProps = {
   /** What happened: «№ 12 убран из набора», «Вердикты ИИ приняты: 3». */
@@ -22,6 +22,9 @@ export function UndoToast({ text, undoLabel, onUndo, testID }: UndoToastProps) {
   const styles = useStyles();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  // iOS has no live regions. The undo action is part of the announcement: the toast leaves on its own
+  // after a few seconds, and a VoiceOver user must learn that there is something to undo.
+  useAnnounce(accessibilityLabelOf([text, undoLabel], '. '));
   return (
     <View style={[styles.layer, { bottom: theme.space.lg + insets.bottom }]}>
       <Enter>

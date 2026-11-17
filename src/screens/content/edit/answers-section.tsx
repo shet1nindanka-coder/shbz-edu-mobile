@@ -122,6 +122,8 @@ export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout
                 selected={entry.id === highlightedId}
                 onPress={() => onOpenNumber(entry)}
                 accessibilityLabel={`${a.cardKicker}: ${format(m.content.edit.openNumber, { number: entry.number })}. ${a.status[fill]}`}
+                // The two badges under the head are part of what the row shows.
+                accessibilityParts={[hasCondition ? a.hasCondition : a.noCondition, hasAnswer ? a.hasAnswer : a.noAnswer]}
                 style={styles.row}
                 testID={`answers-number-${entry.number}`}
               >

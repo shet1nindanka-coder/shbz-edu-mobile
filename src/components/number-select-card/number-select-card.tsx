@@ -30,6 +30,10 @@ export function NumberSelectCard({ number, status, selected, conditionLatex, foo
   const styles = useStyles();
   const { dict } = useI18n();
   const name = format(dict.topics.widgets.numberSelectAria, { number });
+  // The card is one element for a screen reader (iOS reads none of its children): the student's status
+  // — what the card exists to show — and the footnote are in the name, the statement in the hint.
+  const statusText = status ? dict.status[status].label : dict.student.statusBadge.unmarked;
+  const statement = conditionLatex?.trim() ?? '';
   return (
     <Card
       variant="outline"
@@ -37,8 +41,11 @@ export function NumberSelectCard({ number, status, selected, conditionLatex, foo
       selected={selected}
       disabled={disabled}
       onPress={onToggle}
-      // The footnote changes what a tap means («already assigned»): it is part of the spoken name.
-      accessibilityLabel={footnote ? `${name} — ${footnote}` : name}
+      accessibilityLabel={name}
+      // The footnote changes what a tap means («already assigned»): it is part of the spoken name too.
+      accessibilityParts={[statusText, footnote]}
+      // The source text, as `MathContent` gives it to screen readers everywhere else.
+      accessibilityHint={statement === '' ? undefined : statement}
       testID={testID}
       style={styles.card}
     >

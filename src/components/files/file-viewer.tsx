@@ -21,7 +21,7 @@ import { format } from '@/lib/i18n/format';
 import { SHARE_IS_DOWNLOAD } from '@/services/files/file-actions';
 import { useFileService } from '@/services/files/file-service-context';
 import { makeStyles } from '@/theme';
-import { Button, IconButton, Notice, ProgressBar, Spinner, Text } from '@/ui';
+import { Button, IconButton, Notice, ProgressBar, Spinner, Text, useAnnounce } from '@/ui';
 
 import { FileHandOff } from './file-hand-off';
 import { PdfView } from './pdf-view';
@@ -53,7 +53,7 @@ function clampIndex(index: number, count: number): number {
 
 export function FileViewer({ files: givenFiles, initialIndex = 0, title, describeIds, onClose, testID }: FileViewerProps) {
   const styles = useStyles();
-  const { files, pendingIds, missingIds } = useDescribedFiles(givenFiles, describeIds);
+  const { files, pendingIds, missingIds, failedIds, retry: retryDescribe } = useDescribedFiles(givenFiles, describeIds);
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const { dict, m } = useI18n();
@@ -107,7 +107,7 @@ export function FileViewer({ files: givenFiles, initialIndex = 0, title, describ
 
   const sharing = actions.pending?.action === 'share';
   // Nothing to share before the stored file's own type and name are known.
-  const describing = pendingIds.has(current.id) || missingIds.has(current.id);
+  const describing = pendingIds.has(current.id) || missingIds.has(current.id) || failedIds.has(current.id);
   // A deep link names files by id only: their name is not shown (viewer-handoff.ts), a neutral word is.
   const heading = title ?? viewerFileName(current, m.common.files.untitled);
 
@@ -176,6 +176,8 @@ export function FileViewer({ files: givenFiles, initialIndex = 0, title, describ
                     file={file}
                     describing={pendingIds.has(file.id)}
                     missing={missingIds.has(file.id)}
+                    describeFailed={failedIds.has(file.id) ? (failedIds.get(file.id) ?? m.common.errors.network) : null}
+                    onRetryDescribe={retryDescribe}
                     active={fileIndex === safeIndex}
                     actions={actions}
                     onZoomChange={fileIndex === safeIndex ? setZoomed : undefined}
@@ -190,6 +192,8 @@ export function FileViewer({ files: givenFiles, initialIndex = 0, title, describ
             file={current}
             describing={pendingIds.has(current.id)}
             missing={missingIds.has(current.id)}
+            describeFailed={failedIds.has(current.id) ? (failedIds.get(current.id) ?? m.common.errors.network) : null}
+            onRetryDescribe={retryDescribe}
             active
             actions={actions}
             onZoomChange={setZoomed}
@@ -241,6 +245,12 @@ type FileViewerPageProps = {
   describing?: boolean;
   /** The file does not exist or may not be read (its description was `404 fileNotFound`). */
   missing?: boolean;
+  /**
+   * Its description failed without an answer (no connection, 429): the error text. The page cannot know
+   * what to show (a PDF, a picture) before the stored type arrives, so it shows the error and a retry.
+   */
+  describeFailed?: string | null;
+  onRetryDescribe?: () => void;
   active: boolean;
   actions: FileActions;
   onZoomChange?: (zoomed: boolean) => void;
@@ -248,11 +258,24 @@ type FileViewerPageProps = {
   onClose: () => void;
 };
 
-function FileViewerPage({ file, describing, missing, active, actions, onZoomChange, onClose }: FileViewerPageProps) {
+function FileViewerPage({
+  file,
+  describing,
+  missing,
+  describeFailed,
+  onRetryDescribe,
+  active,
+  actions,
+  onZoomChange,
+  onClose,
+}: FileViewerPageProps) {
   const styles = useStyles();
   const { m } = useI18n();
   // Retrying cannot help a 404: the way out is closing (the same page as an unreadable picture).
   if (missing) return <PageMessage text={m.common.errors.fileNotFound} actionLabel={m.common.actions.close} onAction={onClose} />;
+  if (describeFailed && onRetryDescribe) {
+    return <PageMessage text={describeFailed} actionLabel={m.common.actions.retry} onAction={onRetryDescribe} />;
+  }
   if (describing) {
     return (
       <View style={[styles.page, styles.centered]}>
@@ -268,7 +291,12 @@ function FileViewerPage({ file, describing, missing, active, actions, onZoomChan
   );
 }
 
-function ImagePage({ file, active, onZoomChange, onClose }: Omit<FileViewerPageProps, 'actions' | 'describing' | 'missing'>) {
+function ImagePage({
+  file,
+  active,
+  onZoomChange,
+  onClose,
+}: Omit<FileViewerPageProps, 'actions' | 'describing' | 'missing' | 'describeFailed' | 'onRetryDescribe'>) {
   const styles = useStyles();
   const files = useFileService();
   const { m } = useI18n();
@@ -375,6 +403,8 @@ function DocumentPage({ file, kind, actions }: { file: ViewerFile; kind: 'pdf' |
 
 function PageMessage({ text, actionLabel, onAction }: { text: string; actionLabel: string; onAction: () => void }) {
   const styles = useStyles();
+  // `role="alert"` speaks it on web; VoiceOver needs it said (iOS has no live regions).
+  useAnnounce(text);
   return (
     <View style={[styles.page, styles.centered]}>
       <Text variant="small" color="textMuted" align="center" accessibilityRole="alert">

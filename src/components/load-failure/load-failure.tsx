@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { errorText, retryAfterOf } from '@/api/errors';
@@ -5,7 +6,7 @@ import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { ErrorState } from '@/ui';
 
-import { useCountdown, useWaitText } from '../retry-wait';
+import { useWaitClock, useWaitText } from '../retry-wait';
 
 import type { LoadQueryState } from './load-state';
 
@@ -54,7 +55,9 @@ export function LoadFailure(props: LoadFailureProps) {
   const retry = fromQuery ? () => void props.query.refetch() : props.onRetry;
 
   const wait = failedAt > 0 ? retryAfterOf(failure) : 0;
-  const seconds = useCountdown(wait > 0 ? failedAt + wait * 1000 : null);
+  // A duration from the failure, not a deadline on the device clock (a clock set back must not lengthen it).
+  const waitStart = useMemo(() => (wait > 0 ? { seconds: wait, at: failedAt } : null), [wait, failedAt]);
+  const seconds = useWaitClock(waitStart);
   // A parked read has no error of its own: say what is wrong (no connection).
   const parked = fromQuery && !props.query.isError;
   const message = errorText(failure, parked ? m.common.errors.network : dict.shells.errorDescription);
@@ -63,6 +66,8 @@ export function LoadFailure(props: LoadFailureProps) {
     <ErrorState
       title={dict.shells.errorTitle}
       description={seconds > 0 ? `${message} ${waitText.retryIn(seconds)}` : message}
+      // Spoken once (iOS), not again at every tick of the countdown.
+      announcement={`${dict.shells.errorTitle}. ${message}`}
       retryLabel={dict.common.retry}
       onRetry={seconds > 0 ? undefined : retry}
       retrying={retrying}

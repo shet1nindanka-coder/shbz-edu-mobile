@@ -54,6 +54,8 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
         <Notice
           tone="error"
           text={errorMessage}
+          // The countdown in the text changes every second: VoiceOver speaks only the message, once.
+          announcement={note.error?.message ?? null}
           action={
             // Never sent again by itself: the student decides, and only once a rate-limit wait is over.
             wait > 0 ? undefined : (

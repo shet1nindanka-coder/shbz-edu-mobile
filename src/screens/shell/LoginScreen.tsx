@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
 import { isApiError, isRateLimited, qk, useApi } from '@/api';
-import { useCountdown, useWaitText } from '@/components/retry-wait';
+import { useDurationLock, useWaitText } from '@/components/retry-wait';
 import { MAX_PASSWORD_LENGTH } from '@/domain/password-policy';
 import { MAX_LOGIN_LENGTH } from '@/domain/text';
 import { validateLoginInput } from '@/domain/account-validation';
@@ -63,11 +63,13 @@ export function LoginScreen() {
   const [pending, setPending] = useState(false);
   // `pending` is the last render's value: a second submit in the same frame (return key + button) passes it.
   const inFlight = useRef(false);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  // A duration, not a deadline on the device clock: setting the clock back must not lengthen the lock.
+  const lock = useDurationLock();
+  const { start: startLock, clear: clearLock } = lock;
   const [demoOpen, setDemoOpen] = useState(false);
   const passwordRef = useRef<TextInputInstance>(null);
-  const waitSeconds = useCountdown(lockedUntil);
-  const locked = waitSeconds > 0;
+  const waitSeconds = lock.seconds;
+  const locked = lock.locked;
 
   const meta = useQuery({ queryKey: qk('shell', 'getMeta'), queryFn: () => api.shell.getMeta(), staleTime: 5 * 60 * 1000 });
   const helpContact = meta.data?.loginHelpContact.trim() ?? '';
@@ -80,16 +82,16 @@ export function LoginScreen() {
       setLogin(prefill.login);
       setPassword(prefill.password);
       setFailure(null);
-      setLockedUntil(null);
+      clearLock();
     };
     apply();
     return subscribeLoginPrefill(apply);
-  }, []);
+  }, [clearLock]);
 
   const changeLogin = (value: string) => {
     setLogin(value);
     // Another login may not be limited: let the user try it right away.
-    if (lockedUntil !== null) setLockedUntil(null);
+    if (locked) clearLock();
   };
 
   const submit = async () => {
@@ -111,7 +113,7 @@ export function LoginScreen() {
       setPassword('');
       if (isApiError(failure)) {
         setFailure(loginFailureOf(failure));
-        if (isRateLimited(failure) && failure.retryAfterSeconds) setLockedUntil(Date.now() + failure.retryAfterSeconds * 1000);
+        if (isRateLimited(failure) && failure.retryAfterSeconds) startLock(failure.retryAfterSeconds);
       } else {
         setFailure({ code: 'unknown' });
       }
@@ -200,7 +202,9 @@ export function LoginScreen() {
               testID="password-input"
             />
             {error ? (
-              <View accessibilityLiveRegion="polite">
+              // The notice announces itself (live region on Android, `useAnnounce` on iOS); the countdown
+              // under it must not be spoken at every tick.
+              <View>
                 <Notice tone="error" text={error} testID="login-error" />
                 {locked ? (
                   <Text variant="caption" color="textMuted" style={styles.wait} testID="login-wait">

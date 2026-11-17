@@ -230,3 +230,25 @@ export function diffReminders(
     schedule: [...wanted.entries()].filter(([identifier]) => !present.has(identifier)).map(([, reminder]) => reminder),
   };
 }
+
+/**
+ * Android: the wanted reminders that are scheduled but whose alarm was not set by this process in the
+ * current exact-timing mode (`armed`), so they have to be set again. An alarm keeps the mode (exact or
+ * inexact) it was set with, and the OS cancels the exact ones when the "alarms & reminders" access is
+ * revoked (killing the app) while the notifications module's own store still lists them — so an alarm
+ * from an earlier run, or from before the access changed, is of unknown state.
+ */
+export function remindersToRearm(
+  scheduledIdentifiers: readonly string[],
+  desired: readonly LocalReminder[],
+  armed: ReadonlySet<string>,
+): LocalReminder[] {
+  const present = new Set(scheduledIdentifiers);
+  const seen = new Set<string>();
+  return desired.filter((reminder) => {
+    const identifier = reminderIdentifier(reminder);
+    if (!present.has(identifier) || armed.has(identifier) || seen.has(identifier)) return false;
+    seen.add(identifier);
+    return true;
+  });
+}

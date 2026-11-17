@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { POLLING, errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus, useScreenLive, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, useScreenFocused, useScreenLive, useStillHere, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
@@ -51,6 +51,20 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   // The group has just been deleted here: nothing may refetch (and answer 404) while the screen leaves.
   const [leaving, setLeaving] = useState(false);
+  // The group is gone but the teacher had moved on when the answer came: the screen leaves when it is back.
+  const leaveOnReturn = useRef(false);
+  const stillHere = useStillHere();
+  const focused = useScreenFocused();
+  useEffect(() => {
+    if (!leaveOnReturn.current || !focused) return;
+    leaveOnReturn.current = false;
+    navigation.back();
+  }, [focused, navigation]);
+  // `back` from a screen that is not on top would close whatever the teacher went to.
+  const leave = () => {
+    if (stillHere()) navigation.back();
+    else leaveOnReturn.current = true;
+  };
   // The attendance poll runs only while this screen is on top and the app is in the foreground.
   const screenLive = useScreenLive();
 
@@ -207,14 +221,14 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
               dismissCreated();
               // The site redirects to the list with «Группа удалена. Ученики остались на платформе.»
               postGroupNotice(GROUPS_LIST_NOTICE, 'deleted');
-              navigation.back();
+              leave();
             }}
             onDeleteFailed={(text) => setBanner({ tone: 'error', text })}
             onMissing={() => {
               setLeaving(true);
               dismissCreated();
               postGroupNotice(GROUPS_LIST_NOTICE, 'missing');
-              navigation.back();
+              leave();
             }}
           />
         </View>

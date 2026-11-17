@@ -71,6 +71,11 @@ export type MockDatasetInfo = {
   generation: number;
   /** Whether the dataset is re-seeded automatically at start once it is older than 24 hours. */
   autoReseed: boolean;
+  /**
+   * The stored dataset could not be read at start (the storage rejected the reads): this run works on fresh
+   * fixtures in memory and saves nothing, so the stored data is not overwritten. A demo reset ends it.
+   */
+  storageReadFailed: boolean;
 };
 
 /** Actions of the demo screen (methods of `MockApiClient.controls`). */

@@ -34,17 +34,37 @@
  *
  *   (none) ──submit──▶ SENDING ──answer──────────────────────────────▶ (none)          delivered
  *                         │ ──no answer (isRetryable)──▶ WAITING                       kept, attempts + 1
- *                         │ ──session gone (isHeld)────▶ WAITING                       kept, flush stops
+ *                         │ ──session gone (isHeld)────▶ WAITING                       kept, flush stops (unless
+ *                         │                                                            a sign-in since asked for one)
  *                         └ ──refusal──▶ REFUSED  if `keepRefused(error)` returns the refusal to remember,
  *                                        (none)   otherwise (and `onRejected` when nobody awaited it)
  *   WAITING ──flush──▶ SENDING      flush: on reconnect, in the foreground, after sign-in, and — when
  *                                   `retryDelaysMs` is set — by itself with backoff while the device is
  *                                   online (a timeout while "online" brings no reconnect event).
+ *                                   A flush asked for while another one runs is not lost: the running one
+ *                                   makes one more pass over the entries as they are THEN (a write that
+ *                                   became sendable meanwhile is in it). So, while signed in and online, a
+ *                                   WAITING write always has a request in flight, a pass coming, or a
+ *                                   backoff timer armed — it is never left waiting for an outside event.
  *   REFUSED ──flush──▶ REFUSED      never re-sent by itself (a refused write cannot succeed unchanged); the
  *                                   UI shows `refusal`, the user re-submits or `discard`s it.
  *   any ──submit (newer payload)──▶ SENDING   last write wins; a refusal is forgotten with the old payload.
  *   any ──discard / clear──▶ (none)           `clear` = explicit sign-out (the user confirmed losing them).
- *   other users' entries ──dropOtherUsers(id)──▶ (none)   a different account signed in on this device.
+ *   other users' entries ──dropOtherUsers(id)──▶ (none)   a different account signed in on this device — also
+ *                                                        the ones a stored copy not read yet still holds.
+ *
+ * THE STORED COPY (`storage`)
+ *
+ *   NOT READ ──hydrate ok──▶ READ           stored entries merged in (memory wins for keys touched already)
+ *   NOT READ ──hydrate fails──▶ NOT READ    the queue works in memory; the read is tried again by the next
+ *                                           `hydrate` and before every write of the stored copy
+ *   NOT READ ──change──▶ read, merge, write — or NO write when the read fails again: a store that could not
+ *                                           be read is never overwritten as if it were empty
+ *   entries merged by such a late read are flushed at once while signed in and online (the sign-in flush
+ *   may be over by then)
+ *   any ──clear──▶ READ, stored copy removed (explicit sign-out)
+ *   A stored entry whose payload fails its kind's guard (`register(kind, handler, isPayload)`) is dropped
+ *   when read: one corrupted row must not break the screens that show it, nor be "sent" forever.
  *
  * WHO MAY SEND: only the signed-in user (`getUserId`) sends, and only their own entries. While nobody is
  * signed in because the session EXPIRED (not a sign-out), `getOwnerId` names the user whose drafts are
@@ -54,7 +74,10 @@
  *
  * RULES
  * - One entry per `kind + id`: a newer payload replaces the older one (last write wins) — a queue of drafts
- *   for the same field would only replay stale text.
+ *   for the same field would only replay stale text. "Newer" is the order of `submit` calls, so a caller
+ *   must submit a draft when it is made, never hold it back privately and submit it later (two editors of
+ *   one entry would otherwise let the held, older draft land last). The entry is the single source of
+ *   truth of "what waits to be saved" for every editor of it.
  * - One request per `kind + id` at a time, `submit` and `flush` alike: a write waits until the previous
  *   request for the same entry has settled and then sends the NEWEST payload. Two overlapping requests could
  *   reach the server in the wrong order and the older text would win. A submit whose payload was superseded
@@ -152,11 +175,14 @@ export type PendingWritesOptions<C> = {
 export interface PendingWritesQueue<C> {
   /** Loads the stored queue. Idempotent; every other method waits for it. */
   hydrate(): Promise<void>;
-  /** Registers the sender of a kind; returns the unregister function. */
-  register<P, R = unknown>(kind: string, handler: PendingWriteHandler<P, C, R>): () => void;
+  /**
+   * Registers the sender of a kind; returns the unregister function. `isPayload` guards the payloads read
+   * back from storage: a stored entry of this kind that fails it is dropped.
+   */
+  register<P, R = unknown>(kind: string, handler: PendingWriteHandler<P, C, R>, isPayload?: (payload: unknown) => payload is P): () => void;
   /** Tries to send now; on a network failure the write is kept for later. */
   submit<P, R = unknown>(kind: string, id: string, payload: P): Promise<SubmitOutcome<R>>;
-  /** Sends everything that can be sent. Concurrent calls share one run. */
+  /** Sends everything that can be sent. A call during a run joins it and makes it do one more pass. */
   flush(): Promise<FlushResult>;
   get<P = unknown>(kind: string, id: string): PendingWrite<P> | null;
   list(kind?: string): PendingWrite[];
@@ -170,6 +196,11 @@ export interface PendingWritesQueue<C> {
   subscribe(listener: () => void): () => void;
   /** Monotonic counter of changes — a cheap snapshot for `useSyncExternalStore`. */
   version(): number;
+  /**
+   * True while a request for `kind + id` is in flight (submit or flush alike). A waiting entry that is not
+   * being sent is waiting for its next try. Starting and settling a request count as changes.
+   */
+  isSending(kind: string, id: string): boolean;
 }
 
 export const PENDING_WRITES_STORAGE_KEY = "shbz-pending-writes";
@@ -228,47 +259,113 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
 
   const entries = new Map<string, PendingWrite>();
   const handlers = new Map<string, PendingWriteHandler<unknown, C>>();
+  const payloadGuards = new Map<string, (payload: unknown) => boolean>();
   const listeners = new Set<() => void>();
   let changes = 0;
   let hydration: Promise<void> | null = null;
   let flushing: Promise<FlushResult> | null = null;
+  /** A flush was asked for while one was running: the running one makes one more pass. */
+  let flushAgain = false;
   let saveChain: Promise<void> = Promise.resolve();
+  /** The stored copy has been read (successfully) and merged in; until then it is never overwritten. */
+  let storedRead = false;
+  /** Keys changed in memory (submit / discard) — newer than whatever a late read of storage still holds. */
+  const touched = new Set<string>();
+  /**
+   * The only owner whose stored entries may still be merged by a late read, or `null` when none may (two
+   * different accounts signed in before the read succeeded); unset until `dropOtherUsers` runs. The rule
+   * "signing in as someone else drops them" applies to drafts still sitting in an unread store too.
+   */
+  let storedKeep: { user: string | null } | undefined;
+  /** Keys with a request in flight. */
+  const inFlight = new Set<string>();
 
-  const changed = () => {
+  const notify = () => {
     changes += 1;
     listeners.forEach((listener) => listener());
-    // Saves are serialized so an older snapshot can never overwrite a newer one.
-    const snapshot = JSON.stringify([...entries.values()]);
-    saveChain = saveChain.then(async () => {
-      try {
-        if (snapshot === "[]") await storage.removeItem(storageKey);
-        else await storage.setItem(storageKey, snapshot);
-      } catch {
-        // The queue keeps working in memory for this run of the app.
-      }
-    });
   };
 
-  const hydrate = (): Promise<void> => {
-    hydration ??= (async () => {
-      let stored: PendingWrite[] = [];
-      try {
-        stored = parsePendingWrites(await storage.getItem(storageKey));
-      } catch {
-        stored = [];
-      }
-      let added = false;
+  const payloadOk = (write: PendingWrite): boolean => {
+    const guard = payloadGuards.get(write.kind);
+    return !guard || guard(write.payload);
+  };
+
+  /** The stored entries, or null when the store could not be read (which is not the same as "empty"). */
+  const readStored = async (): Promise<PendingWrite[] | null> => {
+    try {
+      return parsePendingWrites(await storage.getItem(storageKey));
+    } catch {
+      return null;
+    }
+  };
+
+  /** Merges a successful read into memory: what was added, and whether a stored entry was dropped. */
+  const mergeStored = (stored: PendingWrite[]): { added: boolean; dropped: boolean } => {
+    let added = false;
+    let dropped = false;
+    if (!storedRead) {
       for (const write of stored) {
         const key = entryKey(write.kind, write.id);
-        // A write made before hydration finished is newer than the stored one.
-        if (entries.has(key)) continue;
+        // A write made (or discarded) in memory meanwhile is newer than the stored one.
+        if (entries.has(key) || touched.has(key)) continue;
+        if (!payloadOk(write) || (storedKeep !== undefined && write.userId !== storedKeep.user)) {
+          dropped = true;
+          continue;
+        }
         entries.set(key, write);
         added = true;
       }
-      if (added) {
-        changes += 1;
-        listeners.forEach((listener) => listener());
+    }
+    storedRead = true;
+    return { added, dropped };
+  };
+
+  const persist = async (): Promise<void> => {
+    if (!storedRead) {
+      const stored = await readStored();
+      // Never overwrite a store that could not be read: it may hold drafts of an earlier run.
+      if (stored === null) return;
+      if (mergeStored(stored).added) lateMerge();
+    }
+    // The snapshot is taken when this save runs: saves are serialized, so it is always the newest state.
+    const snapshot = JSON.stringify([...entries.values()]);
+    try {
+      if (snapshot === "[]") await storage.removeItem(storageKey);
+      else await storage.setItem(storageKey, snapshot);
+    } catch {
+      // The queue keeps working in memory for this run of the app.
+    }
+  };
+
+  const changed = () => {
+    notify();
+    saveChain = saveChain.then(persist);
+  };
+
+  /**
+   * Entries of an earlier run were merged by a read that succeeded only now (the first ones failed). Sign-in,
+   * reconnect and foreground flushes may all be over by then, so the queue sends them itself — a submit of
+   * another key sends only that key. Offline the reconnect flushes; signed out the next sign-in does.
+   */
+  const lateMerge = () => {
+    notify();
+    if (getUserId() !== null && isOnline() && hasWaiting()) void flush();
+  };
+
+  const hydrate = (): Promise<void> => {
+    if (storedRead) return hydration ?? Promise.resolve();
+    hydration ??= (async () => {
+      const stored = await readStored();
+      if (stored === null) {
+        // A failed read is not an empty queue: the next `hydrate` (and the next write) reads again.
+        hydration = null;
+        return;
       }
+      const { added, dropped } = mergeStored(stored);
+      if (added) lateMerge();
+      // An entry dropped by its payload guard leaves the stored copy too, and writes made in memory while
+      // the store could not be read reach it now.
+      if (dropped || touched.size > 0) saveChain = saveChain.then(persist);
     })();
     return hydration;
   };
@@ -314,9 +411,17 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     const handler = handlers.get(write.kind);
     // No sender yet (its module is not loaded), another user's draft, or a refusal waiting for the user.
     if (!handler || write.userId !== getUserId() || write.refusal) return { result: "skipped" };
+    if (!payloadOk(write)) {
+      // Unreadable (a guard registered after it was loaded): it can never be sent.
+      entries.delete(key);
+      changed();
+      return { result: "skipped" };
+    }
 
     const sentAt = write.updatedAt;
     const isStillSame = () => entries.get(key)?.updatedAt === sentAt;
+    inFlight.add(key);
+    notify();
     try {
       const value = await handler(write, getContext());
       if (isStillSame()) {
@@ -345,6 +450,9 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         changed();
       }
       return { result: "rejected", error, sentAt };
+    } finally {
+      inFlight.delete(key);
+      notify();
     }
   };
 
@@ -375,21 +483,48 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
   };
 
   const flush = (): Promise<FlushResult> => {
-    flushing ??= (async () => {
+    if (flushing) {
+      // The running flush took its list of keys when it started: a write that became sendable since then
+      // (e.g. its backoff timer fired just now) is not in it. One more pass picks it up.
+      flushAgain = true;
+      return flushing;
+    }
+    flushing = (async () => {
       await hydrate();
       let sent = 0;
       let rejected = 0;
-      // Oldest first, so writes reach the server in the order they were made.
-      const keys = [...entries.entries()].sort((a, b) => a[1].updatedAt - b[1].updatedAt).map(([key]) => key);
-      for (const key of keys) {
-        const write = entries.get(key);
-        const outcome = await attempt(key);
-        if (outcome.result === "sent") sent += 1;
-        else if (outcome.result === "rejected") {
-          rejected += 1;
-          if (write) onRejected?.(write, outcome.error);
-        } else if (outcome.result === "retry" || outcome.result === "hold") break;
+      for (;;) {
+        flushAgain = false;
+        let stopped: Attempt | null = null;
+        // Oldest first, so writes reach the server in the order they were made.
+        const keys = [...entries.entries()].sort((a, b) => a[1].updatedAt - b[1].updatedAt).map(([key]) => key);
+        for (const key of keys) {
+          const write = entries.get(key);
+          const outcome = await attempt(key);
+          if (outcome.result === "sent") sent += 1;
+          else if (outcome.result === "rejected") {
+            rejected += 1;
+            if (write) onRejected?.(write, outcome.error);
+          } else if (outcome.result === "retry" || outcome.result === "hold") {
+            stopped = outcome.result;
+            break;
+          }
+        }
+        if (!flushAgain) break;
+        if (stopped === "hold") {
+          // The session that sent it expired. A sign-in since then asked for a flush (it joined this run):
+          // that one belongs to the new session, which may send — one more pass. Otherwise wait for a sign-in.
+          if (getUserId() === null) break;
+          continue;
+        }
+        if (stopped === "retry") {
+          // No answer: the next try belongs to the backoff (re-armed if the timer that asked has fired),
+          // never to an immediate loop.
+          scheduleRetry();
+          break;
+        }
       }
+      flushAgain = false;
       return { sent, rejected, remaining: entries.size };
     })().finally(() => {
       flushing = null;
@@ -399,8 +534,19 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
 
   return {
     hydrate,
-    register<P, R = unknown>(kind: string, handler: PendingWriteHandler<P, C, R>) {
+    register<P, R = unknown>(kind: string, handler: PendingWriteHandler<P, C, R>, isPayload?: (payload: unknown) => payload is P) {
       handlers.set(kind, handler as PendingWriteHandler<unknown, C>);
+      if (isPayload) {
+        payloadGuards.set(kind, isPayload);
+        // Entries loaded before the guard existed are checked now.
+        let dropped = false;
+        for (const [key, write] of entries) {
+          if (write.kind !== kind || isPayload(write.payload)) continue;
+          entries.delete(key);
+          dropped = true;
+        }
+        if (dropped) changed();
+      }
       return () => {
         if (handlers.get(kind) === (handler as PendingWriteHandler<unknown, C>)) handlers.delete(kind);
       };
@@ -413,6 +559,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
       if (!handlers.has(kind)) return { status: "rejected", error: new Error(`pending-writes: kind "${kind}" is not registered`) };
 
       const key = entryKey(kind, id);
+      touched.add(key);
       const previous = entries.get(key);
       const stamp = now();
       entries.set(key, {
@@ -448,19 +595,26 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     },
     async discard(kind, id) {
       await hydrate();
-      if (entries.delete(entryKey(kind, id))) changed();
+      const key = entryKey(kind, id);
+      touched.add(key);
+      if (entries.delete(key)) changed();
     },
     async clear() {
       await hydrate();
       cancelRetry();
       retryStep = 0;
-      if (entries.size === 0) return;
+      // The user chose to delete everything unsent — also a stored copy that could not be read.
+      const unread = !storedRead;
+      storedRead = true;
+      if (entries.size === 0 && !unread) return;
       entries.clear();
       changed();
       await saveChain;
     },
     async dropOtherUsers(userId) {
       await hydrate();
+      // A store that is still unread may hold other users' drafts: they are dropped when it is read.
+      if (!storedRead) storedKeep = storedKeep === undefined || storedKeep.user === userId ? { user: userId } : { user: null };
       let dropped = false;
       for (const [key, write] of entries) {
         if (write.userId === userId) continue;
@@ -477,5 +631,6 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
       };
     },
     version: () => changes,
+    isSending: (kind, id) => inFlight.has(entryKey(kind, id)),
   };
 }

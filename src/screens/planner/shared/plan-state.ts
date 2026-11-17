@@ -73,6 +73,15 @@ export function planSignature(
     .join('|');
 }
 
+/**
+ * Whether the plan progress of a board has moved since the signature seen before: the moment the screens
+ * that show it without polling (lessons and drafts lists, student card, group pages) must be refreshed.
+ * The first signature (`previous === null`, the board just loaded) only initialises the comparison.
+ */
+export function planProgressMoved(previous: string | null, next: string | null): boolean {
+  return previous !== null && next !== null && previous !== next;
+}
+
 /** Rows of a status payload (`participantId`) as signature rows. */
 export function statusSignatureRows<T extends { participantId: string; planGeneratedAt: string | null; planError: string | null }>(
   rows: readonly T[],

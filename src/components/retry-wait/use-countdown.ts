@@ -27,7 +27,9 @@ function subscribeToNothing(): () => void {
 
 /**
  * Seconds left until `until` (epoch ms), re-rendering once a second; 0 when the moment has passed or
- * `until` is null. Used to keep a control disabled for `retryAfterSeconds` (90-addendum-1 A.3 rule 3).
+ * `until` is null. For a real moment on the clock (a lesson start, a scheduled end). A cool-down of
+ * `retryAfterSeconds` is a duration: use `useWaitClock` / `useDurationLock`, which a backward change of the
+ * device clock cannot lengthen.
  */
 export function useCountdown(until: number | null): number {
   // The clock is an external store: no ticking at all while nothing counts down. The snapshot is the

@@ -4,7 +4,7 @@ import type { StudentStreak } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Card, Text } from '@/ui';
+import { Card, Text, widthForText } from '@/ui';
 
 import { StreakHero } from './streak-hero';
 import { streakTexts, weekCells } from './streak-model';
@@ -30,7 +30,8 @@ export function StreakWidget({ streak, testID }: StreakWidgetProps) {
   const weekly = dict.student.weekly;
   const texts = streakTexts(streak, weekly, locale);
   const cells = weekCells(streak, dict.student.weekdaysShort, weekly);
-  const stacked = window.width < STACK_BELOW_WIDTH;
+  // The panels hold text: at a larger OS font size they need the room of a wider phone.
+  const stacked = window.width < widthForText(STACK_BELOW_WIDTH, window.fontScale);
 
   return (
     <View style={styles.root} testID={testID}>

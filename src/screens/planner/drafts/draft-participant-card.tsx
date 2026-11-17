@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import type { HomeworkPlanItem, HomeworkPlanParticipant } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Card, Chip, Icon, PressableScale, Spinner, Text } from '@/ui';
+import { Button, Card, CardPressArea, Chip, Icon, Spinner, Text } from '@/ui';
 
 import type { PlanState } from '../shared/plan-state';
 import { PlanStatusBlock } from '../shared/plan-status-block';
@@ -67,14 +67,17 @@ export function DraftParticipantCard({
   // An issued participant is frozen: its old plan error is not shown any more.
   const failed = !issued && (planState.failed || planState.stale);
   const empty = participant.items.length === 0;
+  // What the header shows, also spoken with its name: the header is one element for a screen reader.
+  const showMeta = !planState.pending || !expanded;
+  const tasksLabel = showMeta && !planState.pending ? format(t.tasksCount, { n: participant.items.length }) : null;
+  const selectingLabel = showMeta && planState.pending ? t.aiSelecting : null;
 
   return (
     <Card style={styles.card} testID={`draft-participant-${participant.id}`}>
-      <PressableScale
-        accessibilityRole="button"
+      <CardPressArea
         accessibilityLabel={format(expanded ? m.planner.lessonBoard.collapse : m.planner.lessonBoard.expand, { name: participant.studentName })}
-        accessibilityState={{ expanded }}
-        scaleTo={1}
+        accessibilityParts={[tasksLabel, selectingLabel, showMeta && issued && t.issued, showMeta && failed && common.error]}
+        expanded={expanded}
         onPress={onToggle}
         testID={`draft-participant-toggle-${participant.id}`}
         style={styles.header}
@@ -86,10 +89,10 @@ export function DraftParticipantCard({
           <Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={18} color="kicker" />
         </View>
         {/* While the plan is being built the open card says so in its body: no second line here. */}
-        {!planState.pending || !expanded ? (
+        {showMeta ? (
           <View style={styles.headerMeta}>
-            {!planState.pending ? (
-              <Chip tone="muted" label={format(t.tasksCount, { n: participant.items.length })} />
+            {tasksLabel !== null ? (
+              <Chip tone="muted" label={tasksLabel} />
             ) : (
               <View style={styles.selecting}>
                 <Spinner size={14} color="accentSolid" />
@@ -102,7 +105,7 @@ export function DraftParticipantCard({
             {failed ? <Chip tone="red" label={common.error} /> : null}
           </View>
         ) : null}
-      </PressableScale>
+      </CardPressArea>
 
       {expanded ? (
         <View style={styles.body}>

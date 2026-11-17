@@ -5,7 +5,9 @@ import { makeStyles } from '@/theme';
 import { Button } from './button';
 import { Card } from './card';
 import { Enter } from './enter';
+import { accessibilityLabelOf } from './a11y';
 import { Text } from './text';
+import { useAnnounce } from './use-announce';
 
 export type ErrorStateProps = {
   title: string;
@@ -22,6 +24,11 @@ export type ErrorStateProps = {
   numeral?: string;
   /** `card` — the site's centered surface card (default); `plain` — no card, for use inside a card. */
   variant?: 'card' | 'plain';
+  /**
+   * What VoiceOver speaks when the state appears (iOS). Default: title and description. Pass it when the
+   * description changes on its own (a countdown), so the state is spoken once and not every second.
+   */
+  announcement?: string;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -37,12 +44,16 @@ export function ErrorState({
   onSecondary,
   numeral,
   variant = 'card',
+  announcement,
   testID,
   style,
 }: ErrorStateProps) {
   const styles = useStyles();
   const hasRetry = Boolean(retryLabel && onRetry);
   const hasSecondary = Boolean(secondaryLabel && onSecondary);
+  // A screen that turns into its error shell after a failed load or refresh says so (iOS; `role="alert"`
+  // covers the web, and Android reads the new content of the focused screen).
+  useAnnounce(announcement ?? accessibilityLabelOf([title, description], '. '));
   const body = (
     <View style={styles.body} accessibilityRole="alert" testID={testID}>
       {numeral ? (

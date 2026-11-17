@@ -9,6 +9,7 @@ import { hitSlopFor, PressableScale } from './internal/pressable-scale';
 import { usePressGuard, type GuardedPress } from './internal/press-guard';
 import { Spinner } from './spinner';
 import { Text } from './text';
+import { useTextScale } from './use-text-scale';
 
 export type ButtonVariant = 'primary' | 'outline' | 'dark' | 'danger' | 'dangerSolid' | 'tonal';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'field';
@@ -129,6 +130,7 @@ export function Button({
   const theme = useTheme();
   const guardedPress = usePressGuard(onPress);
   const styles = useStyles();
+  const { minimumFontScale } = useTextScale();
   const spec = variantSpec(variant, theme);
   const inactive = disabled || loading;
   const isPrimary = variant === 'primary';
@@ -179,6 +181,10 @@ export function Button({
         <Text
           variant={labelVariant(size, spec.strong)}
           numberOfLines={wrapLabel ? 2 : 1}
+          // One line in a row sized for the default text: at a large OS font size the label shrinks back
+          // towards that size instead of being cut («Назван…») — native only, the web has no font scale.
+          adjustsFontSizeToFit={!wrapLabel}
+          minimumFontScale={minimumFontScale}
           align={wrapLabel ? 'center' : undefined}
           style={{ color: textColor }}
         >

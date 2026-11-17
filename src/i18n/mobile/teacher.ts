@@ -15,7 +15,11 @@ const ru = {
     // (one row, the word «Отчёт» once); a viewer title stands alone, so every period names the report.
     title7d: "Отчёт: 7 дней",
     title30d: "Отчёт: 30 дней",
-    titleYear: "Отчёт: учебный год"
+    titleYear: "Отчёт: учебный год",
+    // A report finished after the teacher left the card: it is not opened over the screen they went to,
+    // it waits on the card until they open it (the same as the group screen's reports).
+    ready: "Отчёт готов: {title}",
+    open: "Открыть отчёт"
   },
   review: {
     // A status group has no visible caption on a phone; this is its accessible name.
@@ -60,7 +64,9 @@ const en: typeof ru = {
     preparing: "Preparing the report…",
     title7d: "Report: 7 days",
     title30d: "Report: 30 days",
-    titleYear: "Report: school year"
+    titleYear: "Report: school year",
+    ready: "The report is ready: {title}",
+    open: "Open the report"
   },
   review: {
     statusAria: "Status of problem {n}",

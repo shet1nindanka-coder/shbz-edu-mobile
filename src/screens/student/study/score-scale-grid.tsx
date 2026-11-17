@@ -2,7 +2,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import type { ScoreRow } from '@/domain/exam-scores';
 import { makeStyles } from '@/theme';
-import { Icon, Text } from '@/ui';
+import { Icon, Text, widthForText } from '@/ui';
 
 export type ScoreScaleGridProps = {
   rows: readonly ScoreRow[];
@@ -25,7 +25,8 @@ function chunk<T>(list: readonly T[], size: number): T[][] {
 export function ScoreScaleGrid({ rows, highlightPrimary }: ScoreScaleGridProps) {
   const styles = useStyles();
   const window = useWindowDimensions();
-  const columns = window.width < NARROW_BELOW_WIDTH ? NARROW_COLUMNS : COLUMNS;
+  // The chips hold numbers drawn with the OS font size: three of them need more room at a larger one.
+  const columns = window.width < widthForText(NARROW_BELOW_WIDTH, window.fontScale) ? NARROW_COLUMNS : COLUMNS;
   return (
     <View style={styles.grid} testID="exam-scale-grid">
       {chunk(rows, columns).map((line) => (

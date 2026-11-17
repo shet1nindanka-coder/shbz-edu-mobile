@@ -3,6 +3,7 @@ import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles } from '@/theme';
 
+import { withErrorHint } from './a11y';
 import { BottomSheet } from './bottom-sheet';
 import { Button } from './button';
 import { Icon } from './icon';
@@ -26,6 +27,9 @@ export type DateTimeFieldLabels = {
   date: string;
   /** `…datetime.time` — «Время». */
   time: string;
+  /** Buttons of the Android system date / time dialogs («ОК» / «Отмена»), in the app's language. */
+  ok?: string;
+  cancel?: string;
 };
 
 export type DateTimeFieldProps = {
@@ -105,6 +109,7 @@ export function DateTimeField({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label ?? placeholder}
       accessibilityValue={{ text: display || placeholder }}
+      accessibilityHint={withErrorHint(error, undefined)}
       accessibilityState={{ disabled, expanded: open }}
       disabled={disabled}
       onPress={() => setOpen(true)}
@@ -162,6 +167,8 @@ export function DateTimeField({
           locale={locale}
           dateLabel={labels.date}
           timeLabel={labels.time}
+          okLabel={labels.ok}
+          cancelLabel={labels.cancel}
         />
       </View>
     </BottomSheet>

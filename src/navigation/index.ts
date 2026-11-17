@@ -6,6 +6,7 @@
 //   navigateTo(link, role)   imperative form (reminder taps)
 //   useScreenFocused()       the screen is the focused one (joins, keep-awake)
 //   useScreenLive()          focused AND the app is in the foreground (interval polling)
+//   useStillHere()           () => still mounted and focused: ask it before navigating when a request ends
 //   useRefetchOnFocus(queries, { always? })   refetch on return to the screen
 export {
   navigateHome,
@@ -39,4 +40,5 @@ export { LAUNCH_ROUTE, normalizeRootStack, sessionBottomRoute } from './root-sta
 export { RoleTabBar, type RoleTabBarProps } from './tab-bar';
 export { useRefetchOnFocus, type FocusQuery, type RefetchOnFocusOptions } from './use-refetch-on-focus';
 export { useScreenLive } from './use-screen-live';
+export { useStillHere } from './use-still-here';
 export { MORE_TAB_NAME, moreSections, navItemOf, navLabel, tabsForRole, type TabDefinition } from './tabs';

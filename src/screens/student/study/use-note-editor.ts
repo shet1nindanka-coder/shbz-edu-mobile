@@ -3,7 +3,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isApiError, isRateLimited, qk } from '@/api';
 import type { StudentNumberDetailResponse } from '@/api/types';
-import { discardStudentNote, flushPendingWrites, saveStudentNote, usePendingStudentNote } from '@/providers';
+import {
+  STUDENT_NOTE_WRITE,
+  discardStudentNote,
+  flushPendingWrites,
+  getPendingStudentNote,
+  saveStudentNote,
+  usePendingStudentNote,
+  usePendingWriteSending,
+} from '@/providers';
 import { isOnline, useIsOnline } from '@/services/network';
 
 import {
@@ -47,11 +55,14 @@ type SaveLoop = {
   saved: string;
   /** The newest text of the field. */
   draft: string;
-  /** A draft waiting in the queue (no answer yet), or null. A draft the server refused is not "queued". */
-  queued: string | null;
-  inFlight: boolean;
-  /** A newer draft that arrived while a save was running. */
-  next: string | null;
+  /** Texts this editor submitted whose outcome has not come back yet, oldest first. */
+  mine: string[];
+  /** Number of the latest submit of this editor: only its outcome speaks for the editor. */
+  seq: number;
+  /** `Date.now()` of the latest submit: a queue entry stamped before it is older than this editor's draft. */
+  submittedAt: number;
+  /** The waiting (not refused) text of the queue entry when last seen, to recognise a background delivery. */
+  lastEntry: string | null;
   /**
    * A queued draft that left the queue in the background (normalised): delivered or refused, the queue does
    * not say which. It counts as saved only once the server's note confirms it.
@@ -68,23 +79,28 @@ type SaveLoop = {
  *
  * Differences from the site, all from 02 Q12 (offline) and the app's error contract:
  * - saves go through the pending-writes queue, so a draft typed without a connection is kept and sent later;
- * - saves are sent one at a time, in order (the queue cannot abort a request, and two overlapping saves
- *   could land in the wrong order);
+ * - every draft is handed to the queue the moment it is due (typing pause, blur, leaving), never held back
+ *   inside the editor: the queue keeps one entry per number, sends one request at a time and always the
+ *   NEWEST entry, so the last text typed — in this editor or in the other editor of the same number (the
+ *   homework card and the number screen are mounted together) — is the one that lands. A draft parked in one
+ *   editor and submitted later would land after a newer text typed in the other one;
+ * - outcomes of this editor's older submits are ignored: only the latest submit's outcome speaks;
  * - after `429 rateLimited` nothing is sent until `retryAfterSeconds` has passed (never auto-retried).
  *
  * `serverNote` is followed, not only read at mount: the screen may first render a cached detail that is
  * older than a save which finished after the previous visit (the flush on leaving), or the note may have
  * been saved from the homework screen or delivered by the offline queue meanwhile. See `adoptServerNote` in note-model.ts.
  *
- * The queue entry of the number is followed too (states in `src/services/query/pending-writes.ts`): another
- * editor of the same number (homework card and number screen are mounted together) may replace the waiting
- * draft, and a draft the server refused in the background stays in the queue with its refusal, which this
- * editor shows like the refusal of its own save.
+ * The queue entry of the number is the single source of truth of "what waits to be saved" (states in
+ * `src/services/query/pending-writes.ts`): the field follows an entry written by the other editor after
+ * this editor's last submit (unless the student is typing here), and a draft the server refused in the
+ * background stays in the queue with its refusal, which this editor shows like the refusal of its own save.
  */
 export function useNoteEditor(homeworkNumberId: string, serverNote: string, fallbackError: string): NoteEditor {
   const queryClient = useQueryClient();
   const online = useIsOnline();
   const entry = usePendingStudentNote(homeworkNumberId);
+  const entrySending = usePendingWriteSending(STUDENT_NOTE_WRITE, homeworkNumberId);
   const entryNote = entry?.payload.note ?? null;
   const entryAt = entry?.updatedAt ?? null;
   const refusal = entry?.refusal ?? null;
@@ -106,9 +122,10 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     mounted: true,
     saved: serverNote,
     draft: initialNoteText(serverNote, entryNote),
-    queued: pendingNote,
-    inFlight: false,
-    next: null,
+    mine: [],
+    seq: 0,
+    submittedAt: 0,
+    lastEntry: pendingNote,
     delivering: null,
     blockedUntil: refusal?.retryAt ?? 0,
     debounce: null,
@@ -139,96 +156,126 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     [queryClient, homeworkNumberId],
   );
 
+  /** The text waiting in the queue now (not refused), read outside render: the other editor may have changed it. */
+  const waitingNow = useCallback((): string | null => {
+    const current = getPendingStudentNote(homeworkNumberId);
+    return current && !current.refusal ? current.payload.note : null;
+  }, [homeworkNumberId]);
+
   const send = useCallback(
     async (value: string, explicit = false): Promise<void> => {
       const loop = loopRef.current;
-      if (loop.inFlight) {
-        loop.next = value;
-        return;
-      }
-      loop.inFlight = true;
-      let draft: string | null = value;
-      while (draft !== null) {
-        // Nothing to send when the draft equals what the server has — or what already waits in the queue.
-        const dirty = isNoteDirty(draft, loop.queued ?? loop.saved);
-        if (!dirty && loop.queued !== null && explicit && isOnline()) {
-          // Blur / «Повторить» / leaving on a draft that already waits: send it now rather than waiting for
-          // the queue's next try (the device may be online and the last failure a passing one).
+      const current = getPendingStudentNote(homeworkNumberId);
+      const waiting = current && !current.refusal ? current.payload.note : null;
+      // Nothing to send when the draft equals what already waits in the queue — or, if nothing waits, what
+      // the server has.
+      if (!isNoteDirty(value, waiting ?? loop.saved)) {
+        if (waiting !== null && explicit && isOnline() && loop.mine.length === 0) {
+          // Blur / «Повторить» / leaving on a draft that already waits (and is not being sent by this editor):
+          // send it now rather than waiting for the queue's next try (the last failure may be a passing one).
           flushPendingWrites();
-        } else if (!dirty && loop.queued === null && refusalRef.current) {
+        } else if (waiting === null && current?.refusal) {
           // The student put the saved text back over a refused draft: nothing is left to save.
           void discardStudentNote(homeworkNumberId);
         }
-        if (dirty && loop.blockedUntil <= Date.now()) {
-          if (loop.mounted) {
-            setError(null);
-            setSaving(true);
-          }
-          loop.delivering = null;
-          const outcome = await saveStudentNote(homeworkNumberId, draft);
-          if (outcome.status === 'sent') {
-            loop.saved = outcome.result.note;
-            loop.queued = null;
-            rememberSavedNote(outcome.result.note);
-            if (loop.mounted && !outcome.result.notesEnabled) setDisabledByServer(true);
-            showSaved();
-          } else if (outcome.status === 'queued') {
-            loop.queued = draft;
-          } else {
-            // The queue keeps the refused draft (with its refusal) until it is replaced or discarded.
-            loop.queued = null;
-            const failure = outcome.error;
-            const retryAfter = isRateLimited(failure) && isApiError(failure) ? failure.retryAfterSeconds : undefined;
-            const retryAt = retryAfter ? Date.now() + retryAfter * 1000 : null;
-            if (retryAt) loop.blockedUntil = retryAt;
-            if (loop.mounted) {
-              setError({ message: isApiError(failure) && failure.message ? failure.message : fallbackError, retryAt });
-            }
-          }
-          if (loop.mounted) setSaving(false);
-        }
-        draft = loop.next;
-        loop.next = null;
+        return;
       }
-      loop.inFlight = false;
+      // After `429` nothing is sent until the wait is over; the draft stays in the field for blur / retry.
+      if (loop.blockedUntil > Date.now()) return;
+
+      loop.seq += 1;
+      const token = loop.seq;
+      loop.submittedAt = Date.now();
+      loop.mine.push(value);
+      loop.delivering = null;
+      if (loop.mounted) {
+        setError(null);
+        setSaving(true);
+      }
+      const outcome = await saveStudentNote(homeworkNumberId, value);
+      const index = loop.mine.indexOf(value);
+      if (index >= 0) loop.mine.splice(index, 1);
+      // A newer submit of this editor is on its way: its outcome (which comes later) decides.
+      if (token !== loop.seq) return;
+      if (loop.mounted) setSaving(false);
+
+      // The other editor has written a newer text meanwhile: the queue sends it; this outcome is not news
+      // for the field (the entry is followed below).
+      const after = waitingNow();
+      const superseded = after !== null && isNoteDirty(after, value);
+
+      if (outcome.status === 'sent') {
+        loop.saved = outcome.result.note;
+        rememberSavedNote(outcome.result.note);
+        if (loop.mounted && !outcome.result.notesEnabled) setDisabledByServer(true);
+        if (!superseded && !isNoteDirty(loop.draft, outcome.result.note)) showSaved();
+      } else if (outcome.status === 'rejected' && !superseded) {
+        // The queue keeps the refused draft (with its refusal) until it is replaced or discarded.
+        const failure = outcome.error;
+        const retryAfter = isRateLimited(failure) && isApiError(failure) ? failure.retryAfterSeconds : undefined;
+        const retryAt = retryAfter ? Date.now() + retryAfter * 1000 : null;
+        if (retryAt) loop.blockedUntil = retryAt;
+        if (loop.mounted) {
+          setError({ message: isApiError(failure) && failure.message ? failure.message : fallbackError, retryAt });
+        }
+      }
+      // `queued`: the entry holds the draft; its status comes from the entry.
     },
-    [homeworkNumberId, fallbackError, showSaved, rememberSavedNote],
+    [homeworkNumberId, fallbackError, showSaved, rememberSavedNote, waitingNow],
   );
 
   // The server's note changed under the editor (rules in `adoptServerNote`). A draft still waiting in the
   // queue is newer than anything the server can say.
-  const followServerNote = useCallback((note: string) => {
-    const loop = loopRef.current;
-    if (loop.delivering !== null) {
-      // The re-read after a background delivery: only now is the queued draft known to be saved.
-      const delivered = !isNoteDirty(note, loop.delivering);
-      loop.delivering = null;
-      if (delivered && !loop.inFlight) {
-        loop.saved = note;
-        showSaved();
-        return;
+  const followServerNote = useCallback(
+    (note: string) => {
+      const loop = loopRef.current;
+      if (loop.delivering !== null) {
+        // The re-read after a background delivery: only now is the queued draft known to be saved.
+        const delivered = !isNoteDirty(note, loop.delivering);
+        loop.delivering = null;
+        if (delivered && loop.mine.length === 0) {
+          loop.saved = note;
+          showSaved();
+          return;
+        }
       }
-    }
-    const next = adoptServerNote(
-      { saved: loop.saved, draft: loop.draft, writing: loop.inFlight || loop.queued !== null, typing: loop.debounce !== null },
-      note,
-    );
-    if (!next) return;
-    loop.saved = next.saved;
-    if (next.draft === loop.draft) return;
-    loop.draft = next.draft;
-    setText(next.draft);
-  }, [showSaved]);
+      const next = adoptServerNote(
+        { saved: loop.saved, draft: loop.draft, writing: loop.mine.length > 0 || waitingNow() !== null, typing: loop.debounce !== null },
+        note,
+      );
+      if (!next) return;
+      loop.saved = next.saved;
+      if (next.draft === loop.draft) return;
+      loop.draft = next.draft;
+      setText(next.draft);
+    },
+    [showSaved, waitingNow],
+  );
 
-  // The queue entry changed without a save of this editor: another editor of the same number wrote a newer
-  // draft, or the queue refused the waiting one in the background. The field shows what the entry holds —
-  // unless the student is typing here or a save of this editor is on its way (its own result decides).
+  // The queue entry changed. The field shows what the entry holds when it was written after this editor's
+  // last submit (the other editor of the same number), or when the queue refused it in the background —
+  // unless the student is typing here (that text is newer and is submitted on the pause / blur), or the
+  // entry is one of this editor's own submits (their outcome decides).
   useEffect(() => {
     const loop = loopRef.current;
-    if (entryNote === null || loop.debounce !== null || loop.inFlight) return;
-    loop.queued = refusal ? null : entryNote;
+    if (entryNote === null) {
+      // The entry left the queue without a save of ours: delivered in the background (a refusal stays in
+      // the queue), or dropped because its number is gone. A delivery invalidates the detail, and the
+      // re-read that returns the draft confirms it (`delivering`, «Сохранено»). Without that re-read the
+      // draft stays unsaved and is sent again on blur or when the screen goes away — it is never reported
+      // as saved on the queue's word alone.
+      const left = loop.lastEntry;
+      loop.lastEntry = null;
+      if (left !== null && loop.mine.length === 0 && isNoteDirty(left, loop.saved)) loop.delivering = normalizeNoteDraft(left);
+      return;
+    }
+    loop.lastEntry = refusal ? null : entryNote;
     loop.delivering = null;
     if (refusal?.retryAt) loop.blockedUntil = Math.max(loop.blockedUntil, refusal.retryAt);
+    if (loop.debounce !== null) return;
+    if (loop.mine.includes(entryNote)) return;
+    // Stamped before this editor's latest submit: older than what this editor sent (a late notification).
+    if (entryAt !== null && entryAt < loop.submittedAt) return;
     if (entryNote === loop.draft) return;
     loop.draft = entryNote;
     setText(entryNote);
@@ -244,18 +291,6 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     seenServerNote.current = serverNote;
     if (pendingNote === null) followServerNote(serverNote);
   }, [serverNote, pendingNote, followServerNote]);
-
-  // A queued draft that disappears without a save of ours left the queue in the background: delivered (a
-  // refusal stays in the queue, see above), or dropped because its number is gone. A delivery invalidates the
-  // detail, and the re-read that returns the draft confirms it (`delivering`, «Сохранено»). Without that
-  // re-read the draft stays unsaved and is sent again on blur or when the screen goes away — it is never
-  // reported as saved on the queue's word alone.
-  useEffect(() => {
-    const loop = loopRef.current;
-    if (entryNote !== null || loop.queued === null || loop.inFlight) return;
-    loop.delivering = normalizeNoteDraft(loop.queued);
-    loop.queued = null;
-  }, [entryNote]);
 
   // The screen is going away: save what the debounce still holds.
   useEffect(() => {
@@ -308,7 +343,8 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     onChangeText,
     flush,
     retry: flush,
-    status: noteStatus({ saving, queued: pendingNote !== null && !saving, savedFlash, online }),
+    // An entry whose request is in flight (here, in the other editor or in a flush) is «Сохраняем…».
+    status: noteStatus({ saving, queued: pendingNote !== null && !saving, savedFlash, online, sending: entrySending }),
     error: error ?? keptError,
     disabledByServer,
   };

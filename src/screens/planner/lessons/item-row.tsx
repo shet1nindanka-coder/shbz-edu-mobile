@@ -5,7 +5,7 @@ import { MathContent } from '@/components/math';
 import { LESSON_RESULT_ORDER, lessonResultMeta } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Chip, IconButton, StatusOptionGroup, Text, TextButton, type ChipTone } from '@/ui';
+import { Chip, IconButton, StatusOptionGroup, Text, TextButton, useAnnounce, type ChipTone } from '@/ui';
 
 import { SubmissionInfo } from './submission-info';
 
@@ -43,6 +43,8 @@ export function ItemRow({ item, ordinal, busy, saving, resultsBlocked, error, sp
   const common = dict.planner.common;
   const reasons: Record<string, string> = dict.planner.reasons;
   const results = dict.students.lessonResult;
+  // The row's error appears without moving focus: VoiceOver says it (Android reads the alert).
+  useAnnounce(error);
 
   return (
     <View style={styles.row} testID={`lesson-item-${item.id}`}>

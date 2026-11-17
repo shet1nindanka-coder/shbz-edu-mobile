@@ -7,7 +7,7 @@ import { errorText, qk, useApi } from '@/api';
 import type { GroupListItem } from '@/api/types';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, useStillHere } from '@/navigation';
 import { DetailAppBar } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
@@ -27,6 +27,7 @@ export function GroupsListScreen() {
   const theme = useTheme();
   const api = useApi();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const { dict, m } = useI18n();
   const t = dict.planner.groups.list;
   const [notice, dismissNotice] = useGroupNotice(GROUPS_LIST_NOTICE);
@@ -133,7 +134,8 @@ export function GroupsListScreen() {
             dismissNotice();
             // The site redirects to the new group with «Группа создана. Добавьте в неё учеников.»
             postGroupNotice(groupNoticeChannel(group.id), 'created');
-            navigation.push({ screen: 'groups.detail', groupId: group.id });
+            // Only from the list itself: a teacher who has moved on meanwhile finds the group in the list.
+            if (stillHere()) navigation.push({ screen: 'groups.detail', groupId: group.id });
           }}
         />
       ) : null}

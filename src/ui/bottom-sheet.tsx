@@ -19,6 +19,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { IconButton } from './icon-button';
 import { MODAL_ORIENTATIONS, absoluteFill } from './internal/layout';
 import { useDismissKeyboardWhen, useKeyboardCoversHomeIndicator } from './internal/keyboard';
+import { useCloseOnBlur } from './internal/close-on-blur';
 import { easing } from './internal/motion';
 import { OverlayCoverSlot, coveredAccessibilityProps, useOverlayCovered } from './overlay-cover';
 import { Text } from './text';
@@ -92,6 +93,9 @@ export function BottomSheet({
   const wide = window.width > theme.sizes.wideBreakpoint;
   // The field the sheet was opened from must not keep the keyboard over the sheet (iOS).
   useDismissKeyboardWhen(visible);
+  // Leaving the screen (a reminder tap, a notification row) closes its sheet: a modal window would stay
+  // above the next screen. Also while a request is pending — the owner decides what its close means.
+  useCloseOnBlur(visible, onClose);
   const keyboardShown = useKeyboardCoversHomeIndicator();
 
   useEffect(() => {

@@ -7,6 +7,7 @@ import { makeStyles } from '@/theme';
 import { PressableScale } from './internal/pressable-scale';
 import { useSlidingIndicator } from './internal/sliding-indicator';
 import { Text } from './text';
+import { useTextScale } from './use-text-scale';
 
 export type TabOption<T extends string> = {
   value: T;
@@ -42,6 +43,7 @@ export function Tabs<T extends string>({
   style,
 }: TabsProps<T>) {
   const styles = useStyles();
+  const { minimumFontScale } = useTextScale();
   const activeIndex = options.findIndex((option) => option.value === value);
   const { onItemLayout, indicatorStyle } = useSlidingIndicator(activeIndex);
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -83,7 +85,15 @@ export function Tabs<T extends string>({
             style={[styles.tab, fill ? styles.tabFill : null, option.disabled ? styles.disabled : null]}
             pressedStyle={selected ? null : styles.tabPressed}
           >
-            <Text variant="tab" numberOfLines={1} color={selected ? 'tabActiveText' : 'tabText'}>
+            <Text
+              variant="tab"
+              numberOfLines={1}
+              // A `fill` bar shares a fixed row: a label drawn at a large OS font size shrinks instead of
+              // being cut. A scrolling bar gives every tab the width of its label.
+              adjustsFontSizeToFit={fill}
+              minimumFontScale={minimumFontScale}
+              color={selected ? 'tabActiveText' : 'tabText'}
+            >
               {option.label}
             </Text>
           </PressableScale>

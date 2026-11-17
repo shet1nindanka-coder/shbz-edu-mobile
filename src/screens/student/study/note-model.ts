@@ -62,11 +62,19 @@ export function adoptServerNote(snapshot: NoteEditorSnapshot, serverNote: string
  * What the line next to the «Заметка» kicker shows. A waiting draft is "queued" while the device is offline
  * and "retrying" while it is online (the last try got no answer; the queue tries again by itself) — saying
  * "will save when online" to an online device would be false.
+ *
+ * `sending` is the queue's own knowledge that a request for the entry is in flight — sent by this editor, by
+ * the other editor of the same number or by a flush — so it reads "saving", never "not saved, retrying".
+ * Any other waiting entry online waits for its next try: "retrying" (also one that never failed — loaded
+ * from a run killed mid-request, held for an expired session, or not reached by a pass that stopped earlier).
  */
 export type NoteStatus = "saving" | "queued" | "retrying" | "saved" | null;
 
-export function noteStatus(state: { saving: boolean; queued: boolean; savedFlash: boolean; online?: boolean }): NoteStatus {
+export function noteStatus(state: { saving: boolean; queued: boolean; savedFlash: boolean; online?: boolean; sending?: boolean }): NoteStatus {
   if (state.saving) return "saving";
-  if (state.queued) return state.online ? "retrying" : "queued";
+  if (state.queued) {
+    if (!state.online) return "queued";
+    return state.sending ? "saving" : "retrying";
+  }
   return state.savedFlash ? "saved" : null;
 }

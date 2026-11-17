@@ -8,7 +8,7 @@ import type { StoredFileRef, TopicNumber } from '@/api/types';
 import { FileCard, type ViewerFile } from '@/components/files';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
+import { useAppNavigation, useRefetchOnFocus, useStillHere, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
@@ -38,6 +38,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   const t = dict.topics.view;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const isDeveloper = user.role === 'DEVELOPER';
 
   const [shownAnswers, setShownAnswers] = useState<ReadonlySet<string>>(() => new Set());
@@ -217,7 +218,8 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
             setDeleted(true);
             // Back to the list, as the site's redirect does; the list shows «Тема успешно удалена».
             postTopicDeleted(topicId);
-            navigation.open({ screen: 'content.topics' });
+            // Answered after the user went elsewhere: the screen shows the gone state on return instead.
+            if (stillHere()) navigation.open({ screen: 'content.topics' });
           }}
         />
       ) : null}

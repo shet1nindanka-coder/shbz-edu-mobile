@@ -29,6 +29,7 @@ import {
   bankNumbersGap,
   freeBankNumbers,
   lessonPlanState,
+  planRequestDeviceAnchor,
   syncPendingSince,
   lessonSetIds,
   markLessonPending,
@@ -419,9 +420,47 @@ describe("lessons segment", () => {
     assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 60_000, seen), "pending", "an old lesson seen pending a minute ago");
     assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 16 * 60_000, seen), "stale");
     // A retry accepted a minute ago restarts the 15 minutes.
-    const retried = new Date(seen + 15 * 60_000).toISOString();
+    const retried = seen + 15 * 60_000;
     assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 16 * 60_000, seen, retried), "pending");
     assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 31 * 60_000, seen, retried), "stale");
+  });
+
+  it("keeps one clock: a Retry is compared on device time, so the card and the board turn stale together", () => {
+    const MIN = 60_000;
+    const server = Date.parse("2026-11-17T10:00:00Z");
+    const raw = new Date(server).toISOString();
+    for (const skew of [0, -30 * MIN, -120 * MIN, 30 * MIN]) {
+      // skew = device minus server; the board's offset is server minus device.
+      const deviceAtRetry = server + skew;
+      const seen = deviceAtRetry - 60 * MIN;
+      const fromBoard = planRequestDeviceAnchor(undefined, raw, -skew, deviceAtRetry + 5 * MIN);
+      assert.equal(fromBoard?.deviceMs, deviceAtRetry, `skew ${skew / MIN}: the board's offset converts exactly`);
+      for (const [elapsed, expected] of [
+        [14 * MIN, "pending"],
+        [16 * MIN, "stale"],
+        [40 * MIN, "stale"],
+      ] as const) {
+        assert.equal(
+          lessonPlanState(lesson({ planPending: true }), deviceAtRetry + elapsed, seen, fromBoard?.deviceMs),
+          expected,
+          `skew ${skew / MIN} min, ${elapsed / MIN} min after the Retry`,
+        );
+      }
+    }
+  });
+
+  it("converts a Retry to device time once, falling back to when the card first saw it", () => {
+    const raw = "2026-11-17T10:00:00.000Z";
+    const observed = Date.parse("2026-11-17T08:05:00Z");
+    assert.equal(planRequestDeviceAnchor(undefined, null, 0, observed), undefined);
+    assert.equal(planRequestDeviceAnchor(undefined, "not a date", 0, observed), undefined);
+    const first = planRequestDeviceAnchor(undefined, raw, null, observed);
+    assert.deepEqual(first, { raw, deviceMs: observed }, "no server offset known: never earlier than the card saw it");
+    assert.equal(planRequestDeviceAnchor(first, raw, 0, observed + 60_000), first, "the same Retry keeps its stamp");
+    const own = { raw, deviceMs: 42 };
+    assert.equal(planRequestDeviceAnchor(own, raw, 7_200_000, observed), own, "a Retry made on the card keeps its device time");
+    const next = "2026-11-17T10:20:00.000Z";
+    assert.deepEqual(planRequestDeviceAnchor(first, next, 7_200_000, observed), { raw: next, deviceMs: Date.parse(next) - 7_200_000 });
   });
 
   it("stamps the first time a lesson is seen pending and forgets it once it leaves", () => {

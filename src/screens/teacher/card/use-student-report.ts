@@ -5,7 +5,7 @@ import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { DownloadedFile, ReportPeriod } from '@/api/types';
 import { useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-import { useAppNavigation } from '@/navigation';
+import { useAppNavigation, useStillHere } from '@/navigation';
 
 
 export type StudentReport = {
@@ -18,7 +18,11 @@ export type StudentReport = {
   dismissError: () => void;
   start: (period: ReportPeriod) => void;
   /** Call when the progress sheet has left the screen: opens the finished report in the file viewer. */
+  onProgressClosed: () => void;
+  /** A report that came back after the teacher had left the card: kept, opened only on request. */
+  ready: { title: string } | null;
   openReady: () => void;
+  dismissReady: () => void;
 };
 
 /**
@@ -31,21 +35,26 @@ export function useStudentReport(studentId: string): StudentReport {
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const { m } = useI18n();
   const wait = useRetryWait();
   const noteWait = wait.note;
   const [error, setError] = useState<string | null>(null);
-  const ready = useRef<{ period: ReportPeriod; file: DownloadedFile } | null>(null);
+  const finished = useRef<{ period: ReportPeriod; file: DownloadedFile } | null>(null);
+  // A report that finished while the card was not in front. It ran and counts against the limit of five
+  // reports per five minutes, so it is offered on the card instead of being thrown away.
+  const [ready, setReady] = useState<{ period: ReportPeriod; file: DownloadedFile } | null>(null);
 
   const download = useMutation({
     mutationFn: (period: ReportPeriod) => api.teacherStudents.downloadStudentReport(studentId, period),
     onMutate: () => {
-      ready.current = null;
+      finished.current = null;
+      setReady(null);
       setError(null);
     },
     onSuccess: (file, period) => {
       // Opened once the progress sheet is gone: two modal layers must not overlap.
-      ready.current = { period, file };
+      finished.current = { period, file };
     },
     onError: (failure) => {
       // studentNotFound, exportFailed, rateLimited, reportsBusy, no connection — each message is localised.
@@ -55,21 +64,32 @@ export function useStudentReport(studentId: string): StudentReport {
     },
   });
 
-  const openReady = useCallback(() => {
-    const done = ready.current;
-    ready.current = null;
+  // Not the site's period buttons (only the first of them says «Отчёт»): the viewer title stands alone.
+  const titleOf = useCallback(
+    (period: ReportPeriod) =>
+      period === '7d' ? m.teacher.report.title7d : period === '30d' ? m.teacher.report.title30d : m.teacher.report.titleYear,
+    [m],
+  );
+
+  const open = useCallback(
+    (done: { period: ReportPeriod; file: DownloadedFile }) => {
+      navigation.openFiles(
+        [{ id: `student-report-${studentId}-${done.period}`, originalName: done.file.fileName, mimeType: 'application/pdf', localUri: done.file.uri }],
+        { title: titleOf(done.period) },
+      );
+    },
+    [navigation, studentId, titleOf],
+  );
+
+  const onProgressClosed = useCallback(() => {
+    const done = finished.current;
+    finished.current = null;
     if (!done) return;
-    // Not the site's period buttons (only the first of them says «Отчёт»): the viewer title stands alone.
-    const titles: Record<ReportPeriod, string> = {
-      '7d': m.teacher.report.title7d,
-      '30d': m.teacher.report.title30d,
-      year: m.teacher.report.titleYear,
-    };
-    navigation.openFiles(
-      [{ id: `student-report-${studentId}-${done.period}`, originalName: done.file.fileName, mimeType: 'application/pdf', localUri: done.file.uri }],
-      { title: titles[done.period] },
-    );
-  }, [m, navigation, studentId]);
+    // The report came back after the teacher left the card (the progress sheet closed on blur): the viewer
+    // would open over whatever they are doing now, so the card keeps it until they are back and ask for it.
+    if (stillHere()) open(done);
+    else setReady(done);
+  }, [open, stillHere]);
 
   return {
     pendingPeriod: download.isPending ? (download.variables ?? null) : null,
@@ -81,6 +101,13 @@ export function useStudentReport(studentId: string): StudentReport {
       if (download.isPending || wait.waiting) return;
       download.mutate(period);
     },
-    openReady,
+    onProgressClosed,
+    ready: ready ? { title: titleOf(ready.period) } : null,
+    openReady: () => {
+      if (!ready) return;
+      setReady(null);
+      open(ready);
+    },
+    dismissReady: () => setReady(null),
   };
 }
