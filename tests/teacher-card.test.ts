@@ -6,6 +6,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { getMobileDictionary } from "../src/i18n/mobile";
+
 import type {
   AssignBoardTopic,
   HomeworkNumberStatus,
@@ -26,6 +28,7 @@ import {
 import {
   freeBankNumbers,
   lessonPlanState,
+  syncPendingSince,
   lessonSetIds,
   markLessonPending,
   patchItemResult,
@@ -398,12 +401,28 @@ describe("lessons segment", () => {
 
   it("derives the plan state", () => {
     const created = Date.parse("2026-11-16T09:00:00.000Z");
-    assert.equal(lessonPlanState(lesson(), created), "ready");
-    assert.equal(lessonPlanState(lesson({ planError: "plan-error:failed" }), created), "failed");
-    assert.equal(lessonPlanState(lesson({ planPending: true }), created + 60_000), "pending");
-    assert.equal(lessonPlanState(lesson({ planPending: true }), created + 16 * 60_000), "stale");
+    assert.equal(lessonPlanState(lesson(), created, undefined), "ready");
+    assert.equal(lessonPlanState(lesson({ planError: "plan-error:failed" }), created, undefined), "failed");
+    // The 15 minutes run from when this client first saw the plan pending, not from lesson.createdAt.
+    const seen = created + 60 * 60_000;
+    assert.equal(lessonPlanState(lesson({ planPending: true }), seen, undefined), "pending", "not stamped yet: pending");
+    assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 60_000, seen), "pending", "an old lesson seen pending a minute ago");
+    assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 16 * 60_000, seen), "stale");
     // A retry accepted a minute ago restarts the 15 minutes.
-    assert.equal(lessonPlanState(lesson({ planPending: true }), created + 16 * 60_000, "2026-11-16T09:15:00.000Z"), "pending");
+    const retried = new Date(seen + 15 * 60_000).toISOString();
+    assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 16 * 60_000, seen, retried), "pending");
+    assert.equal(lessonPlanState(lesson({ planPending: true }), seen + 31 * 60_000, seen, retried), "stale");
+  });
+
+  it("stamps the first time a lesson is seen pending and forgets it once it leaves", () => {
+    const since = new Map<string, number>();
+    syncPendingSince(since, ["a", "b"], 1_000);
+    syncPendingSince(since, ["a", "b", "c"], 5_000);
+    assert.deepEqual([...since.entries()], [["a", 1_000], ["b", 1_000], ["c", 5_000]], "an existing stamp is kept");
+    syncPendingSince(since, ["c"], 9_000);
+    assert.deepEqual([...since.entries()], [["c", 5_000]]);
+    syncPendingSince(since, ["a", "c"], 12_000);
+    assert.equal(since.get("a"), 12_000, "pending again: a fresh stamp");
   });
 
   it("reads this student's participant from the status poll", () => {
@@ -418,5 +437,16 @@ describe("lessons segment", () => {
     assert.equal(planSettled(status(null, "plan-error:failed"), "part"), true);
     assert.equal(planSettled(undefined, "part"), false);
     assert.equal(planSettled(status(null, null), "missing"), false);
+  });
+});
+
+describe("student report viewer titles", () => {
+  it("names the report for every period, in both languages", () => {
+    // The site's period buttons read «Отчёт: 7 дней» · «30 дней» · «Учебный год»: only the first one alone
+    // says it is a report, so the file viewer has its own titles.
+    const ru = getMobileDictionary("ru").teacher.report;
+    const en = getMobileDictionary("en").teacher.report;
+    assert.deepEqual([ru.title7d, ru.title30d, ru.titleYear], ["Отчёт: 7 дней", "Отчёт: 30 дней", "Отчёт: учебный год"]);
+    for (const title of [en.title7d, en.title30d, en.titleYear]) assert.match(title, /^Report: /);
   });
 });

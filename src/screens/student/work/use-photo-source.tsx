@@ -1,14 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Linking, Platform } from 'react-native';
 
 import type { PhotoUpload } from '@/api/types';
 import type { PhotoSource } from '@/components/files';
-import { useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { pickFromCamera, pickFromLibrary, type PickResult } from '@/services/photos';
 import { Notice, TextButton } from '@/ui';
 
 /** Why a pick produced no photos, in words for the student. */
 export type PickProblem = {
+  /** `warning` when photos were added but not all of them; `error` (default) when none were. */
+  tone?: 'error' | 'warning';
   title?: string;
   text: string;
   /** The OS will not ask again: offer the device settings. */
@@ -46,14 +48,29 @@ export function usePhotoSource(limit: number, onPicked: (files: PhotoUpload[]) =
   const [sheetOpen, setSheetOpen] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [problem, setProblem] = useState<PickProblem | null>(null);
+  // The source rows are plain list rows (no press guard), and `preparing` read from a render is stale: a
+  // double tap must not open the picker twice.
+  const running = useRef(false);
 
   const handle = useCallback(
     (result: PickResult<PhotoUpload>) => {
       const t = m.common.photos;
       switch (result.status) {
-        case 'picked':
-          if (result.files.length > 0) onPicked(result.files.slice(0, Math.max(1, limit)));
+        case 'picked': {
+          const kept = result.files.slice(0, Math.max(1, limit));
+          if (kept.length > 0) onPicked(kept);
+          // Where the picker ignores the selection limit the extra photos are left out: say so rather than
+          // drop them silently (the site refuses such a batch with an error).
+          const dropped = (result.dropped ?? 0) + (result.files.length - kept.length);
+          if (dropped > 0 && kept.length > 0) {
+            setProblem({
+              tone: 'warning',
+              text: format(m.studentWork.photos.tooMany, { picked: kept.length + dropped, added: kept.length }),
+              settings: false,
+            });
+          }
           return;
+        }
         case 'cancelled':
           return;
         case 'denied': {
@@ -80,7 +97,8 @@ export function usePhotoSource(limit: number, onPicked: (files: PhotoUpload[]) =
 
   const select = useCallback(
     (source: PhotoSource) => {
-      if (limit <= 0) return;
+      if (limit <= 0 || running.current) return;
+      running.current = true;
       setProblem(null);
       setPreparing(true);
       const run = async () => {
@@ -89,7 +107,10 @@ export function usePhotoSource(limit: number, onPicked: (files: PhotoUpload[]) =
       };
       run()
         .then(handle, () => setProblem({ text: m.common.photos.pickFailed, settings: false }))
-        .finally(() => setPreparing(false));
+        .finally(() => {
+          running.current = false;
+          setPreparing(false);
+        });
     },
     [handle, limit, locale, m],
   );
@@ -110,7 +131,7 @@ export function PickProblemNotice({ problem, onDismiss, testID }: { problem: Pic
   const { m } = useI18n();
   return (
     <Notice
-      tone="error"
+      tone={problem.tone ?? 'error'}
       title={problem.title}
       text={problem.text}
       onDismiss={onDismiss}

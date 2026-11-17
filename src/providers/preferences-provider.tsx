@@ -9,6 +9,7 @@ import {
   type ReminderCategory,
 } from '@/services/preferences';
 
+import { getQueryClient } from './query';
 import { setRequestLocale } from './services';
 
 export type PreferencesValue = {
@@ -95,6 +96,10 @@ export function PreferencesProvider({ store, children }: PreferencesProviderProp
           localeRef.current = result.locale;
           // Requests made from now on are answered in the new language.
           setRequestLocale(result.locale);
+          // Cached responses carry texts the server wrote in the old language (journal summaries,
+          // notifications, plan errors) and query keys hold no locale: refetch them, as the site's
+          // LocaleSwitch reloads the page. Mounted screens refetch now, the rest when they open.
+          void getQueryClient().invalidateQueries();
           setPreferences((current) => ({ ...current, locale: result.locale }));
         })
         .finally(() => {

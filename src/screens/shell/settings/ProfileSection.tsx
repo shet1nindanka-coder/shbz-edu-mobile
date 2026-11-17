@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { isApiError, useApi } from '@/api';
@@ -27,6 +27,9 @@ export function ProfileSection() {
   const [name, setName] = useState(user.name);
   const [result, setResult] = useState<Result>(null);
 
+  // Set before the request and cleared when it settles: `isPending` read in a handler is the last render's
+  // value, so a second submit (return key + button) in the same frame would pass it.
+  const inFlight = useRef(false);
   const save = useMutation({
     mutationFn: (value: string) => api.shell.updateProfile({ name: value }),
     onSuccess: ({ user: updated }) => {
@@ -37,16 +40,20 @@ export function ProfileSection() {
     onError: (error) => {
       setResult({ tone: 'error', text: isApiError(error) ? error.message : m.common.errors.generic });
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const submit = () => {
-    if (save.isPending) return;
+    if (inFlight.current) return;
     const normalized = normalizeUserName(name);
     if (normalized === null) {
       setResult({ tone: 'error', text: t.notices.infoInvalid });
       return;
     }
     setResult(null);
+    inFlight.current = true;
     save.mutate(normalized);
   };
 

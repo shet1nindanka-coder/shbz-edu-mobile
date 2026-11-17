@@ -1,11 +1,11 @@
 // Bundled sample files of the mock FileService (built by scripts/build-mock-files.mjs). Metro turns
 // each `require` into an asset module; the DOCX is not an asset type Metro knows, so it travels as
-// base64 in `generated/mock-docx.ts`.
+// base64 in `generated/mock-docx.ts`, and the HTML print version is a string in `mock-print-html.ts`.
 import type { MockSampleKey } from './mock-samples';
 
 type AssetModule = number;
 
-export const MOCK_SAMPLE_MODULES: Record<Exclude<MockSampleKey, 'docx'>, AssetModule> = {
+export const MOCK_SAMPLE_MODULES: Record<Exclude<MockSampleKey, 'docx' | 'printHtml'>, AssetModule> = {
   pdfLong: require('../../../assets/mock-files/theory-12-pages.pdf'),
   pdfShort: require('../../../assets/mock-files/homework-1-page.pdf'),
   cheatsheet: require('../../../assets/mock-files/cheatsheet.jpg'),

@@ -57,7 +57,8 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
     queryKey: qk('content', 'getTopicConditions', topic?.id ?? ''),
     queryFn: () => api.content.getTopicConditions(topic?.id ?? ''),
     enabled: needsStatements,
-    staleTime: Number.POSITIVE_INFINITY,
+    // The default staleness: a statement edited on the site meanwhile (or a cache restored after a cold
+    // start) is read again instead of being trusted forever.
     retry: false,
   });
 

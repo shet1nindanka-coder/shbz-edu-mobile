@@ -9,6 +9,7 @@ import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { DetailAppBar } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, IconButton, LoadingState, Notice, Screen } from '@/ui';
 
@@ -30,7 +31,6 @@ export function GroupsListScreen() {
   const t = dict.planner.groups.list;
   const [notice, dismissNotice] = useGroupNotice(GROUPS_LIST_NOTICE);
   const [createOpen, setCreateOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const groups = useQuery({ queryKey: qk('groups', 'listGroups'), queryFn: () => api.groups.listGroups() });
   // The list stays mounted under an open group: a stale list is reloaded on the way back (00 §2.3).
@@ -39,10 +39,7 @@ export function GroupsListScreen() {
   const canCreate = data?.canCreate === true;
   const canCompose = navigation.canOpen({ screen: 'planner.lessonNew' });
 
-  const refresh = () => {
-    setRefreshing(true);
-    void groups.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([groups]);
 
   const open = (group: GroupListItem) => {
     // Notices are one-shot, like the site's redirect parameters: leaving the list drops «Группа удалена».

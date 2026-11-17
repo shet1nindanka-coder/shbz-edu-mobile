@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, Share, View } from 'react-native';
 
 import { qk, useApi } from '@/api';
@@ -27,6 +27,9 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
   const copied = feedback.copied !== null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // `busy` reaches the controls one render late: a second tap handled before it would open a second
+  // share sheet (IconButton has no press guard). The ref is the synchronous lock.
+  const running = useRef(false);
 
   const loadPrompt = async (): Promise<string> => {
     try {
@@ -45,18 +48,21 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
   };
 
   const copy = async () => {
-    if (busy) return;
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
       if (!(await feedback.copy('prompt', await loadPrompt()))) setError(m.content.importPanel.clipboardDenied);
     } finally {
+      running.current = false;
       setBusy(false);
     }
   };
 
   const share = async () => {
-    if (busy) return;
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -64,6 +70,7 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
     } catch {
       // The user closed the sheet or sharing is unavailable: copying still works.
     } finally {
+      running.current = false;
       setBusy(false);
     }
   };
@@ -78,7 +85,7 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
           size="md"
           leftIcon={copied ? 'check' : 'copy'}
           loading={busy}
-          onPress={() => void copy()}
+          onPress={copy}
           style={styles.copy}
           testID={testID}
         />

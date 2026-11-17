@@ -77,7 +77,32 @@ export type MockApiClientOptions = {
   onFileUploaded?: (file: MockUploadedFile) => void;
   /** Device hook: a file row was removed because nothing references it (wire it to `forgetLocalFile`). */
   onFileRemoved?: (fileId: string) => void;
+  /**
+   * Notifies the client that ANOTHER writer changed `key` in the same storage (web: a second browser tab of
+   * the demo over one `localStorage`). The client then reloads the stored dataset before its next call
+   * instead of overwriting the other writer's tables with its stale copy. Returns an unsubscribe function.
+   * Default: the browser's `storage` event when there is one; `null` turns it off. A phone has a single
+   * JS runtime, so it has no other writer.
+   */
+  watchExternalWrites?: ((onWrite: (key: string) => void) => () => void) | null;
 };
+
+/** The browser's `storage` event (fired in every OTHER tab of the origin that shares the `localStorage`). */
+function browserStorageWatcher(): MockApiClientOptions["watchExternalWrites"] {
+  const target = (globalThis as { window?: { addEventListener?: unknown; removeEventListener?: unknown; localStorage?: unknown } }).window;
+  if (!target || typeof target.addEventListener !== "function" || typeof target.removeEventListener !== "function" || !target.localStorage) return null;
+  const win = target as unknown as {
+    addEventListener(type: "storage", listener: (event: { key: string | null }) => void): void;
+    removeEventListener(type: "storage", listener: (event: { key: string | null }) => void): void;
+  };
+  return (onWrite) => {
+    const listener = (event: { key: string | null }) => {
+      if (typeof event.key === "string") onWrite(event.key);
+    };
+    win.addEventListener("storage", listener);
+    return () => win.removeEventListener("storage", listener);
+  };
+}
 
 export interface MockApiClient extends ApiClient {
   /** Resolves when the store has been loaded (or seeded). Every method waits for it, so awaiting is optional. */
@@ -169,9 +194,21 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
   const isOnline = options.isOnline ?? (() => true);
   const defaultLatency = resolveLatency(options.latency);
   const reseedAfterMs = options.reseedAfterMs === undefined ? DAY_MS : options.reseedAfterMs;
+  // Demo-control changes not saved yet: replayed onto the other writer's data when a save finds that data
+  // newer (web tabs), so the change survives while the stale rest of this copy does not.
+  type UnsavedControl = { no: number; apply: () => void };
+  let unsavedControls: UnsavedControl[] = [];
+  let controlNo = 0;
   const persistence = new MockPersistence(options.storage ?? createMemoryStorage(), {
     prefix: options.storagePrefix,
     debounceMs: options.saveDebounceMs ?? 250,
+    hooks: {
+      onExternalSave: () => onExternalSave(),
+      saveStarted: () => controlNo,
+      onSaved: (mark) => {
+        unsavedControls = unsavedControls.filter((control) => control.no > mark);
+      },
+    },
   });
 
   let token: string | null = null;
@@ -198,6 +235,9 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
     const snapshot: MockSnapshot = buildFixtures(now, { generation, latency: defaultLatency, autoReseed });
     const userIds = new Set(snapshot.tables.users.map((user) => user.id));
     snapshot.tables.sessions = sessions.filter((session) => userIds.has(session.userId));
+    // The surviving sessions (and the device-side copies of uploaded files, keyed by id) still hold ids
+    // from the old counter: restarting it at the fixture value would hand out `ses_m1`… again.
+    snapshot.meta.idCounter = Math.max(snapshot.meta.idCounter, store.meta.idCounter);
     store.restore(snapshot);
     ctx.notify.resetThrottles();
   };
@@ -215,13 +255,75 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
         // unusable as an old one.
         if (stale || age < 0 || store.meta.fixtures !== FIXTURES_REVISION) reseed(store.meta.generation + 1, store.meta.autoReseed);
       } catch {
-        // A snapshot that violates the schema (e.g. written by a buggy build) is discarded.
-        store.restore(buildFixtures(clock.now(), { latency: defaultLatency }));
+        // A snapshot that violates the schema (e.g. written by a buggy build) is discarded. Its id counter
+        // is kept when readable, so ids handed out before (device-side file copies) never repeat.
+        const fresh = buildFixtures(clock.now(), { latency: defaultLatency });
+        const storedCounter = (snapshot.meta as { idCounter?: unknown } | undefined)?.idCounter;
+        if (typeof storedCounter === "number" && Number.isSafeInteger(storedCounter)) fresh.meta.idCounter = Math.max(fresh.meta.idCounter, storedCounter);
+        store.restore(fresh);
       }
     }
     persistence.schedule(store);
   };
   const ready = load();
+
+  // ───────────────────────────── another writer of the same storage (web tabs) ─────────────────────────────
+
+  // Only a real device storage can have another writer; the in-memory default never does.
+  const watch = options.watchExternalWrites === undefined ? (options.storage ? browserStorageWatcher() : null) : options.watchExternalWrites;
+  let externalWrite = false;
+  let syncing: Promise<void> | null = null;
+  const unwatch = watch
+    ? watch((key) => {
+        // The manifest is written last by a save: its change means the other writer finished one.
+        if (key === persistence.manifestStorageKey) externalWrite = true;
+      })
+    : null;
+
+  /**
+   * Replaces the in-memory dataset with what the other writer stored, so the next save starts from its
+   * rows (and its save number) instead of writing whole stale tables over them. A change of this client
+   * that was not saved yet is dropped: the two writers edited at the same moment and the stored one wins.
+   */
+  const syncExternalWrites = (): Promise<void> | null => {
+    if (syncing) return syncing;
+    if (!externalWrite) return null;
+    syncing = (async () => {
+      try {
+        await persistence.settled();
+        externalWrite = false;
+        const snapshot = await persistence.load();
+        // Null: the other writer is in the middle of its next save; its manifest event marks us again.
+        if (!snapshot) return;
+        const previous = store.snapshot();
+        try {
+          store.restore(snapshot);
+          store.takeDirty();
+          persistence.discardPending();
+        } catch {
+          // Rows this build cannot accept: keep the own copy (it is saved with the next change).
+          store.restore(previous);
+          return;
+        }
+        // Demo controls changed here but not saved yet are applied again on top of the stored data.
+        for (const control of unsavedControls) control.apply();
+        persistence.schedule(store);
+      } finally {
+        syncing = null;
+      }
+    })();
+    return syncing;
+  };
+
+  /**
+   * A save found the stored manifest written by another writer after this copy was loaded or saved (its
+   * storage event is late, missed, or the change came from outside an API call: a demo control, the
+   * debounced save of an earlier call). Reload instead of writing the stale copy over it.
+   */
+  function onExternalSave(): void {
+    externalWrite = true;
+    void syncExternalWrites()?.catch(() => undefined);
+  }
 
   // ───────────────────────────── forced errors (demo screen) ─────────────────────────────
 
@@ -261,6 +363,8 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
       callCounter += 1;
       // A method never resolves synchronously, even with zero latency.
       await clock.sleep(latencyFor(callCounter, store.controls.latency));
+      const sync = syncExternalWrites();
+      if (sync) await sync.catch(() => undefined);
       try {
         if (!isOnline()) throw ctx.errors.network();
         // Forced errors are consumed before any store access, so the store does not change.
@@ -299,51 +403,81 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
 
   // ───────────────────────────── mock controls ─────────────────────────────
 
+  /**
+   * Applies a demo-control change now (the Demo data screen reads it back at once) and keeps it until it is
+   * saved: when another tab saved in the meantime, this copy is reloaded first and the change re-applied,
+   * so the stale copy (older id counter, save number, rows) is never written over that tab's data.
+   */
+  const applyControl = (apply: () => void): void => {
+    apply();
+    controlNo += 1;
+    unsavedControls.push({ no: controlNo, apply });
+    // The save itself notices a newer stored manifest (`onExternalSave`) and reloads instead of writing.
+    persistence.schedule(store);
+  };
+
+  /** Saves everything, including what a reload from another writer's save re-applied. */
+  const flushAll = async (): Promise<void> => {
+    await ready;
+    // Bounded: every round either saves or reloads what another writer stored.
+    for (let round = 0; round < 4; round += 1) {
+      persistence.schedule(store);
+      await persistence.flush();
+      const pending = syncing;
+      if (!pending) return;
+      await pending.catch(() => undefined);
+    }
+    persistence.schedule(store);
+    await persistence.flush();
+  };
+
+  const rearm = (): void => {
+    const lesson = store.lessons.get(FIXTURE_SOON_LESSON_ID);
+    if (!lesson) return;
+    const now = ctx.nowIso();
+    store.transaction(() => {
+      store.lessons.update(lesson.id, {
+        startsAt: new Date(ctx.now() + MINUTE_MS).toISOString(),
+        finishedAt: null,
+        startedAt: null,
+        status: "PLANNED",
+        updatedAt: now,
+      });
+      for (const participant of store.participants.by("lessonId", lesson.id)) {
+        store.participants.update(participant.id, { joinedAt: null, attendance: "UNKNOWN", updatedAt: now });
+        for (const item of store.lessonItems.by("participantId", participant.id)) {
+          for (const submission of store.submissions.by("itemId", item.id)) ctx.cascade.deleteLessonSubmission(submission.id);
+          store.lessonItems.update(item.id, { result: null });
+        }
+      }
+    });
+    for (const participant of store.participants.by("lessonId", lesson.id)) {
+      ctx.emit({ kind: "lesson-activity", lessonId: lesson.id, teacherId: lesson.teacherId, studentId: participant.studentId });
+    }
+  };
+
   const controls: MockControlActions = {
     get: () => JSON.parse(JSON.stringify(store.controls)) as MockControls,
     set(key, value) {
-      store.patchControls({ [key]: value } as Partial<MockControls>);
-      persistence.schedule(store);
+      applyControl(() => store.patchControls({ [key]: value } as Partial<MockControls>));
     },
     async resetDemoData() {
       await ready;
-      reseed(store.meta.generation + 1, store.meta.autoReseed);
-      ctx.realtime.sessionChanged();
-      persistence.schedule(store);
-      await persistence.flush();
+      applyControl(() => {
+        reseed(store.meta.generation + 1, store.meta.autoReseed);
+        ctx.realtime.sessionChanged();
+      });
+      await flushAll();
     },
     clearLimiters() {
-      ctx.limits.clear();
-      persistence.schedule(store);
+      applyControl(() => ctx.limits.clear());
     },
     exhaust(scope, identifier, rule) {
-      ctx.limits.exhaust(scope, identifier, rule);
-      persistence.schedule(store);
+      applyControl(() => ctx.limits.exhaust(scope, identifier, rule));
     },
     rearmSoonLesson() {
-      const lesson = store.lessons.get(FIXTURE_SOON_LESSON_ID);
-      if (!lesson) return;
-      const now = ctx.nowIso();
-      store.transaction(() => {
-        store.lessons.update(lesson.id, {
-          startsAt: new Date(ctx.now() + MINUTE_MS).toISOString(),
-          finishedAt: null,
-          startedAt: null,
-          status: "PLANNED",
-          updatedAt: now,
-        });
-        for (const participant of store.participants.by("lessonId", lesson.id)) {
-          store.participants.update(participant.id, { joinedAt: null, attendance: "UNKNOWN", updatedAt: now });
-          for (const item of store.lessonItems.by("participantId", participant.id)) {
-            for (const submission of store.submissions.by("itemId", item.id)) ctx.cascade.deleteLessonSubmission(submission.id);
-            store.lessonItems.update(item.id, { result: null });
-          }
-        }
-      });
-      for (const participant of store.participants.by("lessonId", lesson.id)) {
-        ctx.emit({ kind: "lesson-activity", lessonId: lesson.id, teacherId: lesson.teacherId, studentId: participant.studentId });
-      }
-      persistence.schedule(store);
+      if (!store.lessons.has(FIXTURE_SOON_LESSON_ID)) return;
+      applyControl(rearm);
     },
     listLimiters: () => ctx.limits.list(),
     datasetInfo: () => ({
@@ -353,8 +487,7 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
       autoReseed: store.meta.autoReseed,
     }),
     setAutoReseed(enabled) {
-      store.patchMeta({ autoReseed: enabled });
-      persistence.schedule(store);
+      applyControl(() => store.patchMeta({ autoReseed: enabled }));
     },
   };
 
@@ -371,12 +504,9 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
     getSessionToken: () => token,
     controls,
     realtimeState: () => ctx.realtime.state(),
-    async flush() {
-      await ready;
-      persistence.schedule(store);
-      await persistence.flush();
-    },
+    flush: flushAll,
     dispose() {
+      unwatch?.();
       ctx.realtime.dispose();
     },
     backend: ctx,

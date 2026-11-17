@@ -6,6 +6,7 @@ import { RefreshControl, View } from 'react-native';
 import { errorText, qk, useApi } from '@/api';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Avatar, Icon, ListRow, LoadingState, Notice, Text, TextField } from '@/ui';
 
@@ -34,7 +35,6 @@ export function TargetChooser({ onPick }: TargetChooserProps) {
   const { dict, m } = useI18n();
   const t = dict.planner.lessonNew;
   const [query, setQuery] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
 
   const targets = useQuery({ queryKey: qk('planner', 'getLessonTargets'), queryFn: () => api.planner.getLessonTargets() });
   const data = targets.data;
@@ -69,6 +69,8 @@ export function TargetChooser({ onPick }: TargetChooserProps) {
     ];
   }, [data, query, t, dict]);
 
+  const { refreshing, refresh } = usePullRefresh([targets]);
+
   if (!data) {
     return targets.isError || isWaitingForNetwork(targets) ? (
       <View style={styles.state}>
@@ -80,11 +82,6 @@ export function TargetChooser({ onPick }: TargetChooserProps) {
       </View>
     );
   }
-
-  const refresh = () => {
-    setRefreshing(true);
-    void targets.refetch().finally(() => setRefreshing(false));
-  };
 
   const renderRow = ({ item }: { item: ChooserRow }) => {
     switch (item.type) {

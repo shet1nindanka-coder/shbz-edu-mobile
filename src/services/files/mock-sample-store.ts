@@ -5,12 +5,13 @@ import { File } from 'expo-file-system';
 
 import { prepareCacheTarget, type CacheableFile } from './file-cache';
 import { MOCK_DOCX_BASE64 } from './generated/mock-docx';
+import { MOCK_PRINT_HTML } from './mock-print-html';
 import { MOCK_SAMPLE_MODULES } from './mock-sample-assets';
 import type { MockSampleKey } from './mock-samples';
 
-/** A URI an image component can load directly. The DOCX sample has none. */
+/** A URI an image component can load directly. The DOCX and HTML samples have none. */
 export function mockSampleUri(key: MockSampleKey): string {
-  if (key === 'docx') return '';
+  if (key === 'docx' || key === 'printHtml') return '';
   return Asset.fromModule(MOCK_SAMPLE_MODULES[key]).uri;
 }
 
@@ -20,6 +21,12 @@ export async function materialiseMockSample(key: MockSampleKey, file: CacheableF
     const target = prepareCacheTarget(file);
     target.create({ overwrite: true });
     await target.write(MOCK_DOCX_BASE64, { encoding: 'base64' });
+    return target.uri;
+  }
+  if (key === 'printHtml') {
+    const target = prepareCacheTarget(file);
+    target.create({ overwrite: true });
+    await target.write(MOCK_PRINT_HTML);
     return target.uri;
   }
   // In development the asset is served by the dev server; `downloadAsync` gives a file:// copy either way.

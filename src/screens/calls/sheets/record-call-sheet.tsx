@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, isNetworkError, isNotFoundError, useApi } from '@/api';
@@ -48,9 +48,15 @@ export function RecordCallSheet({ target, onClose, onSaved, onMissing }: RecordC
     setError(null);
   }
 
+  // The log is append-only: a second record cannot be undone. `record.isPending` reaches this render only
+  // later, so a synchronous flag keeps a submit handled twice in a row from saving the call twice.
+  const inFlight = useRef(false);
   const record = useMutation({
     mutationFn: (call: { input: RecordCallRequest; target: RecordCallTarget }) => api.groups.recordParentCall(call.input),
     onMutate: () => setError(null),
+    onSettled: () => {
+      inFlight.current = false;
+    },
     onSuccess: (response, call) => onSaved(response, call.target),
     onError: (failure) => {
       // 404 studentNotFound: nothing to retry here — the list reloads without the student.
@@ -66,7 +72,8 @@ export function RecordCallSheet({ target, onClose, onSaved, onMissing }: RecordC
   });
 
   const submit = () => {
-    if (!shown || record.isPending || wait.waiting) return;
+    if (!shown || inFlight.current || wait.waiting) return;
+    inFlight.current = true;
     record.mutate({ input: { studentId: shown.studentId, outcome, comment }, target: shown });
   };
 

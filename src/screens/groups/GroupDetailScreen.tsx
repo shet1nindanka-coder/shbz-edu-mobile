@@ -7,6 +7,7 @@ import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Button, IconButton, LoadingState, Notice, Screen, Segmented } from '@/ui';
 
@@ -45,7 +46,6 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const [createdNotice, dismissCreated] = useGroupNotice(groupNoticeChannel(groupId));
   const [banner, setBanner] = useState<Banner | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   // The group has just been deleted here: nothing may refetch (and answer 404) while the screen leaves.
   const [leaving, setLeaving] = useState(false);
   // The attendance poll runs only while this screen is on top and the app is in the foreground.
@@ -78,6 +78,12 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
       : [group, ...(visited.has('statistics') ? [statistics] : []), ...(visited.has('attendance') ? [attendance] : [])],
   );
 
+  const { refreshing, refresh } = usePullRefresh([
+    group,
+    visited.has('statistics') && statistics,
+    visited.has('attendance') && attendance,
+  ]);
+
   // A foreign or deleted group is indistinguishable from a missing one.
   if (isNotFoundError(group.error) && !leaving) return <NotFoundScreen />;
 
@@ -86,15 +92,6 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const selectTab = (next: Tab) => {
     setTab(next);
     setVisited((current) => (current.has(next) ? current : new Set(current).add(next)));
-  };
-
-  const refresh = () => {
-    setRefreshing(true);
-    void Promise.all([
-      group.refetch(),
-      visited.has('statistics') ? statistics.refetch() : null,
-      visited.has('attendance') ? attendance.refetch() : null,
-    ]).finally(() => setRefreshing(false));
   };
 
   const tabLabels: Record<Tab, string> = {

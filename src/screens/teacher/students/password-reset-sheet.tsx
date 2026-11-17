@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText } from '@/api';
@@ -69,6 +69,8 @@ export function PasswordResetSheet({
   const [error, setError] = useState<string | null>(null);
   const limit = useRetryWait();
 
+  // The keyboard's "send" bypasses Button's press guard: one request at a time, set before mutate.
+  const inFlight = useRef(false);
   const reset = useMutation({
     mutationFn: (input: { target: ResetPasswordTarget; password: string }) => send(input.target.id, input.password),
     onSuccess: (_result, input) => {
@@ -89,12 +91,16 @@ export function PasswordResetSheet({
       }
       setError(text);
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const canSubmit = canSubmitPassword(password) && !limit.waiting;
 
   const submit = () => {
-    if (!target || !canSubmit || reset.isPending) return;
+    if (!target || !canSubmit || inFlight.current) return;
+    inFlight.current = true;
     setError(null);
     reset.mutate({ target, password });
   };

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, useApi } from '@/api';
@@ -33,6 +33,9 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
   const [name, setName] = useState('');
   const [grade, setGrade] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Both the button and the keyboard's "done" submit: `create.isPending` reaches this render only later,
+  // so a synchronous flag keeps two submits handled back to back from creating two groups.
+  const inFlight = useRef(false);
 
   const create = useMutation({
     mutationFn: (input: { name: string; grade: number | null }) => api.groups.createGroup(input),
@@ -43,17 +46,21 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
     // 400 invalidData, 403 unauthorized (a developer), 500 saveFailed and a network failure all carry
     // their own localised line.
     onError: (failure) => setError(errorText(failure, t.list.notices.save)),
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const normalizedName = normalizeGroupName(name);
   const submit = () => {
-    if (create.isPending || normalizedName === '') return;
+    if (inFlight.current || normalizedName === '') return;
     const parsed = parseGradeInput(grade);
     if (!parsed.ok) {
       setError(t.list.notices.invalid);
       return;
     }
     setError(null);
+    inFlight.current = true;
     create.mutate({ name: normalizedName, grade: parsed.grade });
   };
 

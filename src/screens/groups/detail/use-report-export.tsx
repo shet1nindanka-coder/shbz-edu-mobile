@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, useApi } from '@/api';
@@ -45,12 +45,15 @@ export function useReportExport(): ReportExport {
   const { m } = useI18n();
   const wait = useRetryWait();
   const [error, setError] = useState<string | null>(null);
+  // Set synchronously when a report starts: `run.isPending` reaches this hook a render later, and every
+  // report button has its own press guard, so two buttons tapped back to back would both start one.
+  const inFlight = useRef(false);
 
   const run = useMutation({
     mutationFn: (job: ExportJob) => job.download(),
     onMutate: () => setError(null),
-    onSuccess: (file, job) => {
-      navigation.openFiles([{ id: job.key, originalName: file.fileName, mimeType: 'application/pdf', localUri: file.uri }]);
+    onSettled: () => {
+      inFlight.current = false;
     },
     onError: (failure) => {
       // 404 groupNotFound / studentNotFound, 500 exportFailed, 429, 503 and a network failure: each
@@ -61,8 +64,15 @@ export function useReportExport(): ReportExport {
   });
 
   const start = (job: ExportJob) => {
-    if (run.isPending || wait.waiting) return;
-    run.mutate(job);
+    if (inFlight.current || wait.waiting) return;
+    inFlight.current = true;
+    run.mutate(job, {
+      // A per-call callback: TanStack skips it once the group screen has unmounted, so a report that
+      // arrives after the teacher left does not open the viewer over whatever they went to.
+      onSuccess: (file) => {
+        navigation.openFiles([{ id: job.key, originalName: file.fileName, mimeType: 'application/pdf', localUri: file.uri }]);
+      },
+    });
   };
 
   return {

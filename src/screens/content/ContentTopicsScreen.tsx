@@ -10,6 +10,7 @@ import { useI18n } from '@/i18n';
 import { tabsForRole, useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { useCurrentUser } from '@/providers';
 import { DetailAppBar, ShellAppBar, screenTitle } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, Screen, Text } from '@/ui';
 
@@ -49,7 +50,6 @@ export function ContentTopicsScreen() {
   const [createOpen, setCreateOpen] = useState(false);
   const [reorderOpen, setReorderOpen] = useState(false);
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const topics = useQuery({ queryKey: qk('content', 'listTopics'), queryFn: () => api.content.listTopics() });
   const list = topics.data;
@@ -62,10 +62,7 @@ export function ContentTopicsScreen() {
   const listRef = useRef<FlashListRef<TopicListItem>>(null);
   const scrollMemory = useListScrollMemory((offset) => listRef.current?.scrollToOffset({ offset, animated: false }));
 
-  const refresh = () => {
-    setRefreshing(true);
-    void topics.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([topics]);
 
   const open = (topic: TopicListItem) => navigation.push({ screen: 'content.topic', topicId: topic.id });
 

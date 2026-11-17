@@ -22,6 +22,7 @@ import { ComposeCard } from './lessons/compose-card';
 import { LessonCard } from './lessons/lesson-card';
 import { buildLessonRows, groupLessons, hasScheduleAdvanced, type LessonListRow } from './lessons/lessons-list-logic';
 import { useNowTick } from '@/services/clock';
+import { usePullRefresh } from '@/services/query';
 
 /**
  * `planner.lessons` (docs/spec/05-teacher-lessons-plans.md §1.1): root of the teacher's «занятия» tab —
@@ -37,7 +38,6 @@ export function PlannerLessonsScreen() {
   const t = dict.planner.lessonsList;
   const del = dict.planner.lessonDelete;
 
-  const [refreshing, setRefreshing] = useState(false);
   const [menuFor, setMenuFor] = useState<LessonListItem | null>(null);
   const [deleting, setDeleting] = useState<LessonListItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -68,10 +68,7 @@ export function PlannerLessonsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceNow]);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void lessons.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([lessons]);
 
   const remove = useMutation({
     mutationFn: (lesson: LessonListItem) => api.planner.deleteLesson(lesson.id),

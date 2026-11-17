@@ -1,5 +1,5 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { LessonItemResult, TeacherStudentLesson } from '@/api/types';
@@ -20,6 +20,7 @@ import {
   planSettled,
   setWithNumber,
   setWithoutNumber,
+  syncPendingSince,
   type LessonItem,
   type LessonPlanState,
   type LessonSetIds,
@@ -99,6 +100,17 @@ export function useStudentLessons(studentId: string) {
       gcTime: 0,
     })),
   });
+  // When this screen first saw each lesson pending (the site's `pendingSinceRef`): the 15-minute "lost"
+  // timer starts here, not at `lesson.createdAt`, so an old lesson whose plan is being rebuilt shows the
+  // spinner after an app restart. Held per mount, like the site page: re-opening the tab starts it anew.
+  // No re-render is needed after stamping: an unstamped lesson already reads as pending, and the stamp is
+  // "now", so the 30 s tick is what eventually moves it to "stale".
+  const pendingSince = useRef(new Map<string, number>());
+  const pendingKey = pendingLessons.map((lesson) => lesson.id).join(' ');
+  useEffect(() => {
+    syncPendingSince(pendingSince.current, pendingKey === '' ? [] : pendingKey.split(' '), Date.now());
+  }, [pendingKey]);
+
   const listUpdatedAt = list.dataUpdatedAt;
   const listFetching = list.isFetching;
   // A status older than the list describes the past (e.g. the moment before an accepted "Retry").
@@ -136,6 +148,14 @@ export function useStudentLessons(studentId: string) {
 
   // ───────────────────────────── the set ─────────────────────────────
 
+  // The trash icon has no press guard and `busy` disables it one render late: one set write per lesson at a time.
+  const itemsInFlight = useRef(new Set<string>());
+  const saveItems = (lesson: TeacherStudentLesson, ids: LessonSetIds) => {
+    if (itemsInFlight.current.has(lesson.id)) return;
+    itemsInFlight.current.add(lesson.id);
+    items.mutate({ lesson, ids });
+  };
+
   const items = useMutation({
     mutationFn: (input: { lesson: TeacherStudentLesson; ids: LessonSetIds }) =>
       api.planner.saveLessonItems(input.lesson.id, input.lesson.participantId, input.ids.mainIds, input.ids.extraIds),
@@ -151,6 +171,7 @@ export function useStudentLessons(studentId: string) {
       noteItemsWait(error);
     },
     onSettled: (_saved, _error, input) => {
+      itemsInFlight.current.delete(input.lesson.id);
       setBusy((current) => without(current, [input.lesson.id]));
       invalidateStudentData(queryClient);
     },
@@ -194,7 +215,8 @@ export function useStudentLessons(studentId: string) {
   );
 
   const planStateOf = useCallback(
-    (lesson: TeacherStudentLesson): LessonPlanState => lessonPlanState(lesson, now, planRequestedAtOf(lesson.participantId)),
+    (lesson: TeacherStudentLesson): LessonPlanState =>
+      lessonPlanState(lesson, now, pendingSince.current.get(lesson.id), planRequestedAtOf(lesson.participantId)),
     [now],
   );
 
@@ -209,9 +231,9 @@ export function useStudentLessons(studentId: string) {
     planStateOf,
     markResult: (lesson: TeacherStudentLesson, item: LessonItem, value: LessonItemResult | null) => result.mutate({ lesson, item, result: value }),
     removeItem: (lesson: TeacherStudentLesson, item: LessonItem) =>
-      items.mutate({ lesson, ids: setWithoutNumber(lessonSetIds(lesson.items), item.homeworkNumberId) }),
+      saveItems(lesson, setWithoutNumber(lessonSetIds(lesson.items), item.homeworkNumberId)),
     addNumber: (lesson: TeacherStudentLesson, homeworkNumberId: string, toExtra: boolean) =>
-      items.mutate({ lesson, ids: setWithNumber(lessonSetIds(lesson.items), homeworkNumberId, toExtra) }),
+      saveItems(lesson, setWithNumber(lessonSetIds(lesson.items), homeworkNumberId, toExtra)),
     regenerate: (lesson: TeacherStudentLesson) => regenerate.mutate(lesson),
     dismissError: (lessonId: string) => setErrors((current) => without(current, [lessonId])),
   };

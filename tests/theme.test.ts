@@ -153,4 +153,9 @@ describe('initialsOf', () => {
     assert.equal(initialsOf(''), '?');
     assert.equal(initialsOf('   '), '?');
   });
+
+  it('keeps a character outside the BMP whole (no lone surrogate)', () => {
+    assert.equal(initialsOf('😀 Эмодзи Имя'), '😀Э');
+    assert.equal(initialsOf('𝒜lice 𝔅ob'), '𝒜𝔅');
+  });
 });

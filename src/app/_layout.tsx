@@ -9,9 +9,14 @@
 // The guards make a role's tree unreachable for everyone else: a guarded route does not exist for the
 // navigator, so there is no "access denied" screen and no bounce — the site's `requireUser` redirect has
 // no visible equivalent here (90-addendum-2 B.7).
+//
+// `index` is only a redirect: `useRootStackKeeper` swaps it out as soon as something is above it, so the
+// session's bottom route (the role tree, or `login`) is always the first route of this stack. The bottom
+// routes also turn the iOS edge swipe off: there is nothing under them to swipe back to.
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import { useMemo } from 'react';
 
+import { useRootStackKeeper } from '@/navigation';
 import { AppProviders, IS_MOCK_BUILD, useSession } from '@/providers';
 import { LaunchScreen, LockGate, ReminderOpener } from '@/screens/shell';
 import { OfflineBannerHost } from '@/services/network';
@@ -33,6 +38,9 @@ function RootNavigator() {
   const theme = useTheme();
   const { status, user } = useSession();
   const role = status === 'signedIn' ? (user?.role ?? null) : null;
+  // The role tree (or the login form) is the bottom of this stack: the launch route never stays under it,
+  // so back / the edge swipe on a tab root leaves the app instead of rebuilding the role tree.
+  useRootStackKeeper(role, status === 'signedIn' || status === 'signedOut');
 
   // Navigator backgrounds follow the app theme, so a transition never flashes white in dark mode.
   const navigationTheme = useMemo(() => {
@@ -65,17 +73,17 @@ function RootNavigator() {
             <Stack.Screen name="index" options={{ animation: 'none' }} />
 
             <Stack.Protected guard={!signedIn}>
-              <Stack.Screen name="login" options={{ animation: 'fade' }} />
+              <Stack.Screen name="login" options={{ animation: 'fade', gestureEnabled: false }} />
             </Stack.Protected>
 
             <Stack.Protected guard={role === 'STUDENT'}>
-              <Stack.Screen name="(student)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(student)" options={{ animation: 'fade', gestureEnabled: false }} />
             </Stack.Protected>
             <Stack.Protected guard={role === 'TEACHER'}>
-              <Stack.Screen name="(teacher)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(teacher)" options={{ animation: 'fade', gestureEnabled: false }} />
             </Stack.Protected>
             <Stack.Protected guard={role === 'DEVELOPER'}>
-              <Stack.Screen name="(developer)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(developer)" options={{ animation: 'fade', gestureEnabled: false }} />
             </Stack.Protected>
 
             <Stack.Protected guard={signedIn}>

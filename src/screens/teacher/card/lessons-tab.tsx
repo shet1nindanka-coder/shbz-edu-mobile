@@ -9,6 +9,7 @@ import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { LoadingState, Notice, Text } from '@/ui';
 
@@ -44,15 +45,11 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
   // Every lesson starts collapsed; local view state is reset when the screen is opened again.
   const [expandedIds, setExpandedIds] = useState<readonly string[]>([]);
   const [addFor, setAddFor] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const addLesson = lessons?.find((lesson) => lesson.id === addFor) ?? null;
   const waitSeconds = Math.max(controller.waits.result.seconds, controller.waits.items.seconds, controller.waits.plan.seconds);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void list.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([list]);
 
   const toggle = (id: string) => setExpandedIds((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
 

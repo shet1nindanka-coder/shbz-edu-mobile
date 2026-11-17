@@ -9,6 +9,7 @@ import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen, Text } from '@/ui';
 
@@ -55,7 +56,6 @@ export function TeacherStudentsScreen() {
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   // The sheet to open once the current one has finished closing.
   const queued = useRef<Overlay | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const students = useQuery({
     queryKey: qk('teacherStudents', 'listStudents'),
@@ -65,10 +65,7 @@ export function TeacherStudentsScreen() {
   useRefetchOnFocus([students]);
   const studentsFailure = loadFailureOf(students);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void students.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([students]);
 
   /** A banner is useless below the fold: bring the list back to its top with it. */
   const announce = (next: ListNotice) => setNotice(next);

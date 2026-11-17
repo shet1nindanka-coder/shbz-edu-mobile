@@ -89,20 +89,33 @@ function epoch(value: string | null | undefined): number {
 
 /**
  * State of this student's plan in a lesson. A plan that has been "running" for more than 15 minutes was
- * lost (the server does not expose the queue time): the anchor is when the lesson was created, or the
- * latest "Retry" the app had accepted for this participant.
+ * lost (the server does not expose the queue time). Like the site's lessons tab (04 §5.2), the anchor is
+ * when THIS client first saw the lesson pending (`pendingSince`, epoch ms) — never `lesson.createdAt`, so a
+ * plan still being built after an app restart or a retry made elsewhere shows the spinner — or the latest
+ * "Retry" the app had accepted for this participant, whichever is later. Not seen yet → pending.
  */
 export function lessonPlanState(
-  lesson: Pick<TeacherStudentLesson, 'planPending' | 'planError' | 'createdAt'>,
+  lesson: Pick<TeacherStudentLesson, 'planPending' | 'planError'>,
   now: number,
+  pendingSince: number | undefined,
   planRequestedAt?: string | null,
 ): LessonPlanState {
   if (lesson.planError !== null) return 'failed';
   if (!lesson.planPending) return 'ready';
-  const created = epoch(lesson.createdAt);
+  const seen = pendingSince ?? Number.NaN;
   const requested = epoch(planRequestedAt);
-  const anchor = Number.isNaN(requested) ? created : Number.isNaN(created) ? requested : Math.max(created, requested);
+  const anchor = Number.isNaN(requested) ? seen : Number.isNaN(seen) ? requested : Math.max(seen, requested);
   return !Number.isNaN(anchor) && now - anchor > LIMITS.stalePlanMs ? 'stale' : 'pending';
+}
+
+/**
+ * Keeps the "first seen pending" map in step with the current pending set (the site's `pendingSinceRef`):
+ * a newly pending lesson is stamped with `now`, a lesson that left the set is forgotten. Mutates `since`.
+ */
+export function syncPendingSince(since: Map<string, number>, pendingIds: readonly string[], now: number): void {
+  const pending = new Set(pendingIds);
+  for (const id of pending) if (!since.has(id)) since.set(id, now);
+  for (const id of [...since.keys()]) if (!pending.has(id)) since.delete(id);
 }
 
 /** The status poll answered: has this student's plan been built (or failed) since the list was read? */

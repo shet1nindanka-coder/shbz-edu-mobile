@@ -10,6 +10,7 @@ import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Button, IconButton, LoadingState, Notice, Screen, Segmented, Text, TextButton } from '@/ui';
 
@@ -65,7 +66,6 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   const [deleteOpen, setDeleteOpen] = useState(false);
   // Deleted from this screen: it is on its way out, so the 404 of the last refetch is not news.
   const [deleted, setDeleted] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const focusScroll = useRef<{ sectionY: number | null; rowY: number | null; done: boolean }>({ sectionY: null, rowY: null, done: false });
 
@@ -79,6 +79,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   // The editor stays mounted under the number screen: realtime first, and a stale topic is asked again when
   // the editor is returned to (00 §2.3). Nothing is asked for a role the screen is not for.
   useRefetchOnFocus(isDeveloper ? [detail] : NO_QUERIES);
+  const { refreshing, refresh } = usePullRefresh([isDeveloper && detail]);
 
   // Both keep their state while another section is shown (typed text, picked files, a loaded JSON).
   const form = useTopicEditForm({ topicId, detail: data, onNotice: setNotice });
@@ -89,10 +90,6 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   // the cached copy must not stay editable.
   if (!isDeveloper || (!deleted && isNotFoundError(detail.error))) return <NotFoundScreen />;
 
-  const refresh = () => {
-    setRefreshing(true);
-    void detail.refetch().finally(() => setRefreshing(false));
-  };
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: false });
   // The ringed number may sit below the fold of its page: once the section and the row know where they
   // are, the screen scrolls to the row — one time, never against the user's own scrolling later.

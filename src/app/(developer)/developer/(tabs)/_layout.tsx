@@ -6,6 +6,10 @@ import { useTheme } from '@/theme';
 
 export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
 
+// «темы» is the role home (roleHome). Without it the navigator would start on the shortest route name
+// («calls»): a deep entry into a screen above the tabs went back to «звонки», and /developer opened Calls.
+export const unstable_settings = { anchor: 'topics' };
+
 export default function DeveloperTabsLayout() {
   const theme = useTheme();
   return (

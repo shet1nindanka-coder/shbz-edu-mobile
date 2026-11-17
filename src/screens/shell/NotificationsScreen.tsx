@@ -60,7 +60,10 @@ export function NotificationsScreen() {
 
   const markRead = useMutation({
     mutationFn: (notificationId?: string) => api.shell.markNotificationsRead(notificationId ? { notificationId } : {}),
-    onMutate: (notificationId) => {
+    onMutate: async (notificationId) => {
+      // The sheet's opening refetch may still be in flight: its answer was read before this write and would
+      // overwrite the optimistic rows with unread ones, while onSuccess zeroes the count and hides the button.
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
       const now = new Date().toISOString();
       queryClient.setQueryData<NotificationsResponse>(QUERY_KEY, (current) => {
         if (!current) return current;
@@ -79,6 +82,9 @@ export function NotificationsScreen() {
       // The server's count covers rows beyond the 20 shown.
       queryClient.setQueryData<NotificationsResponse>(QUERY_KEY, (current) => (current ? { ...current, unreadCount } : current));
     },
+    // A read that starts after the write is consistent with it (and restores the list a cancelled refetch
+    // did not deliver).
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 
   const openRow = (item: NotificationItem) => {

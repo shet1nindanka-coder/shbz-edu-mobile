@@ -2,7 +2,12 @@ import type { Locale } from '@/lib/i18n/locale';
 
 /** Outcome of a picker call. Only `picked` carries files; every other state is a reason there are none. */
 export type PickResult<T> =
-  | { status: 'picked'; files: T[] }
+  | {
+      status: 'picked';
+      files: T[];
+      /** Photos chosen beyond `limit` and left out, where the picker did not enforce the limit (web, some Android pickers). */
+      dropped?: number;
+    }
   /** The user closed the picker. Not an error: show nothing. */
   | { status: 'cancelled' }
   /**

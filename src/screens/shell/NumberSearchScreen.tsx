@@ -36,6 +36,9 @@ export function NumberSearchScreen() {
   // user corrects the number right away, so the focus comes back.
   const refocus = () => setTimeout(() => input.current?.focus(), 0);
 
+  // Set before the request and cleared when it settles: `isPending` read in a handler is the last render's
+  // value, so a second submit (return key + button) in the same frame would pass it.
+  const inFlight = useRef(false);
   const search = useMutation({
     mutationFn: (number: string) => api.shell.findNumber(number),
     onSuccess: (result) => {
@@ -51,16 +54,20 @@ export function NumberSearchScreen() {
       setError(useServerText ? failure.message : isNetworkError(failure) ? failure.message : t.notFound);
       refocus();
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const submit = (raw: string) => {
-    if (search.isPending) return;
+    if (inFlight.current) return;
     // Also the empty field: that is what is left after typing letters, which are stripped (01 §1.5.4).
     if (!DIGITS_ONLY.test(raw) || ALL_ZEROS.test(raw)) {
       setError(t.invalid);
       return;
     }
     setError(null);
+    inFlight.current = true;
     search.mutate(raw);
   };
 

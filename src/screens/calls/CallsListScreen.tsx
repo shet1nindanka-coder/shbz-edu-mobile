@@ -10,6 +10,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useScreenFocused, type AppLink, type ScreenParams } from '@/navigation';
 import { useCurrentUser } from '@/providers';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen } from '@/ui';
 
@@ -55,7 +56,6 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
 
   const [notice, setNotice] = useState<ListNotice | null>(null);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   // From a saved call until the list has reloaded: the row is about to change its state and place.
   const [settling, setSettling] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -109,10 +109,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   }, [flashId]);
 
   // ── actions ────────────────────────────────────────────────────────────────────────────────────
-  const refresh = () => {
-    setRefreshing(true);
-    void overview.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([overview]);
 
   /** A banner is useless below the fold: bring the list back to its top with it. */
   const announce = (next: ListNotice) => {

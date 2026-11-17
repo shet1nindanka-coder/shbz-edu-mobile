@@ -105,7 +105,8 @@ export function createLessons(
     audit.write({
       category: "DATA",
       action: "lesson.auto_results",
-      actorName: "Автозавершение урока",
+      // No actor, as on the site (lib/lesson-finalize.ts): the system name is written only on the
+      // per-number progress.status rows, so the journal shows «—» here.
       targetType: "Lesson",
       targetId: lesson.id,
       targetLabel: lesson.title,

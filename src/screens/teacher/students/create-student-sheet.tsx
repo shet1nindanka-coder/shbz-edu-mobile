@@ -54,6 +54,8 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
   const passwordRef = useRef<TextInputInstance>(null);
   const values = { name, login, password };
 
+  // The keyboard's "send" bypasses Button's press guard: one request at a time, set before mutate.
+  const inFlight = useRef(false);
   const create = useMutation({
     mutationFn: (input: StudentCreateInput) => api.teacherStudents.createStudent(input),
     onSuccess: ({ student }, input) => {
@@ -79,12 +81,16 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
         setFormError(text);
       }
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const canSubmit = canSubmitStudentForm(values) && !create.isPending && !limit.waiting;
 
   const submit = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || inFlight.current) return;
+    inFlight.current = true;
     setFormError(null);
     setLoginError(null);
     create.mutate({ name, login, password });

@@ -13,6 +13,8 @@ import type { RealtimeConnectionState, RealtimeEvent } from "../src/api/types";
 import { META_LIMITS } from "../src/api/types";
 import { DAY_MS, HOUR_MS, MINUTE_MS } from "../src/domain/moscow-time";
 import { DEMO_PERSONAS, createMockApiClient } from "../src/mock";
+import { createManualClock } from "../src/mock/clock";
+import { createMemoryStorage } from "../src/mock/store/persistence";
 import { latencyFor } from "../src/mock/rules";
 import { TEST_T0, createTestMock } from "../src/mock/testing";
 
@@ -707,6 +709,34 @@ describe("MockApiClient: offline, forced errors, persistence", () => {
     assert.equal(reopened.api.controls.datasetInfo().generation, 2);
   });
 
+  it("keeps the id counter across a reset, so surviving sessions never collide with new ones", async () => {
+    const mock = createTestMock();
+    await mock.signIn("ilya@example.com");
+    const before = mock.store.sessions.all().map((session) => session.id);
+    assert.ok(before.length > 0);
+    await mock.api.controls.resetDemoData();
+    assert.deepEqual(mock.store.sessions.all().map((session) => session.id), before);
+    // A second sign-in while the first session is still stored gets a fresh id.
+    await mock.api.shell.login({ login: "teacher@example.com", password: "teacher123" });
+    const after = mock.store.sessions.all().map((session) => session.id);
+    assert.equal(new Set(after).size, after.length);
+    assert.equal(after.length, before.length + 1);
+    const fresh = mock.store.nextId("ses");
+    assert.ok(!after.includes(fresh));
+  });
+
+  it("keeps the id counter when the stored dataset is re-seeded at start", async () => {
+    const first = createTestMock();
+    await first.signIn("ilya@example.com");
+    const counter = first.store.meta.idCounter;
+    first.store.patchMeta({ fixtures: 0 });
+    await first.api.flush();
+    const second = createTestMock({ storage: first.storage, clock: first.clock });
+    await second.api.ready();
+    assert.equal(second.api.controls.datasetInfo().generation, 2);
+    assert.ok(second.store.meta.idCounter >= counter);
+  });
+
   it("re-arms the lesson that starts in a minute", async () => {
     const mock = createTestMock();
     await mock.api.ready();
@@ -737,6 +767,183 @@ describe("MockApiClient: offline, forced errors, persistence", () => {
     assert.equal((await api.shell.getMe()).user.role, "DEVELOPER");
     await api.flush();
     api.dispose();
+  });
+});
+
+describe("MockApiClient: two writers of one storage (web tabs)", () => {
+  it("reloads what the other tab saved before its next call instead of overwriting whole tables", async () => {
+    const shared = createMemoryStorage();
+    const clock = createManualClock(TEST_T0);
+    // Each "tab" writes through its own adapter; a write reaches the OTHER tabs as a browser `storage` event.
+    const listeners = new Map<number, (key: string) => void>();
+    const tab = (id: number) =>
+      createMockApiClient({
+        clock,
+        latency: 0,
+        saveDebounceMs: 0,
+        storage: {
+          getItem: (key) => shared.getItem(key),
+          removeItem: (key) => shared.removeItem(key),
+          setItem: async (key, value) => {
+            await shared.setItem(key, value);
+            for (const [other, listener] of listeners) if (other !== id) listener(key);
+          },
+        },
+        watchExternalWrites: (onWrite) => {
+          listeners.set(id, onWrite);
+          return () => listeners.delete(id);
+        },
+      });
+    const signIn = async (client: ReturnType<typeof tab>, login: string) => {
+      const { token } = await client.shell.login({ login, password: "student123" });
+      client.setSessionToken(token);
+    };
+
+    const a = tab(1);
+    const b = tab(2);
+    await Promise.all([a.ready(), b.ready()]);
+    await signIn(a, "ilya@example.com");
+    await a.shell.updateProfile({ name: "Илья из вкладки A" });
+    await a.flush();
+    // Tab B loaded before A's saves; its own writes must not bring back its stale copy of the tables.
+    await signIn(b, "maria@example.com");
+    await b.shell.updateProfile({ name: "Мария из вкладки B" });
+    await b.flush();
+    // …and tab A still sees its session (B's save kept it) and B's change.
+    assert.equal((await a.shell.getMe()).user.name, "Илья из вкладки A");
+    assert.equal(a.backend.store.users.get("usr_maria")!.name, "Мария из вкладки B");
+    await a.flush();
+
+    const reopened = createMockApiClient({ clock, latency: 0, saveDebounceMs: 0, storage: shared, watchExternalWrites: null });
+    await reopened.ready();
+    assert.equal(reopened.backend.store.users.get("usr_ilya")!.name, "Илья из вкладки A");
+    assert.equal(reopened.backend.store.users.get("usr_maria")!.name, "Мария из вкладки B");
+    assert.equal(reopened.backend.store.sessions.size, 2);
+    a.dispose();
+    b.dispose();
+    reopened.dispose();
+  });
+
+  /** Two "tabs" over one storage; `deliver: false` drops the storage events (a missed or late event). */
+  function twoTabs(options: { debounceA?: number; deliver?: boolean } = {}) {
+    const shared = createMemoryStorage();
+    const clock = createManualClock(TEST_T0);
+    const listeners = new Map<number, (key: string) => void>();
+    const tab = (id: number, saveDebounceMs: number) =>
+      createMockApiClient({
+        clock,
+        latency: 0,
+        saveDebounceMs,
+        storage: {
+          getItem: (key) => shared.getItem(key),
+          removeItem: (key) => shared.removeItem(key),
+          setItem: async (key, value) => {
+            await shared.setItem(key, value);
+            if (options.deliver === false) return;
+            for (const [other, listener] of listeners) if (other !== id) listener(key);
+          },
+        },
+        watchExternalWrites: (onWrite) => {
+          listeners.set(id, onWrite);
+          return () => listeners.delete(id);
+        },
+      });
+    const reopen = async () => {
+      const client = createMockApiClient({ clock, latency: 0, saveDebounceMs: 0, storage: shared, watchExternalWrites: null });
+      await client.ready();
+      return client;
+    };
+    return { a: tab(1, options.debounceA ?? 0), b: tab(2, 0), reopen };
+  }
+
+  it("a demo control used in a stale tab never moves the stored id counter back", async () => {
+    for (const deliver of [true, false]) {
+      const { a, b, reopen } = twoTabs({ deliver });
+      await Promise.all([a.ready(), b.ready()]);
+      const { token } = await b.shell.login({ login: "teacher@example.com", password: "teacher123" });
+      b.setSessionToken(token);
+      await b.groups.createGroup({ name: "G1" });
+      await b.flush();
+      const counter = b.backend.store.meta.idCounter;
+      assert.ok(a.backend.store.meta.idCounter < counter);
+
+      // Tab A has made no API call since B saved; the Demo data screen calls the controls directly.
+      a.controls.set("checkQueueFull", true);
+      a.controls.exhaust("login:ip", "mock-device");
+      // The change is visible at once in the tab that made it.
+      assert.equal(a.controls.get().checkQueueFull, true);
+      await a.flush();
+
+      const stored = await reopen();
+      assert.ok(stored.backend.store.meta.idCounter >= counter, `deliver=${deliver}`);
+      assert.equal(stored.controls.get().checkQueueFull, true);
+      assert.ok(stored.backend.store.limiterBuckets.size > 0);
+      assert.equal(stored.backend.store.groups.all().filter((group) => group.name === "G1").length, 1);
+      stored.dispose();
+
+      // B goes on creating rows without colliding with ids it handed out before. (Without the storage
+      // event B learns about A's save only when its own save finds it: that one change of B is dropped —
+      // the stored copy wins — but nothing collides.)
+      await b.groups.createGroup({ name: "G2" });
+      await b.groups.createGroup({ name: "G3" });
+      await b.flush();
+      const again = await reopen();
+      assert.deepEqual(
+        again.backend.store.groups.all().map((group) => group.name).filter((name) => /^G\d$/.test(name)).sort(),
+        deliver ? ["G1", "G2", "G3"] : ["G1", "G3"],
+      );
+      assert.equal(again.controls.get().checkQueueFull, true);
+      again.dispose();
+      a.dispose();
+      b.dispose();
+    }
+  });
+
+  it("a reset of the demo data in a stale tab lands on top of the other tab's save", async () => {
+    const { a, b, reopen } = twoTabs({ deliver: false });
+    await Promise.all([a.ready(), b.ready()]);
+    const { token } = await b.shell.login({ login: "teacher@example.com", password: "teacher123" });
+    b.setSessionToken(token);
+    await b.groups.createGroup({ name: "G1" });
+    await b.flush();
+    const counter = b.backend.store.meta.idCounter;
+
+    await a.controls.resetDemoData();
+    const stored = await reopen();
+    assert.equal(stored.controls.datasetInfo().generation, 2);
+    assert.ok(stored.backend.store.meta.idCounter >= counter);
+    // B's session survives the reset (sessions of existing users are kept).
+    assert.ok(stored.backend.store.sessions.all().some((session) => session.userId === "usr_anna"));
+    stored.dispose();
+    a.dispose();
+    b.dispose();
+  });
+
+  it("the debounced save of a stale tab does not write its whole tables over the other tab's newer save", async () => {
+    const { a, b, reopen } = twoTabs({ debounceA: 40 });
+    await Promise.all([a.ready(), b.ready()]);
+    const ilya = await a.shell.login({ login: "ilya@example.com", password: "student123" });
+    a.setSessionToken(ilya.token);
+    await a.flush();
+    // A's next change waits for its debounce timer while B saves a change of another row.
+    await a.shell.updateProfile({ name: "Илья из вкладки A" });
+    const maria = await b.shell.login({ login: "maria@example.com", password: "student123" });
+    b.setSessionToken(maria.token);
+    await b.shell.updateProfile({ name: "Мария из вкладки B" });
+    await b.flush();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await a.flush();
+
+    const stored = await reopen();
+    // The stored copy wins: B's row and session are kept, nothing went backwards.
+    assert.equal(stored.backend.store.users.get("usr_maria")!.name, "Мария из вкладки B");
+    assert.ok(stored.backend.store.sessions.all().some((session) => session.userId === "usr_maria"));
+    assert.ok(stored.backend.store.meta.idCounter >= b.backend.store.meta.idCounter);
+    // …and tab A now works on B's data.
+    assert.equal(a.backend.store.users.get("usr_maria")!.name, "Мария из вкладки B");
+    stored.dispose();
+    a.dispose();
+    b.dispose();
   });
 });
 

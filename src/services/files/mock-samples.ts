@@ -12,6 +12,8 @@ export type MockSampleKey =
   | 'pdfShort'
   | 'docx'
   | 'cheatsheet'
+  /** The print version of a lesson handout (an HTML page, `planner.getHandoutUrl({ format: 'html' })`). */
+  | 'printHtml'
   | `photo${MockPhotoIndex}`
   | `photo${MockPhotoIndex}Thumb`;
 
@@ -71,6 +73,7 @@ export const MOCK_SAMPLE_MIME: Record<MockSampleKey, string> = {
   pdfShort: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   cheatsheet: 'image/jpeg',
+  printHtml: 'text/html',
   photo1: 'image/jpeg',
   photo2: 'image/jpeg',
   photo3: 'image/jpeg',
@@ -88,3 +91,8 @@ export const MOCK_SAMPLE_MIME: Record<MockSampleKey, string> = {
   photo7Thumb: 'image/jpeg',
   photo8Thumb: 'image/jpeg',
 };
+
+/** Runtime check for a key coming from outside the device layer (a `mock-sample://` URL of the backend). */
+export function isMockSampleKey(value: string): value is MockSampleKey {
+  return Object.prototype.hasOwnProperty.call(MOCK_SAMPLE_MIME, value);
+}

@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
@@ -7,6 +6,7 @@ import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Enter, LoadingState, Notice, PageHeader, Screen } from '@/ui';
 
@@ -24,7 +24,6 @@ export function TeacherHomeScreen() {
   const { dict, m } = useI18n();
   const t = dict.teacherHome;
   const navigation = useAppNavigation();
-  const [refreshing, setRefreshing] = useState(false);
 
   const home = useQuery({
     queryKey: qk('teacherStudents', 'getTeacherHome'),
@@ -51,10 +50,7 @@ export function TeacherHomeScreen() {
       )
     : null;
 
-  const refresh = () => {
-    setRefreshing(true);
-    void Promise.all([home.refetch(), callCounts.refetch()]).finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([home, callCounts]);
 
   const open = (card: HomeCard) => navigation.open(card.link);
 

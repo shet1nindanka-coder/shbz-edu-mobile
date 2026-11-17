@@ -159,12 +159,15 @@ export function streakColorMeta(currentStreak: number): StreakColorMeta {
   };
 }
 
-/** Same rule as `initialsOf()` in the site's components/dashboard-nav.tsx. */
+/**
+ * Same rule as `initialsOf()` in the site's components/dashboard-nav.tsx, but by code point: the site's
+ * `charAt(0)` cuts an emoji (or any letter outside the BMP) into a lone surrogate that renders as "�".
+ */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   return parts
     .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
+    .map((part) => (Array.from(part)[0] ?? '').toUpperCase())
     .join('');
 }

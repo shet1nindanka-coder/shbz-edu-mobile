@@ -5,8 +5,11 @@ import { mskDayKey } from '@/domain/moscow-time';
 export type HandoutVariant = { answers?: boolean; format?: 'pdf' | 'html'; studentId?: string };
 
 /**
- * File name of a handout as the site sends it: `urok-YYYY-MM-DD.pdf`, `otvety-…` for the answer sheet;
- * the date is the Moscow day the lesson (or the homework draft) was created.
+ * File name of a handout in the site's pattern: `urok-YYYY-MM-DD.pdf`, `otvety-…` for the answer sheet.
+ * Deliberate deviation: the date is the MOSCOW day the lesson (or the homework draft) was created. The
+ * site's pdf route slices `createdAt.toISOString()`, i.e. the UTC day, so for a lesson created between
+ * 00:00 and 03:00 Moscow time it names the previous day — every other date the teacher sees is a Moscow
+ * day (CLAUDE.md "Time"). The name is only the cache / share-sheet file name; the viewer shows its own title.
  */
 export function handoutFileName(createdAt: string, options: Pick<HandoutVariant, 'answers' | 'format'> = {}): string {
   const day = mskDayKey(createdAt);

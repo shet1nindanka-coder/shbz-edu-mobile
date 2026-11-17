@@ -21,5 +21,5 @@ export type {
   ScriptedResult,
 } from "./schema";
 export { DEFAULT_STORAGE_PREFIX, MockPersistence, createMemoryStorage } from "./persistence";
-export type { MockStorageAdapter } from "./persistence";
+export type { MockPersistenceHooks, MockStorageAdapter } from "./persistence";
 export * as cascade from "./cascade";

@@ -31,7 +31,7 @@ export function useStudentReport(studentId: string): StudentReport {
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
-  const { dict, m } = useI18n();
+  const { m } = useI18n();
   const wait = useRetryWait();
   const noteWait = wait.note;
   const [error, setError] = useState<string | null>(null);
@@ -59,16 +59,17 @@ export function useStudentReport(studentId: string): StudentReport {
     const done = ready.current;
     ready.current = null;
     if (!done) return;
+    // Not the site's period buttons (only the first of them says «Отчёт»): the viewer title stands alone.
     const titles: Record<ReportPeriod, string> = {
-      '7d': dict.students.detail.report7d,
-      '30d': dict.students.detail.report30d,
-      year: dict.students.detail.reportYear,
+      '7d': m.teacher.report.title7d,
+      '30d': m.teacher.report.title30d,
+      year: m.teacher.report.titleYear,
     };
     navigation.openFiles(
       [{ id: `student-report-${studentId}-${done.period}`, originalName: done.file.fileName, mimeType: 'application/pdf', localUri: done.file.uri }],
       { title: titles[done.period] },
     );
-  }, [dict, navigation, studentId]);
+  }, [m, navigation, studentId]);
 
   return {
     pendingPeriod: download.isPending ? (download.variables ?? null) : null,

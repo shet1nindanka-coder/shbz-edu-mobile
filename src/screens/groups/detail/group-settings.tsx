@@ -51,8 +51,13 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
   const [name, setName] = useState(group.name);
   const [renameError, setRenameError] = useState<string | null>(null);
 
+  // The button and the keyboard's "done" both submit: a synchronous flag, `rename.isPending` lags a render.
+  const renameInFlight = useRef(false);
   const rename = useMutation({
     mutationFn: (value: string) => api.groups.renameGroup(group.id, { name: value }),
+    onSettled: () => {
+      renameInFlight.current = false;
+    },
     onMutate: () => setRenameError(null),
     onSuccess: ({ group: renamed }) => {
       queryClient.setQueryData<GroupDetailResponse>(qk('groups', 'getGroup', group.id), (current) =>
@@ -88,7 +93,8 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
 
   const normalized = normalizeGroupName(name);
   const submitRename = () => {
-    if (rename.isPending || normalized === '') return;
+    if (renameInFlight.current || normalized === '') return;
+    renameInFlight.current = true;
     rename.mutate(normalized);
   };
 

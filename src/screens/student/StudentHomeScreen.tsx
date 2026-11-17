@@ -7,6 +7,7 @@ import { correctedNow } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar, useStudentStreak } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Card, Chip, Enter, Icon, ListRow, Notice, PageHeader, Screen, TextButton, navIcons } from '@/ui';
 
@@ -17,7 +18,6 @@ import { HomeSkeleton } from './study/home-skeleton';
 import { RefreshError } from './study/refresh-error';
 import { StreakWidget } from './study/streak-widget';
 import { useNow } from './study/use-now';
-import { useRefresh } from './study/use-refresh';
 
 /**
  * `student.home` — «Обзор» (docs/spec/02-student-study.md S1): what is next (the nearest unfinished
@@ -40,9 +40,7 @@ export function StudentHomeScreen() {
     queryFn: () => api.studentStudy.getHomeworkDeadlines(),
   });
   const streak = useStudentStreak();
-  const { refetch: refetchDeadlines } = deadlines;
-  const { refetch: refetchStreak } = streak;
-  const { refreshing, refresh } = useRefresh(() => Promise.all([refetchDeadlines(), refetchStreak()]));
+  const { refreshing, refresh } = usePullRefresh([deadlines, streak]);
   useRefetchOnFocus([deadlines, streak]);
 
   const data = deadlines.data;
@@ -61,7 +59,7 @@ export function StudentHomeScreen() {
       <Notice
         tone="error"
         text={m.student.home.streakFailed}
-        action={<TextButton label={dict.common.retry} tone="danger" onPress={() => void refetchStreak()} testID="home-streak-retry" />}
+        action={<TextButton label={dict.common.retry} tone="danger" onPress={() => void streak.refetch()} testID="home-streak-retry" />}
         testID="home-streak-error"
       />
     </HomeSection>

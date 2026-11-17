@@ -422,7 +422,12 @@ describe("rules: lazy lesson finalisation", () => {
     const auto = mock.store.auditLogs.all().slice(journal).filter((row) => row.action === "lesson.auto_results");
     assert.equal(auto.length, 1);
     assert.equal(auto[0]!.summary, "Итоги закрыты автоматически: не решил — 1, не успел — 9, отметок посещаемости — 1");
-    assert.equal(auto[0]!.actorName, "Автозавершение урока");
+    // The site writes lesson.auto_results with no actor (the journal shows «—»); the system name is only
+    // on the per-number progress.status rows of source lesson_end.
+    assert.deepEqual([auto[0]!.actorId, auto[0]!.actorName, auto[0]!.actorRole], [null, null, null]);
+    const statusRows = mock.store.auditLogs.all().slice(journal).filter((row) => row.action === "progress.status");
+    assert.ok(statusRows.length > 0);
+    assert.ok(statusRows.every((row) => row.actorName === "Автозавершение урока" && row.actorId === null));
 
     await Promise.resolve();
     await Promise.resolve();

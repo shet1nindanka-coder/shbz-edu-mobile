@@ -11,6 +11,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, IconButton, LoadingState, Notice, Screen, Segmented, Text } from '@/ui';
 
@@ -43,7 +44,6 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   // Deleted from this screen: it is on its way out, so the 404 of the last refetch is not news.
   const [deleted, setDeleted] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const detail = useQuery({ queryKey: qk('content', 'getTopic', topicId), queryFn: () => api.content.getTopic(topicId) });
   const data = detail.data;
@@ -64,10 +64,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
     });
   }, []);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void detail.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([detail]);
 
   // The topic is gone (deleted by another developer, or from the editor above this screen): a 404 is the
   // not-found state whether or not a copy is cached (90-addendum-1 A.3 rule 6) — files, numbers and answers

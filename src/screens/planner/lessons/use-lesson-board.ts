@@ -10,6 +10,7 @@ import { serverClockOffset } from '@/domain/server-clock';
 import { format, useI18n } from '@/i18n';
 
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
+import { useStillHere } from '../shared/use-still-here';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 import { mergeQueryData } from '@/services/query';
@@ -44,6 +45,7 @@ export function useLessonBoard(lessonId: string) {
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const { dict } = useI18n();
   const t = dict.planner.lessonBoard;
   const boardKey = qk('planner', 'getLessonBoard', lessonId);
@@ -362,7 +364,8 @@ export function useLessonBoard(lessonId: string) {
       // The cached board is left alone: dropping it now would make this still-mounted screen read the
       // deleted lesson once more and flash "not found" during the transition.
       invalidateAround();
-      navigation.open({ screen: 'planner.lessons' });
+      // Only from the board itself: a teacher who has left it meanwhile is not moved.
+      if (stillHere()) navigation.open({ screen: 'planner.lessons' });
     },
     onError: (error) => {
       lessonWait.note(error);

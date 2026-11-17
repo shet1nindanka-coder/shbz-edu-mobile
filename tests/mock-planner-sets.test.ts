@@ -656,6 +656,37 @@ describe("planner: plan generation on the mock clock", () => {
     assert.deepEqual([lastAudit(mock).action, lastAudit(mock).actorId], ["lesson_plan.generate", "usr_anna"]);
   });
 
+  it("journals the shortlist call before the plan call when the trimmed pool exceeds the shortlist size", async () => {
+    const mock = await signedIn(ANNA);
+    const size = mock.store.settings.lessonPlanShortlistSize;
+    // The job runs when the clock passes its delay and somebody reads the lesson.
+    const generated = async ({ lessonId }: { lessonId: string }) => {
+      mock.clock.advance(5000);
+      assert.equal((await mock.api.planner.getLessonStatus(lessonId)).ready, 1);
+    };
+    const rows = () => mock.store.auditLogs.all().filter((row) => row.category === "AI" && row.targetId === "usr_timur");
+
+    // Every topic: far more numbers than the shortlist size even after the per-topic trim (site: two calls).
+    const before = rows().length;
+    await generated(await newLesson(mock, "usr_timur", { topicIds: [] }));
+    const all = rows().slice(before);
+    assert.deepEqual(all.map((row) => [row.action, row.model]), [["lesson_plan.shortlist", "gpt-6-luna"], ["lesson_plan.generate", "gpt-6.1-sol"]]);
+    assert.deepEqual([all[0]!.actorId, all[0]!.outcome, all[0]!.targetLabel], ["usr_anna", "ok", "Тимур Новиков"]);
+    // The plan call sees at most `shortlistSize` candidates.
+    assert.equal(all[1]!.inputTokens, 3200 + 140 * size);
+
+    // One topic: the trim to the topic head leaves ≤ the shortlist size, so there is no shortlist call.
+    const single = rows().length;
+    await generated(await newLesson(mock, "usr_timur", { topicIds: ["top_systems"] }));
+    assert.deepEqual(rows().slice(single).map((row) => row.action), ["lesson_plan.generate"]);
+
+    // No shortlist model set: the site makes the call on the main model.
+    mock.store.patchSettings({ aiShortlistModel: "" });
+    const fallback = rows().length;
+    await generated(await newLesson(mock, "usr_timur", { topicIds: [] }));
+    assert.deepEqual(rows().slice(fallback).map((row) => [row.action, row.model]), [["lesson_plan.shortlist", "gpt-6.1-sol"], ["lesson_plan.generate", "gpt-6.1-sol"]]);
+  });
+
   it("honours the one-shot nextPlanOutcome control", async () => {
     const mock = await signedIn(ANNA);
     const p = mock.api.planner;

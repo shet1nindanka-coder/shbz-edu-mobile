@@ -11,7 +11,8 @@ import { QueryObserver, onlineManager, type QueryClient, type QueryObserverResul
 
 import { ApiError, isNetworkError } from "@/api/errors";
 import { PERSIST_STORAGE_KEY } from "@/services/query/persist-policy";
-import { createAppQueryClient, removePersistedQueries } from "@/services/query/query-client";
+import { createAppQueryClient, markRestoredQueriesStale, removePersistedQueries } from "@/services/query/query-client";
+import { isPullRefreshing } from "@/services/query/use-pull-refresh";
 
 const NETWORK_TEXT = "Нет связи с сервером.";
 
@@ -139,6 +140,65 @@ describe("query client offline rules", () => {
     await waitFor(observer, (result) => result.status === "error" && result.fetchStatus === "idle");
     // One retry for a failure that a second attempt can fix.
     assert.equal(calls, 2);
+  });
+
+  it("marks a restored cache stale, so a statement kept fresh forever is fetched again after a restart", async () => {
+    client = mountedClient();
+    const startedAt = Date.now();
+    const restoredKey = ["content", "getTopicConditions", "top_quadratic"];
+    const thisRunKey = ["content", "listTopics"];
+    client.setQueryData(restoredKey, "old statement", { updatedAt: startedAt - 3 * 24 * 60 * 60 * 1000 });
+    client.setQueryData(thisRunKey, "fresh", { updatedAt: startedAt + 1 });
+    await markRestoredQueriesStale(client, startedAt);
+    assert.equal(client.getQueryState(restoredKey)?.isInvalidated, true);
+    assert.equal(client.getQueryState(thisRunKey)?.isInvalidated, false);
+    // Nothing was fetched by the call itself; a screen with staleTime Infinity now refetches on mount.
+    let calls = 0;
+    const observer = new QueryObserver<string, unknown>(client, {
+      queryKey: restoredKey,
+      staleTime: Number.POSITIVE_INFINITY,
+      queryFn: () => {
+        calls += 1;
+        return Promise.resolve("new statement");
+      },
+    });
+    const stop = observer.subscribe(() => undefined);
+    try {
+      const loaded = await waitFor(observer, (result) => result.data === "new statement");
+      assert.equal(loaded.fetchStatus === "idle" || loaded.fetchStatus === "fetching", true);
+      assert.equal(calls, 1);
+    } finally {
+      stop();
+    }
+  });
+
+  it("pull-to-refresh: the spinner ends when a refetch over cached data is parked offline", async () => {
+    client = mountedClient();
+    const key = ["teacherStudents", "listStudents"];
+    client.setQueryData(key, "cached", { updatedAt: Date.now() - 60_000 });
+    onlineManager.setOnline(false);
+    const observer = new QueryObserver<string, unknown>(client, {
+      queryKey: key,
+      queryFn: () => Promise.reject(ApiError.network(NETWORK_TEXT)),
+    });
+    const stop = observer.subscribe(() => undefined);
+    try {
+      // The user pulls: the refetch promise stays pending while offline ...
+      let settled = false;
+      void observer.refetch().finally(() => {
+        settled = true;
+      });
+      const parked = await waitFor(observer, (result) => result.fetchStatus === "paused");
+      assert.equal(settled, false);
+      // ... but the spinner is not bound to it.
+      assert.equal(isPullRefreshing(true, [parked.fetchStatus]), false);
+      assert.equal(isPullRefreshing(true, ["fetching"]), true);
+      assert.equal(isPullRefreshing(false, ["fetching"]), false);
+      onlineManager.setOnline(true);
+      await waitFor(observer, (result) => result.fetchStatus === "idle");
+    } finally {
+      stop();
+    }
   });
 
   it("removes the persisted cache from storage at once", async () => {

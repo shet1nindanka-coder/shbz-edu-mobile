@@ -1,4 +1,4 @@
-import { View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles, useTheme, type TextVariant, type Theme } from '@/theme';
 
@@ -6,6 +6,7 @@ import { AccentGradient } from './accent-gradient';
 import { Icon, type IconName } from './icon';
 import { absoluteFill } from './internal/layout';
 import { hitSlopFor, PressableScale } from './internal/pressable-scale';
+import { usePressGuard, type GuardedPress } from './internal/press-guard';
 import { Spinner } from './spinner';
 import { Text } from './text';
 
@@ -14,7 +15,11 @@ export type ButtonSize = 'sm' | 'md' | 'lg' | 'field';
 
 export type ButtonProps = {
   label: string;
-  onPress?: (event: GestureResponderEvent) => void;
+  /**
+   * A second press is ignored until the first one has been handled (the next macrotask), or — when the
+   * handler returns a promise (`() => mutation.mutateAsync(…)`) — until that promise settles.
+   */
+  onPress?: GuardedPress;
   /** Default `primary`. Never place two gradient (primary) buttons next to each other. */
   variant?: ButtonVariant;
   /** `sm` 36 · `md` 44 (default) · `lg` 48 · `field` 52 (pairs with an input). */
@@ -122,6 +127,7 @@ export function Button({
   style,
 }: ButtonProps) {
   const theme = useTheme();
+  const guardedPress = usePressGuard(onPress);
   const styles = useStyles();
   const spec = variantSpec(variant, theme);
   const inactive = disabled || loading;
@@ -145,7 +151,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
-      onPress={onPress}
+      onPress={guardedPress}
       hitSlop={hitSlopFor(theme.sizes.minTouch, height)}
       testID={testID}
       style={[

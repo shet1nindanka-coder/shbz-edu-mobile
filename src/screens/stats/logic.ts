@@ -28,6 +28,20 @@ type Content = DeveloperStatistics["content"];
 export const STATS_VIEWS = ["teacher", "teachers", "developer"] as const;
 export type StatsView = (typeof STATS_VIEWS)[number];
 
+/**
+ * The view and the timeline student a link opens (site `teacher/statistics/page.tsx`): `view` is
+ * "teachers" or "developer", anything else is the progress view; `studentId` filters the timeline of the
+ * progress view only.
+ */
+export function initialStatsState(
+  view: string | undefined,
+  studentId: string | undefined,
+): { view: StatsView; timelineStudentId: string | undefined } {
+  const resolved: StatsView = view === "developer" ? "developer" : view === "teachers" ? "teachers" : "teacher";
+  const timelineStudentId = resolved === "teacher" && studentId ? studentId : undefined;
+  return { view: resolved, timelineStudentId };
+}
+
 /** Rankings show the first five rows. */
 export const RANKING_SIZE = 5;
 /** «Пробелы в контенте» lists the first six topics, then «И ещё N тем с пробелами». */

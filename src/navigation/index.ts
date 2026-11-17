@@ -12,6 +12,7 @@ export {
   navigateTo,
   useAppNavigation,
   useNavTarget,
+  useRootStackKeeper,
   useScreenFocused,
   useTrackPosition,
   type AppNavigation,
@@ -34,6 +35,7 @@ export {
   type RoutePlacement,
   type ScreenParams,
 } from './routes';
+export { LAUNCH_ROUTE, normalizeRootStack, sessionBottomRoute } from './root-stack';
 export { RoleTabBar, type RoleTabBarProps } from './tab-bar';
 export { useRefetchOnFocus, type FocusQuery, type RefetchOnFocusOptions } from './use-refetch-on-focus';
 export { useScreenLive } from './use-screen-live';

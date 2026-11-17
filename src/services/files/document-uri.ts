@@ -7,6 +7,7 @@ import { MOCK_SAMPLE_SCHEME, parseMockSampleUrl } from '@/mock/assets';
 
 import type { CacheableFile } from './file-cache';
 import { materialiseMockSample } from './mock-sample-store';
+import { isMockSampleKey } from './mock-samples';
 
 /** True when `uri` cannot be shown as is and has to go through `resolveDocumentUri` first. */
 export function isDeferredDocumentUri(uri: string): boolean {
@@ -22,6 +23,7 @@ export async function resolveDocumentUri(uri: string, file: CacheableFile): Prom
   if (!isDeferredDocumentUri(uri)) return uri;
   const mock = parseMockSampleUrl(uri);
   // An address of the mock scheme that names no bundled sample: the caller shows its generic failure text.
-  if (!mock) throw new Error(`Unknown mock sample document: ${uri}`);
+  // The backend's key list is checked at runtime too, so a key the device layer has no bytes for fails here.
+  if (!mock || !isMockSampleKey(mock.sample)) throw new Error(`Unknown mock sample document: ${uri}`);
   return materialiseMockSample(mock.sample, file);
 }

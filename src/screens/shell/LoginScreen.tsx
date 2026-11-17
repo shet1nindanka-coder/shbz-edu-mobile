@@ -61,6 +61,8 @@ export function LoginScreen() {
   // Kept as a code, not as text: the notice must follow the language switch above the form.
   const [failure, setFailure] = useState<LoginFailure | null>(null);
   const [pending, setPending] = useState(false);
+  // `pending` is the last render's value: a second submit in the same frame (return key + button) passes it.
+  const inFlight = useRef(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [demoOpen, setDemoOpen] = useState(false);
   const passwordRef = useRef<TextInputInstance>(null);
@@ -92,12 +94,13 @@ export function LoginScreen() {
 
   const submit = async () => {
     // A double tap must not burn rate-limit attempts.
-    if (pending || locked) return;
+    if (inFlight.current || pending || locked) return;
     const input = validateLoginInput(login, password);
     if (!input.ok) {
       setFailure({ code: 'empty' });
       return;
     }
+    inFlight.current = true;
     setPending(true);
     setFailure(null);
     dismissNotice();
@@ -113,6 +116,7 @@ export function LoginScreen() {
         setFailure({ code: 'unknown' });
       }
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   };

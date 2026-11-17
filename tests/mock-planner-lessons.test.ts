@@ -1029,8 +1029,9 @@ describe("planner.getHandoutUrl", () => {
     const p = mock.api.planner;
     assert.deepEqual(parseMockSampleUrl(p.getHandoutUrl("les_g1", { format: "pdf" })), { sample: "pdfLong", query: { kind: "lessonHandout", lessonId: "les_g1", format: "pdf" } });
     assert.deepEqual(parseMockSampleUrl(p.getHandoutUrl("les_g1", { format: "html", studentId: "usr_artem", answers: true })), {
-      sample: "pdfLong",
-      query: { kind: "lessonHandout", lessonId: "les_g1", format: "html", studentId: "usr_artem", answers: "1" },
+      // The print version is an HTML page, as the site's /teacher/lessons/[id]/print (not the PDF sample).
+      sample: "printHtml",
+      query: { kind: "lessonPrint", lessonId: "les_g1", format: "html", studentId: "usr_artem", answers: "1" },
     });
     // A draft has an answer sheet only.
     assert.equal(parseMockSampleUrl(p.getHandoutUrl("hp_ready", { format: "pdf", answers: true }))?.query.lessonId, "hp_ready");

@@ -15,6 +15,7 @@ import { Button, CheckRow, DateTimeField, Notice, Screen, Select, Text, TextArea
 
 import { DurationStepper } from '../lessons/duration-stepper';
 import { checkedMemberIds, toggleId } from '../lessons/new-lesson-logic';
+import { useStillHere } from '../shared/use-still-here';
 import { useDateTimeLabels } from '@/components/date-time';
 import { useNowTick } from '@/services/clock';
 import { buildDraftInput, draftBudget, initialTopicId, validateDraftForm, type DraftFormProblem } from './drafts-logic';
@@ -38,6 +39,7 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const { dict, m, locale } = useI18n();
   const t = dict.planner.homeworkPlans.createForm;
   const hints = useHintsEnabled();
@@ -68,8 +70,8 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: qk('planner', 'listHomeworkPlans') });
       // The form is replaced, not covered: "back" from the board must not return to a form that would
-      // create the same draft again.
-      navigation.replace({ screen: 'planner.draftBoard', planId: created.planId });
+      // create the same draft again. Only the form is replaced: a teacher who has left it meanwhile stays put.
+      if (stillHere()) navigation.replace({ screen: 'planner.draftBoard', planId: created.planId });
     },
     onError: (failure) => {
       wait.note(failure);

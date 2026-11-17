@@ -22,7 +22,8 @@ const ARTEM = actor(USER.artem, "Артём Кузнецов", "STUDENT");
 const POLINA = actor(USER.polina, "Полина Морозова", "STUDENT");
 /** System actors are stored as a Russian snapshot; the journal translates them (`auditActorNameFor`). */
 const AUTO_CHECK: Actor = { actorId: null, actorName: "Автопроверка", actorRole: null };
-const AUTO_FINISH: Actor = { actorId: null, actorName: "Автозавершение урока", actorRole: null };
+// «Автозавершение урока» is written only on progress.status rows of source lesson_end (site
+// lib/progress-write.ts); lesson.auto_results rows carry no actor (site lib/lesson-finalize.ts).
 
 const CLIENT_IPS = ["203.0.113.24", "198.51.100.7", "203.0.113.88", "192.0.2.41"] as const;
 
@@ -184,12 +185,12 @@ export function addJournal(b: FixtureBuilder): void {
   b.audit({ createdAt: b.at(-13, 12, 30), category: "DATA", action: "topic.delete", ...DEV, targetType: "Topic", targetLabel: "Пробная тема", text: { key: "topic.deleted", params: { count: 2 } } });
   b.audit({ createdAt: b.at(-12, 10, 40), category: "DATA", action: "student.owner_change", ...DEV, text: { key: "account.owner_changed", params: { count: 1 } } });
   b.audit({ createdAt: b.at(-10, 12, 1), category: "DATA", action: "lesson.schedule", ...ANNA, targetType: "Lesson", targetId: "les_g3", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.scheduled", params: { startsAt: b.at(-8, 17) } } });
-  b.audit({ createdAt: b.at(-8, 18, 1), category: "DATA", action: "lesson.auto_results", ...AUTO_FINISH, targetType: "Lesson", targetId: "les_g3", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.auto_results", params: { notSolved: 1, skipped: 9, attendance: 0 } }, meta: { notSolved: 1, skipped: 9, attendance: 0 } });
+  b.audit({ createdAt: b.at(-8, 18, 1), category: "DATA", action: "lesson.auto_results", targetType: "Lesson", targetId: "les_g3", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.auto_results", params: { notSolved: 1, skipped: 9, attendance: 0 } }, meta: { notSolved: 1, skipped: 9, attendance: 0 } });
   b.audit({ createdAt: b.at(-7, 9, 30), category: "DATA", action: "topic.create", ...DEV, targetType: "Topic", targetId: "top_word", targetLabel: "Текстовые задачи", text: { key: "topic.created", params: { title: "Текстовые задачи", count: 40 } } });
   b.audit({ createdAt: b.at(-6, 12, 2), category: "DATA", action: "lesson.schedule", ...ANNA, targetType: "Lesson", targetId: "les_g4", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.scheduled", params: { startsAt: b.at(-4, 17) } } });
   b.audit({ createdAt: b.at(-5, 10, 31), category: "DATA", action: "student.create", ...ANNA, targetType: "User", targetId: USER.dasha, targetLabel: "Даша Белова", text: { key: "student.created", params: { name: "Даша Белова" } } });
   b.audit({ createdAt: b.at(-5, 11, 10), category: "DATA", action: "developer.retention_run", ...DEV, text: { key: "developer.retention_run", params: { photos: 14, files: 9 } } });
-  b.audit({ createdAt: b.at(-4, 18, 1), category: "DATA", action: "lesson.auto_results", ...AUTO_FINISH, targetType: "Lesson", targetId: "les_g4", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.auto_results", params: { notSolved: 2, skipped: 11, attendance: 0 } }, meta: { notSolved: 2, skipped: 11, attendance: 0 } });
+  b.audit({ createdAt: b.at(-4, 18, 1), category: "DATA", action: "lesson.auto_results", targetType: "Lesson", targetId: "les_g4", targetLabel: "Занятие группы · Квадратные функции", text: { key: "lesson.auto_results", params: { notSolved: 2, skipped: 11, attendance: 0 } }, meta: { notSolved: 2, skipped: 11, attendance: 0 } });
   b.audit({ createdAt: b.at(-4, 18, 20), category: "DATA", action: "progress.status", ...ANNA, targetType: "ProgressStatusEvent", text: { key: "progress.status", params: { source: "lesson_teacher", previousStatus: null, status: "YELLOW", decision: "changed" } } });
   b.audit({ createdAt: b.at(-3, 9, 40), category: "DATA", action: "developer.settings_saved", ...DEV, text: { key: "developer.settings_saved" } });
   b.audit({ createdAt: b.at(-2, 18, 0), category: "DATA", action: "progress.status", ...AUTO_CHECK, targetType: "ProgressStatusEvent", targetId: "pse_ilya_118_25", text: { key: "progress.status", params: { source: "homework_check", previousStatus: null, status: "RED", decision: "changed" } } });

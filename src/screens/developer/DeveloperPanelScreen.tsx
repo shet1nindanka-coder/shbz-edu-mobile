@@ -9,6 +9,7 @@ import { developerPanelTabs } from '@/domain/developer-panel-tabs';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Segmented, Text } from '@/ui';
 
@@ -52,7 +53,6 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
     setSeenRouteTab(routeTab);
     setActive(routeTab);
   }
-  const [refreshing, setRefreshing] = useState(false);
 
   const panel = useQuery({
     queryKey: qk('developer', 'getPanel'),
@@ -62,10 +62,7 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
   useRefetchOnFocus(panel.refetch);
   const form = useSettingsForm(data?.settings);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void panel.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([panel]);
 
   const selectTab = (next: DeveloperPanelTab) => {
     setActive(next);

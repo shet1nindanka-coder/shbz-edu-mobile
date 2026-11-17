@@ -19,6 +19,7 @@ import {
   useNoticeScroll,
   type CreatedCredentials,
 } from '@/screens/teacher/students';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen, Segmented, Text } from '@/ui';
 
@@ -89,7 +90,6 @@ export function DeveloperAccountsScreen() {
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   // The sheet to open once the current one has finished closing.
   const queued = useRef<Overlay | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const directory = useQuery({
     queryKey: qk('accounts', 'getAccounts'),
@@ -107,10 +107,7 @@ export function DeveloperAccountsScreen() {
     invalidateStudents(queryClient);
   };
 
-  const refresh = () => {
-    setRefreshing(true);
-    void directory.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([directory]);
 
   /** A banner is useless below the fold: bring the list back to its top with it. */
   const announce = (next: PageNotice) => setNotice(next);

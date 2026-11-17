@@ -10,6 +10,7 @@ import { serverClockOffset } from '@/domain/server-clock';
 import { format, plural, useI18n } from '@/i18n';
 
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
+import { useStillHere } from '../shared/use-still-here';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 import { mergeQueryData } from '@/services/query';
@@ -40,6 +41,7 @@ export function useDraftBoard(planId: string) {
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
+  const stillHere = useStillHere();
   const { dict, locale } = useI18n();
   const t = dict.planner.homeworkPlans.board;
   const boardKey = qk('planner', 'getHomeworkPlanBoard', planId);
@@ -240,7 +242,8 @@ export function useDraftBoard(planId: string) {
       // The cached board is left alone: dropping it now would make this still-mounted screen read the
       // deleted draft once more and flash "not found" during the transition.
       void queryClient.invalidateQueries({ queryKey: qk('planner', 'listHomeworkPlans') });
-      navigation.open({ screen: 'planner.drafts' });
+      // Only from the board itself: a teacher who has left it meanwhile is not moved.
+      if (stillHere()) navigation.open({ screen: 'planner.drafts' });
     },
     onError: (error) => {
       draftWait.note(error);

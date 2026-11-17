@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { errorText, qk, useApi } from '@/api';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
 import { useKeepScreenAwake } from '@/services/keep-awake';
+import { usePullRefresh } from '@/services/query';
 import { LoadingState, Notice, Screen } from '@/ui';
 
 import { LessonLive } from './work/lesson-live';
@@ -59,7 +60,6 @@ export function StudentLessonScreen() {
   const api = useApi();
   const { m } = useI18n();
   const live = useScreenLive();
-  const [refreshing, setRefreshing] = useState(false);
 
   const lesson = useQuery({
     queryKey: qk('studentWork', 'getLiveLesson'),
@@ -101,10 +101,7 @@ export function StudentLessonScreen() {
     refetch: () => void refetch(),
   });
 
-  const refresh = () => {
-    setRefreshing(true);
-    void refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([lesson]);
   const refreshError = lesson.isError && data ? errorText(lesson.error, m.studentWork.lesson.refreshFailed) : null;
   const header = <ShellAppBar title={screenTitle('student.lesson', m.shell.tabs)} />;
 

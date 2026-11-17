@@ -9,13 +9,13 @@ import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, LoadingState, MAX_FONT_SCALE, Notice, PageHeader, Screen } from '@/ui';
 
 import { RefreshError } from './study/refresh-error';
 import { TheoryCard, isPreviewableTheory, type TheoryTopic } from './study/theory-card';
 import { theoryTitleBasis } from './study/theory-layout';
-import { useRefresh } from './study/use-refresh';
 
 function viewerFileOf(topic: TheoryTopic): ViewerFile {
   const { id, originalName, mimeType, size } = topic.theoryFile;
@@ -40,8 +40,7 @@ export function StudentTheoryScreen() {
     queryKey: qk('studentStudy', 'getTheoryLibrary'),
     queryFn: () => api.studentStudy.getTheoryLibrary(),
   });
-  const { refetch } = library;
-  const { refreshing, refresh } = useRefresh(refetch);
+  const { refreshing, refresh } = usePullRefresh([library]);
   // 00 §2.3: realtime first, a refetch when the tab regains focus as the fallback.
   useRefetchOnFocus([library]);
   const topics = library.data?.topics;

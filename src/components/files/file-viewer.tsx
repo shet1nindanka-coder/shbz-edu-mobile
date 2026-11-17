@@ -54,6 +54,11 @@ export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: 
   const pager = useRef<ScrollViewInstance>(null);
   const [index, setIndex] = useState(() => clampIndex(initialIndex, files.length));
   const [zoomed, setZoomed] = useState(false);
+  // `contentOffset` is an initial position only. Native scroll views apply every CHANGE of the prop as an
+  // immediate programmatic scroll (iOS sets `contentOffset`, Android calls `scrollTo`), so feeding the live
+  // index back into it would yank the pager to the next page half-way through a swipe — and on Android
+  // make one swipe skip a photo. Later moves go through `scrollTo` (rotation effect, `goTo`).
+  const [initialOffset] = useState(() => ({ x: clampIndex(initialIndex, files.length) * window.width, y: 0 }));
 
   // Pages are sized from the measured body: a horizontal ScrollView does not stretch its children to its
   // own height, and on a wide web window the viewer is narrower than the window.
@@ -145,7 +150,7 @@ export function FileViewer({ files, initialIndex = 0, title, onClose, testID }: 
             // A zoomed picture owns the horizontal drag.
             scrollEnabled={!zoomed}
             showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: safeIndex * pageWidth, y: 0 }}
+            contentOffset={initialOffset}
             onScroll={onScroll}
             scrollEventThrottle={16}
             bounces={false}

@@ -63,6 +63,10 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshing, onR
   const begin = (item: LessonItemDto) => {
     setTarget(item);
     setDraft([]);
+    // A preview that is still marked open was never presented (iOS refuses a modal asked for while the
+    // system picker is still leaving the screen, and React Native does not ask again): the cards could only
+    // be pressed because it is not on screen. Drop it, so the next pick presents a fresh sheet.
+    setPreviewOpen(false);
     clearProblem();
     openSheet();
   };
@@ -76,8 +80,9 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshing, onR
     closePreview();
   };
 
-  const submitDisabled =
-    state.uploadingItemId !== null || !data.lessonCheckAvailable || state.limit.waiting || source.preparing || previewOpen;
+  // `previewOpen` is deliberately not part of it: the open preview is a modal that covers the cards anyway,
+  // and if it failed to appear the cards must stay usable — otherwise nothing on screen could reset it.
+  const submitDisabled = state.uploadingItemId !== null || !data.lessonCheckAvailable || state.limit.waiting || source.preparing;
 
   const header = (
     <View style={styles.header}>

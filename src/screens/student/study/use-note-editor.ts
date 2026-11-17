@@ -51,6 +51,11 @@ type SaveLoop = {
   inFlight: boolean;
   /** A newer draft that arrived while a save was running. */
   next: string | null;
+  /**
+   * A queued draft that left the queue in the background (normalised): delivered or refused, the queue does
+   * not say which. It counts as saved only once the server's note confirms it.
+   */
+  delivering: string | null;
   blockedUntil: number;
   debounce: Timer | null;
   flash: Timer | null;
@@ -87,6 +92,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     queued: pendingNote,
     inFlight: false,
     next: null,
+    delivering: null,
     blockedUntil: 0,
     debounce: null,
     flash: null,
@@ -132,6 +138,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
             setError(null);
             setSaving(true);
           }
+          loop.delivering = null;
           const outcome = await saveStudentNote(homeworkNumberId, draft);
           if (outcome.status === 'sent') {
             loop.saved = outcome.result.note;
@@ -165,6 +172,16 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
   // queue is newer than anything the server can say.
   const followServerNote = useCallback((note: string) => {
     const loop = loopRef.current;
+    if (loop.delivering !== null) {
+      // The re-read after a background delivery: only now is the queued draft known to be saved.
+      const delivered = !isNoteDirty(note, loop.delivering);
+      loop.delivering = null;
+      if (delivered && !loop.inFlight) {
+        loop.saved = note;
+        showSaved();
+        return;
+      }
+    }
     const next = adoptServerNote(
       { saved: loop.saved, draft: loop.draft, writing: loop.inFlight || loop.queued !== null, typing: loop.debounce !== null },
       note,
@@ -174,22 +191,30 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     if (next.draft === loop.draft) return;
     loop.draft = next.draft;
     setText(next.draft);
-  }, []);
+  }, [showSaved]);
 
+  // Each value of the server's note is news once. A value that arrived while a write of this editor was on
+  // its way (in flight or queued) is older than that write and is dropped for good: re-reading it once the
+  // write has settled would put the editor's previous save back into the field (a re-read that started
+  // before the latest save answers after it).
+  const seenServerNote = useRef(serverNote);
   useEffect(() => {
+    if (serverNote === seenServerNote.current) return;
+    seenServerNote.current = serverNote;
     if (pendingNote === null) followServerNote(serverNote);
   }, [serverNote, pendingNote, followServerNote]);
 
-  // A queued draft that disappears without a save of ours was delivered by the queue (the connection
-  // came back). SPEC-GAP: the queue does not tell a background delivery from a background refusal; the
-  // number detail is refetched after a delivery, and a refusal leaves the server's note as it was.
+  // A queued draft that disappears without a save of ours left the queue in the background. SPEC-GAP: the
+  // queue does not tell a delivery from a refusal. A delivery invalidates the detail, and the re-read that
+  // returns the draft confirms it (`delivering`, «Сохранено»). After a refusal no re-read comes: the draft
+  // stays unsaved and is sent again on blur or when the screen goes away, like after a refusal of our own
+  // save — it is never reported as saved.
   useEffect(() => {
     const loop = loopRef.current;
     if (pendingNote !== null || loop.queued === null || loop.inFlight) return;
-    loop.saved = normalizeNoteDraft(loop.queued);
+    loop.delivering = normalizeNoteDraft(loop.queued);
     loop.queued = null;
-    showSaved();
-  }, [pendingNote, showSaved]);
+  }, [pendingNote]);
 
   // The screen is going away: save what the debounce still holds.
   useEffect(() => {

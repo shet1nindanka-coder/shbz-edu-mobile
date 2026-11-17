@@ -65,10 +65,9 @@ export function CredentialsSheet({ credentials, title, onClose }: CredentialsShe
     if (await copy(WHOLE_MESSAGE, message)) announce(t.copiedMessage);
   };
 
-  const share = () => {
-    // A dismissed share sheet is not an error; a refusal leaves the copy buttons as the way out.
-    Share.share({ message }).catch(() => undefined);
-  };
+  // A dismissed share sheet is not an error; a refusal leaves the copy buttons as the way out. Returned to
+  // Button, so the press lock lasts until the sheet is closed (no second sheet on a double tap).
+  const share = () => Share.share({ message }).catch(() => undefined);
 
   const close = () => {
     setFeedback(null);

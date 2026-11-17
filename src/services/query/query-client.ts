@@ -92,6 +92,21 @@ export function createAppQueryClient(options: AppQueryClientOptions = {}): Query
 }
 
 /**
+ * Marks every query restored from the persisted cache as stale (`onSuccess` of the persist provider).
+ * Everything on disk was answered in an earlier run of the app, the realtime stream has no replay of the
+ * events missed while the app was closed, and a screen may keep a query fresh for long (`staleTime`
+ * Infinity for statements): without this, such a query would show what the server said days ago. Nothing
+ * is fetched here — mounted screens fetch once the restore ends, the others when they open; offline the
+ * cached value stays on screen. `restoredBefore`: start of this run (data newer than that is this run's).
+ */
+export function markRestoredQueriesStale(client: QueryClient, restoredBefore: number): Promise<void> {
+  return client.invalidateQueries({
+    predicate: (query) => query.state.dataUpdatedAt > 0 && query.state.dataUpdatedAt < restoredBefore,
+    refetchType: 'none',
+  });
+}
+
+/**
  * Deletes the persisted cache from the device at once. The persister only writes on a throttle, so after
  * `queryClient.clear()` the previous user's responses would stay on disk for about a second — for good if
  * the app is closed inside that second. Sign-out awaits this instead of relying on the next write.

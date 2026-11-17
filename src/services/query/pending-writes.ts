@@ -33,6 +33,10 @@
  * RULES
  * - One entry per `kind + id`: a newer payload replaces the older one (last write wins) — a queue of drafts
  *   for the same field would only replay stale text.
+ * - One request per `kind + id` at a time, `submit` and `flush` alike: a write waits until the previous
+ *   request for the same entry has settled and then sends the NEWEST payload. Two overlapping requests could
+ *   reach the server in the wrong order and the older text would win. A submit whose payload was superseded
+ *   while it waited gets the outcome of the request that carried the newer payload.
  * - Only a `network` failure keeps the entry. Any answer from the server is final: success removes it, a
  *   refusal removes it and is reported (`onRejected`), because repeating a refused write cannot succeed.
  * - `flush()` is called when the connection returns, when the app comes to the foreground and after
@@ -193,9 +197,15 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
   };
 
   type Attempt = "sent" | "retry" | "rejected" | "skipped";
+  type AttemptOutcome = { result: Attempt; error?: unknown; value?: unknown; sentAt?: number };
+
+  /** Tail of the requests of each entry: the next request for a key starts when this settles. */
+  const lanes = new Map<string, Promise<void>>();
+  /** The last request that reached an answer per key, for submits whose payload it carried. */
+  const answered = new Map<string, AttemptOutcome & { sentAt: number }>();
 
   /** Sends one entry. The entry is removed unless a NEWER payload replaced it while the request was running. */
-  const attempt = async (key: string): Promise<{ result: Attempt; error?: unknown; value?: unknown }> => {
+  const send = async (key: string): Promise<AttemptOutcome> => {
     const write = entries.get(key);
     if (!write) return { result: "skipped" };
     const handler = handlers.get(write.kind);
@@ -210,7 +220,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         entries.delete(key);
         changed();
       }
-      return { result: "sent", value };
+      return { result: "sent", value, sentAt };
     } catch (error) {
       if (isRetryable(error)) {
         const current = entries.get(key);
@@ -218,14 +228,34 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
           entries.set(key, { ...current, attempts: current.attempts + 1 });
           changed();
         }
-        return { result: "retry", error };
+        return { result: "retry", error, sentAt };
       }
       if (isStillSame()) {
         entries.delete(key);
         changed();
       }
-      return { result: "rejected", error };
+      return { result: "rejected", error, sentAt };
     }
+  };
+
+  /** `send`, queued behind the request already running for the same entry (one request per key). */
+  const attempt = (key: string): Promise<AttemptOutcome> => {
+    const previous = lanes.get(key) ?? Promise.resolve();
+    const run = previous.then(() => send(key));
+    const tail = run.then(
+      (outcome) => {
+        if (outcome.sentAt !== undefined) answered.set(key, { ...outcome, sentAt: outcome.sentAt });
+      },
+      () => undefined,
+    );
+    lanes.set(key, tail);
+    void tail.then(() => {
+      if (lanes.get(key) === tail) {
+        lanes.delete(key);
+        answered.delete(key);
+      }
+    });
+    return run;
   };
 
   const flush = (): Promise<FlushResult> => {
@@ -279,8 +309,14 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         attempts: 0,
       });
       changed();
+      const mine = entries.get(key)?.updatedAt ?? stamp;
 
-      const outcome = await attempt(key);
+      let outcome = await attempt(key);
+      if (outcome.result === "skipped") {
+        // An earlier request of this entry already carried this payload (or a newer one): its answer is ours.
+        const carrier = answered.get(key);
+        if (carrier && carrier.sentAt >= mine) outcome = carrier;
+      }
       if (outcome.result === "sent") return { status: "sent", result: outcome.value as R };
       if (outcome.result === "rejected") return { status: "rejected", error: outcome.error };
       return { status: "queued" };

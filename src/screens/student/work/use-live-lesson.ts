@@ -52,8 +52,9 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
   const [submitEpoch, setSubmitEpoch] = useState(0);
   const limit = useRetryWait();
 
-  // "I am in class": once per entry into the live lesson, and only while the tab is really in front —
-  // the call marks the student present. A failure never blocks the screen (the site swallows it too).
+  // "I am in class": on entry into the live lesson until it has gone through, and only while the tab is
+  // really in front — the call marks the student present. A failure never blocks the screen (the site
+  // swallows it too) and is repeated on the next entry.
   const join = useMutation({ mutationFn: (id: string) => api.studentWork.joinLesson(id) });
   const { mutate: sendJoin } = join;
   const joinedFor = useRef<string | null>(null);
@@ -72,7 +73,12 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
         // The lesson is over or was removed: let the tab go back to the waiting state.
         if (hasErrorCode(failure, 'lessonNotActive', 'lessonNotFound')) {
           void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'getLiveLesson') });
+          return;
         }
+        // Not joined yet (no connection, 429, 503): the next entry into the tab sends the call again, as
+        // every new visit of the site's lesson page does. Never retried on the spot — only a later
+        // `live` false → true transition re-runs this effect.
+        if (joinedFor.current === lessonId) joinedFor.current = null;
       },
     });
   }, [lessonId, live, queryClient, sendJoin]);

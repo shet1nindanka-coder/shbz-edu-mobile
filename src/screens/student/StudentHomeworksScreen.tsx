@@ -11,6 +11,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Text } from '@/ui';
 
@@ -33,7 +34,6 @@ export function StudentHomeworksScreen() {
   const live = useScreenLive();
 
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const homeworks = useQuery({
     queryKey: qk('studentWork', 'listHomeworks'),
@@ -51,10 +51,7 @@ export function StudentHomeworksScreen() {
   const nowMs = useServerNow(data ? serverClockOffset(data.serverNow, homeworks.dataUpdatedAt) : 0);
   const rows = useMemo(() => (data ? buildHomeworkRows(data.assignments, archiveOpen) : []), [data, archiveOpen]);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([homeworks]);
   const open = (homework: HomeworkSummaryDto) => navigation.push({ screen: 'student.homework', assignmentId: homework.id });
 
   const header = (

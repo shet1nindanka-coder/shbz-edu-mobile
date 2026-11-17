@@ -45,3 +45,17 @@ export function clampSelectionLimit(limit: number | undefined, multiple: boolean
   if (limit === undefined) return 0;
   return Math.max(0, Math.floor(limit));
 }
+
+/**
+ * How long the iOS system picker (camera, photo library) takes to leave the screen after it hands back its
+ * result. expo-image-picker resolves the promise independently of `picker.dismiss(animated: true)`, and
+ * UIKit refuses to present a modal (the photo preview sheet) while that dismissal is still running — the
+ * refusal is silent and React Native never retries it.
+ */
+export const IOS_PICKER_EXIT_MS = 650;
+
+/** Milliseconds still to wait before a modal may be presented over the picker that resolved at `resolvedAt`. */
+export function pickerExitRemainingMs(platform: string, resolvedAt: number, now: number, exitMs: number = IOS_PICKER_EXIT_MS): number {
+  if (platform !== 'ios') return 0;
+  return Math.max(0, resolvedAt + exitMs - now);
+}

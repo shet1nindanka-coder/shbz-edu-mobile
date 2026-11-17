@@ -68,6 +68,21 @@ function parseJson(text: string | null): unknown {
   }
 }
 
+/** Callbacks of the owner of the store (the mock client) around saves. */
+export type MockPersistenceHooks = {
+  /**
+   * Called instead of a save when the stored manifest was written by ANOTHER writer of the same storage
+   * (a web tab) after this persistence last loaded or saved. Writing then would put whole stale tables, an
+   * older id counter and a lower save number over that writer's data; the owner reloads instead
+   * (`load()`), and the store stays dirty. Without this hook the save goes ahead (single writer).
+   */
+  onExternalSave?: () => void;
+  /** Called synchronously when a save takes its snapshot; the value comes back to `onSaved`. */
+  saveStarted?: () => number;
+  /** Called after a save landed completely (manifest included), with what `saveStarted` returned. */
+  onSaved?: (mark: number) => void;
+};
+
 export class MockPersistence {
   private readonly adapter: MockStorageAdapter;
   private readonly prefix: string;
@@ -76,15 +91,40 @@ export class MockPersistence {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private pendingStore: MockStore | null = null;
   private saveSeq = 0;
+  private readonly hooks: MockPersistenceHooks;
 
   /**
    * @param debounceMs Changes are coalesced for this long before a save starts (0 = save on the next
    * microtask — what tests use).
+   * @param hooks See `MockPersistenceHooks`.
    */
-  constructor(adapter: MockStorageAdapter, options: { prefix?: string; debounceMs?: number } = {}) {
+  constructor(adapter: MockStorageAdapter, options: { prefix?: string; debounceMs?: number; hooks?: MockPersistenceHooks } = {}) {
     this.adapter = adapter;
     this.prefix = options.prefix ?? DEFAULT_STORAGE_PREFIX;
     this.debounceMs = Math.max(0, options.debounceMs ?? 0);
+    this.hooks = options.hooks ?? {};
+  }
+
+  /** The storage key written last by every save — another writer of the same storage changes it. */
+  get manifestStorageKey(): string {
+    return this.manifestKey();
+  }
+
+  /**
+   * Drops a save that was requested but has not started (the store is about to be replaced by what another
+   * writer stored). A save already running finishes.
+   */
+  discardPending(): void {
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.pendingStore = null;
+  }
+
+  /** Waits for the saves already started (without starting the pending one). */
+  async settled(): Promise<void> {
+    await this.chain;
   }
 
   private manifestKey(): string {
@@ -108,6 +148,9 @@ export class MockPersistence {
       if (meta.version !== MOCK_STORE_VERSION || typeof meta.t0 !== "number") return null;
 
       const saveSeq = typeof manifest.saveSeq === "number" ? manifest.saveSeq : 0;
+      // Even when the tables below are rejected, the next save of this writer must number after the stored
+      // one (otherwise it would look like another writer's save to itself forever).
+      this.saveSeq = Math.max(this.saveSeq, saveSeq);
 
       const tables = {} as Record<MockTableName, unknown[]>;
       for (const name of MOCK_TABLE_NAMES) {
@@ -171,9 +214,29 @@ export class MockPersistence {
     this.chain = this.chain.then(() => this.save(store));
   }
 
+  /** Save number of the stored manifest; null when there is none or it cannot be read. */
+  private async storedSaveSeq(): Promise<number | null> {
+    try {
+      const manifest = parseJson(await this.adapter.getItem(this.manifestKey()));
+      if (!isRecord(manifest) || manifest.version !== MOCK_STORE_VERSION) return null;
+      return typeof manifest.saveSeq === "number" ? manifest.saveSeq : null;
+    } catch {
+      return null;
+    }
+  }
+
   private async save(store: MockStore): Promise<void> {
     if (!store.hasDirty()) return;
+    if (this.hooks.onExternalSave) {
+      const stored = await this.storedSaveSeq();
+      if (stored !== null && stored > this.saveSeq) {
+        this.hooks.onExternalSave();
+        return;
+      }
+      if (!store.hasDirty()) return;
+    }
     const dirty = store.takeDirty();
+    const mark = this.hooks.saveStarted?.() ?? 0;
     try {
       const snapshot = store.snapshot();
       const seq = this.saveSeq + 1;
@@ -191,6 +254,7 @@ export class MockPersistence {
       };
       await this.adapter.setItem(this.manifestKey(), JSON.stringify(manifest));
       this.saveSeq = seq;
+      this.hooks.onSaved?.(mark);
     } catch {
       // Storage is full or unavailable: the store stays correct in memory; the same keys are retried with
       // the next change.

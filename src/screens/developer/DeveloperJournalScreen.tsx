@@ -12,6 +12,7 @@ import { useRefetchOnFocus } from '@/navigation';
 import type { ScreenParams } from '@/navigation';
 import { Hint } from '@/providers';
 import { DetailAppBar } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, Chip, EmptyState, LoadingState, Notice, Screen, Spinner, Text } from '@/ui';
 
@@ -67,7 +68,6 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   const [historyOpen, setHistoryOpen] = useState(false);
   // The history chosen in the detail sheet, waiting for that sheet to finish closing.
   const queuedHistory = useRef<ProgressRef | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const query = useMemo(() => toJournalQuery(filters), [filters]);
   const journal = useInfiniteQuery({
@@ -91,10 +91,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   // of spinning for as long as the phone is offline.
   const stalled = switching && journal.fetchStatus === 'paused';
 
-  const refresh = () => {
-    setRefreshing(true);
-    void journal.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([journal]);
   const loadMore = () => {
     if (journal.hasNextPage && !journal.isFetching) void journal.fetchNextPage();
   };
@@ -206,7 +203,8 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           keyExtractor={(entry) => entry.id}
           renderItem={({ item }) => (
             <View style={[styles.item, switching ? styles.stale : null]}>
-              <JournalEntryCard entry={item} onOpen={openDetail} />
+              {/* Keyed by the entry: a recycled cell must not carry another entry's «полностью» state. */}
+              <JournalEntryCard key={item.id} entry={item} onOpen={openDetail} />
             </View>
           )}
           extraData={switching}

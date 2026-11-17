@@ -19,6 +19,8 @@ const COMFORTABLE_ITEM_WIDTH = 84;
 // Five tabs on a 320 pt phone leave about 56 pt per label: «дедлайны» needs one more point off. The size
 // is chosen from the width instead of `adjustsFontSizeToFit` alone, which the web build does not have.
 const NARROW_ITEM_WIDTH = 68;
+// On a tablet or a wide browser the items stay together in the middle instead of spreading over the width.
+const ROW_MAX_WIDTH = 560;
 
 function iconFor(role: UserRole, tab: TabDefinition): IconName {
   if (tab.labelKey === null) return navIcons.teacher.more;
@@ -40,7 +42,9 @@ export function RoleTabBar({ state, emitter, navigateToTab, insets, role }: Role
   const styles = useStyles();
   const { dict, m } = useI18n();
   const reducedMotion = useReducedMotion();
-  const [barWidth, setBarWidth] = useState(0);
+  // Width of the row that holds the items (capped at ROW_MAX_WIDTH and centred on tablets / web), not of
+  // the full-width bar: the pill is positioned inside that row, so its width and offset must use that box.
+  const [rowWidth, setRowWidth] = useState(0);
 
   const definitions = tabsForRole(role);
   // Only routes of the tab table are shown, in table order (expo-router may add helper routes to the state).
@@ -50,7 +54,7 @@ export function RoleTabBar({ state, emitter, navigateToTab, insets, role }: Role
   const focusedKey = state.routes[state.index]?.key;
   const activeIndex = tabs.findIndex((tab) => tab.route.key === focusedKey);
 
-  const itemWidth = tabs.length > 0 ? Math.max(0, (barWidth - BAR_PADDING * 2) / tabs.length) : 0;
+  const itemWidth = tabs.length > 0 ? Math.max(0, rowWidth / tabs.length) : 0;
   const x = useSharedValue(0);
   const visible = useSharedValue(0);
   const { tabSlide, base } = theme.motion.duration;
@@ -78,10 +82,9 @@ export function RoleTabBar({ state, emitter, navigateToTab, insets, role }: Role
     <View
       accessibilityRole="tablist"
       accessibilityLabel={dict.nav.sections}
-      onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
       style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }]}
     >
-      <View style={styles.row}>
+      <View style={styles.row} onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}>
         <Animated.View pointerEvents="none" style={[styles.pill, { width: itemWidth }, pillStyle]} />
         {tabs.map(({ definition, route }, index) => {
           const focused = index === activeIndex;
@@ -130,7 +133,7 @@ const useStyles = makeStyles((t) => ({
     paddingTop: 6,
     paddingHorizontal: BAR_PADDING,
   },
-  row: { flexDirection: 'row', alignSelf: 'center', width: '100%', maxWidth: 560 },
+  row: { flexDirection: 'row', alignSelf: 'center', width: '100%', maxWidth: ROW_MAX_WIDTH },
   pill: {
     position: 'absolute',
     top: 0,

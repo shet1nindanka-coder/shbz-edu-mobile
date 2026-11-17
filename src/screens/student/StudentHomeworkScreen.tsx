@@ -13,6 +13,7 @@ import { useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Card, Chip, Divider, LoadingState, Notice, Screen, Text } from '@/ui';
 
@@ -42,7 +43,6 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
   const live = useScreenLive();
 
   const listRef = useRef<FlashListRef<StudentHomeworkNumberDto>>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -91,10 +91,11 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
 
   const nowMs = useServerNow(data ? serverClockOffset(data.serverNow, detail.dataUpdatedAt) : 0);
 
+  const pull = usePullRefresh([detail]);
+  const { refreshing } = pull;
   const refresh = () => {
-    setRefreshing(true);
     check.retryPoll();
-    void refetch().finally(() => setRefreshing(false));
+    pull.refresh();
   };
 
   const redo = (result: StudentCheckResultDto) => {

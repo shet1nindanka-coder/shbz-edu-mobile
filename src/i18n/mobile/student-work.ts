@@ -23,7 +23,10 @@ const ru = {
     // replaces `dict.student.photos.successTitle` («Файлы добавлены»)
     added: "Фото добавлены",
     counterA11y: "Прикреплено фото: {count} из {max}",
-    uploadProgressA11y: "Загрузка фото: {percent}%"
+    uploadProgressA11y: "Загрузка фото: {percent}%",
+    // the picker ignored the selection limit (web, some Android pickers); the site refuses the whole batch
+    // with `apiStudent.homeworkSubmissions.photoLimit`, here the photos that fit are kept
+    tooMany: "Выбрано {picked} фото, добавить удалось только {added} — больше не помещается."
   },
   check: {
     // replaces `dict.student.check.runningHint` («Страница обновится сама»)
@@ -73,7 +76,8 @@ const en: typeof ru = {
     sourceTitle: "Add a photo",
     added: "Photos added",
     counterA11y: "Photos attached: {count} of {max}",
-    uploadProgressA11y: "Uploading photos: {percent}%"
+    uploadProgressA11y: "Uploading photos: {percent}%",
+    tooMany: "You chose {picked} photos; only {added} could be added — there is no room for more."
   },
   check: {
     runningHint: "Checking your solution — this usually takes up to a minute. The screen refreshes on its own.",

@@ -13,6 +13,7 @@ import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Dialog, IconButton, LoadingState, Screen } from '@/ui';
 
@@ -44,7 +45,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   const { data: lesson, board, now } = controller;
   const handout = useHandout();
 
-  const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState<'finish' | 'delete' | null>(null);
   // A group opens collapsed (the headers carry the live chips); a single student opens expanded.
@@ -59,6 +59,8 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   useEffect(() => {
     if (notice || handoutFailure) listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, [notice, handoutFailure]);
+
+  const { refreshing, refresh } = usePullRefresh([board]);
 
   // `404 lessonNotFound`: deleted, or it belongs to another teacher — with the server's own words.
   if (controller.notFound) return <NotFoundScreen description={errorText(board.error, dict.shells.notFoundDescription)} />;
@@ -89,11 +91,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   const single = lesson.participants.length === 1;
   const isExpanded = (participantId: string) => toggled[participantId] ?? single;
   const addParticipant = lesson.participants.find((participant) => participant.id === addFor) ?? null;
-
-  const refresh = () => {
-    setRefreshing(true);
-    void board.refetch().finally(() => setRefreshing(false));
-  };
 
   const openPhotos = (item: LessonBoardItem, index: number) => {
     const photos = item.submission?.photoFileIds ?? [];

@@ -30,6 +30,7 @@ export function Logo({ size = 24, variant = 'default', monoColor, accessibilityL
   const mono = variant === 'mono' ? (monoColor ?? theme.colors.textStrong) : null;
   const ink = mono ?? (variant === 'onDark' ? theme.colors.onAccent : theme.colors.logoInk);
   const brand = mono ?? (size < 22 ? theme.colors.brandDeep : theme.colors.brand);
+  const lineHeight = Math.round(size * 1.2);
   return (
     <Text
       accessible
@@ -41,7 +42,7 @@ export function Logo({ size = 24, variant = 'default', monoColor, accessibilityL
         {
           fontFamily: theme.fonts.black,
           fontSize: size,
-          lineHeight: Math.round(size * 1.2),
+          lineHeight,
           letterSpacing: -0.015 * size,
           color: ink,
         },
@@ -49,7 +50,9 @@ export function Logo({ size = 24, variant = 'default', monoColor, accessibilityL
       ]}
     >
       {INK_PART}
-      <Text maxFontSizeMultiplier={1} style={{ fontFamily: theme.fonts.black, fontSize: size, color: brand }}>
+      {/* The nested span repeats the lockup's line height: the app Text would otherwise bring the body
+          variant's 22pt, and on Android every span's line height shrinks the shared line box. */}
+      <Text maxFontSizeMultiplier={1} style={{ fontFamily: theme.fonts.black, fontSize: size, lineHeight, color: brand }}>
         {BRAND_PART}
       </Text>
     </Text>

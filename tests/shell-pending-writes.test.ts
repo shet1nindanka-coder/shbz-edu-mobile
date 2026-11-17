@@ -223,6 +223,82 @@ describe("pending writes", () => {
     assert.equal(queue.get("note", "n1"), null);
   });
 
+  it("sends one request per entry at a time, so a slow older save can never land after a newer one", async () => {
+    const { queue } = harness();
+    let server = "";
+    let inFlight = 0;
+    let overlap = false;
+    // The first request is slow, the next ones are fast: unserialized, "one" would be applied last.
+    const delays = [40, 1, 1];
+    queue.register<{ note: string }, { note: string }>("note", async (write) => {
+      inFlight += 1;
+      if (inFlight > 1) overlap = true;
+      await new Promise((resolve) => setTimeout(resolve, delays.shift() ?? 1));
+      server = write.payload.note;
+      inFlight -= 1;
+      return { note: write.payload.note };
+    });
+    const first = queue.submit("note", "n1", { note: "one" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const second = queue.submit("note", "n1", { note: "one two" });
+    const [a, b] = await Promise.all([first, second]);
+    assert.equal(overlap, false);
+    assert.equal(server, "one two");
+    assert.deepEqual(a, { status: "sent", result: { note: "one" } });
+    assert.deepEqual(b, { status: "sent", result: { note: "one two" } });
+    assert.equal(queue.get("note", "n1"), null);
+  });
+
+  it("a payload superseded while it waited is not sent; its submit gets the newer request's answer", async () => {
+    const { queue } = harness();
+    const sent: string[] = [];
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    queue.register<{ note: string }, { note: string }>("note", async (write) => {
+      if (sent.length === 0) await gate;
+      sent.push(write.payload.note);
+      return { note: write.payload.note };
+    });
+    const a = queue.submit("note", "n1", { note: "a" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const b = queue.submit("note", "n1", { note: "ab" });
+    const c = queue.submit("note", "n1", { note: "abc" });
+    release();
+    const outcomes = await Promise.all([a, b, c]);
+    assert.deepEqual(sent, ["a", "abc"]);
+    assert.deepEqual(outcomes, [
+      { status: "sent", result: { note: "a" } },
+      { status: "sent", result: { note: "abc" } },
+      { status: "sent", result: { note: "abc" } },
+    ]);
+  });
+
+  it("a background flush and an editor's submit of the same entry do not overlap", async () => {
+    const { queue, state } = harness();
+    let inFlight = 0;
+    let overlap = false;
+    const applied: string[] = [];
+    queue.register<{ note: string }>("note", async (write) => {
+      if (!state.online) throw ApiError.network("offline");
+      inFlight += 1;
+      if (inFlight > 1) overlap = true;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      applied.push(write.payload.note);
+      inFlight -= 1;
+    });
+    state.online = false;
+    assert.equal((await queue.submit("note", "n1", { note: "offline text" })).status, "queued");
+    state.online = true;
+    const flushing = queue.flush();
+    const typed = queue.submit("note", "n1", { note: "newer text" });
+    await Promise.all([flushing, typed]);
+    assert.equal(overlap, false);
+    assert.equal(applied[applied.length - 1], "newer text");
+    assert.equal(queue.get("note", "n1"), null);
+  });
+
   it("notifies subscribers and bumps the version on every change", async () => {
     const { queue, state, registerNote } = harness();
     registerNote();

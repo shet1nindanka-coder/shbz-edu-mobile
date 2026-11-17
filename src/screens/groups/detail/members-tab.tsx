@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
@@ -59,9 +59,15 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
     invalidateGroupMembership(queryClient);
   };
 
+  // A row of the pick sheet is not a guarded button and `busy` lags a render: a synchronous flag keeps a
+  // double tap from sending the same student twice.
+  const addInFlight = useRef(false);
   const add = useMutation({
     mutationFn: (student: GroupCandidate) => api.groups.addGroupMember(group.id, { studentId: student.id }),
     onMutate: begin,
+    onSettled: () => {
+      addInFlight.current = false;
+    },
     onSuccess: ({ member }) => {
       flash.finish(true);
       patchGroup((current) => ({
@@ -148,7 +154,9 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
         onClose={() => setAddOpen(false)}
         onPick={(student) => {
           setAddOpen(false);
-          if (!busy) add.mutate(student);
+          if (busy || addInFlight.current) return;
+          addInFlight.current = true;
+          add.mutate(student);
         }}
       />
 

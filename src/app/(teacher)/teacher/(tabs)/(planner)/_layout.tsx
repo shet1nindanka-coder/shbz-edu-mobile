@@ -6,11 +6,14 @@ import { useTheme } from '@/theme';
 
 export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
 
-export const unstable_settings = { anchor: 'lessons' };
-
+// No anchor: either segment may be the only screen of this stack. An anchor put «Уроки» under a deep entry
+// into «Домашние задания», so back walked between the segments. The order makes «Уроки» the default.
 export default function TeacherPlannerTabLayout() {
   const theme = useTheme();
   return (
-    <Stack screenOptions={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: theme.colors.pageBg } }} />
+    <Stack screenOptions={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: theme.colors.pageBg } }}>
+      <Stack.Screen name="lessons" />
+      <Stack.Screen name="homework-plans" />
+    </Stack>
   );
 }

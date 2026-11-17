@@ -21,6 +21,8 @@ export const MOCK_FILE_SAMPLES = [
   "docx",
   /** A typeset formula sheet — an image used as a theory file. */
   "cheatsheet",
+  /** An HTML page — the print version of a lesson handout (the site's `/teacher/lessons/[id]/print`). */
+  "printHtml",
   /** Eight "handwritten solution" photos. */
   ...MOCK_PHOTO_SAMPLES,
 ] as const;
@@ -38,8 +40,13 @@ export const MOCK_DOCUMENT_SAMPLES = {
   studentReport: { sample: "pdfShort", mimeType: "application/pdf" },
   /** `groups.downloadGroupAttendancePdf` — the attendance sheet of a group (a Russian-only document). */
   groupAttendance: { sample: "pdfShort", mimeType: "application/pdf" },
-  /** `planner.getHandoutUrl` — the printable handout of a lesson. */
+  /** `planner.getHandoutUrl({ format: "pdf" })` — the PDF handout of a lesson (the site's `/teacher/lessons/[id]/pdf`). */
   lessonHandout: { sample: "pdfLong", mimeType: "application/pdf" },
+  /**
+   * `planner.getHandoutUrl({ format: "html" })` — the print version (the site's `/teacher/lessons/[id]/print`,
+   * served as `text/html`), so the name, type and bytes of the handed-over file agree.
+   */
+  lessonPrint: { sample: "printHtml", mimeType: "text/html" },
 } as const satisfies Record<string, { sample: MockFileSample; mimeType: string }>;
 
 export type MockDocumentKind = keyof typeof MOCK_DOCUMENT_SAMPLES;

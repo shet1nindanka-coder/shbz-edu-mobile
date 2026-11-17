@@ -50,7 +50,7 @@
  * │ content.topic             │ /developer/topics/[topicId]                   │ tab 1 stack              │
  * │ developer.accounts        │ /developer/accounts                           │ tab 2 «аккаунты»         │
  * │ calls.list                │ /developer/calls ?studentId                   │ tab 3 «звонки»           │
- * │ stats.main                │ /developer/statistics                         │ tab 4 «статистика»       │
+ * │ stats.main                │ /developer/statistics ?view ?studentId        │ tab 4 «статистика»       │
  * │ developer.panel           │ /developer/panel ?tab                         │ tab 5 «дев-панель» (stack)│
  * │ developer.journal         │ /developer/panel/journal ?outcome ?days       │ tab 5 stack              │
  * │ content.topicEdit         │ /developer/topics/[topicId]/edit              │ developer stack, over tabs│
@@ -88,6 +88,9 @@ import { DEVELOPER_PANEL_TABS, HOME, isScreenRegisteredFor } from "./registry";
 export type FileViewerFile = { id: string; originalName: string; mimeType: string; size?: number; localUri?: string };
 
 /** Route params of every screen (`undefined` = none). These are the props of the screen components. */
+/** A non-default view of `stats.main` (the default, the progress view, has no query param). */
+export type StatsViewParam = "teachers" | "developer";
+
 export type ScreenParams = {
   "auth.launch": undefined;
   "auth.login": undefined;
@@ -126,7 +129,8 @@ export type ScreenParams = {
   /** `studentId` — the row is scrolled into view and flashed for 1500 ms; nothing is expanded. */
   "calls.list": { studentId?: string };
   "developer.accounts": undefined;
-  "stats.main": undefined;
+  /** Initial view and timeline student, like the site's `?view=teachers|developer` / `?studentId=` (06 §1.6). */
+  "stats.main": { view?: StatsViewParam; studentId?: string };
   "developer.panel": { tab?: DeveloperPanelTab };
   /** Initial, editable filters. */
   "developer.journal": { outcome?: "failed"; days?: number };
@@ -308,6 +312,10 @@ function paramsOf(link: AppLink): Record<string, string> {
       // "status" is the default tab: no query, like the site's bare `/developer/panel`.
       if (link.tab && link.tab !== "status") params.tab = link.tab;
       break;
+    case "stats.main":
+      if (link.view) params.view = link.view;
+      if (link.studentId) params.studentId = link.studentId;
+      break;
     case "developer.journal":
       if (link.outcome === "failed") params.outcome = link.outcome;
       if (link.days !== undefined) params.days = String(link.days);
@@ -370,6 +378,27 @@ export function planNavigation(link: AppLink, role: UserRole): NavigationPlan | 
 }
 
 /**
+ * Tabs whose stack has several possible roots (`tabSegment`, 90-addendum-2 N1): the tab root pattern →
+ * every segment that can be the bottom of its stack. A segment switch REPLACES the root, so the stack may
+ * start with any of them; a link into the tab must land on the root that is there, not push another one.
+ */
+const TAB_SEGMENTS: Readonly<Record<string, readonly string[]>> = {
+  "/teacher/lessons": ["/teacher/lessons", "/teacher/homework-plans"],
+};
+
+/**
+ * The href that selects the tab of `tabRoot` without pushing inside its stack: the segment that is the
+ * stack's first route now (`firstRouteName` = the route name in the tab's stack, the last path segment),
+ * else the tab root itself (a tab without segments, or a stack that has not been created yet).
+ */
+export function tabLandingHref(tabRoot: AppHref, firstRouteName: string | null | undefined): AppHref {
+  const segments = TAB_SEGMENTS[tabRoot.pathname];
+  if (!segments || !firstRouteName) return tabRoot;
+  const current = segments.find((pattern) => pattern.slice(pattern.lastIndexOf("/") + 1) === firstRouteName);
+  return current ? { pathname: current } : tabRoot;
+}
+
+/**
  * Where the user is, from `useSegments()`: inside a tab ("tabs") or on a screen that sits above the tabs
  * ("above": a role-stack screen, settings, a sheet or a modal). Getting to a tab differs between the two.
  */
@@ -409,6 +438,15 @@ export function requiredParam(value: RawParam): string {
 export function panelTabParam(value: RawParam): DeveloperPanelTab {
   const raw = stringParam(value);
   return (DEVELOPER_PANEL_TABS as readonly string[]).includes(raw ?? "") ? (raw as DeveloperPanelTab) : "status";
+}
+
+/**
+ * `view` of the statistics page, parsed like the site (teacher/statistics/page.tsx): "teachers" and
+ * "developer" are honoured, anything else is the default progress view (undefined).
+ */
+export function statsViewParam(value: RawParam): StatsViewParam | undefined {
+  const raw = stringParam(value);
+  return raw === "teachers" || raw === "developer" ? raw : undefined;
 }
 
 /** `outcome` is honoured only when it equals "failed" (A2 B.6 rule 2). */
@@ -482,7 +520,6 @@ export function parseAppLink(raw: unknown): AppLink | null {
     case "planner.lessons":
     case "planner.drafts":
     case "developer.accounts":
-    case "stats.main":
     case "shell.settings":
     case "shell.notifications":
       return { screen: data.screen };
@@ -512,6 +549,14 @@ export function parseAppLink(raw: unknown): AppLink | null {
       if (!studentId) return null;
       const assignmentId = text(data.assignmentId);
       return assignmentId ? { screen: "teacher.student.review", studentId, assignmentId } : { screen: "teacher.student.review", studentId };
+    }
+    case "stats.main": {
+      const link: AppLink = { screen: "stats.main" };
+      const view = statsViewParam(text(data.view));
+      if (view) link.view = view;
+      const studentId = text(data.studentId);
+      if (studentId) link.studentId = studentId;
+      return link;
     }
     case "developer.panel":
       return { screen: "developer.panel", tab: panelTabParam(text(data.tab)) };

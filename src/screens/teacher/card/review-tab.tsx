@@ -12,6 +12,7 @@ import { getFileExtension, getMimeTypeFromExtension } from '@/domain/files';
 import { homeworkAssignmentLabel } from '@/domain/homework-label';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, LoadingState, Notice, Text } from '@/ui';
 
@@ -67,7 +68,6 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const [lessonMode, setLessonMode] = useState(false);
   const [expandedIds, setExpandedIds] = useState<readonly string[]>(assignmentId ? [assignmentId] : []);
   const [completedToggled, setCompletedToggled] = useState<boolean | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState<ListNotice | null>(null);
   const [cancelFor, setCancelFor] = useState<TeacherHomeworkAssignment | null>(null);
   const [historyFor, setHistoryFor] = useState<string | null>(null);
@@ -119,10 +119,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
     );
   }, [focus, rows]);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void homeworks.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([homeworks]);
 
   const announce = (next: ListNotice) => setNotice(next);
   useNoticeScroll(listRef, notice);

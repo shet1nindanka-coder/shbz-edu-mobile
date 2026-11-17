@@ -1004,6 +1004,8 @@ describe("developer.getJournal", () => {
 
   it("renders labels, summaries and system actors for the request language", async () => {
     const mock = await developerMock();
+    // Lazy finalisation writes progress.status rows with the system actor «Автозавершение урока».
+    mock.ctx.lessons.finalizeDue({ lessonId: "les_g_unfinalized" });
     const russian = await allEntries(mock, { days: 0 });
     mock.setLocale("en");
     const english = await allEntries(mock, { days: 0 });
@@ -1018,9 +1020,12 @@ describe("developer.getJournal", () => {
     assert.match(pick(english, check).summary!, /^AI check: correct \d+, incorrect \d+, unrecognised \d+$/);
 
     const autoFinish = idOf((row) => row.action === "lesson.auto_results");
-    assert.equal(pick(russian, autoFinish).actorName, "Автозавершение урока");
-    assert.equal(pick(english, autoFinish).actorName, "Lesson auto-finish");
+    // As on the site, the row has no actor: the journal shows «—».
+    assert.equal(pick(russian, autoFinish).actorName, null);
     assert.equal(pick(english, autoFinish).actionLabel, "Lesson results closed automatically");
+    const lessonEnd = idOf((row) => row.action === "progress.status" && row.actorName === "Автозавершение урока");
+    assert.equal(pick(russian, lessonEnd).actorName, "Автозавершение урока");
+    assert.equal(pick(english, lessonEnd).actorName, "Lesson auto-finish");
     // No template text for the row: the target label is the fallback.
     const itemCheck = idOf((row) => row.action === "lesson_item.check");
     assert.match(pick(english, itemCheck).summary!, /^Classwork: problem \d+ — (correct|incorrect|unrecognised)$/);

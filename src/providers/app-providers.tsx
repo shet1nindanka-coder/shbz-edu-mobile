@@ -10,7 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nProvider } from '@/i18n';
 import { FileServiceProvider } from '@/services/files';
 import { startNetworkMonitor } from '@/services/network';
-import { createPersistOptions } from '@/services/query';
+import { createPersistOptions, markRestoredQueriesStale } from '@/services/query';
 import { ThemeProvider, useAppFonts, useTheme } from '@/theme';
 
 import { PreferencesProvider, usePreferences } from './preferences-provider';
@@ -22,6 +22,12 @@ import { ShellEffects } from './shell-effects';
 // The native splash stays until fonts and preferences are ready, so the first frame is already in the
 // user's theme and language.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+/** Start of this run of the app: cached data older than this was restored from disk. */
+const APP_STARTED_AT = Date.now();
+
+/** The restored cache predates this run and missed every realtime event meanwhile: refetch it once. */
+const onCacheRestored = () => markRestoredQueriesStale(getQueryClient(), APP_STARTED_AT);
 
 export type AppProvidersProps = { children: ReactNode };
 
@@ -76,7 +82,7 @@ function Themed({ children }: { children: ReactNode }) {
     <ThemeProvider mode={preferences.themeMode}>
       <SystemChrome />
       <I18nProvider locale={preferences.locale} onChangeLocale={setLocale}>
-        <PersistQueryClientProvider client={getQueryClient()} persistOptions={persistOptions}>
+        <PersistQueryClientProvider client={getQueryClient()} persistOptions={persistOptions} onSuccess={onCacheRestored}>
           <FileServiceProvider service={runtime.files}>
             <SessionProvider>
               <ShellEffects />

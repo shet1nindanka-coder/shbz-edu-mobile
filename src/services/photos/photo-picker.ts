@@ -5,6 +5,7 @@
 // canvas), so this module runs unchanged on web.
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import type { PhotoUpload } from '@/api/types';
 import { MAX_UPLOAD_SIZE_BYTES, UploadValidationError, validateUploadMetadata } from '@/domain/upload-validation';
@@ -15,6 +16,7 @@ import { getLocalFileSize } from './file-size';
 import {
   clampSelectionLimit,
   normalisedPhotoName,
+  pickerExitRemainingMs,
   PHOTO_JPEG_QUALITY,
   PHOTO_MIME_TYPE,
   planPhotoResize,
@@ -27,6 +29,17 @@ export type PickFromLibraryOptions = PickOptions & {
   /** Free slots: `maxPhotosPerAssignment − attached` for a homework, 3 for a lesson item. */
   limit?: number;
 };
+
+/**
+ * Resolves `result` only once the system picker that resolved at `resolvedAt` has left the screen (iOS), so
+ * the caller may present a sheet right away (the lesson's photo preview). The re-encoding usually covers
+ * most of the wait already.
+ */
+async function afterPickerExit<T>(resolvedAt: number, result: T): Promise<T> {
+  const remaining = pickerExitRemainingMs(Platform.OS, resolvedAt, Date.now());
+  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+  return result;
+}
 
 /** Re-encodes one picked asset to a bounded JPEG and describes it as an upload. */
 async function normalisePhoto(asset: ImagePicker.ImagePickerAsset, stamp: number, index: number): Promise<PhotoUpload> {
@@ -100,8 +113,9 @@ export async function pickFromCamera(options: PickOptions = {}): Promise<PickRes
     // No camera hardware (simulator, some tablets) or the system refused to start it.
     return { status: 'unavailable' };
   }
-  if (result.canceled) return { status: 'cancelled' };
-  return preparePhotos(result.assets.slice(0, 1), locale);
+  const resolvedAt = Date.now();
+  if (result.canceled) return afterPickerExit<PickResult<PhotoUpload>>(resolvedAt, { status: 'cancelled' });
+  return afterPickerExit(resolvedAt, await preparePhotos(result.assets.slice(0, 1), locale));
 }
 
 /**
@@ -136,8 +150,12 @@ export async function pickFromLibrary(options: PickFromLibraryOptions = {}): Pro
     }
     return { status: 'failed' };
   }
-  if (result.canceled) return { status: 'cancelled' };
+  const resolvedAt = Date.now();
+  if (result.canceled) return afterPickerExit<PickResult<PhotoUpload>>(resolvedAt, { status: 'cancelled' });
   // The web file input and some Android pickers ignore the selection limit.
   const assets = limit > 0 ? result.assets.slice(0, limit) : result.assets;
-  return preparePhotos(assets, locale);
+  const prepared = await preparePhotos(assets, locale);
+  // The caller tells the user about the photos left out instead of dropping them silently.
+  const dropped = result.assets.length - assets.length;
+  return afterPickerExit(resolvedAt, prepared.status === 'picked' && dropped > 0 ? { ...prepared, dropped } : prepared);
 }

@@ -26,7 +26,9 @@ export {
   createAppQueryClient,
   createPersistOptions,
   failQueriesWaitingWithoutData,
+  markRestoredQueriesStale,
   removePersistedQueries,
   shouldRetryQuery,
   type AppQueryClientOptions,
 } from './query-client';
+export { isPullRefreshing, usePullRefresh, type PullRefresh, type PullRefreshQuery } from './use-pull-refresh';

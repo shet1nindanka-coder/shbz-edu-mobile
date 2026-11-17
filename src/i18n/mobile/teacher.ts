@@ -10,7 +10,12 @@ const ru = {
   },
   report: {
     // The PDF is generated for seconds; the site shows nothing meanwhile (the browser downloads it).
-    preparing: "Готовим отчёт…"
+    preparing: "Готовим отчёт…",
+    // Title of the file viewer. The site's period buttons read «Отчёт: 7 дней» · «30 дней» · «Учебный год»
+    // (one row, the word «Отчёт» once); a viewer title stands alone, so every period names the report.
+    title7d: "Отчёт: 7 дней",
+    title30d: "Отчёт: 30 дней",
+    titleYear: "Отчёт: учебный год"
   },
   review: {
     // A status group has no visible caption on a phone; this is its accessible name.
@@ -51,7 +56,10 @@ const en: typeof ru = {
     suggestPickHint: "Tap to use it"
   },
   report: {
-    preparing: "Preparing the report…"
+    preparing: "Preparing the report…",
+    title7d: "Report: 7 days",
+    title30d: "Report: 30 days",
+    titleYear: "Report: school year"
   },
   review: {
     statusAria: "Status of problem {n}",

@@ -13,7 +13,7 @@
  * Screens never build paths themselves and never import `expo-router` for navigation.
  */
 import { router, useIsFocused, useNavigationContainerRef, useSegments, type Href } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import type { NavTarget, UserRole } from '@/api/types';
 import { useRole } from '@/providers/session-provider';
@@ -26,10 +26,12 @@ import {
   hrefFor,
   planNavigation,
   positionOf,
+  tabLandingHref,
   type AppHref,
   type AppLink,
   type FileViewerFile,
 } from './routes';
+import { normalizeRootStack, type RootStackState } from './root-stack';
 import { tabsForRole } from './tabs';
 import { handOverViewerFiles } from './viewer-handoff';
 
@@ -48,7 +50,7 @@ function toHref(href: AppHref): Href {
 let currentSegments: readonly string[] = [];
 
 /** The part of a navigation state that `tabIsAboveItsRoot` reads. */
-type NavState = { type?: string; index?: number; routes?: readonly { name: string; state?: NavState }[] };
+type NavState = { key?: string; type?: string; index?: number; routes?: readonly { key?: string; name: string; state?: NavState }[] };
 
 /** Reads the whole navigation tree at call time; installed by `useTrackPosition()`. */
 let readRootState: () => NavState | null = () => null;
@@ -68,27 +70,102 @@ export function useTrackPosition(): void {
   }, [container]);
 }
 
+/** The stack of the tab whose root is `root`, as it is now; null when that tab has not been created yet. */
+function tabStackOf(root: AppHref, role: UserRole): NavState | null {
+  const tab = tabsForRole(role).find((candidate) => {
+    const href = candidate.section === 'more' ? { pathname: EXTRA_ROUTES.teacherMore } : hrefFor({ screen: candidate.section } as AppLink, role);
+    return href?.pathname === root.pathname;
+  });
+  if (!tab) return null;
+  // The role's tab navigator: on the focused branch while the tabs are on screen, under the role-stack
+  // screen or the overlay otherwise (there is one tab navigator per role tree).
+  const findTabs = (state: NavState | null | undefined): NavState | null => {
+    if (!state) return null;
+    if (state.type === 'tab') return state;
+    const routes = state.routes ?? [];
+    const focused = routes[state.index ?? 0];
+    for (const route of [focused, ...routes.filter((candidate) => candidate !== focused)]) {
+      const found = findTabs(route?.state);
+      if (found) return found;
+    }
+    return null;
+  };
+  return findTabs(readRootState())?.routes?.find((route) => route.name === tab.name)?.state ?? null;
+}
+
 /**
  * Whether the tab whose root is `root` currently holds screens above its first one, i.e. whether
  * `router.dismissAll()` after selecting that tab has something to pop INSIDE the tab.
  *
  * `dismissAll` is a POP_TO_TOP for the focused stack; a stack that is already on its first screen does not
- * handle it and the action bubbles up. The root stack is [launch, role tree] after a sign-in or a deep
- * entry, so the bubble popped the whole role tree back to the launch route, which redirected home: the
- * first cross-tab link of every session bounced. The pop is therefore sent only when the tab can take it.
+ * handle it and the action bubbles up to the root stack, which must not be popped (it holds the role tree
+ * at its bottom, `useRootStackKeeper`). The pop is therefore sent only when the tab can take it.
  */
 function tabIsAboveItsRoot(root: AppHref, role: UserRole): boolean {
-  const tab = tabsForRole(role).find((candidate) => {
-    const href = candidate.section === 'more' ? { pathname: EXTRA_ROUTES.teacherMore } : hrefFor({ screen: candidate.section } as AppLink, role);
-    return href?.pathname === root.pathname;
-  });
-  if (!tab) return false;
-  // Down the focused branch to the tab navigator.
-  let state = readRootState();
-  while (state && state.type !== 'tab') state = state.routes?.[state.index ?? 0]?.state ?? null;
-  const stack = state?.routes?.find((route) => route.name === tab.name)?.state;
+  const stack = tabStackOf(root, role);
   if (!stack) return false;
   return (stack.index ?? (stack.routes?.length ?? 1) - 1) > 0;
+}
+
+/**
+ * The href that selects the tab of `root` without pushing inside it: for a tab with segments (the teacher's
+ * «занятия») the segment that is the bottom of its stack now — navigating to the other one would push a
+ * second list over it (back would then walk between segments, 90-addendum-2 N1).
+ */
+function tabLanding(root: AppHref, role: UserRole): AppHref {
+  return tabLandingHref(root, tabStackOf(root, role)?.routes?.[0]?.name);
+}
+
+/** The root layout's stack inside the container state (expo-router wraps it in a `__root` route). */
+function rootStackOf(state: NavState | null): NavState | null {
+  if (!state) return null;
+  const only = state.routes?.length === 1 ? state.routes[0] : undefined;
+  return only?.name === '__root' ? (only.state ?? null) : state;
+}
+
+/**
+ * Mount once in the root layout: keeps the launch route from staying under the session's screens (see
+ * `root-stack.ts`). `mounted` = the root stack navigator is rendered (the session is resolved): before
+ * that the container only holds the state built from the start URL, which no navigator could change.
+ * Runs on every navigation state change and when the role changes (sign-in, sign-out). Routes that stay
+ * keep their keys, so nothing that is on screen remounts.
+ */
+export function useRootStackKeeper(role: UserRole | null, mounted: boolean): void {
+  const container = useNavigationContainerRef();
+  // Read when the check runs, not when it was scheduled: the state event of a sign-in can arrive before
+  // this effect re-subscribes with the new role.
+  const roleRef = useRef(role);
+  useLayoutEffect(() => {
+    roleRef.current = role;
+  }, [role]);
+  useEffect(() => {
+    if (!mounted) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = () => {
+      timer = null;
+      if (!container.isReady()) return;
+      const stack = rootStackOf(container.getRootState() as unknown as NavState);
+      if (!stack?.key || !stack.routes) return;
+      const next = normalizeRootStack(
+        { index: stack.index ?? stack.routes.length - 1, routes: stack.routes as RootStackState['routes'] },
+        roleRef.current,
+      );
+      if (!next) return;
+      container.dispatch({ type: 'RESET', payload: { ...stack, index: next.index, routes: next.routes }, target: stack.key });
+    };
+    // Not inside the state event itself: the navigator may still be rendering the state that triggered it
+    // (and the role of a sign-in is only known once that render is committed). A frame later is invisible:
+    // the launch route is under other screens. One pending check at a time: it reads the latest state.
+    const schedule = () => {
+      if (timer === null) timer = setTimeout(check, 0);
+    };
+    schedule();
+    const unsubscribe = container.addListener('state', schedule);
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [container, role, mounted]);
 }
 
 /**
@@ -107,21 +184,26 @@ export function navigateTo(link: AppLink, role: UserRole): boolean {
   const overlayOpen = OVERLAY_SEGMENTS.includes(currentSegments[0] ?? '');
 
   switch (plan.kind) {
-    case 'tab':
+    case 'tab': {
+      // The root the tab's stack has now (a segmented tab may start with either segment).
+      const landing = tabLanding(plan.root, role);
       if (position === 'tabs') {
         // Select the tab, then return its stack to the root.
         const deep = tabIsAboveItsRoot(plan.root, role);
-        router.navigate(toHref(plan.root));
+        router.navigate(toHref(landing));
         if (deep) router.dismissAll();
       } else {
         // Pops everything above the tabs (settings, a sheet, a role-stack screen) and lands on the tab root.
-        router.dismissTo(toHref(plan.root));
+        router.dismissTo(toHref(landing));
       }
-      if (plan.replaceRoot) router.replace(toHref(plan.replaceRoot));
+      // Then the root the link asks for replaces the one that is there (a segment switch), never pushed.
+      const wanted = plan.replaceRoot ?? plan.root;
+      if (wanted.pathname !== landing.pathname) router.replace(toHref(wanted));
       // `withAnchor`: a stack that is not mounted yet is created as [its list, the detail], never the
       // detail alone. A mounted stack already has its list and simply gets the detail on top.
       if (plan.detail) router.push(toHref(plan.detail), { withAnchor: true });
       break;
+    }
     case 'stack':
       // A sheet or modal must not stay under the screen it leads to.
       if (overlayOpen && router.canGoBack()) router.back();

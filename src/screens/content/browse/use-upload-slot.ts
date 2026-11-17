@@ -17,7 +17,7 @@ export type UploadSlot = {
   file: StoredFileRef | null;
   uploading: boolean;
   /** Opens the system file browser; the picked file is uploaded at once. */
-  pick: () => void;
+  pick: () => Promise<void>;
   /** Aborts the running upload. */
   cancel: () => void;
   /** Back to `idle` (after the topic is created the files belong to it). */
@@ -63,7 +63,9 @@ export function useUploadSlot(onRateLimited: (error: unknown) => void): UploadSl
   }, []);
 
   const pick = useCallback(() => {
-    void (async () => {
+    // Returned until the picker has answered: Button keeps its press lock meanwhile, so a double tap does not
+    // open a second picker. The upload itself runs on (a newer pick may supersede it).
+    return (async () => {
       const picked = await pickDocument({ locale });
       if (picked.status === 'cancelled') return;
       if (picked.status !== 'picked') {
@@ -81,35 +83,37 @@ export function useUploadSlot(onRateLimited: (error: unknown) => void): UploadSl
       const upload = picked.files[0];
       if (!upload) return;
 
-      controller.current?.abort();
-      const current = new AbortController();
-      controller.current = current;
-      const id = (run.current += 1);
-      setStatus({ kind: 'uploading', name: upload.name, progress: 0 });
-      try {
-        const stored = await api.content.uploadFile(upload, {
-          signal: current.signal,
-          previousFileId: previous.current ?? undefined,
-          onProgress: (percent) => {
-            if (run.current === id) setStatus({ kind: 'uploading', name: upload.name, progress: percent });
-          },
-        });
-        if (run.current !== id) return;
-        previous.current = stored.id;
-        setStatus({ kind: 'uploaded', file: stored });
-      } catch (failure) {
-        // An aborted or superseded upload reports nothing: the newer run owns the slot.
-        if (run.current !== id || current.signal.aborted) return;
-        onRateLimited(failure);
-        const message = isNetworkError(failure)
-          ? dict.topics.errors.networkUpload
-          : isApiError(failure) && failure.message
-            ? failure.message
-            : dict.topics.errors.uploadFailed;
-        setStatus({ kind: 'error', message });
-      } finally {
-        if (controller.current === current) controller.current = null;
-      }
+      void (async () => {
+        controller.current?.abort();
+        const current = new AbortController();
+        controller.current = current;
+        const id = (run.current += 1);
+        setStatus({ kind: 'uploading', name: upload.name, progress: 0 });
+        try {
+          const stored = await api.content.uploadFile(upload, {
+            signal: current.signal,
+            previousFileId: previous.current ?? undefined,
+            onProgress: (percent) => {
+              if (run.current === id) setStatus({ kind: 'uploading', name: upload.name, progress: percent });
+            },
+          });
+          if (run.current !== id) return;
+          previous.current = stored.id;
+          setStatus({ kind: 'uploaded', file: stored });
+        } catch (failure) {
+          // An aborted or superseded upload reports nothing: the newer run owns the slot.
+          if (run.current !== id || current.signal.aborted) return;
+          onRateLimited(failure);
+          const message = isNetworkError(failure)
+            ? dict.topics.errors.networkUpload
+            : isApiError(failure) && failure.message
+              ? failure.message
+              : dict.topics.errors.uploadFailed;
+          setStatus({ kind: 'error', message });
+        } finally {
+          if (controller.current === current) controller.current = null;
+        }
+      })();
     })();
   }, [api, dict, locale, m, onRateLimited]);
 

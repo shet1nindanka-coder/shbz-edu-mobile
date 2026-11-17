@@ -7,12 +7,13 @@ import { errorText, qk, useApi } from '@/api';
 import type { TeacherStatsEntry } from '@/api/types';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
-import { useRefetchOnFocus } from '@/navigation';
+import { useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { LoadingState, Notice, PageHeader, Screen, Segmented } from '@/ui';
 
-import { STATS_VIEWS, type StatsView } from './logic';
+import { STATS_VIEWS, initialStatsState, type StatsView } from './logic';
 import { TeacherCard } from './parts/teacher-card';
 import { PlatformView } from './views/platform-view';
 import { ProgressView } from './views/progress-view';
@@ -33,18 +34,32 @@ import { TeachersView } from './views/teachers-view';
 type StatsRow = { kind: 'teacher'; entry: TeacherStatsEntry } | { kind: 'body' };
 const BODY_ROWS: readonly StatsRow[] = [{ kind: 'body' }];
 
-export function StatsMainScreen() {
+/** Route params of `stats.main`: the site's `?view=` and `?studentId=` (06 §1.6). */
+export type StatsMainScreenProps = ScreenParams['stats.main'];
+
+export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: StatsMainScreenProps = {}) {
   const styles = useStyles();
   const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.statistics;
-  const [view, setView] = useState<StatsView>('teacher');
-  const [visited, setVisited] = useState<ReadonlySet<StatsView>>(new Set<StatsView>(['teacher']));
-  // The student the progress timeline is filtered by; undefined = every student.
-  const [timelineStudentId, setTimelineStudentId] = useState<string | undefined>(undefined);
-  const [refreshing, setRefreshing] = useState(false);
+  // A deep link (`/developer/statistics?view=teachers`, `?studentId=…`) chooses the initial view and
+  // timeline student, like the site page; a later link with other params applies them again.
+  const initial = initialStatsState(routeView, routeStudentId);
+  const routeKey = `${initial.view}|${initial.timelineStudentId ?? ''}`;
+  const [seenRouteKey, setSeenRouteKey] = useState(routeKey);
+  const [view, setView] = useState<StatsView>(initial.view);
+  const [visited, setVisited] = useState<ReadonlySet<StatsView>>(() => new Set<StatsView>([initial.view]));
+  // The student the progress timeline is filtered by; undefined = every student. An unknown id falls
+  // back to "all students" on the server (`timelineStudentId: null`), as on the site.
+  const [timelineStudentId, setTimelineStudentId] = useState<string | undefined>(initial.timelineStudentId);
+  if (seenRouteKey !== routeKey) {
+    setSeenRouteKey(routeKey);
+    setView(initial.view);
+    setVisited((seen) => (seen.has(initial.view) ? seen : new Set(seen).add(initial.view)));
+    setTimelineStudentId(initial.timelineStudentId);
+  }
 
   const progress = useQuery({
     queryKey: qk('groups', 'getStatisticsProgress', timelineStudentId),
@@ -71,11 +86,12 @@ export function StatsMainScreen() {
     setVisited((seen) => (seen.has(next) ? seen : new Set(seen).add(next)));
   };
 
+  const pull = usePullRefresh([current]);
+  const refreshing = pull.refreshing;
   const refresh = () => {
-    setRefreshing(true);
     // The slice of the drilldown is part of the progress view: it reloads with it.
     if (view === 'teacher') void queryClient.invalidateQueries({ queryKey: qk('groups', 'getStatisticsDrilldown') });
-    void current.refetch().finally(() => setRefreshing(false));
+    pull.refresh();
   };
 
   const body = () => {

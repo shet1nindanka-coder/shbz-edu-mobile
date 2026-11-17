@@ -41,9 +41,11 @@ import { daysUntil, normalizeHomeworkParams, pickDominantTopicId } from "@/domai
 import {
   collectAvailableNumbers,
   isGapCandidate,
+  LESSON_TOPIC_HEAD,
   normalizePlanParams,
   normalizeSpeed,
   planLessonItemsUpdate,
+  trimToTopicHeads,
   type AvailableNumber,
   type LessonPlanContextTopics,
 } from "@/domain/lesson-plan";
@@ -103,8 +105,11 @@ type PlannedItem = { homeworkNumberId: string; reason: "NEW" | "GAP"; minutes: n
 type PlanDraft = { main: PlannedItem[]; extra: PlannedItem[]; summary: string | null };
 
 /** What one generation ends with: a set, or a stored plan error (`modelCalled` — the "model" answered or timed out). */
+/** Stage 1 of the site's generation (the cheap shortlist call): how many candidates went in and came out. */
+type ShortlistStage = { pool: number; picked: number };
+
 type GenerationOutcome =
-  | { kind: "plan"; plan: PlanDraft; candidates: number }
+  | { kind: "plan"; plan: PlanDraft; candidates: number; shortlist?: ShortlistStage }
   | { kind: "error"; code: PlanErrorCode; modelCalled: boolean; candidates: number };
 
 type PlanJobPayload = { locale?: unknown; actorId?: unknown };
@@ -470,12 +475,32 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
     return { main: script.mainNumberIds.map(toItem), extra: script.extraNumberIds.map(toItem), summary: script.summary };
   };
 
+  /**
+   * The candidate stages of the site (lib/lesson-plan-generate.ts, lib/homework-plan-generate.ts): when there
+   * are more numbers than `shortlistSize`, the far numbers of each topic are trimmed (`headPerTopic` per topic,
+   * gaps always stay); a pool still larger than `shortlistSize` goes through the shortlist call first, which
+   * keeps at most `shortlistSize` candidates for the plan call. The mocked shortlist keeps the gaps first.
+   */
+  const stageCandidates = (
+    available: AvailableNumber[],
+    shortlistSize: number,
+    headPerTopic: number,
+  ): { candidates: AvailableNumber[]; shortlist?: ShortlistStage } => {
+    const now = ctx.nowDate();
+    const pool = available.length > shortlistSize ? trimToTopicHeads(available, headPerTopic, now) : available;
+    if (pool.length <= shortlistSize) return { candidates: pool };
+    const ordered = [...pool.filter((candidate) => isGapCandidate(candidate, now)), ...pool.filter((candidate) => !isGapCandidate(candidate, now))];
+    const candidates = ordered.slice(0, shortlistSize);
+    return { candidates, shortlist: { pool: pool.length, picked: candidates.length } };
+  };
+
   const generateLessonPlan = (lesson: Lesson, participant: LessonParticipant, locale: Locale): GenerationOutcome => {
     // `planParams` may be null or lack fields (old rows): the readers are defensive, like the site's.
     const raw = (lesson.planParams ?? {}) as { title?: unknown; durationMinutes?: unknown; topicIds?: unknown; teacherNote?: unknown };
     const params = normalizePlanParams({ ...raw, durationMinutes: raw.durationMinutes ?? lesson.durationMinutes });
-    const candidates = collectAvailableNumbers(planContext(participant.studentId), { topicIds: params.topicIds });
-    if (candidates.length === 0) return { kind: "error", code: "noCandidates", modelCalled: false, candidates: 0 };
+    const available = collectAvailableNumbers(planContext(participant.studentId), { topicIds: params.topicIds });
+    if (available.length === 0) return { kind: "error", code: "noCandidates", modelCalled: false, candidates: 0 };
+    const { candidates, shortlist } = stageCandidates(available, ctx.settings().lessonPlanShortlistSize, LESSON_TOPIC_HEAD);
 
     const maxMain = ctx.settings().lessonPlanMaxItems;
     const plan = composePlan(candidates, {
@@ -486,7 +511,7 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
       texts: MODEL_TEXTS[locale].lesson,
       gapComment: MODEL_TEXTS[locale].gapComment,
     });
-    return { kind: "plan", plan, candidates: candidates.length };
+    return { kind: "plan", plan, candidates: candidates.length, shortlist };
   };
 
   const generateHomeworkPlan = (plan: Lesson, participant: LessonParticipant, locale: Locale): GenerationOutcome => {
@@ -495,8 +520,11 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
     const params = normalizeHomeworkParams({ ...raw, topicId: raw.topicId ?? plan.topicId ?? "", deadlineAt: plan.deadlineAt ?? "" }, ctx.nowDate());
     if (!params || !q.topic(params.topicId)) return { kind: "error", code: "homeworkParams", modelCalled: false, candidates: 0 };
 
-    const candidates = collectAvailableNumbers(planContext(participant.studentId), { topicIds: [params.topicId] });
-    if (candidates.length === 0) return { kind: "error", code: "homeworkNoCandidates", modelCalled: false, candidates: 0 };
+    const available = collectAvailableNumbers(planContext(participant.studentId), { topicIds: [params.topicId] });
+    if (available.length === 0) return { kind: "error", code: "homeworkNoCandidates", modelCalled: false, candidates: 0 };
+    // The site trims a homework pool with the shortlist size as the per-topic head.
+    const shortlistSize = ctx.settings().homeworkPlanShortlistSize;
+    const { candidates, shortlist } = stageCandidates(available, shortlistSize, shortlistSize);
 
     const draft = composePlan(candidates, {
       // The volume is the daily minutes times the days until the next lesson (clamped to 1..60).
@@ -508,7 +536,7 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
       // A homework item never carries a comment.
       gapComment: null,
     });
-    return { kind: "plan", plan: draft, candidates: candidates.length };
+    return { kind: "plan", plan: draft, candidates: candidates.length, shortlist };
   };
 
   /** Atomic write of a finished generation: items without submissions are replaced, the rest stays (skipDuplicates). */
@@ -598,6 +626,33 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
     else store.participants.update(participant.id, { planError: planErrorValue(outcome.code), updatedAt: ctx.nowIso() });
 
     // The journal gets one AI row per model call: none when the generation stopped before the model.
+    if (student && outcome.kind === "plan" && outcome.shortlist) {
+      // Stage 1 runs on the cheap model; the site falls back to the main one when none is set.
+      const action = lesson.kind === "HOMEWORK" ? ("homework_plan.shortlist" as const) : ("lesson_plan.shortlist" as const);
+      const settings = ctx.settings();
+      const shortlistModel = settings.aiShortlistModel.trim();
+      const model = shortlistModel || settings.aiModel;
+      const inputTokens = 1200 + 40 * outcome.shortlist.pool;
+      const outputTokens = 20 + 4 * outcome.shortlist.picked;
+      const cost = estimateModelCostRub(model, inputTokens, outputTokens);
+      ctx.audit.write({
+        category: "AI",
+        action,
+        outcome: "ok",
+        actor: requester ?? null,
+        targetType: "User",
+        targetId: student.id,
+        targetLabel: student.name,
+        text: { key: action, params: { name: student.name } },
+        model,
+        inputTokens,
+        outputTokens,
+        costRub: cost === null ? null : cost.toFixed(4),
+        durationMs: Math.round(job.delayMs / 3),
+        error: null,
+        meta: { lessonId: lesson.id, participantId: participant.id },
+      });
+    }
     if (student && (outcome.kind === "plan" || outcome.modelCalled)) {
       const action = lesson.kind === "HOMEWORK" ? ("homework_plan.generate" as const) : ("lesson_plan.generate" as const);
       const failed = outcome.kind === "error" && outcome.code === "failed";
@@ -1141,7 +1196,7 @@ export function createPlanner(ctx: MockContext): TeacherPlannerApi {
       // Nobody left after the filter: nothing to print.
       if (participants.length === 0) throw errors.notFound("lessonNotFound");
 
-      return ctx.documents.url("lessonHandout", { lessonId: lesson.id, format, studentId: studentId ?? undefined, answers: answers ? "1" : undefined });
+      return ctx.documents.url(format === "html" ? "lessonPrint" : "lessonHandout", { lessonId: lesson.id, format, studentId: studentId ?? undefined, answers: answers ? "1" : undefined });
     },
 
     async listHomeworkPlans() {

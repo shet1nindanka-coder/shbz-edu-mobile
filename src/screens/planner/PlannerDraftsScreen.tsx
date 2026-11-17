@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { RefreshControl, View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
@@ -9,6 +9,7 @@ import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { PlannerSegments, ShellAppBar, screenTitle } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, LoadingState, Notice, Screen } from '@/ui';
 
@@ -28,7 +29,6 @@ export function PlannerDraftsScreen() {
   const { dict, m } = useI18n();
   const t = dict.planner.homeworkPlans.list;
 
-  const [refreshing, setRefreshing] = useState(false);
 
   // The "assigned" counters move while a board is open elsewhere, so the list is re-read on every visit.
   const drafts = useQuery({ queryKey: qk('planner', 'listHomeworkPlans'), queryFn: () => api.planner.listHomeworkPlans(), refetchOnMount: 'always' });
@@ -38,10 +38,7 @@ export function PlannerDraftsScreen() {
   const data = drafts.data;
   const plans = useMemo(() => (data ? sortDrafts(data) : []), [data]);
 
-  const refresh = () => {
-    setRefreshing(true);
-    void drafts.refetch().finally(() => setRefreshing(false));
-  };
+  const { refreshing, refresh } = usePullRefresh([drafts]);
 
   const open = (plan: HomeworkPlanListItem) => navigation.open({ screen: 'planner.draftBoard', planId: plan.id });
 

@@ -1,5 +1,6 @@
-// The student's homework and lesson screens: cache merges that must not move the server clock, and the
-// rule for taking over a re-read note (src/screens/student/work/cache.ts, logic.ts).
+// The student's homework and lesson screens: cache merges that must not move the server clock
+// (src/screens/student/work/cache.ts, logic.ts). The note of a homework card uses the number screen's editor;
+// its rules are tested with note-model.ts (student-study-models.test.ts).
 /// <reference path="../node_modules/@types/node/assert.d.ts" />
 /// <reference path="../node_modules/@types/node/assert/strict.d.ts" />
 /// <reference path="../node_modules/@types/node/test.d.ts" />
@@ -9,7 +10,7 @@ import { describe, it } from "node:test";
 import { QueryClient } from "@tanstack/query-core";
 
 import { mergeQueryData } from "@/services/query/merge-query-data";
-import { decideServerNote, secondsUntil } from "@/screens/student/work/logic";
+import { secondsUntil } from "@/screens/student/work/logic";
 import { serverClockOffset } from "@/domain/server-clock";
 
 type Lesson = { serverNow: string; endsAt: string; closed: number };
@@ -67,36 +68,5 @@ describe("mergeQueryData", () => {
     });
     assert.equal(called, false);
     assert.equal(client.getQueryData(KEY), undefined);
-  });
-});
-
-describe("decideServerNote", () => {
-  const rest = { hasPendingWrite: false, superseded: [] as string[] };
-
-  it("the trimmed echo of the card's own save never replaces what was typed", () => {
-    // «слово » was typed, «слово» was saved, the re-read brings «слово» back.
-    assert.equal(decideServerNote({ serverNote: "слово", text: "слово ", baseline: "слово", ...rest }), "confirmed");
-    assert.equal(decideServerNote({ serverNote: "первая строка", text: "первая строка\n", baseline: "первая строка", ...rest }), "confirmed");
-  });
-
-  it("a note changed elsewhere is taken over while the field holds nothing newer", () => {
-    assert.equal(decideServerNote({ serverNote: "с другого устройства", text: "старая", baseline: "старая", ...rest }), "adopt");
-    assert.equal(decideServerNote({ serverNote: "", text: "старая", baseline: "старая", ...rest }), "adopt");
-  });
-
-  it("an unsaved edit and a draft waiting for a connection win over the server", () => {
-    assert.equal(decideServerNote({ serverNote: "с сервера", text: "старая и ещё", baseline: "старая", ...rest }), "keep");
-    assert.equal(
-      decideServerNote({ serverNote: "с сервера", text: "черновик", baseline: "черновик", hasPendingWrite: true, superseded: [] }),
-      "keep",
-    );
-  });
-
-  it("a late re-read that returns the card's earlier save is ignored", () => {
-    // Saved «а», then «аб»; the re-read started after the first save answers after the second.
-    assert.equal(
-      decideServerNote({ serverNote: "а", text: "аб", baseline: "аб", hasPendingWrite: false, superseded: ["", "а"] }),
-      "keep",
-    );
   });
 });

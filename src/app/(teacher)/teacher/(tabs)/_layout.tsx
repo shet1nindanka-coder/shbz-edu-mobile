@@ -6,6 +6,10 @@ import { useTheme } from '@/theme';
 
 export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
 
+// «обзор» is the role home; named explicitly so the first tab never depends on the route sort order
+// (a deep entry above the tabs goes back here).
+export const unstable_settings = { anchor: '(home)' };
+
 export default function TeacherTabsLayout() {
   const theme = useTheme();
   return (

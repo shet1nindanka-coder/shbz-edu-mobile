@@ -10,6 +10,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Badge, Card, LoadingState, Notice, Screen, Text, TextButton, type BadgeTone } from '@/ui';
 
@@ -39,7 +40,6 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
   const user = useCurrentUser();
   const navigation = useAppNavigation();
   const isDeveloper = user.role === 'DEVELOPER';
-  const [refreshing, setRefreshing] = useState(false);
   // Pushed from the editor's statements-and-answers list: that editor is the screen right below this one.
   const [fromEditor] = useState(() => peekOpenedFromEditor(topicId, number));
   useEffect(() => clearOpenedFromEditor(), []);
@@ -51,15 +51,11 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
 
   // Realtime first; a stale number is asked again when the screen is returned to (00 §2.3).
   useRefetchOnFocus([detail]);
+  const { refreshing, refresh } = usePullRefresh([detail]);
 
   // The number or its topic is gone: the not-found state, cached copy or not (90-addendum-1 A.3 rule 6).
   // (A topic deleted from its editor a moment ago is closing its screens: no "not found" flash on the way.)
   if (!isTopicLeaving(topicId) && isNotFoundError(detail.error)) return <NotFoundScreen />;
-
-  const refresh = () => {
-    setRefreshing(true);
-    void detail.refetch().finally(() => setRefreshing(false));
-  };
 
   // The stored value is shown at once; everything else that renders statements is refetched.
   const applyChange = (patch: Partial<Pick<NumberDetail['number'], 'conditionLatex' | 'answerLatex'>>) => {

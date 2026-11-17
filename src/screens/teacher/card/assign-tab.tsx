@@ -13,6 +13,7 @@ import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import {
   BottomSheet,
@@ -79,7 +80,6 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const [title, setTitle] = useState('');
   const [titleOpen, setTitleOpen] = useState(false);
   const [notice, setNotice] = useState<ListNotice | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   // Issue and cancel share one bucket: 120 / 60 s.
   const wait = useRetryWait();
 
@@ -95,8 +95,10 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
     queryKey: qk('content', 'getTopicConditions', topic?.id ?? ''),
     queryFn: () => api.content.getTopicConditions(topic?.id ?? ''),
     enabled: needsConditions,
-    staleTime: Infinity,
+    // The default (15 s) staleness: statements change on the server, and a restored cache must not keep an
+    // outdated one for days. Pull-to-refresh reads them again too.
   });
+  const { refreshing, refresh } = usePullRefresh([board, needsConditions && conditions]);
   const numbers = topic ? withConditions(topic, conditions.data) : NO_NUMBERS;
   const picked = liveSelection(topic, selected);
 
@@ -138,11 +140,6 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
     // Changing the topic clears the selection and both banners.
     setSelected([]);
     setNotice(null);
-  };
-
-  const refresh = () => {
-    setRefreshing(true);
-    void board.refetch().finally(() => setRefreshing(false));
   };
 
   const header = (

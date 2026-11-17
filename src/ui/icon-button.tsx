@@ -1,4 +1,4 @@
-import { View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles, useTheme } from '@/theme';
 
@@ -52,6 +52,11 @@ export function IconButton({
   const c = theme.colors;
   const small = variant === 'danger' || variant === 'dangerRaised';
   const diameter = small ? theme.sizes.dangerIcon : theme.sizes.iconCircle;
+  // A caller may shrink the visual through `style` (the 28pt close button of a notice): the touch target
+  // must be grown from the size actually rendered, not from the default diameter.
+  const override = StyleSheet.flatten(style);
+  const width = typeof override?.width === 'number' ? override.width : diameter;
+  const height = typeof override?.height === 'number' ? override.height : diameter;
 
   return (
     <PressableScale
@@ -61,7 +66,7 @@ export function IconButton({
       accessibilityState={{ disabled, selected: active }}
       disabled={disabled}
       onPress={onPress}
-      hitSlop={hitSlopFor(diameter, diameter)}
+      hitSlop={hitSlopFor(width, height)}
       testID={testID}
       style={[
         styles.base,

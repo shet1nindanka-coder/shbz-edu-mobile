@@ -22,10 +22,13 @@ import {
   registerLocalFile,
   unregisterLocalFile
 } from "@/services/files/local-file-registry";
-import { MOCK_PHOTO_COUNT, MOCK_SAMPLE_MIME, pickMockPhoto, pickMockSample } from "@/services/files/mock-samples";
+import { MOCK_PRINT_HTML } from "@/services/files/mock-print-html";
+import { MOCK_PHOTO_COUNT, MOCK_SAMPLE_MIME, isMockSampleKey, pickMockPhoto, pickMockSample } from "@/services/files/mock-samples";
 import {
   clampSelectionLimit,
+  IOS_PICKER_EXIT_MS,
   normalisedPhotoName,
+  pickerExitRemainingMs,
   PHOTO_MAX_SIDE,
   planPhotoResize
 } from "@/services/photos/photo-rules";
@@ -135,7 +138,7 @@ test("every photo sample has a thumbnail twin and a MIME type", () => {
     assert.equal(MOCK_SAMPLE_MIME[`photo${index}Thumb` as keyof typeof MOCK_SAMPLE_MIME], "image/jpeg");
   }
 
-  assert.equal(Object.keys(MOCK_SAMPLE_MIME).length, MOCK_PHOTO_COUNT * 2 + 4);
+  assert.equal(Object.keys(MOCK_SAMPLE_MIME).length, MOCK_PHOTO_COUNT * 2 + 5);
 });
 
 test("the bundled DOCX is a real Word file by the site's upload rules", () => {
@@ -213,4 +216,22 @@ test("viewer file helpers", () => {
     originalName: "a.jpg",
     mimeType: "image/jpeg"
   });
+});
+
+test("iOS: a picked photo is reported only after the system picker has left the screen", () => {
+  assert.equal(pickerExitRemainingMs("ios", 1000, 1000), IOS_PICKER_EXIT_MS);
+  // The re-encoding already took part of the wait.
+  assert.equal(pickerExitRemainingMs("ios", 1000, 1400), IOS_PICKER_EXIT_MS - 400);
+  assert.equal(pickerExitRemainingMs("ios", 1000, 1000 + IOS_PICKER_EXIT_MS + 50), 0);
+  // Android re-shows a refused dialog itself; web has no native modal.
+  assert.equal(pickerExitRemainingMs("android", 1000, 1000), 0);
+  assert.equal(pickerExitRemainingMs("web", 1000, 1000), 0);
+});
+
+test("the mock print version of a handout is a real HTML document", () => {
+  assert.equal(MOCK_SAMPLE_MIME.printHtml, "text/html");
+  assert.match(MOCK_PRINT_HTML.trimStart(), /^<!doctype html>/i);
+  assert.equal(isMockSampleKey("printHtml"), true);
+  assert.equal(isMockSampleKey("pdfLong"), true);
+  assert.equal(isMockSampleKey("toString"), false);
 });

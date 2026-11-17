@@ -11,6 +11,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { Hint } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, Dialog, IconButton, LoadingState, Screen, Text } from '@/ui';
 
@@ -41,7 +42,6 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
   const { data: plan, board, now } = controller;
   const handout = useHandout();
 
-  const [refreshing, setRefreshing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   // A group opens collapsed (a card per student, the chips tell its state); a single student opens expanded.
@@ -55,6 +55,8 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
   useEffect(() => {
     if (notice || issueFailures.length > 0 || handoutFailure) listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, [notice, issueFailures, handoutFailure]);
+
+  const { refreshing, refresh } = usePullRefresh([board]);
 
   if (controller.notFound) return <NotFoundScreen description={errorText(board.error, dict.shells.notFoundDescription)} />;
 
@@ -75,11 +77,6 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
   const addParticipant = plan.participants.find((participant) => participant.id === addFor) ?? null;
   const sourceLesson = plan.sourceLesson;
   const sourceLink = sourceLesson ? ({ screen: 'planner.lessonBoard', lessonId: sourceLesson.id } as const) : null;
-
-  const refresh = () => {
-    setRefreshing(true);
-    void board.refetch().finally(() => setRefreshing(false));
-  };
 
   const menuActions: SheetAction[] = [
     {

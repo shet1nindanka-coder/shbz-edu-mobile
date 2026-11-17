@@ -8,13 +8,13 @@ import { format, useI18n } from '@/i18n';
 import { useRefetchOnFocus } from '@/navigation';
 import type { ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles } from '@/theme';
 import { Screen } from '@/ui';
 
 import { NumberCard } from './study/number-card';
 import { NumberSkeleton } from './study/number-skeleton';
 import { RefreshError } from './study/refresh-error';
-import { useRefresh } from './study/use-refresh';
 
 /** Route params of `student.number` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type StudentNumberScreenProps = ScreenParams['student.number'];
@@ -38,8 +38,7 @@ export function StudentNumberScreen({ number }: StudentNumberScreenProps) {
     queryKey: qk('studentStudy', 'getNumberDetail', number),
     queryFn: () => api.studentStudy.getNumberDetail(number),
   });
-  const { refetch } = detail;
-  const { refreshing, refresh } = useRefresh(refetch);
+  const { refreshing, refresh } = usePullRefresh([detail]);
   // 00 §2.3 (statements): a refetch when the screen is uncovered again with stale data.
   useRefetchOnFocus([detail]);
 

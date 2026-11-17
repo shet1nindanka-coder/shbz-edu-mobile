@@ -71,6 +71,8 @@ export function CreateAccountSheet({ visible, teachers, onClose, onCreated, onTe
   const teacherId = validOwnerId(pickedTeacherId, teachers);
   const values = { role, teacherId, name, login, password };
 
+  // The keyboard's "send" bypasses Button's press guard: one request at a time, set before mutate.
+  const inFlight = useRef(false);
   const create = useMutation({
     mutationFn: (input: AccountCreateInput) => api.accounts.createAccount(input),
     onSuccess: ({ account }, input) => {
@@ -100,12 +102,16 @@ export function CreateAccountSheet({ visible, teachers, onClose, onCreated, onTe
         setFormError(text);
       }
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const canSubmit = canSubmitAccountForm(values, teachers) && !create.isPending && !limit.waiting;
 
   const submit = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || inFlight.current) return;
+    inFlight.current = true;
     setFormError(null);
     setLoginError(null);
     setTeacherError(null);

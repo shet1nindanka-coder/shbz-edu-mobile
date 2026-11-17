@@ -10,6 +10,7 @@ import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { ShellAppBar } from '@/screens/shell';
+import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { PageHeader, Screen, Text } from '@/ui';
 
@@ -19,7 +20,6 @@ import { groupByMskDay, monthOfInstant, shiftMonth, toDeadlineItems, type Calend
 import { DeadlinesCalendar } from './study/deadlines-calendar';
 import { RefreshError } from './study/refresh-error';
 import { useNow } from './study/use-now';
-import { useRefresh } from './study/use-refresh';
 
 /**
  * `student.deadlines` — «Дедлайны» (docs/spec/02-student-study.md S4): a month calendar of homework
@@ -37,8 +37,7 @@ export function StudentDeadlinesScreen() {
     queryKey: qk('studentStudy', 'getHomeworkDeadlines'),
     queryFn: () => api.studentStudy.getHomeworkDeadlines(),
   });
-  const { refetch } = deadlines;
-  const { refreshing, refresh } = useRefresh(refetch);
+  const { refreshing, refresh } = usePullRefresh([deadlines]);
   // 00 §2.3: realtime first, a refetch when the tab regains focus as the fallback.
   useRefetchOnFocus([deadlines]);
 
