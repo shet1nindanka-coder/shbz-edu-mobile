@@ -89,11 +89,19 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   // Offline, the request for a new selection does not start (queries are `offlineFirst`): the rows on
   // screen belong to the previous selection and will stay until the connection returns — say so instead
   // of spinning for as long as the phone is offline.
-  const stalled = switching && journal.fetchStatus === 'paused';
+  const paused = journal.fetchStatus === 'paused';
+  const stalled = switching && paused;
+  // Any other read parked offline over the rows on screen — «Показать ещё», the end-of-list load, a refresh on
+  // return: its retry waits for the connection, which leaves neither a spinner nor an error (#403). Say so
+  // (once: a parked filter switch has its own notice above).
+  const readPaused = paused && !switching;
+  const hasFooter = first !== undefined && entries.length > 0;
 
   const { refreshing, refresh } = usePullRefresh([journal]);
+  // The end-of-list load: not while a read is parked offline (the footer says so; a tap on «Показать ещё»
+  // restarts the request on purpose).
   const loadMore = () => {
-    if (journal.hasNextPage && !journal.isFetching) void journal.fetchNextPage();
+    if (journal.hasNextPage && !journal.isFetching && !paused) void journal.fetchNextPage();
   };
   const openDetail = (entry: JournalEntry) => {
     setDetail(entry);
@@ -157,7 +165,8 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
       </View>
       {stalled ? <Notice tone="warning" text={m.common.errors.network} testID="journal-offline-notice" /> : null}
       {/* Loaded rows stay on screen when a refresh fails (offline): say so instead of replacing them. */}
-      {journal.isError && first && !journal.isFetchNextPageError ? (
+      {readPaused && !hasFooter ? <Notice tone="error" text={m.common.errors.network} testID="journal-paused-notice" /> : null}
+      {journal.isError && first && !journal.isFetchNextPageError && !paused ? (
         <Notice tone="error" text={errorText(journal.error, m.developer.journal.refreshFailed)} testID="journal-refresh-error" />
       ) : null}
     </View>
@@ -166,8 +175,12 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   const footer =
     first && entries.length > 0 ? (
       <View style={styles.footer}>
-        {journal.isFetchNextPageError ? (
-          <Notice tone="error" text={errorText(journal.error, m.developer.journal.loadMoreFailed)} testID="journal-more-error" />
+        {readPaused || journal.isFetchNextPageError ? (
+          <Notice
+            tone="error"
+            text={readPaused ? m.common.errors.network : errorText(journal.error, m.developer.journal.loadMoreFailed)}
+            testID="journal-more-error"
+          />
         ) : null}
         {first.pageCount > 1 ? (
           <Text variant="caption" align="center" tabular testID="journal-page-of">
@@ -228,7 +241,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
               />
             </View>
           }
-          onEndReached={journal.isFetchNextPageError ? undefined : loadMore}
+          onEndReached={journal.isFetchNextPageError || paused ? undefined : loadMore}
           onEndReachedThreshold={0.6}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

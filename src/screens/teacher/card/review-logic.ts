@@ -122,6 +122,66 @@ export function chunkChanges<T>(changes: readonly T[], size = STATUS_BATCH_MAX):
 }
 
 /**
+ * A status batch that failed part-way. The endpoint takes at most `STATUS_BATCH_MAX` changes per call, so a
+ * longer batch goes out in several requests, each one a transaction of its own: when a later request fails,
+ * the earlier ones are already applied. `applied` holds the server's results of those requests and
+ * `appliedIds` the numbers they wrote (empty when the first request failed and nothing was applied).
+ */
+export class StatusBatchError extends Error {
+  readonly reason: unknown;
+  readonly applied: StatusChangeEntry[];
+  readonly appliedIds: string[];
+
+  constructor(reason: unknown, applied: StatusChangeEntry[], appliedIds: string[]) {
+    super(reason instanceof Error ? reason.message : 'Status batch failed');
+    // Keeps `instanceof` working when the class is transpiled to ES5-style constructors.
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.name = 'StatusBatchError';
+    this.reason = reason;
+    this.applied = applied;
+    this.appliedIds = appliedIds;
+  }
+}
+
+/**
+ * Sends a status batch in chunks of `STATUS_BATCH_MAX`, one after another, and returns the server's results.
+ * A failed chunk stops the batch and rejects with a `StatusBatchError` that says what was applied before it.
+ */
+export async function sendStatusChunks(
+  entries: readonly StatusChangeEntry[],
+  send: (chunk: StatusChangeEntry[]) => Promise<{ results: StatusChangeEntry[] }>,
+  size = STATUS_BATCH_MAX,
+): Promise<StatusChangeEntry[]> {
+  const results: StatusChangeEntry[] = [];
+  const appliedIds: string[] = [];
+  for (const chunk of chunkChanges(entries, size)) {
+    try {
+      const response = await send(chunk);
+      results.push(...response.results);
+    } catch (error) {
+      throw new StatusBatchError(error, results, appliedIds);
+    }
+    appliedIds.push(...chunk.map((entry) => entry.homeworkNumberId));
+  }
+  return results;
+}
+
+/** What a failed status batch left behind: the original error and the part that was applied before it. */
+export function statusBatchFailure(error: unknown): { reason: unknown; applied: StatusChangeEntry[]; appliedIds: string[] } {
+  if (error instanceof StatusBatchError) return { reason: error.reason, applied: error.applied, appliedIds: error.appliedIds };
+  return { reason: error, applied: [], appliedIds: [] };
+}
+
+/**
+ * The part of an undo that may be sent once its accept batch has settled: only the numbers the accept
+ * actually wrote. After a failed accept that is nothing — writing the "previous" colours anyway would
+ * record manual teacher marks the teacher never made (and refresh their protection against a check).
+ */
+export function undoEntriesAfterAccept(previous: readonly StatusChangeEntry[], appliedIds: ReadonlySet<string>): StatusChangeEntry[] {
+  return previous.filter((entry) => appliedIds.has(entry.homeworkNumberId));
+}
+
+/**
  * Which write a number's in-flight colour and lock belong to. A number can be written by several requests
  * in a row (the accept batch, then its undo; a tap after either): only the LAST one that took the number may
  * release it, so an earlier request that settles later does not unlock the number or bring back its colour

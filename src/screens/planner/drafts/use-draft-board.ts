@@ -13,7 +13,7 @@ import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../sh
 import { usePlanProgressObservers } from '../shared/use-plan-progress-observers';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive, useStillHere } from '@/navigation';
 import { useNowTick } from '@/services/clock';
-import { mergeQueryData } from '@/services/query';
+import { mergeQueryData, refreshQueries } from '@/services/query';
 import {
   countIssuable,
   countIssued,
@@ -55,6 +55,15 @@ export function useDraftBoard(planId: string) {
   const screenLive = useScreenLive();
   const data = board.data;
   const refetchBoard = board.refetch;
+  /**
+   * A re-read asked for by the server side (the generation poll saw a new plan or issue stamp): unlike
+   * `refetchBoard` it never cancels a read in flight (most likely a realtime refresh of the same change)
+   * and is followed by one more read instead. `refetchBoard` stays for the teacher's own actions.
+   */
+  const refreshBoard = useCallback(
+    () => void refreshQueries(queryClient, { queryKey: qk('planner', 'getHomeworkPlanBoard', planId), exact: true }),
+    [queryClient, planId],
+  );
   const boardUpdatedAt = board.dataUpdatedAt;
   const boardFetching = board.isFetching;
 
@@ -141,15 +150,13 @@ export function useDraftBoard(planId: string) {
     // The first value only initialises the comparison: the board may hide a stamp the status still reports.
     const stampsMoved = lastStamps.current !== null && lastStamps.current !== stamps;
     lastStamps.current = stamps;
-    if (stampsMoved || planSignature(rows) !== planSignature(participants)) void refetchBoard();
-  }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refetchBoard]);
+    if (stampsMoved || planSignature(rows) !== planSignature(participants)) refreshBoard();
+  }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refreshBoard]);
 
-  // A plan that arrived or failed also changes the drafts list (its «ошибок: N» chip): it is not polled.
-  const invalidateDraftList = useCallback(
-    () => void queryClient.invalidateQueries({ queryKey: qk('planner', 'listHomeworkPlans') }),
-    [queryClient],
-  );
-  usePlanProgressObservers(participants, invalidateDraftList);
+  // A plan that arrived or failed also changes the drafts list (its «ошибок: N» chip): it is not polled. A
+  // server-side change, so the re-read never cancels a list read already in flight (`refreshQueries`).
+  const refreshDraftList = useCallback(() => void refreshQueries(queryClient, { queryKey: qk('planner', 'listHomeworkPlans') }), [queryClient]);
+  usePlanProgressObservers(participants, refreshDraftList);
 
   // ───────────────────────────── set editing ─────────────────────────────
 

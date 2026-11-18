@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 
@@ -11,7 +11,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
-import { usePullRefresh } from '@/services/query';
+import { refreshQueries, usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, Icon, LoadingState, Notice, PageHeader, PressableScale, Screen, Text } from '@/ui';
 
@@ -28,6 +28,7 @@ export function StudentHomeworksScreen() {
   const styles = useStyles();
   const theme = useTheme();
   const api = useApi();
+  const queryClient = useQueryClient();
   const { dict, m } = useI18n();
   const t = dict.student.homeworks;
   const navigation = useAppNavigation();
@@ -40,12 +41,13 @@ export function StudentHomeworksScreen() {
     queryFn: ({ signal }) => api.studentWork.listHomeworks({ signal }),
   });
   const data = homeworks.data;
-  const { isStale, refetch } = homeworks;
+  const { isStale } = homeworks;
 
   // Statuses change outside this screen (a check on the detail screen, a lesson, the teacher): the list
   // is re-read when the student comes back to it (00 §2.3 "refetch on focus").
+  // A server-side change: a read already on its way (a realtime re-read) is kept, not cancelled.
   useOnReturn(live, () => {
-    if (isStale) void refetch();
+    if (isStale) void refreshQueries(queryClient, { queryKey: qk('studentWork', 'listHomeworks'), exact: true });
   });
 
   const nowMs = useServerNow(data ? serverClockOffset(data.serverNow, homeworks.dataUpdatedAt) : 0);

@@ -30,7 +30,13 @@ export function WeekPanel({ summary, cells, testID }: WeekPanelProps) {
       <View style={styles.row}>
         {cells.map((cell, index) => (
           <Enter key={cell.date} index={index} duration={320} offset={6} style={styles.column}>
-            <View accessible accessibilityRole="image" accessibilityLabel={cell.accessibilityLabel} style={[styles.cell, cell.isToday ? styles.cellToday : null]}>
+            <View
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel={cell.accessibilityLabel}
+              style={[styles.cell, cell.isToday ? styles.cellToday : null]}
+              testID={cell.isToday ? 'streak-week-today' : undefined}
+            >
               <View style={cell.active ? styles.bar : styles.dot} />
             </View>
             <Text

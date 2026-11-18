@@ -42,7 +42,11 @@ export function DraftBoardHeader({ plan, controller, handout, onOpenSourceLesson
   return (
     <View style={styles.header}>
       <View style={styles.titles}>
-        {/* The app bar has one line; a draft's auto title («ДЗ по теме «…» до …») rarely fits there. */}
+        {/* The app bar has one line; a draft's auto title («ДЗ по теме «…» до …») rarely fits there, and a long
+            topic cuts the group from the bar's subtitle, so the site's kicker (topic · group) is shown here too. */}
+        <Text variant="caption" color="textMuted" testID="draft-board-kicker">
+          {plan.group ? `${plan.topicTitle} · ${plan.group.name}` : plan.topicTitle}
+        </Text>
         <Text variant="sectionTitle" accessibilityRole="header" testID="draft-board-title">
           {plan.title}
         </Text>

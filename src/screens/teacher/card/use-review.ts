@@ -12,11 +12,13 @@ import {
   ACCEPT_UNDO_MS,
   acceptVerdictChanges,
   applyStatuses,
-  chunkChanges,
   claimWrites,
   patchHomeworkStatuses,
   releaseWrites,
+  sendStatusChunks,
   type StatusChangeEntry,
+  statusBatchFailure,
+  undoEntriesAfterAccept,
   type VerdictChange,
   type WriteOwners,
 } from './review-logic';
@@ -41,8 +43,9 @@ function without<T>(record: Record<string, T>, ids: readonly string[]): Record<s
 export function useReview(studentId: string) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.students.review;
+  const mt = m.teacher.review;
   const focused = useScreenFocused();
 
   const key = qk('teacherStudents', 'getStudentHomeworks', studentId);
@@ -64,8 +67,10 @@ export function useReview(studentId: string) {
   const [assignmentErrors, setAssignmentErrors] = useState<Record<string, string>>({});
   const [undo, setUndo] = useState<ReviewUndo | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The accept batch an undo has to wait for: the two requests must reach the server in this order.
-  const acceptRun = useRef<Promise<unknown>>(Promise.resolve());
+  // The accept batch an undo has to wait for: the two requests must reach the server in this order. It
+  // resolves to the numbers the accept actually wrote, so the undo restores only those (none after a
+  // failed accept).
+  const acceptRun = useRef<Promise<ReadonlySet<string>>>(Promise.resolve(new Set<string>()));
   // One bucket for the single mark and the batch: 240 / 60 s.
   const wait = useRetryWait();
   const noteWait = wait.note;
@@ -124,14 +129,7 @@ export function useReview(studentId: string) {
   );
 
   const sendBatch = useCallback(
-    async (entries: readonly StatusChangeEntry[]) => {
-      const results: StatusChangeEntry[] = [];
-      for (const chunk of chunkChanges(entries)) {
-        const response = await api.teacherStudents.setNumberStatuses(studentId, chunk);
-        results.push(...response.results);
-      }
-      return results;
-    },
+    (entries: readonly StatusChangeEntry[]) => sendStatusChunks(entries, (chunk) => api.teacherStudents.setNumberStatuses(studentId, chunk)),
     [api, studentId],
   );
 
@@ -176,24 +174,54 @@ export function useReview(studentId: string) {
     },
     onSuccess: (results) => patchCache(results),
     onError: (error, input) => {
-      // The batch is one transaction: nothing was applied, so there is nothing to undo.
-      clearUndo();
-      setAssignmentErrors((current) => ({ ...current, [input.assignmentId]: errorText(error, t.errors.applyVerdicts) }));
-      noteWait(error);
+      const { reason, applied, appliedIds } = statusBatchFailure(error);
+      let message = errorText(reason, t.errors.applyVerdicts);
+      if (appliedIds.length === 0) {
+        // Every request of the batch is a transaction and the first one failed: nothing was applied, so
+        // there is nothing to undo.
+        clearUndo();
+      } else {
+        // A batch of more than 100 changes failed part-way: the earlier requests are applied. The undo
+        // (if it is still offered) covers exactly those, and the message says how many went through.
+        patchCache(applied);
+        const done = new Set(appliedIds);
+        setUndo((current) => {
+          if (!current || current.assignmentId !== input.assignmentId) return current;
+          const previous = undoEntriesAfterAccept(current.previous, done);
+          return { ...current, previous, label: format(t.verdictsAccepted, { n: previous.length }) };
+        });
+        message = `${message} ${format(mt.partlyApplied, { done: appliedIds.length, total: input.changes.length })}`;
+      }
+      setAssignmentErrors((current) => ({ ...current, [input.assignmentId]: message }));
+      noteWait(reason);
     },
     onSettled: (_result, _error, input, token) => finish(input.changes.map((change) => change.homeworkNumberId), token),
   });
 
   const revert = useMutation({
     mutationFn: async (input: ReviewUndo) => {
-      await acceptRun.current;
-      return sendBatch(input.previous);
+      // Sent after the accept settles, and only for what the accept wrote: after a failed accept this
+      // sends nothing at all.
+      const entries = undoEntriesAfterAccept(input.previous, await acceptRun.current);
+      return entries.length === 0 ? [] : sendBatch(entries);
     },
     onMutate: (input) => begin(input.previous),
-    onSuccess: (results) => patchCache(results),
+    onSuccess: (results, input) => {
+      patchCache(results);
+      // The undo took back what a part-way failed accept had applied: its «Применено N из M.» no longer
+      // describes the card, which is back where it was before the accept. A revert that sent nothing (the
+      // accept applied nothing) keeps the accept's error.
+      if (results.length > 0) setAssignmentErrors((current) => without(current, [input.assignmentId]));
+    },
     onError: (error, input) => {
-      setAssignmentErrors((current) => ({ ...current, [input.assignmentId]: errorText(error, t.errors.undoVerdicts) }));
-      noteWait(error);
+      const { reason, applied, appliedIds } = statusBatchFailure(error);
+      let message = errorText(reason, t.errors.undoVerdicts);
+      if (appliedIds.length > 0) {
+        patchCache(applied);
+        message = `${message} ${format(mt.partlyUndone, { done: appliedIds.length, total: input.previous.length })}`;
+      }
+      setAssignmentErrors((current) => ({ ...current, [input.assignmentId]: message }));
+      noteWait(reason);
     },
     onSettled: (_result, _error, input, token) => finish(input.previous.map((entry) => entry.homeworkNumberId), token),
   });
@@ -213,7 +241,11 @@ export function useReview(studentId: string) {
     (assignment: TeacherHomeworkAssignment) => {
       const changes = acceptVerdictChanges(assignment, effectiveStatus);
       if (changes.length === 0) return;
-      acceptRun.current = acceptMutate({ assignmentId: assignment.id, changes }).catch(() => undefined);
+      const all = new Set(changes.map((change) => change.homeworkNumberId));
+      acceptRun.current = acceptMutate({ assignmentId: assignment.id, changes }).then(
+        () => all,
+        (error: unknown) => new Set(statusBatchFailure(error).appliedIds),
+      );
     },
     [acceptMutate, effectiveStatus],
   );

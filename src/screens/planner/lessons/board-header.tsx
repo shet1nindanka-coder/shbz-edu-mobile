@@ -16,6 +16,8 @@ import type { LessonBoardController } from './use-lesson-board';
 
 export type BoardHeaderProps = {
   lesson: LessonBoardModel;
+  /** The site's page kicker «{group} · {date} · {n} мин», shown in full above the title (#417). */
+  kicker: string;
   controller: LessonBoardController;
   handout: Handout;
   onFinish: () => void;
@@ -26,7 +28,7 @@ export type BoardHeaderProps = {
  * pill with the one contextual action (finish, while the lesson runs), the generation counter, then the
  * banners in the site's order — no time, AI unavailable, the transient notice.
  */
-export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHeaderProps) {
+export function BoardHeader({ lesson, kicker, controller, handout, onFinish }: BoardHeaderProps) {
   const styles = useStyles();
   const theme = useTheme();
   const { dict, m } = useI18n();
@@ -38,10 +40,16 @@ export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHead
 
   return (
     <View style={styles.header}>
-      {/* The app bar has one line; the lesson title is shown here in full. */}
-      <Text variant="sectionTitle" accessibilityRole="header" testID="lesson-board-title">
-        {lesson.title}
-      </Text>
+      {/* The app bar has one line: the kicker (the date and the lesson's length) and the title are shown here
+          in full, as in the site's page header, since a 360 pt bar cuts the kicker's end. */}
+      <View style={styles.titles}>
+        <Text variant="caption" color="textMuted" tabular testID="lesson-board-kicker">
+          {kicker}
+        </Text>
+        <Text variant="sectionTitle" accessibilityRole="header" testID="lesson-board-title">
+          {lesson.title}
+        </Text>
+      </View>
       <View style={styles.toolbar}>
         <View
           accessible
@@ -105,6 +113,7 @@ export function BoardHeader({ lesson, controller, handout, onFinish }: BoardHead
 
 const useStyles = makeStyles((t) => ({
   header: { gap: t.space.md, paddingBottom: t.space.lg },
+  titles: { gap: t.space.xs },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
   pill: { height: t.sizes.button, paddingHorizontal: 18, borderRadius: t.radii.md, alignItems: 'center', justifyContent: 'center' },
   progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.button },

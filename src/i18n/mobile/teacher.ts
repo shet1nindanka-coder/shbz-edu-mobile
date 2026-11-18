@@ -31,7 +31,11 @@ const ru = {
     // Accessible names of the per-number buttons: in a list of numbers each one names its number.
     showConditionOf: "Условие и ответ № {n}",
     hideConditionOf: "Скрыть условие и ответ № {n}",
-    historyOf: "История статуса № {n}"
+    historyOf: "История статуса № {n}",
+    // "Accept AI verdicts" / its undo of more than 100 changes goes out in several requests; when a later
+    // one fails, the earlier ones are applied (the site sends one request per number and has no such case).
+    partlyApplied: "Применено {done} из {total}.",
+    partlyUndone: "Отменено {done} из {total}."
   },
   // Student card (`teacher.student.*`): chrome the site does not have.
   card: {
@@ -47,6 +51,8 @@ const ru = {
     steps: "1. Нажмите на номера ниже, чтобы выбрать их · 2. Задайте дедлайн · 3. Нажмите «Выдать ДЗ».",
     titleAction: "Название",
     titleSheet: "Название ДЗ",
+    // The title button shows the typed title instead of «Название»: its accessible name carries it too.
+    titleSheetOf: "Название ДЗ: {title}",
     titleHint: "Если оставить поле пустым, ДЗ получит номер по порядку в теме, например «ДЗ 3».",
     noNumbers: "В этой теме пока нет номеров.",
     conditionsFailed: "Условия номеров не загрузились — выбирать номера можно и без них."
@@ -81,19 +87,22 @@ const en: typeof ru = {
     noAnswer: "No answer has been added for this problem.",
     showConditionOf: "Statement and answer of problem {n}",
     hideConditionOf: "Hide the statement and answer of problem {n}",
-    historyOf: "Status history of problem {n}"
+    historyOf: "Status history of problem {n}",
+    partlyApplied: "{done} of {total} applied.",
+    partlyUndone: "{done} of {total} undone."
   },
   card: {
     reports: "PDF reports",
     reportsHint: "The report is built on the server and opens in the file viewer — you can share it from there.",
     expand: "Expand: {title}",
     collapse: "Collapse: {title}",
-    openLessonOf: "Open the lesson: {title}, {meta}"
+    openLessonOf: "Open lesson: {title}, {meta}"
   },
   assign: {
     steps: "1. Tap the problems below to select them · 2. Set a deadline · 3. Press “Assign homework”.",
     titleAction: "Title",
     titleSheet: "Homework title",
+    titleSheetOf: "Homework title: {title}",
     titleHint: "If you leave it empty, the homework gets its number within the topic, for example “Homework 3”.",
     noNumbers: "This topic has no problems yet.",
     conditionsFailed: "The statements did not load — you can still select problems without them."

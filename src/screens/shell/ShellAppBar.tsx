@@ -1,5 +1,6 @@
 import { useWindowDimensions, View } from 'react-native';
 
+import { streakForDay } from '@/domain/student-streak';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { useRole } from '@/providers';
@@ -7,7 +8,7 @@ import { makeStyles } from '@/theme';
 import { AppBar, IconButton, Logo, MAX_FONT_SCALE, PressableScale, Text, navIcons } from '@/ui';
 
 import { StreakBadge } from './StreakBadge';
-import { useNotifications, useStudentStreak } from './use-shell-data';
+import { useNotifications, useStreakToday, useStudentStreak } from './use-shell-data';
 
 /**
  * Narrowest window (at the regular font size) in which a section title and the streak pill fit next to
@@ -40,6 +41,8 @@ export function ShellAppBar({ title, testID }: ShellAppBarProps) {
   const role = useRole();
   const notifications = useNotifications();
   const streak = useStudentStreak();
+  // A cached streak from an earlier day is counted on today, as the overview's widget counts it.
+  const streakToday = useStreakToday();
   const unread = notifications.data?.unreadCount ?? 0;
   const t = dict.student.notifications;
   const window = useWindowDimensions();
@@ -58,7 +61,7 @@ export function ShellAppBar({ title, testID }: ShellAppBarProps) {
         </Text>
         {role === 'STUDENT' && streak.data && roomForStreak ? (
           <StreakBadge
-            currentStreak={streak.data.currentStreak}
+            currentStreak={streakForDay(streak.data, streakToday).currentStreak}
             onPress={() => navigation.open({ screen: 'student.home' })}
             testID="app-bar-streak"
           />

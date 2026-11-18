@@ -9,7 +9,7 @@ import { useRetryWait } from '@/components/retry-wait';
 import { serverClockOffset } from '@/domain/server-clock';
 import { format, useI18n } from '@/i18n';
 
-import { invalidateAroundLesson } from '../shared/invalidate';
+import { invalidateAroundLesson, refreshAroundLesson } from '../shared/invalidate';
 import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../shared/plan-state';
 import { usePlanProgressObservers } from '../shared/use-plan-progress-observers';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive, useStillHere } from '@/navigation';
@@ -166,7 +166,9 @@ export function useLessonBoard(lessonId: string) {
 
   // A plan that arrived or failed (seen by the poll, a realtime refresh or a refetch on focus) also changes
   // the lessons list's «подбор идёт», the student card's lessons tab and the group pages.
-  usePlanProgressObservers(participants, invalidateAround);
+  // A plan that arrived or failed is a server-side change: re-read around it without cancelling a read in flight.
+  const refreshAround = useCallback(() => refreshAroundLesson(queryClient), [queryClient]);
+  usePlanProgressObservers(participants, refreshAround);
 
   // ───────────────────────────── live activity poll (fallback of the realtime event) ─────────────────────────────
 

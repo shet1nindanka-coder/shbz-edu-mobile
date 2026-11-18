@@ -79,7 +79,8 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
 
   // The site's page header is «{group | "Урок"} · {date} · {n} мин» over the lesson title. The app bar has
   // one line, where a title such as «Занятие группы · Логарифмические уравнения» is cut, so — as on the
-  // draft board — the bar carries the short label and the kicker, and the board starts with the full title.
+  // draft board — the bar carries the short label and the kicker, and the board starts with the full kicker
+  // and title: on a 360 pt phone the bar cuts the kicker's end, the lesson's length (#417).
   const kicker = [
     lesson.group?.name,
     formatDateTime(lesson.startsAt ?? lesson.createdAt, locale),
@@ -187,7 +188,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
         renderItem={renderParticipant}
         // Everything a card shows besides its participant: the clock, expansion and the request states.
         extraData={[now, toggled, controller.busy, controller.savingItemIds, controller.itemErrors, controller.waits, lesson.status, lesson.aiAvailable]}
-        ListHeaderComponent={<BoardHeader lesson={lesson} controller={controller} handout={handout} onFinish={() => setConfirming('finish')} />}
+        ListHeaderComponent={<BoardHeader lesson={lesson} kicker={kicker} controller={controller} handout={handout} onFinish={() => setConfirming('finish')} />}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

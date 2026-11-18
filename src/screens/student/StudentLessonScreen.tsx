@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { errorText, qk, useApi } from '@/api';
@@ -8,7 +8,7 @@ import { useI18n } from '@/i18n';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
 import { useKeepScreenAwake } from '@/services/keep-awake';
-import { usePullRefresh } from '@/services/query';
+import { refreshQueries, usePullRefresh } from '@/services/query';
 import { LoadingState, Notice, Screen } from '@/ui';
 
 import { LessonLive } from './work/lesson-live';
@@ -58,6 +58,7 @@ function useLessonEdgeRefresh(options: {
  */
 export function StudentLessonScreen() {
   const api = useApi();
+  const queryClient = useQueryClient();
   const { m } = useI18n();
   const live = useScreenLive();
 
@@ -72,11 +73,11 @@ export function StudentLessonScreen() {
       live && query.state.data?.active && !query.state.data.lessonCheckAvailable ? UNAVAILABLE_RECHECK_MS : false,
   });
   const data = lesson.data;
-  const { refetch } = lesson;
 
   // Back on the tab or back in the foreground: timers do not run reliably while hidden, and a lesson may
-  // have started, ended or been rescheduled meanwhile.
-  useOnReturn(live, () => void refetch());
+  // have started, ended or been rescheduled meanwhile. Server-side changes: a read already on its way is
+  // kept (`refreshQueries`), not cancelled.
+  useOnReturn(live, () => void refreshQueries(queryClient, { queryKey: qk('studentWork', 'getLiveLesson'), exact: true }));
 
   const serverOffsetMs = data ? serverClockOffset(data.serverNow, lesson.dataUpdatedAt) : 0;
   const nowMs = useServerNow(serverOffsetMs, 15_000);
@@ -98,7 +99,9 @@ export function StudentLessonScreen() {
     serverOffsetMs,
     live,
     dataUpdatedAt: lesson.dataUpdatedAt,
-    refetch: () => void refetch(),
+    // A schedule edge is a server-side change: a read already on its way (a realtime re-read, the return
+    // to the tab) is kept and followed by one more instead of being cancelled.
+    refetch: () => void refreshQueries(queryClient, { queryKey: qk('studentWork', 'getLiveLesson'), exact: true }),
   });
 
   const { refreshing, refresh } = usePullRefresh([lesson]);

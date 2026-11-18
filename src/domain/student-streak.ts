@@ -10,6 +10,7 @@ import {
   type TimelineEntry,
   type TimelineStatusRow
 } from "@/domain/progress-timeline";
+import { addDaysToDayKey } from "@/domain/moscow-time";
 import { getDayOfWeekIndex } from "@/domain/week-buckets";
 
 /** The streak looks back this many Moscow days (today included). */
@@ -96,4 +97,39 @@ export function computeStudentStreak(
   locale: Locale = "ru"
 ): StudentStreak {
   return buildStudentStreak(buildProgressTimelineEntries(rows, STREAK_WINDOW_DAYS, now), locale);
+}
+
+/**
+ * The streak as it reads on the Moscow day `today` (pass `mskToday(now)`, with the server-corrected `now`
+ * when there is one). The streak query is persisted, so a cold start offline on a later day restores a
+ * response whose last day — the server's "today" — is already over. Shown as is, «Сегодня сделано» would
+ * repeat that day's count and the week would mark that day as today.
+ *
+ * When the last entry is older than `today` the window is moved on to end at `today`: the days the cache
+ * knows nothing about count 0 (it is all the screen can know), `solvedToday` is 0, and the weekly sums and
+ * `currentStreak` follow the site's `buildStudentStreak` over the shifted days — a streak survives an empty
+ * today only through yesterday, so it is kept on the next day when the cached day was active and is 0 two
+ * days later. `bestStreak` stays. A response for `today` (fresh server data) or for a later day (a device
+ * clock behind the server's) is returned unchanged.
+ */
+export function streakForDay(streak: StudentStreak, today: string): StudentStreak {
+  const last = streak.dailyActivity.at(-1);
+  // Day keys are "YYYY-MM-DD": their string order is the calendar order.
+  if (!last || !(last.date < today)) return streak;
+  const known = new Map(streak.dailyActivity.map((day) => [day.date, day]));
+  const length = streak.dailyActivity.length;
+  const dailyActivity = Array.from({ length }, (_, index) => {
+    const date = addDaysToDayKey(today, index - (length - 1));
+    const day = known.get(date);
+    return { date, dayLabel: day?.dayLabel ?? "", count: day?.count ?? 0 };
+  });
+  const yesterday = addDaysToDayKey(today, -1);
+  return {
+    ...streak,
+    currentStreak: last.date === yesterday && last.count > 0 ? streak.currentStreak : 0,
+    solvedToday: 0,
+    solvedThisWeek: dailyActivity.reduce((sum, day) => sum + day.count, 0),
+    activeDaysThisWeek: dailyActivity.filter((day) => day.count > 0).length,
+    dailyActivity,
+  };
 }

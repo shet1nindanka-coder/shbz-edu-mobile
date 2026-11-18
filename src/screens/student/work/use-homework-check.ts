@@ -5,7 +5,7 @@ import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { GetHomeworkResponse, StudentCheckDto } from '@/api/types';
 import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { mergeQueryData } from '@/services/query';
+import { mergeQueryData, refreshQueries } from '@/services/query';
 import { useEventAnnouncement } from '@/ui';
 
 import { applyLatestCheck, applyStartedCheck, countVerdicts, isCheckRunning } from './logic';
@@ -69,16 +69,18 @@ export function useHomeworkCheck(options: {
     const status = latest.check?.status;
     // The check ended: the batch (a DONE check detaches it) and the statuses come from a fresh read made
     // now, after every local upload and deletion. The answer is not copied for them.
-    if (status === 'DONE' || status === 'FAILED') void queryClient.invalidateQueries({ queryKey: detailKey });
+    // The poll saw a server-side change: `refreshQueries` lets a read already on its way (a realtime
+    // re-read) land and follows it with one more, instead of cancelling it.
+    if (status === 'DONE' || status === 'FAILED') void refreshQueries(queryClient, { queryKey: detailKey, exact: true });
     if (status === 'DONE') {
       // Statuses were written and the batch was detached: everything derived from them is stale.
-      void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
-      void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
-      void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getNumberDetail') });
-      void queryClient.invalidateQueries({ queryKey: qk('shell', 'getStreak') });
-      void queryClient.invalidateQueries({ queryKey: qk('shell', 'listNotifications') });
+      void refreshQueries(queryClient, { queryKey: qk('studentWork', 'listHomeworks') });
+      void refreshQueries(queryClient, { queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
+      void refreshQueries(queryClient, { queryKey: qk('studentStudy', 'getNumberDetail') });
+      void refreshQueries(queryClient, { queryKey: qk('shell', 'getStreak') });
+      void refreshQueries(queryClient, { queryKey: qk('shell', 'listNotifications') });
     } else if (status === 'FAILED') {
-      void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
+      void refreshQueries(queryClient, { queryKey: qk('studentWork', 'listHomeworks') });
     }
   }, [api, assignmentId, onGone, queryClient]);
 

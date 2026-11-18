@@ -96,7 +96,6 @@ export function ContentTopicsScreen() {
         <View style={styles.actions}>
           <Button
             label={m.content.list.createAction}
-            accessibilityLabel={t.createSection}
             leftIcon="plus"
             onPress={() => setCreateOpen(true)}
             style={[styles.action, { flexBasis: actionBasis }]}

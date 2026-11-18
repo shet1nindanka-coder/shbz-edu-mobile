@@ -89,9 +89,11 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   // The first topic is pinned as soon as the board arrives (the site's `useState(topics[0]?.id)`): a refetch
   // that reorders the topics (the developer moved one, pull-to-refresh) must not switch the topic under the
   // teacher and drop the numbers they picked. `pickTopic` falls back to the first one only when the pinned
-  // topic has left the list.
-  if (topicId === null && topics && topics.length > 0) setTopicId(topics[0].id);
-  const topic = topics && enabled ? pickTopic(topics, topicId ?? topics[0]?.id ?? null) : null;
+  // topic has left the list — and that fallback is pinned in its turn, so a later reordering refetch does not
+  // switch the topic again (#413).
+  const shownTopic = topics ? pickTopic(topics, topicId) : null;
+  if (shownTopic && shownTopic.id !== topicId) setTopicId(shownTopic.id);
+  const topic = enabled ? shownTopic : null;
 
   // Statements come with the first topic only; any other topic fetches its own once (04 S5 "Data").
   // The board works without them when the read fails.
@@ -186,7 +188,8 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
           {needsConditions && conditions.isError ? (
             <Notice
               tone="warning"
-              text={m.teacher.assign.conditionsFailed}
+              // A retry over statements read earlier waits offline instead of failing: say why nothing happens.
+              text={conditions.fetchStatus === 'paused' ? m.common.errors.network : m.teacher.assign.conditionsFailed}
               action={
                 <Button
                   label={m.common.actions.retry}
@@ -241,7 +244,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
       <View style={styles.barRow}>
         <Button
           label={title.trim() || m.teacher.assign.titleAction}
-          accessibilityLabel={m.teacher.assign.titleSheet}
+          accessibilityLabel={title.trim() ? format(m.teacher.assign.titleSheetOf, { title: title.trim() }) : m.teacher.assign.titleSheet}
           variant="outline"
           size="lg"
           leftIcon="edit"

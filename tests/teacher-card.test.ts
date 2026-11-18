@@ -58,7 +58,11 @@ import {
   patchHomeworkStatuses,
   releaseWrites,
   reviewRowIndex,
+  sendStatusChunks,
   shortenRecognizedAnswer,
+  StatusBatchError,
+  statusBatchFailure,
+  undoEntriesAfterAccept,
   unmarkedCount,
 } from "../src/screens/teacher/card/review-logic";
 
@@ -223,6 +227,60 @@ describe("review: accept AI verdicts", () => {
     const chunks = chunkChanges(Array.from({ length: 205 }, (_, index) => index));
     assert.deepEqual(chunks.map((chunk) => chunk.length), [100, 100, 5]);
     assert.deepEqual(chunkChanges([]), []);
+  });
+
+  it("sends a long batch chunk by chunk and returns every result", async () => {
+    const entries = Array.from({ length: 205 }, (_, index) => ({ homeworkNumberId: `n${index}`, status: "GREEN" as const }));
+    const sizes: number[] = [];
+    const results = await sendStatusChunks(entries, async (chunk) => {
+      sizes.push(chunk.length);
+      return { results: chunk };
+    });
+    assert.deepEqual(sizes, [100, 100, 5]);
+    assert.equal(results.length, 205);
+  });
+
+  it("a batch that fails on its first request reports nothing applied (#412)", async () => {
+    const boom = new Error("503");
+    const entries = [{ homeworkNumberId: "n1", status: "GREEN" as const }];
+    const failure = await sendStatusChunks(entries, async () => {
+      throw boom;
+    }).then(
+      () => assert.fail("must reject"),
+      (error: unknown) => error,
+    );
+    assert.ok(failure instanceof StatusBatchError);
+    const { reason, applied, appliedIds } = statusBatchFailure(failure);
+    assert.equal(reason, boom);
+    assert.deepEqual(applied, []);
+    assert.deepEqual(appliedIds, []);
+    // The queued undo of that accept sends nothing.
+    assert.deepEqual(undoEntriesAfterAccept([{ homeworkNumberId: "n1", status: null }], new Set(appliedIds)), []);
+  });
+
+  it("a batch that fails on its second request reports the first one as applied (#412)", async () => {
+    const entries = Array.from({ length: 150 }, (_, index) => ({ homeworkNumberId: `n${index}`, status: "RED" as const }));
+    let calls = 0;
+    const failure = await sendStatusChunks(entries, async (chunk) => {
+      calls += 1;
+      if (calls === 2) throw new Error("503");
+      return { results: chunk.map((entry) => ({ ...entry, status: "YELLOW" as const })) };
+    }).then(
+      () => assert.fail("must reject"),
+      (error: unknown) => error,
+    );
+    const { applied, appliedIds } = statusBatchFailure(failure);
+    assert.equal(appliedIds.length, 100);
+    assert.deepEqual(appliedIds.slice(0, 2), ["n0", "n1"]);
+    assert.equal(applied[0].status, "YELLOW");
+    const previous = entries.map((entry) => ({ homeworkNumberId: entry.homeworkNumberId, status: null }));
+    const undo = undoEntriesAfterAccept(previous, new Set(appliedIds));
+    assert.deepEqual(undo.map((entry) => entry.homeworkNumberId), appliedIds);
+  });
+
+  it("a plain error is a failure with nothing applied", () => {
+    const error = new Error("x");
+    assert.deepEqual(statusBatchFailure(error), { reason: error, applied: [], appliedIds: [] });
   });
 
   it("patches every homework that contains the number", () => {

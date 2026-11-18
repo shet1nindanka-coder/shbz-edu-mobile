@@ -13,7 +13,7 @@ import { useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
-import { usePullRefresh } from '@/services/query';
+import { refreshQueries, usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Card, Chip, Divider, LoadingState, Notice, Screen, Text } from '@/ui';
 
@@ -59,7 +59,7 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
     refetchInterval: (query) => (live && query.state.data && !query.state.data.aiCheckAvailable ? UNAVAILABLE_RECHECK_MS : false),
   });
   const data = detail.data;
-  const { isStale, refetch } = detail;
+  const { isStale } = detail;
 
   // `404 homeworkNotFound`: an unknown id, or a homework the teacher has cancelled — also when it is
   // discovered by an upload, a check start or a poll. The list is the place to land on (00 §3.3).
@@ -73,8 +73,9 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
     if (!gone || !live || left.current) return;
     left.current = true;
     queryClient.removeQueries({ queryKey: qk('studentWork', 'getHomework', assignmentId) });
-    void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
-    void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
+    // The teacher cancelled it (a server-side change): a list read already on its way is kept.
+    void refreshQueries(queryClient, { queryKey: qk('studentWork', 'listHomeworks') });
+    void refreshQueries(queryClient, { queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
     // `open`, not `replace`: the tab's stack always holds the list under a detail (its layout anchors
     // it), so replacing the detail with the list would leave two lists and "back" would show the same
     // screen again. Opening a tab root returns the stack to that one list.
@@ -91,8 +92,9 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
 
   // Back on the screen (another tab, the photo viewer, the background): statuses and the batch may have
   // changed meanwhile, and a check that is still running resumes its polling by itself.
+  // Server-side changes: a read already on its way (a realtime re-read) is kept, not cancelled.
   useOnReturn(live, () => {
-    if (isStale) void refetch();
+    if (isStale) void refreshQueries(queryClient, { queryKey: qk('studentWork', 'getHomework', assignmentId), exact: true });
   });
 
   const nowMs = useServerNow(data ? serverClockOffset(data.serverNow, detail.dataUpdatedAt) : 0);

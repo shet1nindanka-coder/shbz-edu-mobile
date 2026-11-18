@@ -56,7 +56,7 @@ export function TeacherActionsSheet({ teacher, onClose, onSelect, onClosed }: Te
               variant="outline"
               size="lg"
               leftIcon="key"
-              accessibilityLabel={dict.students.passwordReset.teacher.dialogLabel}
+              accessibilityLabel={m.accounts.a11y.resetTeacherPassword}
               onPress={() => onSelect('resetPassword', shown)}
               testID="teacher-actions-reset"
             />

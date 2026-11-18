@@ -6,7 +6,7 @@ import type { ActiveLessonDto, GetLessonResponse, LessonItemDto, PhotoUpload } f
 import { useRetryWait, type RetryWait } from '@/components/retry-wait';
 import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
-import { mergeQueryData } from '@/services/query';
+import { mergeQueryData, refreshQueries } from '@/services/query';
 import { useEventAnnouncement } from '@/ui';
 
 import { applyLessonState, applySubmission, hasRunningSubmission, lessonItemChip, trackLessonOutcomes } from './logic';
@@ -98,7 +98,9 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
         retry: false,
       });
     } catch (failure) {
-      if (hasErrorCode(failure, 'lessonNotFound')) void queryClient.invalidateQueries({ queryKey: lessonKey });
+      // Poll answers are server-driven: re-read without cancelling a read already on its way
+      // (`refreshQueries`); only the student's own writes below cancel on purpose.
+      if (hasErrorCode(failure, 'lessonNotFound')) void refreshQueries(queryClient, { queryKey: lessonKey, exact: true });
       throw failure;
     }
     // `applyLessonState` keeps an item's submission when the answer is older than it (read on the server
@@ -113,14 +115,14 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
     });
     if (resultChanged) {
       // A lesson result is mirrored into the number's status: homework screens and the streak are stale.
-      void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'listHomeworks') });
-      void queryClient.invalidateQueries({ queryKey: qk('studentWork', 'getHomework') });
-      void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
-      void queryClient.invalidateQueries({ queryKey: qk('studentStudy', 'getNumberDetail') });
-      void queryClient.invalidateQueries({ queryKey: qk('shell', 'getStreak') });
+      void refreshQueries(queryClient, { queryKey: qk('studentWork', 'listHomeworks') });
+      void refreshQueries(queryClient, { queryKey: qk('studentWork', 'getHomework') });
+      void refreshQueries(queryClient, { queryKey: qk('studentStudy', 'getHomeworkDeadlines') });
+      void refreshQueries(queryClient, { queryKey: qk('studentStudy', 'getNumberDetail') });
+      void refreshQueries(queryClient, { queryKey: qk('shell', 'getStreak') });
     }
     // The scheduled end was reached or the teacher finished early: the tab returns to the waiting state.
-    if (state.status !== 'ACTIVE') void queryClient.invalidateQueries({ queryKey: lessonKey });
+    if (state.status !== 'ACTIVE') void refreshQueries(queryClient, { queryKey: lessonKey, exact: true });
   }, [api, lessonId, queryClient]);
 
   // The outcome of a photo the student is waiting for is spoken: the "checking" line it replaces was the

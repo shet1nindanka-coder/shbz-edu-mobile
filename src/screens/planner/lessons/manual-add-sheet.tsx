@@ -45,9 +45,11 @@ export function ManualAddSheet({ visible, studentName, existingIds, onClose, onA
   const [numberId, setNumberId] = useState<string | null>(null);
   // The first topic is the default, as on the site. It is pinned as soon as the bank arrives, so a refetch
   // that reorders the topics does not switch the topic (and drop the picked number) under the teacher; the
-  // first topic takes over only when the pinned one is gone.
-  if (visible && pickedTopicId === null && topics && topics.length > 0) setPickedTopicId(topics[0].topicId);
+  // first topic takes over only when the pinned one is gone, and is pinned in its turn (#414), so a later
+  // reordering refetch cannot switch the fallback topic either. Only while the sheet is open: closing resets
+  // the pin to null.
   const topic = topics?.find((entry) => entry.topicId === pickedTopicId) ?? topics?.[0];
+  if (visible && topic && topic.topicId !== pickedTopicId) setPickedTopicId(topic.topicId);
   const topicId = topic?.topicId ?? null;
   const free = useMemo(() => availableNumbers(topic, existingIds), [topic, existingIds]);
   const picked = numberId !== null && free.some((number) => number.id === numberId) ? numberId : null;

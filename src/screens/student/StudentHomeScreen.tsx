@@ -6,7 +6,7 @@ import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { correctedNow } from '@/domain/server-clock';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
-import { ShellAppBar, useStudentStreak } from '@/screens/shell';
+import { ShellAppBar, useStreakToday, useStudentStreak } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Card, Chip, Enter, Icon, ListRow, Notice, PageHeader, Screen, TextButton, navIcons } from '@/ui';
@@ -40,6 +40,8 @@ export function StudentHomeScreen() {
     queryFn: () => api.studentStudy.getHomeworkDeadlines(),
   });
   const streak = useStudentStreak();
+  // The same day the app bar's streak pill reads the cached streak on.
+  const streakToday = useStreakToday();
   const { refreshing, refresh } = usePullRefresh([deadlines, streak]);
   useRefetchOnFocus([deadlines, streak]);
 
@@ -52,7 +54,7 @@ export function StudentHomeScreen() {
 
   const streakBlock = streak.data ? (
     <HomeSection title={dict.student.weekly.title} testID="home-streak">
-      <StreakWidget streak={streak.data} />
+      <StreakWidget streak={streak.data} today={streakToday} />
     </HomeSection>
   ) : isLoadFailed(streak) ? (
     <HomeSection title={dict.student.weekly.title} testID="home-streak">

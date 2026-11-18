@@ -20,6 +20,9 @@ export type WeeklyCopy = {
   dayEmptyAria: string;
 };
 
+// Moved to `@/domain/student-streak` so the app bar's streak pill reads the same day as the home widget.
+export { streakForDay } from "@/domain/student-streak";
+
 export type StreakTexts = {
   /** «3 дня подряд» / «Зажгите первый день». */
   headline: string;

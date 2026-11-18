@@ -79,7 +79,7 @@ export function StudentDetailSheet({
             ) : null}
             <Select
               label={dict.students.accountForm.ownerTeacher}
-              accessibilityLabel={format(t.teacherOfAria, { name: shown.name })}
+              accessibilityLabel={format(m.accounts.a11y.ownerOf, { name: shown.name })}
               options={teacherOptions(teachers)}
               value={ownerId}
               onChange={(teacherId) => onOwnerChange(shown, teacherId)}
@@ -107,7 +107,7 @@ export function StudentDetailSheet({
               variant="outline"
               size="lg"
               leftIcon="key"
-              accessibilityLabel={dict.students.passwordReset.student.dialogLabel}
+              accessibilityLabel={m.accounts.a11y.resetStudentPassword}
               onPress={() => onSelect('resetPassword', shown)}
               testID="student-detail-reset"
             />

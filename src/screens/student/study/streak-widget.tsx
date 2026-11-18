@@ -7,11 +7,13 @@ import { makeStyles } from '@/theme';
 import { Card, Text, widthForText } from '@/ui';
 
 import { StreakHero } from './streak-hero';
-import { streakTexts, weekCells } from './streak-model';
+import { streakForDay, streakTexts, weekCells } from './streak-model';
 import { WeekPanel } from './week-panel';
 
 export type StreakWidgetProps = {
   streak: StudentStreak;
+  /** The current Moscow day (`mskToday(now)`): a cached streak from an earlier day is moved on to it. */
+  today: string;
   testID?: string;
 };
 
@@ -23,11 +25,12 @@ const STACK_BELOW_WIDTH = 360;
  * «Следующая цель» panels, and the rolling week. On a phone the three parts sit directly on the page —
  * the site's wrapping card would only cost width.
  */
-export function StreakWidget({ streak, testID }: StreakWidgetProps) {
+export function StreakWidget({ streak: cached, today, testID }: StreakWidgetProps) {
   const styles = useStyles();
   const window = useWindowDimensions();
   const { dict, locale } = useI18n();
   const weekly = dict.student.weekly;
+  const streak = streakForDay(cached, today);
   const texts = streakTexts(streak, weekly, locale);
   const cells = weekCells(streak, dict.student.weekdaysShort, weekly);
   // The panels hold text: at a larger OS font size they need the room of a wider phone.

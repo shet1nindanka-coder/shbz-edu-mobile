@@ -26,4 +26,4 @@ export { ShellAppBar, type ShellAppBarProps } from './ShellAppBar';
 export { StreakBadge, type StreakBadgeProps } from './StreakBadge';
 export { TeacherMoreScreen } from './TeacherMoreScreen';
 export { screenTitle } from './screen-titles';
-export { useNotifications, useStudentStreak } from './use-shell-data';
+export { useNotifications, useStreakToday, useStudentStreak } from './use-shell-data';

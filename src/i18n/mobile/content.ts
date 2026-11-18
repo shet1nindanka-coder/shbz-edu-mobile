@@ -8,7 +8,8 @@ const ru = {
   importPanel: {
     pasteFromClipboard: "Вставить JSON из буфера",
     chooseJsonFile: "Выбрать JSON-файл",
-    promptCopied: "Промпт скопирован",
+    // The accessible name of the copy button starts with what it shows («Скопировано»).
+    promptCopied: "Скопировано: промпт для ИИ",
     // replaces `dict.topics.importPanel.dropTitle` (no drag & drop on a phone)
     loadTitle: "Загрузите ответ ИИ",
     textLoaded: "Текст вставлен — нажмите «Проверить файл»",
@@ -87,7 +88,7 @@ const en: typeof ru = {
   importPanel: {
     pasteFromClipboard: "Paste JSON from the clipboard",
     chooseJsonFile: "Choose a JSON file",
-    promptCopied: "Prompt copied",
+    promptCopied: "Copied: the AI prompt",
     loadTitle: "Load the AI reply",
     textLoaded: "Text pasted — tap “Check file”",
     sharePrompt: "Share the prompt",
@@ -123,10 +124,10 @@ const en: typeof ru = {
   },
   topic: {
     hideAnswer: "Hide answer",
-    showAnswerOf: "Show the answer to problem {number}",
-    hideAnswerOf: "Hide the answer to problem {number}",
+    showAnswerOf: "Show answer, problem {number}",
+    hideAnswerOf: "Hide answer, problem {number}",
     numbersCount: "Total: {count}",
-    openEdit: "Open the topic editor"
+    openEdit: "Edit: open the topic editor"
   },
   number: {
     unsaved: "There are unsaved changes",
