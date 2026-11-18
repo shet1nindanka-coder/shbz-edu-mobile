@@ -7,7 +7,9 @@ import { withErrorHint } from './a11y';
 import { BottomSheet } from './bottom-sheet';
 import { Button } from './button';
 import { Icon } from './icon';
-import { formatDateTimeDisplay, todayDateTimeValue, type DateTimeLocale } from './internal/date-time';
+import { mskToday } from '@/domain/moscow-time';
+
+import { currentToday, formatDateTimeDisplay, todayDateTimeValue, type DateTimeLocale, type TodayAnchor, type TodayInput } from './internal/date-time';
 import { DateTimePickerBody } from './internal/date-time-picker-body';
 import { FieldShell } from './internal/field-shell';
 import { PressableScale } from './internal/pressable-scale';
@@ -41,11 +43,14 @@ export type DateTimeFieldProps = {
   /** Wall-clock `YYYY-MM-DDTHH:mm`; empty string = no value. */
   value: string;
   /**
-   * The calendar day (`YYYY-MM-DD`) that is "today" in the zone the value is read in. Screens pass the
-   * Moscow day (`mskToday()`): deadlines and lesson starts are Moscow wall clock on every device.
-   * Default: the device's own day.
+   * The calendar day (`YYYY-MM-DD`) that is "today" for «Сегодня», a time picked with no date and the
+   * picker's preselected day. It is resolved when it is USED, not when the screen rendered
+   * (`currentToday`): a function (`today={mskToday}`) is called then; a string is taken as today at the
+   * render that passed it and moves on with the Moscow calendar (a screen left open past midnight still
+   * gets the new day). Default: the current Moscow day — deadlines and lesson starts are Moscow wall clock
+   * on every device, so screens need not pass it.
    */
-  today?: string;
+  today?: TodayInput;
   onChange: (value: string) => void;
   /** Fires once when the sheet closes, with the final value. */
   onCommit?: (value: string) => void;
@@ -93,6 +98,7 @@ export function DateTimeField({
   const [open, setOpen] = useState(false);
   const display = formatDateTimeDisplay(value, locale);
   const compact = variant === 'compact';
+  const resolveToday = useTodayResolver(today);
 
   const close = (finalValue: string) => {
     setOpen(false);
@@ -101,7 +107,7 @@ export function DateTimeField({
   const done = () => {
     // The iOS inline picker always shows a selection; "Done" on an untouched picker takes what it shows.
     if (!value && Platform.OS === 'ios') {
-      const shown = todayDateTimeValue(new Date(), today);
+      const shown = todayDateTimeValue(new Date(), resolveToday());
       onChange(shown);
       close(shown);
       return;
@@ -158,7 +164,7 @@ export function DateTimeField({
             }}
           />
           <View style={styles.footerRight}>
-            <TextButton label={labels.today} onPress={() => onChange(todayDateTimeValue(new Date(), today))} />
+            <TextButton label={labels.today} onPress={() => onChange(todayDateTimeValue(new Date(), resolveToday()))} />
             <Button label={labels.done} variant="dark" onPress={done} />
           </View>
         </View>
@@ -167,7 +173,7 @@ export function DateTimeField({
       <View style={styles.body}>
         <DateTimePickerBody
           value={value}
-          today={today}
+          today={resolveToday}
           onChange={onChange}
           locale={locale}
           dateLabel={labels.date}
@@ -193,6 +199,18 @@ export function DateTimeField({
       {sheet}
     </FieldShell>
   );
+}
+
+/**
+ * `() => today` read at the moment of use (`currentToday`). A string prop is anchored to the Moscow day on
+ * which the field first rendered with it, so a value computed at the screen's last render keeps up with
+ * the calendar while only the field re-renders.
+ */
+function useTodayResolver(today: TodayInput | undefined): () => string {
+  const [anchor, setAnchor] = useState<TodayAnchor | null>(() => (typeof today === 'string' ? { value: today, day: mskToday() } : null));
+  // A new string from the screen: anchored now (state derived from props, set during render).
+  if (typeof today === 'string' && anchor?.value !== today) setAnchor({ value: today, day: mskToday() });
+  return () => currentToday(today, new Date(), anchor);
 }
 
 const useStyles = makeStyles((t) => ({

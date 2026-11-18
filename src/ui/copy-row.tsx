@@ -9,6 +9,7 @@ import { FieldShell } from './internal/field-shell';
 import { absoluteFill } from './internal/layout';
 import { easing } from './internal/motion';
 import { PressableScale } from './internal/pressable-scale';
+import { isOverlayCovered } from './overlay-cover';
 import { Text } from './text';
 import { useCopyFeedback } from './use-copy-feedback';
 
@@ -71,7 +72,8 @@ export function CopyRow({
     flash.set(1);
     flash.set(withTiming(0, { duration: reducedMotion ? 0 : copyFlash, easing: easing('out') }));
     pill.set(withTiming(1, { duration: reducedMotion ? 0 : copyPillIn, easing: easing('out') }));
-    if (copiedAnnouncement) AccessibilityInfo.announceForAccessibility(copiedAnnouncement);
+    // The copy may resolve after the lock cover came up: nothing of the covered screen is spoken then.
+    if (copiedAnnouncement && !isOverlayCovered()) AccessibilityInfo.announceForAccessibility(copiedAnnouncement);
     onCopied?.();
   };
 

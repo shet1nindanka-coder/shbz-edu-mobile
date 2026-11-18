@@ -8,6 +8,7 @@ import { Icon } from '../icon';
 import { useOverlayCovered } from '../overlay-cover';
 import { Text } from '../text';
 import {
+  currentToday,
   formatDateDisplay,
   formatDateTimeValue,
   formatTimeDisplay,
@@ -19,13 +20,14 @@ import {
   withPickedDate,
   withPickedTime,
   type DateTimeLocale,
+  type TodayInput,
 } from './date-time';
 import { PressableScale } from './pressable-scale';
 
 export type DateTimePickerBodyProps = {
   value: string;
-  /** The caller's "today" (`YYYY-MM-DD`); see `DateTimeField`. */
-  today?: string;
+  /** The caller's "today" (`YYYY-MM-DD`), a function read at use time; see `DateTimeField`. */
+  today?: TodayInput;
   onChange: (value: string) => void;
   locale: DateTimeLocale;
   dateLabel: string;
@@ -51,7 +53,7 @@ export function DateTimePickerBody({ value, today, onChange, locale, dateLabel, 
   // result is read back in Moscow time. Nothing goes through the device zone, whose DST gap would move
   // a Moscow 02:30 to 03:30 (or a date by a day far from UTC+3).
   const shown = partsToPickerDate(
-    parts ?? parseDateTimeValue(todayDateTimeValue(new Date(), today)) ?? pickerDateToParts(new Date()),
+    parts ?? parseDateTimeValue(todayDateTimeValue(new Date(), currentToday(today, new Date()))) ?? pickerDateToParts(new Date()),
   );
   const covered = useOverlayCovered();
 
@@ -104,7 +106,7 @@ export function DateTimePickerBody({ value, today, onChange, locale, dateLabel, 
       ...buttons,
       onValueChange: (_event, date) => {
         const picked = pickerDateToParts(date);
-        onChange(withPickedTime(value, picked.hour, picked.minute, new Date(), today));
+        onChange(withPickedTime(value, picked.hour, picked.minute, new Date(), currentToday(today, new Date())));
       },
     });
   const dateText = parts ? formatDateDisplay(parts, locale) : '—';

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { makeStyles, useTheme } from '@/theme';
 
 import { Text } from '../text';
-import { parseDateTimeValue, withPickedDate, withPickedTime } from './date-time';
+import { currentToday, parseDateTimeValue, withPickedDate, withPickedTime } from './date-time';
 import type { DateTimePickerBodyProps } from './date-time-picker-body';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -56,7 +56,7 @@ export function DateTimePickerBody({ value, today, onChange, dateLabel, timeLabe
           value={parts ? `${pad(parts.hour)}:${pad(parts.minute)}` : ''}
           onChange={(event) => {
             const match = /^(\d{2}):(\d{2})/.exec(event.target.value);
-            if (match) onChange(withPickedTime(value, Number(match[1]), Number(match[2]), new Date(), today));
+            if (match) onChange(withPickedTime(value, Number(match[1]), Number(match[2]), new Date(), currentToday(today, new Date())));
           }}
         />
       </View>

@@ -1,6 +1,15 @@
 // Pure helpers of the date-time field. The value is a wall-clock string `YYYY-MM-DDTHH:mm` ("" = no
 // value), exactly as on the site's `ShbzDateTimePicker`; turning it into an instant is the caller's job.
-import { mskDate, mskParts, SCHOOL_TIME_ZONE } from '@/domain/moscow-time';
+import {
+  addDaysToDayKey,
+  calendarDaysBetweenMsk,
+  dayKeyToDate,
+  isDayKey,
+  mskDate,
+  mskParts,
+  mskToday,
+  SCHOOL_TIME_ZONE,
+} from '@/domain/moscow-time';
 
 export type DateTimeParts = { year: number; month: number; day: number; hour: number; minute: number };
 export type DateTimeLocale = 'ru' | 'en';
@@ -85,6 +94,34 @@ export function todayParts(now: Date, today?: string): DateTimeParts {
   const match = today ? DAY_KEY.exec(today) : null;
   if (!match) return device;
   return { ...device, year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+
+/** "Today" as a caller gives it: a day key, or a function read at the moment the day is needed. */
+export type TodayInput = string | (() => string);
+
+/** A `today` string and the Moscow day on which the field received it. */
+export type TodayAnchor = { value: string; day: string };
+
+/**
+ * The day that is "today" at `now` (when «Сегодня» is tapped, a time is picked with no date, the picker
+ * opens), never the day of an earlier render.
+ *
+ * WHY: a screen computes `today={mskToday()}` when IT renders; opening the picker or tapping «Сегодня»
+ * re-renders only the field, so after Moscow midnight on a screen left open the string is yesterday (a
+ * homework assigned already overdue, a lesson scheduled in the past). The site reads `new Date()` at the
+ * click. So:
+ * - a function is called now;
+ * - no value → the Moscow day of `now` (the field holds Moscow wall clock on every device);
+ * - a string is "today as of when the field received it" (`anchor`): it is moved on by the Moscow days that
+ *   have passed since then. A caller passing `mskToday()` thus gets the current Moscow day, and a caller
+ *   passing a deliberate other day keeps its offset.
+ */
+export function currentToday(today: TodayInput | undefined, now: Date, anchor?: TodayAnchor | null): string {
+  if (typeof today === 'function') return today();
+  if (today === undefined) return mskToday(now);
+  if (!anchor || anchor.value !== today || !isDayKey(today) || !isDayKey(anchor.day)) return today;
+  const passed = calendarDaysBetweenMsk(dayKeyToDate(anchor.day), now);
+  return passed > 0 ? addDaysToDayKey(today, passed) : today;
 }
 
 /** Today 23:59 — the "Сегодня" action and the default when a day is picked with no time. */

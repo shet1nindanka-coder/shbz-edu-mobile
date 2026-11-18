@@ -156,7 +156,35 @@ describe('root error boundary', () => {
     expect(hasTestId(app, 'route-error')).toBe(false);
     expect(app.path()).toBe('/student');
   });
+
+  // Round 5 (#410): the shell sits outside the providers but follows the user's stored language and theme.
+  it('speaks the language and wears the theme the user chose (en, dark)', async () => {
+    silenceRootError();
+    (globalThis as unknown as Record<string, number>).__rootThrow = 3;
+    const app = await launch({ as: 'ilya@example.com', url: '/student/numbers/118', locale: 'en', theme: 'dark' });
+    expect(hasTestId(app, 'route-error')).toBe(true);
+    const text = textOf(app.screen.container as unknown as HostNode);
+    expect(text).toContain('This section is temporarily unavailable');
+    expect(text).not.toContain('Раздел временно недоступен');
+    expect(byTestId(app, 'route-error')?.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: darkPageBg() })]));
+    await press(app, buttonWithText(app, 'Try again'), 'retry');
+    expect(hasTestId(app, 'route-error')).toBe(false);
+    expect(app.path()).toBe('/student/numbers/118');
+  });
+
+  it('a light-theme Russian user keeps the light, Russian shell', async () => {
+    silenceRootError();
+    (globalThis as unknown as Record<string, number>).__rootThrow = 3;
+    const app = await launch({ as: 'ilya@example.com', url: '/student/numbers/118', locale: 'ru', theme: 'light' });
+    expect(textOf(app.screen.container as unknown as HostNode)).toContain('Раздел временно недоступен');
+    expect(byTestId(app, 'route-error')?.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: lightPageBg() })]));
+  });
 });
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const themes = () => require('@/theme') as typeof import('@/theme');
+const darkPageBg = () => themes().darkTheme.colors.pageBg;
+const lightPageBg = () => themes().lightTheme.colors.pageBg;
 
 describe('sign-in screen: the two «Показать» buttons', () => {
   const buttons = (app: AppHandle) =>

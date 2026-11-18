@@ -14,7 +14,7 @@ import { countReady, planSignature, planStateOf, statusRowsOnBoard } from '../sh
 import { usePlanProgressObservers } from '../shared/use-plan-progress-observers';
 import { useAppNavigation, useRefetchOnFocus, useScreenLive, useStillHere } from '@/navigation';
 import { useNowTick } from '@/services/clock';
-import { mergeQueryData } from '@/services/query';
+import { mergeQueryData, refreshQueries } from '@/services/query';
 import {
   applyPendingResults,
   hasScheduleMovedOn,
@@ -70,6 +70,16 @@ export function useLessonBoard(lessonId: string) {
   const screenLive = useScreenLive();
   const data = board.data;
   const refetchBoard = board.refetch;
+  /**
+   * A re-read asked for by the server side (the live signature moved, the schedule timer fired): unlike
+   * `refetchBoard` it never cancels a read in flight — that read was most likely started by the realtime
+   * event behind the same change — and is followed by one more read instead. `refetchBoard` stays for the
+   * teacher's own actions, where cancelling a read older than the write protects the patched board.
+   */
+  const refreshBoard = useCallback(
+    () => void refreshQueries(queryClient, { queryKey: qk('planner', 'getLessonBoard', lessonId), exact: true }),
+    [queryClient, lessonId],
+  );
   const boardUpdatedAt = board.dataUpdatedAt;
   const boardFetching = board.isFetching;
 
@@ -174,9 +184,9 @@ export function useLessonBoard(lessonId: string) {
   useEffect(() => {
     if (liveSignature === undefined) return;
     // The very first value only initialises the comparison.
-    if (lastLiveSignature.current !== null && lastLiveSignature.current !== liveSignature) void refetchBoard();
+    if (lastLiveSignature.current !== null && lastLiveSignature.current !== liveSignature) refreshBoard();
     lastLiveSignature.current = liveSignature;
-  }, [liveSignature, refetchBoard]);
+  }, [liveSignature, refreshBoard]);
 
   // ───────────────────────────── schedule: the status flips by the clock ─────────────────────────────
 
@@ -189,9 +199,9 @@ export function useLessonBoard(lessonId: string) {
     if (boardStatus === null) return undefined;
     const delay = nextScheduleRefreshDelay({ status: boardStatus, startsAt, durationMinutes, finishedAt }, Date.now() + clockOffset);
     if (delay === null) return undefined;
-    const timer = setTimeout(() => void refetchBoard(), delay);
+    const timer = setTimeout(refreshBoard, delay);
     return () => clearTimeout(timer);
-  }, [boardStatus, startsAt, durationMinutes, finishedAt, clockOffset, refetchBoard]);
+  }, [boardStatus, startsAt, durationMinutes, finishedAt, clockOffset, refreshBoard]);
 
   // Safety net of the timer (a sleeping device does not run timers): every tick compares the schedule
   // with the status the board arrived with.

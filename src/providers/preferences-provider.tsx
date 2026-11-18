@@ -4,6 +4,7 @@ import type { HintsMode, Locale, ThemeMode } from '@/api/types';
 import { isLocale } from '@/lib/i18n/locale';
 import {
   DEFAULT_APP_PREFERENCES,
+  noteInterfaceSnapshot,
   type AppPreferences,
   type AppPreferencesStore,
   type ReminderCategory,
@@ -59,6 +60,8 @@ export function PreferencesProvider({ store, children }: PreferencesProviderProp
       if (!active) return;
       localeRef.current = stored.locale;
       setRequestLocale(stored.locale);
+      // The root error shell renders without this provider: it reads the language and theme from here.
+      noteInterfaceSnapshot({ locale: stored.locale, themeMode: stored.themeMode });
       setPreferences(stored);
       setLoaded(true);
     });
@@ -70,6 +73,7 @@ export function PreferencesProvider({ store, children }: PreferencesProviderProp
   const setThemeMode = useCallback(
     (themeMode: ThemeMode) => {
       setPreferences((current) => ({ ...current, themeMode }));
+      noteInterfaceSnapshot({ themeMode });
       void store.setThemeMode(themeMode);
     },
     [store],
@@ -94,6 +98,7 @@ export function PreferencesProvider({ store, children }: PreferencesProviderProp
         .then((result) => {
           if (!result.ok) return;
           localeRef.current = result.locale;
+          noteInterfaceSnapshot({ locale: result.locale });
           // Requests made from now on are answered in the new language.
           setRequestLocale(result.locale);
           // Cached responses carry texts the server wrote in the old language (journal summaries,

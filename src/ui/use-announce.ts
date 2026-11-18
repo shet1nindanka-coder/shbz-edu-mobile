@@ -3,6 +3,20 @@ import { AccessibilityInfo, Platform } from 'react-native';
 
 import { announcementStep, type AnnounceOn } from './a11y';
 import { useNavigationFocused } from './internal/close-on-blur';
+import { isOverlayCovered, useOverlayCovered } from './overlay-cover';
+
+/**
+ * Whether what this component shows may be spoken now: its screen is the focused one AND no overlay cover
+ * (the biometric lock, the privacy shield) is up. An announcement is not tied to a view — TalkBack gets an
+ * event with no source and VoiceOver a global notification — so hiding the covered tree from accessibility
+ * does not silence it; a message of a covered app is held like one of an unfocused screen and spoken after
+ * the cover drops. `useOverlayCovered` is a global store, so this also holds inside sheets and modal windows.
+ */
+function useSpeakable(): boolean {
+  const focused = useNavigationFocused();
+  const covered = useOverlayCovered();
+  return focused && !covered;
+}
 
 /** One announcement on iOS (queued behind what VoiceOver is saying) and Android; the web has live regions. */
 function speakNative(text: string): void {
@@ -15,7 +29,8 @@ function useAnnouncement(message: string | null | undefined, enabled: boolean, o
   const text = enabled ? (message?.trim() ?? '') : '';
   // Only the screen the user is on speaks: inactive tabs and screens under a pushed one stay mounted and
   // keep refetching, and their errors are neither visible nor reachable. Outside a navigator: always true.
-  const focused = useNavigationFocused();
+  // Nothing is spoken under the lock cover either (`useSpeakable`).
+  const focused = useSpeakable();
   useEffect(() => {
     const step = announcementStep(last.current, text, { platform: Platform.OS, focused, on });
     last.current = step.last;
@@ -36,8 +51,8 @@ function useAnnouncement(message: string | null | undefined, enabled: boolean, o
  *   useAnnounce(text, tone === 'error');      // only while it matters
  *
  * The message is queued behind what VoiceOver is saying (the button just pressed), not cut into it. A
- * message of a screen that is not the focused one (a background tab, a screen under a pushed one) is held
- * back and spoken when the user returns to that screen, if it is still shown (`announcementStep`).
+ * message of a screen that is not the focused one (a background tab, a screen under a pushed one) or of an
+ * app under the lock cover is held back and spoken when the user returns to that screen, if it is still shown (`announcementStep`).
  */
 export function useAnnounce(message: string | null | undefined, enabled = true): void {
   useAnnouncement(message, enabled, 'ios');
@@ -68,16 +83,15 @@ export function useStatusAnnouncement(message: string | null | undefined, enable
 /**
  * The imperative form of `useStatusAnnouncement` for an EVENT of a screen (a check finished, a result came
  * in), spoken on iOS and Android by calling the returned function — with the same focus rule: while the
- * screen is not the focused one (`useNavigationFocused()`) or `active` is false (e.g. the app is in the
- * background), the message is held back, and only the LATEST held message is spoken when the screen is in
+ * screen is not the focused one (`useNavigationFocused()`), an overlay cover (the biometric lock) is up, or
+ * `active` is false (e.g. the app is in the background), the message is held back, and only the LATEST held message is spoken when the screen is in
  * front again. A screen that keeps polling from a background tab therefore never speaks over another tab.
  *
  *   const announce = useEventAnnouncement(live);   // call it BEFORE the effects that announce
  *   useEffect(() => { if (finished) announce(text); }, [finished, announce, text]);
  */
 export function useEventAnnouncement(active = true): (message: string) => void {
-  const navigationFocused = useNavigationFocused();
-  const focused = navigationFocused && active;
+  const focused = useSpeakable() && active;
   const focusedRef = useRef(focused);
   const held = useRef<string | null>(null);
   useEffect(() => {
@@ -102,5 +116,7 @@ export function useEventAnnouncement(active = true): (message: string) => void {
  */
 export function announceOnIOS(message: string): void {
   if (Platform.OS !== 'ios' || message.trim() === '') return;
+  // A moment of a screen under the lock cover is not worth holding: it is simply not said.
+  if (isOverlayCovered()) return;
   AccessibilityInfo.announceForAccessibilityWithOptions(message, { queue: true });
 }

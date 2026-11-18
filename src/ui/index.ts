@@ -35,6 +35,7 @@ export {
   todayDateTimeValue,
   type DateTimeLocale,
   type DateTimeParts,
+  type TodayInput,
 } from './internal/date-time';
 export { hitSlopFor, PressableScale, type PressableScaleProps, type PressableState } from './internal/pressable-scale';
 export { ListRow, type ListRowProps } from './list-row';

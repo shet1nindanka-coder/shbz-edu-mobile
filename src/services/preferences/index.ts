@@ -16,3 +16,4 @@ export {
   type KeyValueStorage,
   type ReminderCategory,
 } from "./preferences-store";
+export { getInterfaceSnapshot, noteInterfaceSnapshot, type InterfaceSnapshot } from "./interface-snapshot";

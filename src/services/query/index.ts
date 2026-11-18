@@ -41,4 +41,5 @@ export {
   shouldRetryQuery,
   type AppQueryClientOptions,
 } from './query-client';
+export { cancelPendingRefreshes, refreshQueries, type RefreshFilters } from './refresh-queries';
 export { isPullRefreshing, usePullRefresh, type PullRefresh, type PullRefreshQuery } from './use-pull-refresh';

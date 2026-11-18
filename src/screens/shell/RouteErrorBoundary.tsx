@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useI18n } from '@/i18n';
+import { I18nProvider, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { useSession } from '@/providers';
-import { makeStyles } from '@/theme';
+import { getInterfaceSnapshot } from '@/services/preferences';
+import { ThemeProvider, makeStyles } from '@/theme';
 import { ErrorState } from '@/ui';
 
 /**
@@ -26,14 +27,26 @@ export function RouteErrorBoundary({ retry }: ErrorBoundaryProps) {
 /**
  * Error shell of the root layout: a render error in anything above the routes (the providers, the lock,
  * the offline strip, the root stack). expo-router renders this boundary in place of `RootLayout`, so no
- * provider of the app is mounted: everything here (and in `ErrorState`) must work on the context
- * defaults — the default language, the light theme, the safe-area provider of `ExpoRoot`. "Try again"
- * mounts the providers again; `onHome` comes from the route file (no session, no `useAppNavigation`).
+ * provider of the app is mounted (one of them may be what threw). The shell brings its own theme and
+ * language providers, fed from the module-level copy of the user's choice (`getInterfaceSnapshot`, ru /
+ * system until the preferences have loaded; `system` follows the OS scheme), and the safe-area provider
+ * of `ExpoRoot`. "Try again" mounts the providers again; `onHome` comes from the route file (no session,
+ * no `useAppNavigation`).
  */
 export function RootErrorBoundary({ retry, onHome }: ErrorBoundaryProps & { onHome: (retry: () => Promise<void>) => void }) {
-  // The session is unknown here (its provider is gone): the generic texts, not the login form's.
-  return <ErrorShell signedIn retry={retry} onHome={() => onHome(retry)} />;
+  const { locale, themeMode } = getInterfaceSnapshot();
+  return (
+    <ThemeProvider mode={themeMode}>
+      <I18nProvider locale={locale} onChangeLocale={ignoreLocaleChange}>
+        {/* The session is unknown here (its provider is gone): the generic texts, not the login form's. */}
+        <ErrorShell signedIn retry={retry} onHome={() => onHome(retry)} />
+      </I18nProvider>
+    </ThemeProvider>
+  );
 }
+
+/** Nobody owns the preference while the providers are down: the shell has no language switch anyway. */
+function ignoreLocaleChange(): void {}
 
 function ErrorShell({ signedIn, retry, onHome }: { signedIn: boolean; retry: () => Promise<void>; onHome: () => void }) {
   const styles = useStyles();

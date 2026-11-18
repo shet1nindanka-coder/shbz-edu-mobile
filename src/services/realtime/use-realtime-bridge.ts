@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { POLLING, useApi, type RealtimeConnectionState, type UserRole } from '@/api';
+import { cancelPendingRefreshes, refreshQueries } from '@/services/query';
 
 import {
   dedupePrefixes,
@@ -15,8 +16,10 @@ import { publishRealtimeState } from './realtime-state';
 /**
  * One realtime subscription while a user is signed in and the app is in the foreground
  * (docs/spec/01-shell-auth.md §5.7, 90-addendum-6 §8.4). Events become query invalidations, coalesced for
- * 1500 ms like the site's page refresh. A refused handshake is never shown; after a gap (background,
- * refusal) everything is invalidated once because the server has no replay.
+ * 1500 ms like the site's page refresh. A refresh never cancels a read in flight: it is followed by one more
+ * read instead (`refreshQueries`), so a steady stream of events cannot keep every read from landing. A refused
+ * handshake is never shown; after a gap (background, refusal) everything is invalidated once because the
+ * server has no replay.
  */
 export function useRealtimeBridge(role: UserRole | null): void {
   const api = useApi();
@@ -31,7 +34,7 @@ export function useRealtimeBridge(role: UserRole | null): void {
       timer.current = null;
       const prefixes = dedupePrefixes(pending.current);
       pending.current = [];
-      for (const prefix of prefixes) void queryClient.invalidateQueries({ queryKey: prefix });
+      for (const prefix of prefixes) void refreshQueries(queryClient, { queryKey: prefix });
     };
     const schedule = (prefixes: readonly InvalidationPrefix[]) => {
       pending.current.push(...prefixes);
@@ -78,6 +81,8 @@ export function useRealtimeBridge(role: UserRole | null): void {
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
       pending.current = [];
+      // Signed out or unmounted: the follow-up reads of refreshes still in flight are not wanted.
+      cancelPendingRefreshes(queryClient);
       publishRealtimeState({ status: 'closed' });
     };
   }, [api, queryClient, role]);

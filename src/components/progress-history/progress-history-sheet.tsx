@@ -62,6 +62,10 @@ export function ProgressHistorySheet(props: ProgressHistorySheetProps) {
     staleTime: 0,
   });
   const first = history.data?.pages[0];
+  // Offline a fetch over cached pages (the next page, or the refetch every opening starts) fails once and
+  // then waits for the connection without an error and without `isFetchingNextPage`: say so, or «Более
+  // ранние записи» would silently do nothing.
+  const paused = history.fetchStatus === 'paused';
   const entries = history.data?.pages.flatMap((page) => page.entries) ?? [];
   const statusLabel = (status: HomeworkNumberStatus | null) => statuses[status ?? 'none'];
 
@@ -79,7 +83,11 @@ export function ProgressHistorySheet(props: ProgressHistorySheetProps) {
               </Text>
             </View>
 
-            {history.isError ? <Notice tone="error" text={t.loadFailedShort} testID="progress-history-refresh-error" /> : null}
+            {paused ? (
+              <Notice tone="error" text={m.common.errors.network} testID="progress-history-offline" />
+            ) : history.isError ? (
+              <Notice tone="error" text={t.loadFailedShort} testID="progress-history-refresh-error" />
+            ) : null}
 
             {entries.length === 0 ? (
               <Text variant="small" color="textMuted" testID="progress-history-empty">
@@ -117,7 +125,7 @@ export function ProgressHistorySheet(props: ProgressHistorySheetProps) {
               {t.notRecorded}
             </Text>
           </>
-        ) : history.isError || history.fetchStatus === 'paused' ? (
+        ) : history.isError || paused ? (
           // A paused first read = no connection and nothing cached: the same message as a failed one.
           <Notice
             tone="error"

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  currentToday,
   dateToParts,
   formatDateTimeDisplay,
   formatDateTimeValue,
@@ -79,5 +80,67 @@ describe('date-time picking rules of the site', () => {
   it('a malformed "today" falls back to the device day', () => {
     assert.equal(todayDateTimeValue(now, 'tomorrow'), '2026-11-16T23:59');
     assert.equal(todayDateTimeValue(now, ''), '2026-11-16T23:59');
+  });
+});
+
+describe('«today» of the date-time field is read when it is used (#407)', () => {
+  // 23:57 MSK on 18 Nov and 00:02 MSK on 19 Nov 2026.
+  const BEFORE = new Date('2026-11-18T20:57:00.000Z');
+  const AFTER = new Date('2026-11-18T21:02:00.000Z');
+  const ZONES = ['Europe/Moscow', 'UTC', 'America/Los_Angeles', 'Asia/Vladivostok', 'Pacific/Kiritimati'];
+
+  function inEveryZone(body: () => void) {
+    const original = process.env.TZ;
+    try {
+      for (const zone of ZONES) {
+        process.env.TZ = zone;
+        body();
+      }
+    } finally {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  }
+
+  it('without a value the Moscow day of the moment of use is today', () => {
+    inEveryZone(() => {
+      assert.equal(currentToday(undefined, BEFORE), '2026-11-18');
+      assert.equal(currentToday(undefined, AFTER), '2026-11-19');
+      assert.equal(todayDateTimeValue(AFTER, currentToday(undefined, AFTER)), '2026-11-19T23:59');
+      assert.equal(withPickedTime('', 18, 0, AFTER, currentToday(undefined, AFTER)), '2026-11-19T18:00');
+    });
+  });
+
+  it('a function is called at the moment of use', () => {
+    let day = '2026-11-18';
+    const today = () => day;
+    assert.equal(currentToday(today, BEFORE), '2026-11-18');
+    day = '2026-11-19';
+    assert.equal(currentToday(today, BEFORE), '2026-11-19');
+  });
+
+  it('a day computed at a render before Moscow midnight moves on to the new day after it', () => {
+    inEveryZone(() => {
+      const rendered = '2026-11-18'; // mskToday() of the screen's last render, at 23:57
+      const anchor = { value: rendered, day: '2026-11-18' };
+      assert.equal(currentToday(rendered, BEFORE, anchor), '2026-11-18');
+      assert.equal(currentToday(rendered, AFTER, anchor), '2026-11-19');
+      assert.equal(todayDateTimeValue(AFTER, currentToday(rendered, AFTER, anchor)), '2026-11-19T23:59');
+      assert.equal(withPickedTime('', 18, 0, AFTER, currentToday(rendered, AFTER, anchor)), '2026-11-19T18:00');
+      // A chosen date is never touched.
+      assert.equal(withPickedTime('2026-11-25T10:00', 18, 0, AFTER, currentToday(rendered, AFTER, anchor)), '2026-11-25T18:00');
+      // Across a month end.
+      const late = { value: '2026-11-30', day: '2026-11-30' };
+      assert.equal(currentToday('2026-11-30', new Date('2026-11-30T21:00:00.000Z'), late), '2026-12-01');
+    });
+  });
+
+  it('a deliberate other day keeps its offset; a string with no anchor is taken as given', () => {
+    const anchor = { value: '2026-11-20', day: '2026-11-18' };
+    assert.equal(currentToday('2026-11-20', BEFORE, anchor), '2026-11-20');
+    assert.equal(currentToday('2026-11-20', AFTER, anchor), '2026-11-21');
+    assert.equal(currentToday('2026-11-20', AFTER), '2026-11-20');
+    // An anchor of another value (the screen passed a new day) does not apply.
+    assert.equal(currentToday('2026-11-19', AFTER, anchor), '2026-11-19');
   });
 });

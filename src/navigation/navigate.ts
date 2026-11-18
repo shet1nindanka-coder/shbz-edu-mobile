@@ -70,27 +70,57 @@ export function useTrackPosition(): void {
   }, [container]);
 }
 
-/** The stack of the tab whose root is `root`, as it is now; null when that tab has not been created yet. */
-function tabStackOf(root: AppHref, role: UserRole): NavState | null {
+/**
+ * The role's tab navigator: on the focused branch while the tabs are on screen, under the role-stack screen
+ * or the overlay otherwise (there is one tab navigator per role tree).
+ */
+function findTabs(state: NavState | null | undefined): NavState | null {
+  if (!state) return null;
+  if (state.type === 'tab') return state;
+  const routes = state.routes ?? [];
+  const focused = routes[state.index ?? 0];
+  for (const route of [focused, ...routes.filter((candidate) => candidate !== focused)]) {
+    const found = findTabs(route?.state);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** The tab route (its name) whose root is `root`; null when the role has no such tab. */
+function tabNameOf(root: AppHref, role: UserRole): string | null {
   const tab = tabsForRole(role).find((candidate) => {
     const href = candidate.section === 'more' ? { pathname: EXTRA_ROUTES.teacherMore } : hrefFor({ screen: candidate.section } as AppLink, role);
     return href?.pathname === root.pathname;
   });
-  if (!tab) return null;
-  // The role's tab navigator: on the focused branch while the tabs are on screen, under the role-stack
-  // screen or the overlay otherwise (there is one tab navigator per role tree).
-  const findTabs = (state: NavState | null | undefined): NavState | null => {
-    if (!state) return null;
-    if (state.type === 'tab') return state;
-    const routes = state.routes ?? [];
-    const focused = routes[state.index ?? 0];
-    for (const route of [focused, ...routes.filter((candidate) => candidate !== focused)]) {
-      const found = findTabs(route?.state);
-      if (found) return found;
-    }
-    return null;
-  };
-  return findTabs(readRootState())?.routes?.find((route) => route.name === tab.name)?.state ?? null;
+  return tab?.name ?? null;
+}
+
+/** The stack of the tab whose root is `root`, as it is now; null when that tab has not been created yet. */
+function tabStackOf(root: AppHref, role: UserRole): NavState | null {
+  const name = tabNameOf(root, role);
+  if (name === null) return null;
+  return findTabs(readRootState())?.routes?.find((route) => route.name === name)?.state ?? null;
+}
+
+/**
+ * Whether a tab's stack, or a stack nested in its focused screen (the teacher's «группы» and «темы» have
+ * their own), holds screens above its first one: `dismissAll` is then handled inside the tab (the deepest
+ * focused stack that can pop takes it; one on its first screen hands it up).
+ */
+function stackIsAboveItsRoot(stack: NavState | null | undefined): boolean {
+  for (let state = stack; state; ) {
+    const index = state.index ?? (state.routes?.length ?? 1) - 1;
+    if (index > 0) return true;
+    state = state.routes?.[index]?.state;
+  }
+  return false;
+}
+
+/** The selected tab: its route name and its stack (null when the tab has no state yet). */
+function selectedTab(): { name: string; stack: NavState | null } | null {
+  const tabs = findTabs(readRootState());
+  const route = tabs?.routes?.[tabs.index ?? 0];
+  return route ? { name: route.name, stack: route.state ?? null } : null;
 }
 
 /**
@@ -102,9 +132,7 @@ function tabStackOf(root: AppHref, role: UserRole): NavState | null {
  * at its bottom, `useRootStackKeeper`). The pop is therefore sent only when the tab can take it.
  */
 function tabIsAboveItsRoot(root: AppHref, role: UserRole): boolean {
-  const stack = tabStackOf(root, role);
-  if (!stack) return false;
-  return (stack.index ?? (stack.routes?.length ?? 1) - 1) > 0;
+  return stackIsAboveItsRoot(tabStackOf(root, role));
 }
 
 /**
@@ -216,10 +244,20 @@ export function navigateTo(link: AppLink, role: UserRole): boolean {
   return true;
 }
 
-/** Resets to the role's first tab from anywhere. */
+/**
+ * Resets to the role's first tab from anywhere, leaving behind the screen it was called from.
+ *
+ * WHY the selected tab is popped first: «На главную» of a dead screen (a group or topic deleted on another
+ * device, shown as not found) inside another tab's stack would otherwise stay on top of that tab, and the
+ * next visit to the tab would land on it again. The site replaces the page on every navigation. The pop
+ * must come BEFORE the tab switch: `dismissAll` acts on the focused stack, which after `navigate` is the
+ * home tab's. It is sent only when the selected tab can take it (see `tabIsAboveItsRoot`).
+ */
 export function navigateHome(role: UserRole): void {
   const home = toHref(homeHref(role));
   if (positionOf(currentSegments) === 'tabs') {
+    const selected = selectedTab();
+    if (selected && selected.name !== tabNameOf(homeHref(role), role) && stackIsAboveItsRoot(selected.stack)) router.dismissAll();
     const deep = tabIsAboveItsRoot(homeHref(role), role);
     router.navigate(home);
     if (deep) router.dismissAll();
