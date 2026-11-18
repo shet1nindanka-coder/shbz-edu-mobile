@@ -54,6 +54,9 @@ export function Badge({ label, tone = 'none', accessibilityLabel, style }: Badge
 const useStyles = makeStyles((t) => ({
   base: {
     alignSelf: 'flex-start',
+    // Never wider than its row: a long label ends in «…» (`numberOfLines={1}`) instead of overflowing.
+    maxWidth: '100%',
+    flexShrink: 1,
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderWidth: t.borders.hairline,

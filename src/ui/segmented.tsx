@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
-import { ScrollView, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
+import { ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { makeStyles, useTheme } from '@/theme';
 
 import { PressableScale } from './internal/pressable-scale';
+import { useScrollIntoView } from './internal/scroll-into-view';
 import { useSlidingIndicator } from './internal/sliding-indicator';
 import { Text } from './text';
 import { useTextScale } from './use-text-scale';
@@ -72,17 +72,9 @@ export function Segmented<T extends string>({
   const { minimumFontScale } = useTextScale();
   const activeIndex = options.findIndex((option) => option.value === value);
   const { onItemLayout, indicatorStyle } = useSlidingIndicator(activeIndex);
-  const scrollRef = useRef<ScrollViewInstance>(null);
-  const spans = useRef<({ x: number; width: number } | undefined)[]>([]);
-  const viewport = useRef(0);
-
-  // Scrollable bar: keep the selected segment in view (centred when the bar is wider than the row).
-  useEffect(() => {
-    if (!scrollable) return;
-    const span = spans.current[activeIndex];
-    if (!span || viewport.current === 0) return;
-    scrollRef.current?.scrollTo({ x: Math.max(0, span.x + span.width / 2 - viewport.current / 2), animated: true });
-  }, [activeIndex, scrollable]);
+  // Scrollable bar: keep the selected segment in view (centred when the bar is wider than the row), from
+  // the first layout on.
+  const { scrollRef, onItemLayout: onSpanLayout, onViewportLayout } = useScrollIntoView(activeIndex, scrollable);
 
   const track = (
     <View
@@ -111,7 +103,7 @@ export function Segmented<T extends string>({
               if (!selected) onChange(option.value);
             }}
             onLayout={(event) => {
-              spans.current[index] = { x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width };
+              onSpanLayout(index, event);
               onItemLayout(index)(event);
             }}
             hitSlop={{ top: 5, bottom: 5 }}
@@ -143,9 +135,7 @@ export function Segmented<T extends string>({
     <ScrollView
       ref={scrollRef}
       horizontal
-      onLayout={(event) => {
-        viewport.current = event.nativeEvent.layout.width;
-      }}
+      onLayout={onViewportLayout}
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       style={[styles.scroll, style]}

@@ -42,6 +42,29 @@ export function useWaitClock(start: WaitStart | null): number {
   return seconds;
 }
 
+function startUntil(until: number | null): WaitStart | null {
+  if (until === null || !Number.isFinite(until)) return null;
+  const at = Date.now();
+  const seconds = (until - at) / 1000;
+  return seconds > 0 ? { seconds, at } : null;
+}
+
+/**
+ * Seconds left of a wait that someone else stored as a wall-clock moment (`retryAt` of a refused note save,
+ * kept in the write queue): the remaining time is taken ONCE, when `until` first arrives (or changes), and
+ * from then on counted down as a duration (`useWaitClock`) — a backward change of the device clock while it
+ * runs does not lengthen it. 0 when `until` is null or already past.
+ */
+export function useWaitUntil(until: number | null): number {
+  const [state, setState] = useState<{ until: number | null; start: WaitStart | null }>(() => ({ until, start: startUntil(until) }));
+  let current = state;
+  if (state.until !== until) {
+    current = { until, start: startUntil(until) };
+    setState(current);
+  }
+  return useWaitClock(current.start);
+}
+
 export type DurationLock = {
   /** Seconds until the lock ends; 0 when nothing is locked. */
   seconds: number;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppState, BackHandler, Platform, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, Keyboard, Platform, StyleSheet, View } from 'react-native';
 
 import { useI18n } from '@/i18n';
 import { usePreferences, useSession } from '@/providers';
@@ -194,6 +194,20 @@ function LockController({
     return () => clearTimeout(timer);
     // Runs when the lock closes, not when the prompt texts change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  // The focused field under the cover would otherwise stay first responder: the system keyboard is a window
+  // above the cover (iOS brings it back with the app), so keystrokes, paste and autofill would edit — and
+  // auto-save, or submit on return — a hidden field while the app is locked. Taken away in the commit that
+  // draws the lock, i.e. before the prompt (scheduled after that commit), on every lock. Not for the iOS
+  // privacy cover: it goes up on every `inactive` blip (Control Center, a banner, the Face ID sheet itself)
+  // and must not drop the keyboard of someone who is typing. The lock screen has no field of its own, so a
+  // keyboard that comes up while locked (a field under the cover that focused itself) is closed again.
+  useLayoutEffect(() => {
+    if (!active || Platform.OS === 'web') return;
+    Keyboard.dismiss();
+    const subscription = Keyboard.addListener('keyboardDidShow', () => Keyboard.dismiss());
+    return () => subscription.remove();
   }, [active]);
 
   // While locked the hardware back button does nothing: it must not pop the screens under the cover.

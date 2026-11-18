@@ -1,4 +1,5 @@
-// Rasterises the brand images of the app into assets/images. Usage: node scripts/build-icons.mjs
+// Rasterises the brand images of the app into assets/images.
+// Usage: node scripts/build-icons.mjs [file …]   (no arguments: every image; otherwise only the named ones)
 //
 // The drawing is the site's own (web repo: app/icon.tsx, app/apple-icon.tsx, components/logo.tsx,
 // lib/logo-font.ts; see docs/spec/08-design-system.md §7): the app icon is the single letter «Ш» of the
@@ -34,6 +35,7 @@ const LOCKUP_SPACING_EM = -0.015;
  * Every image the app config points at.
  * - `plate`: fill of the canvas (null = transparent); `radius`: corner radius as a share of the side.
  * - `letter`: font size of «Ш» as a share of the side.
+ * - `glyphFit`: instead of `letter`, the larger side of the ink box of «Ш» as a share of the side (tight crop).
  * - `lockup`: width of the wordmark as a share of the side, and the colour of its «ШБЗ» part.
  */
 const IMAGES = [
@@ -45,6 +47,11 @@ const IMAGES = [
   { file: 'android-icon-background.png', size: 1024, plate: BRAND, radius: 0 },
   // Themed icons: Android tints the alpha channel of the same glyph.
   { file: 'android-icon-monochrome.png', size: 1024, plate: null, radius: 0, letter: 0.4 },
+  // Android notification small icon (status bar and shade): drawn from the alpha channel only, so a white
+  // glyph on transparent — without it Android falls back to the opaque launcher icon, a solid blob. 96 px
+  // is the xxxhdpi size of the 24 dp icon (the expo-notifications plugin scales it to the other densities);
+  // the glyph fills the 22 dp live area of that canvas (88 px), not the adaptive-icon safe zone.
+  { file: 'notification-icon.png', size: 96, plate: null, radius: 0, glyphFit: 88 / 96 },
   // Web favicon: the site's favicon composition (radius ≈ 22 %, glyph ≈ 60 %).
   { file: 'favicon.png', size: 196, plate: BRAND, radius: 7 / 32, letter: 19 / 32 },
   // Splash: the lockup on a transparent square (the config supplies the background colour). It spans
@@ -64,7 +71,12 @@ await page.setContent(`<!doctype html><html><head><style>
 </style></head><body>Ш</body></html>`);
 await page.evaluate(() => document.fonts.load('900 100px "Logo"', 'ШБЗШкола'));
 
-for (const image of IMAGES) {
+const only = process.argv.slice(2);
+const unknown = only.filter((file) => !IMAGES.some((image) => image.file === file));
+if (unknown.length > 0) throw new Error(`unknown image(s): ${unknown.join(', ')}`);
+const selected = only.length > 0 ? IMAGES.filter((image) => only.includes(image.file)) : IMAGES;
+
+for (const image of selected) {
   const dataUrl = await page.evaluate(
     ({ image, colors, text }) => {
       const { size } = image;
@@ -95,8 +107,16 @@ for (const image of IMAGES) {
         };
       };
 
-      if (image.letter) {
-        ctx.font = `900 ${image.letter * size}px "Logo"`;
+      if (image.letter || image.glyphFit) {
+        let fontSize = image.letter * size;
+        if (image.glyphFit) {
+          // Scale a probe so the larger side of the ink box spans the requested share.
+          ctx.font = '900 100px "Logo"';
+          const m = ctx.measureText(text.letter);
+          const ink = Math.max(m.actualBoundingBoxLeft + m.actualBoundingBoxRight, m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
+          fontSize = (100 * image.glyphFit * size) / ink;
+        }
+        ctx.font = `900 ${fontSize}px "Logo"`;
         ctx.fillStyle = colors.white;
         const at = centered(text.letter);
         ctx.fillText(text.letter, at.x, at.y);

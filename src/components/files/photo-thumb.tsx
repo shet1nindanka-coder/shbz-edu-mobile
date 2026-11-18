@@ -10,13 +10,21 @@ import { useFileService } from '@/services/files/file-service-context';
 import { makeStyles } from '@/theme';
 import { IconButton, PressableScale, Spinner } from '@/ui';
 
+import { photoPlaceLabel } from './photo-label';
+
 export const PHOTO_THUMB_SIZE = 96;
 
 export type PhotoThumbProps = {
   /** `StoredFile` id. */
   fileId: string;
-  /** Original file name: the accessible name of the tile. */
-  name: string;
+  /** Original file name: part of the accessible names of the tile. May be empty when unknown. */
+  name?: string;
+  /**
+   * Place of the photo in its set (0-based `index` of `total`). With it every tile of a set has its own
+   * spoken names — «Открыть фото 2 из 3, IMG_2042.jpg», «Удалить фото 2 из 3, IMG_2042.jpg» — instead of
+   * several identical «Удалить фото» buttons. `PhotoGrid` passes it; a hand-made strip should too.
+   */
+  position?: { index: number; total: number };
   /** Side of the square tile in px. Default 96. */
   size?: number;
   /** Show this local picture instead of asking `FileService` (a photo that is still uploading). */
@@ -25,7 +33,7 @@ export type PhotoThumbProps = {
   onPress?: () => void;
   /** Shows the remove button. */
   onRemove?: () => void;
-  /** Accessible name of the remove button. Default `dict.student.photos.deleteAria`. */
+  /** Accessible name of the remove button. Default: «Удалить фото N из M, name» with `position`, else `dict.student.photos.deleteAria`. */
   removeLabel?: string;
   /** The remove request is running: the button is disabled. */
   removing?: boolean;
@@ -36,7 +44,8 @@ export type PhotoThumbProps = {
 
 export function PhotoThumb({
   fileId,
-  name,
+  name = '',
+  position,
   size = PHOTO_THUMB_SIZE,
   localUri,
   onPress,
@@ -51,6 +60,11 @@ export function PhotoThumb({
   const files = useFileService();
   const { dict, m } = useI18n();
   const source = localUri ? { uri: localUri } : files.source(fileId, 'thumb');
+  const photos = m.common.photos;
+  const openLabel = position ? photoPlaceLabel(photos.openPhotoOf, position.index, position.total, name) : format(photos.openPhoto, { name });
+  const imageLabel = position ? photoPlaceLabel(photos.photoOf, position.index, position.total, name) : name;
+  const removeName =
+    removeLabel ?? (position ? photoPlaceLabel(photos.removePhotoOf, position.index, position.total, name) : dict.student.photos.deleteAria);
 
   const picture = (
     <Image
@@ -70,7 +84,7 @@ export function PhotoThumb({
       {onPress ? (
         <PressableScale
           accessibilityRole="imagebutton"
-          accessibilityLabel={format(m.common.photos.openPhoto, { name })}
+          accessibilityLabel={openLabel}
           disabled={uploading}
           onPress={onPress}
           style={styles.fill}
@@ -78,7 +92,7 @@ export function PhotoThumb({
           {picture}
         </PressableScale>
       ) : (
-        <View accessible accessibilityRole="image" accessibilityLabel={name} style={styles.fill}>
+        <View accessible accessibilityRole="image" accessibilityLabel={imageLabel} style={styles.fill}>
           {picture}
         </View>
       )}
@@ -91,7 +105,7 @@ export function PhotoThumb({
         <IconButton
           icon="close"
           variant="dangerRaised"
-          accessibilityLabel={removeLabel ?? dict.student.photos.deleteAria}
+          accessibilityLabel={removeName}
           disabled={removing}
           onPress={onRemove}
           style={styles.remove}

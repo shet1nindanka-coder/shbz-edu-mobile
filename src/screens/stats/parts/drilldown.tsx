@@ -1,10 +1,10 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, qk, retryAfterOf, useApi } from '@/api';
 import type { HomeworkNumberStatus } from '@/api/types';
-import { RetryWaitLine, useCountdown, useWaitText } from '@/components/retry-wait';
+import { RetryWaitLine, useWaitClock, useWaitText } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
 import { ProgressBar, Select, Text, TextButton } from '@/ui';
@@ -64,7 +64,10 @@ export function Drilldown({ topics, students }: DrilldownProps) {
 
   // `429 rateLimited` names a wait: "try again" is offered only after it.
   const wait = slice.isError ? retryAfterOf(slice.error) : 0;
-  const waitSeconds = useCountdown(wait > 0 ? slice.errorUpdatedAt + wait * 1000 : null);
+  // A duration from the failure, not a deadline on the device clock (a clock set back must not lengthen it).
+  const errorAt = slice.errorUpdatedAt;
+  const waitStart = useMemo(() => (wait > 0 ? { seconds: wait, at: errorAt } : null), [wait, errorAt]);
+  const waitSeconds = useWaitClock(waitStart);
 
   if (topics.length === 0 || students.length === 0) {
     return (

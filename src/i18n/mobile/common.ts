@@ -59,12 +59,16 @@ const ru = {
     permissionDenied: "Доступ запрещён. Разрешите его в настройках устройства.",
     cameraUnavailable: "Камера на этом устройстве недоступна.",
     pickFailed: "Не удалось подготовить фото. Попробуйте выбрать его ещё раз.",
-    openPhoto: "Открыть фото {name}"
+    openPhoto: "Открыть фото {name}",
+    openPhotoOf: "Открыть фото {n} из {total}",
+    removePhotoOf: "Удалить фото {n} из {total}",
+    photoOf: "Фото {n} из {total}"
   },
   dateTime: {
     pickDate: "Выбрать дату",
     moscowTime: "Время московское (МСК)",
-    msk: "МСК"
+    msk: "МСК",
+    notSet: "не выбрано"
   },
   a11y: {
     goBack: "Вернуться назад",
@@ -130,12 +134,16 @@ const en: typeof ru = {
     permissionDenied: "Access denied. Allow it in the device settings.",
     cameraUnavailable: "The camera is not available on this device.",
     pickFailed: "Could not prepare the photo. Please pick it again.",
-    openPhoto: "Open photo {name}"
+    openPhoto: "Open photo {name}",
+    openPhotoOf: "Open photo {n} of {total}",
+    removePhotoOf: "Remove photo {n} of {total}",
+    photoOf: "Photo {n} of {total}"
   },
   dateTime: {
     pickDate: "Pick a date",
     moscowTime: "Moscow time (MSK)",
-    msk: "MSK"
+    msk: "MSK",
+    notSet: "not set"
   },
   a11y: {
     goBack: "Go back",

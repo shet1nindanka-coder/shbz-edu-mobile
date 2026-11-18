@@ -34,6 +34,7 @@ export {
 export {
   createAppQueryClient,
   createPersistOptions,
+  destroyOrphanedQueries,
   failQueriesWaitingWithoutData,
   markRestoredQueriesStale,
   removePersistedQueries,

@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef } from 'react';
+import { useIsFocused } from 'expo-router';
 import { NavigationContext } from 'expo-router/react-navigation';
 
 /**
@@ -24,4 +25,22 @@ export function useCloseOnBlur(open: boolean, onClose: () => void): void {
     if (!open || !navigation) return;
     return navigation.addListener('blur', () => latest.current());
   }, [open, navigation]);
+}
+
+// `useIsFocused` reads the navigator's focus context with React's `use()`, which (unlike other hooks) may be
+// called conditionally. It throws outside a navigator, so it is read only where a screen provides one.
+const readScreenFocus = useIsFocused;
+
+/**
+ * Whether the screen this component is rendered in is the focused one; `true` outside a navigator (a
+ * primitive on its own, the lock screen), where there is no screen to leave.
+ *
+ * WHY: inactive tab scenes and screens under a pushed screen stay mounted (and keep refetching), so a
+ * primitive that talks to the whole window — a VoiceOver announcement, a native `Modal` — must ask whether
+ * its screen is the one the user is on. The navigator computes it from its state for the whole tree (a
+ * screen under a screen pushed on the root stack is not focused either) and re-renders on every change.
+ */
+export function useNavigationFocused(): boolean {
+  const navigation = useContext(NavigationContext);
+  return navigation ? readScreenFocus() : true;
 }

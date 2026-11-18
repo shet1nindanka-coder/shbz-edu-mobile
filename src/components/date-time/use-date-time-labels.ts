@@ -18,6 +18,7 @@ export function useDateTimeLabels(): DateTimeFieldLabels {
       // The Android system dialogs would otherwise say «ОК / ОТМЕНА» in the device language.
       ok: m.common.actions.ok,
       cancel: m.common.actions.cancel,
+      notSet: m.common.dateTime.notSet,
     };
   }, [dict, m]);
 }

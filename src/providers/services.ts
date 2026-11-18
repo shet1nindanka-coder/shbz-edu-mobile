@@ -21,7 +21,7 @@ import {
 } from '@/services/files';
 import { isOnline } from '@/services/network';
 import { createPreferencesStore, type AppPreferencesStore, type KeyValueStorage } from '@/services/preferences';
-import { createSessionCache, guardApiClient, type SessionCache, type SessionErrorHandlers } from '@/services/session';
+import { createSessionCache, createSessionTokenSlot, guardApiClient, type SessionCache, type SessionErrorHandlers } from '@/services/session';
 
 /** Language sent with every request (`Accept-Language`); the preferences provider keeps it current. */
 let requestLocale: Locale = DEFAULT_LOCALE;
@@ -51,6 +51,12 @@ export type AppRuntime = AppServices & {
   sessionCache: SessionCache;
   /** Installs the bearer token used by every following call; null = signed out. */
   setSessionToken(token: string | null): void;
+  /**
+   * Bumped whenever the installed token changes. Work started for one session that settles later compares
+   * it with the value it captured and leaves the current session alone when they differ (`api` does so for
+   * `sessionExpired` / role refusals, `files` for its 401s).
+   */
+  sessionGeneration(): number;
   /** The mock backend with its controls — present only in mock builds (the "Demo data" screen). */
   mock: MockApiClient | null;
 };
@@ -87,23 +93,41 @@ export function getAppRuntime(): AppRuntime {
     readUploadBytes: readLocalFileBytes,
   });
 
+  const tokenSlot = createSessionTokenSlot((token) => mock.setSessionToken(token));
+  // The generation in which a file lookup last answered "no session". The file service reports such a 401
+  // right after its lookup, or one microtask later (`source` during render): a report whose lookup belongs
+  // to an earlier generation concerns a session that is gone and must not sign out the current one.
+  let fileExpiredIn = -1;
+
   runtime = {
-    // Every call is observed for the two session-level errors (90-addendum-1 A.3 rules 1 – 2).
-    api: guardApiClient(mock, {
-      onSessionExpired: (error) => sessionErrorHandlers?.onSessionExpired(error),
-      onRoleRefused: (error) => sessionErrorHandlers?.onRoleRefused?.(error),
-    }),
+    // Every call is observed for the two session-level errors (90-addendum-1 A.3 rules 1 – 2), and only an
+    // answer about the session installed now counts (a stale request of the previous user is ignored).
+    api: guardApiClient(
+      mock,
+      {
+        onSessionExpired: (error) => sessionErrorHandlers?.onSessionExpired(error),
+        onRoleRefused: (error) => sessionErrorHandlers?.onRoleRefused?.(error),
+      },
+      { generation: tokenSlot.generation },
+    ),
     // A file opened after the session ended is a 401 that signs out, like any API call.
     files: createMockFileService({
-      lookup: (fileId) => mock.backend.files.access(fileId),
+      lookup: (fileId) => {
+        const access = mock.backend.files.access(fileId);
+        if (access === 'sessionExpired') fileExpiredIn = tokenSlot.generation();
+        return access;
+      },
       locale: getRequestLocale,
-      onSessionExpired: (error) => sessionErrorHandlers?.onSessionExpired(error),
+      onSessionExpired: (error) => {
+        if (fileExpiredIn === tokenSlot.generation()) sessionErrorHandlers?.onSessionExpired(error);
+      },
       ready: () => mock.ready(),
     }),
     preferences: createPreferencesStore(storage),
     storage,
     sessionCache: createSessionCache(storage),
-    setSessionToken: (token) => mock.setSessionToken(token),
+    setSessionToken: (token) => tokenSlot.set(token),
+    sessionGeneration: tokenSlot.generation,
     mock,
   };
   return runtime;

@@ -21,6 +21,8 @@ export type TextButtonProps = {
   variant?: TextVariant;
   disabled?: boolean;
   accessibilityLabel?: string;
+  /** For a disclosure toggle ("Показать / Скрыть" a section): whether that section is open. */
+  expanded?: boolean;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -40,6 +42,7 @@ export function TextButton({
   variant = 'link',
   disabled = false,
   accessibilityLabel,
+  expanded,
   testID,
   style,
 }: TextButtonProps) {
@@ -49,7 +52,9 @@ export function TextButton({
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled }}
+      accessibilityState={expanded === undefined ? { disabled } : { disabled, expanded }}
+      // react-native-web reads `aria-expanded`, not `accessibilityState.expanded`.
+      aria-expanded={expanded}
       disabled={disabled}
       onPress={guardedPress}
       scaleTo={1}

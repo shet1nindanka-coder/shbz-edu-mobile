@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { useCountdown, useWaitText } from '@/components/retry-wait';
+import { RetryWaitLine, useWaitUntil } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
@@ -27,35 +27,30 @@ export type NoteFieldProps = {
 export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: NoteFieldProps) {
   const styles = useStyles();
   const { dict, m } = useI18n();
-  const waitText = useWaitText();
   const t = dict.student.numberCard;
   const editor = useNoteEditor(homeworkNumberId, serverNote, t.noteSaveFailed);
-  const wait = useCountdown(editor.error?.retryAt ?? null);
+  // The server's wait, counted down as a duration from the refusal on (a clock set back does not lengthen it).
+  const wait = useWaitUntil(editor.error?.retryAt ?? null);
 
   if (editor.disabledByServer) return null;
 
-  const errorMessage = editor.error
-    ? wait > 0
-      ? `${editor.error.message} ${waitText.retryIn(wait)}`
-      : editor.error.message
-    : null;
-
   return (
     <View style={styles.root} testID="number-note">
-      {errorMessage ? (
+      {editor.error ? (
+        // The notice holds the server's text only, so its live region speaks it once; the countdown is a
+        // plain line under it (a live region around a countdown makes TalkBack read every tick).
         <Notice
           tone="error"
-          text={errorMessage}
-          // The countdown in the text changes every second: VoiceOver speaks only the message, once.
-          announcement={editor.error?.message ?? null}
+          text={editor.error.message}
           action={
             // Never sent again by itself: the student decides, and only once a rate-limit wait is over.
             wait > 0 ? undefined : <TextButton label={m.common.actions.retry} tone="danger" onPress={editor.retry} testID="number-note-retry" />
           }
           testID="number-note-error"
-          style={styles.notice}
+          style={wait > 0 ? null : styles.notice}
         />
       ) : null}
+      {editor.error ? <RetryWaitLine seconds={wait} testID="number-note-wait" style={styles.notice} /> : null}
       <View style={styles.head}>
         <Text variant="kickerSm">{t.note}</Text>
         {editor.status === 'saving' ? (

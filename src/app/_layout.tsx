@@ -13,16 +13,33 @@
 // `index` is only a redirect: `useRootStackKeeper` swaps it out as soon as something is above it, so the
 // session's bottom route (the role tree, or `login`) is always the first route of this stack. The bottom
 // routes also turn the iOS edge swipe off: there is nothing under them to swipe back to.
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router, type ErrorBoundaryProps, type Href } from 'expo-router';
 import { useMemo } from 'react';
 
 import { useRootStackKeeper } from '@/navigation';
 import { AppProviders, IS_MOCK_BUILD, useSession } from '@/providers';
 import { LaunchScreen, LockGate, ReminderOpener } from '@/screens/shell';
+import { RootErrorBoundary } from '@/screens/shell/RouteErrorBoundary';
 import { OfflineBannerHost } from '@/services/network';
 import { useTheme } from '@/theme';
 
-export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
+/**
+ * expo-router renders the root layout's boundary in place of `RootLayout`, i.e. outside `AppProviders`:
+ * the route boundary (session, role navigation) would throw there and take the whole app down.
+ */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <RootErrorBoundary {...props} onHome={goHomeAfterRootError} />;
+}
+
+function goHomeAfterRootError(retry: () => Promise<void>): void {
+  void retry().then(() => {
+    try {
+      router.replace('/' as Href);
+    } catch {
+      // No navigator yet: the launch route of the new root stack leads home by itself.
+    }
+  });
+}
 
 export const unstable_settings = { anchor: 'index' };
 

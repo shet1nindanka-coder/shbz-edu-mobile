@@ -63,6 +63,13 @@
  *   entries merged by such a late read are flushed at once while signed in and online (the sign-in flush
  *   may be over by then)
  *   any ──clear──▶ READ, stored copy removed (explicit sign-out)
+ *   A removal that cannot reach the stored copy is not undone at the next start. Every entry taken out of
+ *   memory (sent, discarded, dropped, cleared) leaves a TOMBSTONE — its key and the `updatedAt` it had —
+ *   until a write of the stored copy succeeds. A failed write falls back to storing "[]"; when that fails
+ *   too, the tombstones are stored under `<key>::removed`. `hydrate` applies them before any other filter:
+ *   a stored entry whose `updatedAt` is not newer than its tombstone is gone (a `clear` of a store that was
+ *   never read leaves an "everything up to" floor instead). A submit after a removal always gets an
+ *   `updatedAt` above the tombstone, whatever the device clock says, so a removal never drops a later draft.
  *   A stored entry whose payload fails its kind's guard (`register(kind, handler, isPayload)`) is dropped
  *   when read: one corrupted row must not break the screens that show it, nor be "sent" forever.
  *
@@ -205,6 +212,29 @@ export interface PendingWritesQueue<C> {
 
 export const PENDING_WRITES_STORAGE_KEY = "shbz-pending-writes";
 
+/** Tombstones of removed entries: per key the last removed `updatedAt`, plus an optional floor for all. */
+type Tombstones = { keys: Map<string, number>; floor: number | null };
+
+/** Reads stored tombstones; anything malformed reads as none. */
+function parseTombstones(raw: string | null): Tombstones {
+  const result: Tombstones = { keys: new Map(), floor: null };
+  if (!raw) return result;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return result;
+    const { keys, floor } = parsed as { keys?: unknown; floor?: unknown };
+    if (typeof floor === "number" && Number.isFinite(floor)) result.floor = floor;
+    if (Array.isArray(keys)) {
+      for (const item of keys) {
+        if (Array.isArray(item) && typeof item[0] === "string" && typeof item[1] === "number" && Number.isFinite(item[1])) result.keys.set(item[0], item[1]);
+      }
+    }
+  } catch {
+    // Unreadable tombstones remove nothing.
+  }
+  return result;
+}
+
 function entryKey(kind: string, id: string): string {
   return `${kind}\u0000${id}`;
 }
@@ -279,6 +309,38 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
   let storedKeep: { user: string | null } | undefined;
   /** Keys with a request in flight. */
   const inFlight = new Set<string>();
+  const tombstoneKey = `${storageKey}::removed`;
+  /** Removals the stored copy may not reflect yet (see THE STORED COPY). Pruned once it does. */
+  const tombstones: Tombstones = { keys: new Map(), floor: null };
+  /** Tombstones are (or may be) stored under `tombstoneKey`: kept in memory until that row is gone. */
+  let tombstonesStored = false;
+
+  const bury = (key: string, updatedAt: number) => {
+    tombstones.keys.set(key, Math.max(tombstones.keys.get(key) ?? updatedAt, updatedAt));
+  };
+  /** Takes `key` out of memory, leaving its tombstone. */
+  const removeEntry = (key: string): boolean => {
+    const write = entries.get(key);
+    if (!write) return false;
+    entries.delete(key);
+    bury(key, write.updatedAt);
+    return true;
+  };
+  const isBuried = (write: PendingWrite): boolean => {
+    if (tombstones.floor !== null && write.updatedAt <= tombstones.floor) return true;
+    const removedAt = tombstones.keys.get(entryKey(write.kind, write.id));
+    return removedAt !== undefined && write.updatedAt <= removedAt;
+  };
+  /** The lowest `updatedAt` a new write of `key` may get: above any removal of it. */
+  const aboveTombstone = (key: string): number => {
+    const removedAt = Math.max(tombstones.floor ?? -Infinity, tombstones.keys.get(key) ?? -Infinity);
+    return Number.isFinite(removedAt) ? removedAt + 1 : -Infinity;
+  };
+  const absorbTombstones = (stored: Tombstones) => {
+    if (stored.floor !== null) tombstones.floor = Math.max(tombstones.floor ?? stored.floor, stored.floor);
+    for (const [key, updatedAt] of stored.keys) bury(key, updatedAt);
+  };
+  const hasTombstones = () => tombstones.floor !== null || tombstones.keys.size > 0;
 
   const notify = () => {
     changes += 1;
@@ -290,22 +352,39 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     return !guard || guard(write.payload);
   };
 
-  /** The stored entries, or null when the store could not be read (which is not the same as "empty"). */
-  const readStored = async (): Promise<PendingWrite[] | null> => {
+  /**
+   * The stored entries and the stored tombstones, or null when the store could not be read (which is not
+   * the same as "empty"). Without its tombstones a stored copy could bring back removed drafts: both or none.
+   */
+  const readStored = async (): Promise<{ writes: PendingWrite[]; removed: Tombstones } | null> => {
     try {
-      return parsePendingWrites(await storage.getItem(storageKey));
+      const raw = await storage.getItem(storageKey);
+      const removed = await storage.getItem(tombstoneKey);
+      return { writes: parsePendingWrites(raw), removed: parseTombstones(removed) };
     } catch {
       return null;
     }
   };
 
   /** Merges a successful read into memory: what was added, and whether a stored entry was dropped. */
-  const mergeStored = (stored: PendingWrite[]): { added: boolean; dropped: boolean } => {
+  const mergeStored = (read: { writes: PendingWrite[]; removed: Tombstones }): { added: boolean; dropped: boolean } => {
     let added = false;
     let dropped = false;
     if (!storedRead) {
-      for (const write of stored) {
+      const removedBefore = read.removed.floor !== null || read.removed.keys.size > 0;
+      if (removedBefore) {
+        absorbTombstones(read.removed);
+        // The row goes once the stored copy is rewritten without the removed entries.
+        tombstonesStored = true;
+        dropped = true;
+      }
+      for (const write of read.writes) {
         const key = entryKey(write.kind, write.id);
+        // First: a removal the stored copy did not get (a failed write before a restart) is final.
+        if (isBuried(write)) {
+          dropped = true;
+          continue;
+        }
         // A write made (or discarded) in memory meanwhile is newer than the stored one.
         if (entries.has(key) || touched.has(key)) continue;
         if (!payloadOk(write) || (storedKeep !== undefined && write.userId !== storedKeep.user)) {
@@ -329,11 +408,48 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     }
     // The snapshot is taken when this save runs: saves are serialized, so it is always the newest state.
     const snapshot = JSON.stringify([...entries.values()]);
+    // Removals up to now are in this snapshot; later ones leave tombstones of their own.
+    const covered = { keys: new Map(tombstones.keys), floor: tombstones.floor };
+    let written = false;
     try {
       if (snapshot === "[]") await storage.removeItem(storageKey);
       else await storage.setItem(storageKey, snapshot);
+      written = true;
     } catch {
-      // The queue keeps working in memory for this run of the app.
+      // A removal that failed may still be replaced by an empty list.
+      if (snapshot === "[]") {
+        try {
+          await storage.setItem(storageKey, "[]");
+          written = true;
+        } catch {
+          // Below: the tombstones.
+        }
+      }
+    }
+    if (written) {
+      if (tombstonesStored) {
+        try {
+          await storage.removeItem(tombstoneKey);
+          tombstonesStored = false;
+        } catch {
+          // Stale tombstones stay; the ones in memory keep later writes above them.
+        }
+      }
+      if (!tombstonesStored) {
+        // The stored copy reflects these removals now.
+        for (const [key, updatedAt] of covered.keys) if (tombstones.keys.get(key) === updatedAt) tombstones.keys.delete(key);
+        if (tombstones.floor === covered.floor) tombstones.floor = null;
+      }
+      return;
+    }
+    // The stored copy still holds what was removed: the next start must not bring it back (and send it).
+    if (!hasTombstones()) return;
+    try {
+      const keys = [...tombstones.keys.entries()];
+      tombstonesStored = true;
+      await storage.setItem(tombstoneKey, JSON.stringify({ keys, floor: tombstones.floor }));
+    } catch {
+      // Nothing more to try; memory keeps working, and the next change writes again.
     }
   };
 
@@ -413,7 +529,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     if (!handler || write.userId !== getUserId() || write.refusal) return { result: "skipped" };
     if (!payloadOk(write)) {
       // Unreadable (a guard registered after it was loaded): it can never be sent.
-      entries.delete(key);
+      removeEntry(key);
       changed();
       return { result: "skipped" };
     }
@@ -425,7 +541,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
     try {
       const value = await handler(write, getContext());
       if (isStillSame()) {
-        entries.delete(key);
+        removeEntry(key);
         changed();
       }
       return { result: "sent", value, sentAt };
@@ -446,7 +562,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
           const at = now();
           const retryAt = info.retryAfterSeconds ? at + info.retryAfterSeconds * 1000 : null;
           entries.set(key, { ...current, refusal: { code: info.code, message: info.message, retryAt, at } });
-        } else entries.delete(key);
+        } else removeEntry(key);
         changed();
       }
       return { result: "rejected", error, sentAt };
@@ -542,7 +658,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         let dropped = false;
         for (const [key, write] of entries) {
           if (write.kind !== kind || isPayload(write.payload)) continue;
-          entries.delete(key);
+          removeEntry(key);
           dropped = true;
         }
         if (dropped) changed();
@@ -568,8 +684,9 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
         payload,
         userId,
         createdAt: previous?.createdAt ?? stamp,
-        // Strictly increasing per entry, so "still the same payload" checks hold even within one millisecond.
-        updatedAt: previous ? Math.max(stamp, previous.updatedAt + 1) : stamp,
+        // Strictly increasing per entry, so "still the same payload" checks hold even within one millisecond,
+        // and above any removal of the key: a tombstone never takes a draft made after it, clock or not.
+        updatedAt: Math.max(stamp, previous ? previous.updatedAt + 1 : -Infinity, aboveTombstone(key)),
         attempts: 0,
       });
       changed();
@@ -597,7 +714,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
       await hydrate();
       const key = entryKey(kind, id);
       touched.add(key);
-      if (entries.delete(key)) changed();
+      if (removeEntry(key)) changed();
     },
     async clear() {
       await hydrate();
@@ -607,7 +724,14 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
       const unread = !storedRead;
       storedRead = true;
       if (entries.size === 0 && !unread) return;
-      entries.clear();
+      if (unread) {
+        // Unknown entries: everything made up to now goes, by the newest stamp known (the device clock is
+        // only the fallback for what memory never saw).
+        let floor = now();
+        for (const write of entries.values()) floor = Math.max(floor, write.updatedAt);
+        tombstones.floor = Math.max(tombstones.floor ?? floor, floor);
+      }
+      for (const key of [...entries.keys()]) removeEntry(key);
       changed();
       await saveChain;
     },
@@ -618,7 +742,7 @@ export function createPendingWritesQueue<C>(options: PendingWritesOptions<C>): P
       let dropped = false;
       for (const [key, write] of entries) {
         if (write.userId === userId) continue;
-        entries.delete(key);
+        removeEntry(key);
         dropped = true;
       }
       if (dropped) changed();

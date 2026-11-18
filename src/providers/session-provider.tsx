@@ -36,6 +36,11 @@ export type SessionValue = {
   restored: boolean;
   /** Shown on the login screen after a forced sign-out (`apiCommon.sessionExpired`, already localised). */
   notice: string | null;
+  /**
+   * The last sign-out could not remove the saved session from this device (every fallback of
+   * `TokenStorage.clear()` failed). The sign-out itself completed; the login screen says so.
+   */
+  tokenNotRemoved: boolean;
   dismissNotice: () => void;
   /** Rejects with the `ApiError` of `POST /auth/login`; on success the role's tree replaces the auth stack. */
   signIn: (input: LoginRequest) => Promise<AuthenticatedUser>;
@@ -58,7 +63,7 @@ export type SessionValue = {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-type State = { status: SessionStatus; user: AuthenticatedUser | null; restored: boolean; notice: string | null };
+type State = { status: SessionStatus; user: AuthenticatedUser | null; restored: boolean; notice: string | null; tokenNotRemoved: boolean };
 
 const ROLE_REFRESH_MIN_INTERVAL_MS = 5000;
 
@@ -68,7 +73,7 @@ const ROLE_REFRESH_MIN_INTERVAL_MS = 5000;
  * so the teacher who signs in next still sees the photo the student handed in. Access to them is decided
  * by the mock backend per signed-in user; they go away with a reset of the demo dataset.
  */
-async function clearSessionData(options: { keepPendingWrites: boolean }): Promise<void> {
+async function clearSessionData(options: { keepPendingWrites: boolean }): Promise<{ tokenRemoved: boolean }> {
   const runtime = getAppRuntime();
   runtime.setSessionToken(null);
   // Neither a forced expiry nor a plain sign-out (the lock screen's «use password», «sign in again» after a
@@ -87,13 +92,19 @@ async function clearSessionData(options: { keepPendingWrites: boolean }): Promis
   }
   // `tokenStorage.clear()` falls back to overwriting the token and then to a signed-out marker that the
   // next start honours, so a sign-out never leaves a token that restores the session.
-  await Promise.all([tokenStorage.clear(), runtime.sessionCache.clear(), keepPendingWrites ? Promise.resolve() : getPendingWrites().clear(), localNotifications.removeAll()]);
+  const [tokenRemoved] = await Promise.all([
+    tokenStorage.clear().catch(() => false),
+    runtime.sessionCache.clear(),
+    keepPendingWrites ? Promise.resolve() : getPendingWrites().clear(),
+    localNotifications.removeAll(),
+  ]);
   // The cache in memory is empty already; its copy on disk is removed now, not left to the persister's
   // throttled write a second later. The removal is issued one tick after `clear()`: the persister answers
   // the first "query removed" event with an immediate write of a still half-full snapshot, and a removal
   // issued before that write would be undone by it.
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
   await removePersistedQueries(runtime.storage);
+  return { tokenRemoved };
 }
 
 type RestoreOutcome =
@@ -138,7 +149,7 @@ async function resolveStoredSession(): Promise<RestoreOutcome> {
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const runtime = getAppRuntime();
-  const [state, setState] = useState<State>({ status: 'restoring', user: null, restored: false, notice: null });
+  const [state, setState] = useState<State>({ status: 'restoring', user: null, restored: false, notice: null, tokenNotRemoved: false });
   // Callbacks that outlive a render (API guard, listeners) read the latest state from here.
   const stateRef = useRef(state);
   useEffect(() => {
@@ -154,7 +165,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const enter = useCallback((user: AuthenticatedUser, restored: boolean) => {
     setPendingWritesUser(user.id);
-    setState({ status: 'signedIn', user, restored, notice: null });
+    setState({ status: 'signedIn', user, restored, notice: null, tokenNotRemoved: false });
     void getAppRuntime().sessionCache.write(user);
     void registerRemotePush({ locale: getRequestLocale() });
     // Drafts kept from an expired session of another account are never shown or sent to this one.
@@ -169,14 +180,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     stateRef.current = { ...stateRef.current, status: 'signedOut' };
     unconfirmed.current = false;
     holdPendingWritesForExpiredSession();
-    void clearSessionData({ keepPendingWrites: true });
-    setState({ status: 'signedOut', user: null, restored: false, notice: error.message });
+    const cleared = clearSessionData({ keepPendingWrites: true });
+    setState({ status: 'signedOut', user: null, restored: false, notice: error.message, tokenNotRemoved: false });
+    void cleared.then(({ tokenRemoved }) => {
+      if (!tokenRemoved) setState((current) => (current.status === 'signedOut' ? { ...current, tokenNotRemoved: true } : current));
+    });
   }, []);
 
   const refreshUser = useCallback(async () => {
     if (stateRef.current.status !== 'signedIn') return;
+    // An answer to the session that asked: after a sign-out / another sign-in / a rotated token it is about
+    // a session that is gone — it must neither install its user nor sign out the one signed in now.
+    const generation = getAppRuntime().sessionGeneration();
+    const stale = () => getAppRuntime().sessionGeneration() !== generation;
     try {
       const { user } = await getAppRuntime().api.shell.getMe();
+      if (stale()) return;
       const wasUnconfirmed = unconfirmed.current;
       unconfirmed.current = false;
       const previous = stateRef.current.user;
@@ -188,7 +207,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // The server answers again after a start without an answer: send what was waiting.
       if (wasUnconfirmed) void getPendingWrites().flush();
     } catch (error) {
-      if (isSessionExpired(error)) expire(error);
+      if (!stale() && isSessionExpired(error)) expire(error);
       // Any other failure keeps the current user; the next request reports for itself.
     }
   }, [expire]);
@@ -211,7 +230,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (outcome: RestoreOutcome) => {
       switch (outcome.kind) {
         case 'none':
-          setState({ status: 'signedOut', user: null, restored: false, notice: null });
+          setState({ status: 'signedOut', user: null, restored: false, notice: null, tokenNotRemoved: false });
           break;
         case 'confirmed':
           unconfirmed.current = false;
@@ -221,17 +240,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           // No answer from the server: the last known user's tree opens on cached data; confirmed later.
           unconfirmed.current = true;
           setPendingWritesUser(outcome.user.id);
-          setState({ status: 'signedIn', user: outcome.user, restored: true, notice: null });
+          setState({ status: 'signedIn', user: outcome.user, restored: true, notice: null, tokenNotRemoved: false });
           // `GET /me` got no answer, but the device may be online (a timeout, a server error): try the
           // waiting writes now; a failure without an answer re-tries them with backoff by itself.
           void getPendingWrites().dropOtherUsers(outcome.user.id);
           void getPendingWrites().flush();
           break;
         case 'expired':
-          setState({ status: 'signedOut', user: null, restored: false, notice: outcome.message });
+          setState({ status: 'signedOut', user: null, restored: false, notice: outcome.message, tokenNotRemoved: false });
           break;
         case 'failed':
-          setState({ status: 'restoreFailed', user: null, restored: false, notice: outcome.message });
+          setState({ status: 'restoreFailed', user: null, restored: false, notice: outcome.message, tokenNotRemoved: false });
           break;
       }
     },
@@ -256,7 +275,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         retryRestoreRef.current();
         return;
       }
-      if (stateRef.current.status !== 'signedIn') return;
+      // A sign-out in progress still reads 'signedIn': what waits now belongs to the user who is leaving.
+      if (stateRef.current.status !== 'signedIn' || signingOut.current) return;
       if (unconfirmed.current) void refreshUser();
       void getPendingWrites().flush();
     };
@@ -302,9 +322,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       unconfirmed.current = false;
       // Kept drafts — queued ones and those the editors flush as the tree unmounts — stay this user's.
       if (!discardUnsentWrites) holdPendingWritesForExpiredSession();
-      await clearSessionData({ keepPendingWrites: !discardUnsentWrites });
+      const { tokenRemoved } = await clearSessionData({ keepPendingWrites: !discardUnsentWrites });
       signingOut.current = false;
-      setState({ status: 'signedOut', user: null, restored: false, notice: null });
+      setState({ status: 'signedOut', user: null, restored: false, notice: null, tokenNotRemoved: !tokenRemoved });
     }
   }, []);
 
@@ -316,17 +336,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const applyRotatedToken = useCallback(async (token: string) => {
     getAppRuntime().setSessionToken(token);
     await tokenStorage.write(token);
+    // A write sent with the old token while the password changed was answered "session gone" and kept
+    // (held); the session goes on under the new token, so it is sent now instead of at the next reconnect.
+    if (stateRef.current.status === 'signedIn') void getPendingWrites().flush();
   }, []);
 
   const dismissNotice = useCallback(() => {
-    setState((current) => (current.notice === null ? current : { ...current, notice: null }));
+    setState((current) => (current.notice === null && !current.tokenNotRemoved ? current : { ...current, notice: null, tokenNotRemoved: false }));
   }, []);
 
   const retryRestore = useCallback(() => {
     // One attempt at a time, and never over a sign-out that is clearing the stored token.
     if (stateRef.current.status !== 'restoreFailed' || signingOut.current) return;
     stateRef.current = { ...stateRef.current, status: 'restoring' };
-    setState({ status: 'restoring', user: null, restored: false, notice: null });
+    setState({ status: 'restoring', user: null, restored: false, notice: null, tokenNotRemoved: false });
     void resolveStoredSession().then(applyRestored);
   }, [applyRestored]);
   useEffect(() => {
@@ -339,6 +362,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user: state.user,
       restored: state.restored,
       notice: state.notice,
+      tokenNotRemoved: state.tokenNotRemoved,
       dismissNotice,
       signIn,
       signOut,

@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import type { StudentHomeworkNumberDto } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { useCountdown, useWaitText } from '@/components/retry-wait';
+import { RetryWaitLine, useWaitUntil } from '@/components/retry-wait';
 import { homeworkStatusShortLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
@@ -32,10 +32,9 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
   const styles = useStyles();
   const { dict, m } = useI18n();
   const t = dict.student.numberCard;
-  const waitText = useWaitText();
   const note = useNoteEditor(number.homeworkNumberId, number.note, t.noteSaveFailed);
-  const wait = useCountdown(note.error?.retryAt ?? null);
-  const errorMessage = note.error ? (wait > 0 ? `${note.error.message} ${waitText.retryIn(wait)}` : note.error.message) : null;
+  // The server's wait, counted down as a duration from the refusal on (a clock set back does not lengthen it).
+  const wait = useWaitUntil(note.error?.retryAt ?? null);
 
   const statusLine =
     note.status === 'saving'
@@ -50,12 +49,12 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
 
   return (
     <Card variant="outline" padded={16} selected={highlighted} style={styles.card} testID={`number-card-${number.number}`}>
-      {errorMessage ? (
+      {note.error ? (
+        // The notice holds the server's text only, so its live region speaks it once; the countdown is a
+        // plain line under it (a live region around a countdown makes TalkBack read every tick).
         <Notice
           tone="error"
-          text={errorMessage}
-          // The countdown in the text changes every second: VoiceOver speaks only the message, once.
-          announcement={note.error?.message ?? null}
+          text={note.error.message}
           action={
             // Never sent again by itself: the student decides, and only once a rate-limit wait is over.
             wait > 0 ? undefined : (
@@ -70,6 +69,7 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
           testID={`number-note-error-${number.number}`}
         />
       ) : null}
+      {note.error ? <RetryWaitLine seconds={wait} testID={`number-note-wait-${number.number}`} /> : null}
 
       <View style={styles.head}>
         <Text variant="numberTitle" accessibilityRole="header" style={styles.title}>

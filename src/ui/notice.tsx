@@ -6,7 +6,7 @@ import { makeStyles, useTheme, type Theme } from '@/theme';
 import { accessibilityLabelOf } from './a11y';
 import { IconButton } from './icon-button';
 import { Text } from './text';
-import { useAnnounce } from './use-announce';
+import { useAnnounce, useStatusAnnouncement } from './use-announce';
 
 export type NoticeTone = 'error' | 'success' | 'warning';
 
@@ -23,9 +23,12 @@ export type NoticeProps = {
   onDismiss?: () => void;
   dismissLabel?: string;
   /**
-   * What VoiceOver speaks when the notice appears or changes (iOS; Android reads the live region). Default:
-   * `title` and `text` of an error or warning notice. Pass it for a notice whose message is in `children`;
-   * pass `null` for a notice that must stay silent (a countdown that changes every second).
+   * What screen readers speak when the notice appears or changes. Default (prop left out): `title` and
+   * `text` of an error or warning notice — a polite live region on Android, `useAnnounce` on iOS. When the
+   * prop is given, the notice is NOT a live region and exactly this string is announced on both platforms
+   * (`useStatusAnnouncement`), so nothing else in the notice is ever read out by itself: pass it for a
+   * message in `children`, a success that must be heard, or a text with a value that changes (a countdown —
+   * though a countdown belongs in a `RetryWaitLine` beside the notice); pass `null` for a silent notice.
    */
   announcement?: string | null;
   testID?: string;
@@ -48,17 +51,22 @@ function noticeColors(tone: NoticeTone, t: Theme) {
 /**
  * Inline banner (`shbz-notice-*`). The site has no toasts: feedback lives at the top of the card it
  * concerns and stays until the state changes. Errors and warnings are announced to screen readers: a
- * polite live region on Android, `useAnnounce` on iOS (where live regions do not exist).
+ * polite live region on Android, `useAnnounce` on iOS (where live regions do not exist); with an
+ * `announcement`, that string on both platforms and no live region.
  */
 export function Notice({ tone, text, title, children, action, onDismiss, dismissLabel, announcement, testID, style }: NoticeProps) {
   const theme = useTheme();
   const styles = useStyles();
   const colors = noticeColors(tone, theme);
-  useAnnounce(announcement === undefined ? (tone === 'success' ? null : accessibilityLabelOf([title, text], '. ')) : announcement);
+  // Either the live region speaks on Android (default) or the fixed announcement does — never both, and a
+  // live region never wraps a text that the owner says must not be read as it changes.
+  const fixed = announcement !== undefined;
+  useAnnounce(fixed ? null : tone === 'success' ? null : accessibilityLabelOf([title, text], '. '));
+  useStatusAnnouncement(fixed ? announcement : null);
   return (
     <View
       accessibilityRole={tone === 'error' ? 'alert' : undefined}
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion={fixed ? 'none' : 'polite'}
       testID={testID}
       style={[styles.notice, { backgroundColor: colors.bg, borderColor: colors.border }, style]}
     >

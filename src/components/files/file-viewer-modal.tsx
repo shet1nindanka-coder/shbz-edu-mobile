@@ -3,7 +3,7 @@
 import { Modal, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { OverlayCoverSlot, WindowInsetsScope, coveredAccessibilityProps, useCloseOnBlur, useOverlayCovered } from '@/ui';
+import { OverlayCoverSlot, WindowInsetsScope, coveredAccessibilityProps, useCloseOnBlur, useNavigationFocused, useOverlayCovered } from '@/ui';
 
 import { FileViewer, type FileViewerProps } from './file-viewer';
 
@@ -14,9 +14,11 @@ export function FileViewerModal({ visible, onClose, ...viewer }: FileViewerModal
   const covered = useOverlayCovered();
   // A full-screen window of its own: leaving the screen that opened it closes it (`useCloseOnBlur`).
   useCloseOnBlur(visible, onClose);
+  // Its window never stays above another screen, even if the owner keeps it open on blur.
+  const screenFocused = useNavigationFocused();
   return (
     <Modal
-      visible={visible}
+      visible={visible && screenFocused}
       animationType="slide"
       presentationStyle="fullScreen"
       statusBarTranslucent

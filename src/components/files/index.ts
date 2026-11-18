@@ -6,6 +6,7 @@ export { FileViewer, type FileViewerProps } from './file-viewer';
 export { FileViewerModal, type FileViewerModalProps } from './file-viewer-modal';
 export { PhotoGrid, type PhotoGridItem, type PhotoGridProps } from './photo-grid';
 export { PHOTO_THUMB_SIZE, PhotoThumb, type PhotoThumbProps } from './photo-thumb';
+export { photoPlaceLabel } from './photo-label';
 export { PhotoSourceSheet, type PhotoSource, type PhotoSourceSheetProps } from './photo-source-sheet';
 export { useFileDownload, type FileDownloadState } from './use-file-download';
 export { useFileActions, type FileAction, type FileActions } from './use-file-share';

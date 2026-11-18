@@ -228,6 +228,13 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
   });
 
   let token: string | null = null;
+  /**
+   * The token of the call whose member is running right now (its synchronous part, see `wrap`), or null
+   * outside a call. A call is authorised by the token it was ISSUED with, as an HTTP request carries the
+   * bearer header it was sent with: a sign-out and another sign-in during its latency must not make it act
+   * for the next user.
+   */
+  let callScope: { token: string | null } | null = null;
   let callCounter = 0;
 
   // The store starts with a fresh dataset so that `backend` is usable synchronously; `ready` then replaces
@@ -238,7 +245,9 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
     store,
     clock,
     getLocale,
-    getToken: () => token,
+    getToken: () => (callScope ? callScope.token : token),
+    // The realtime stream follows the token installed now (it is the device's connection, not a request).
+    getLiveToken: () => token,
     isOnline,
     materializeDocument,
     fileHooks: {
@@ -416,9 +425,27 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
 
   // ───────────────────────────── the wrapper around every async method ─────────────────────────────
 
+  /**
+   * Runs `run` as a request carrying `issuedWith`. The scope covers the synchronous part of the member —
+   * every member resolves its user (`ctx.auth.require…`) before its first await, so later awaits never
+   * read another call's token. Calls overlap; the previous scope is restored, never cleared.
+   */
+  const runAs = <T>(issuedWith: string | null, run: () => T): T => {
+    const previous = callScope;
+    callScope = { token: issuedWith };
+    try {
+      return run();
+    } finally {
+      callScope = previous;
+    }
+  };
+
   const wrap = <A extends unknown[], R>(member: ApiMember, name: string, method: (...args: A) => Promise<R>) => {
     const fullName = `${member}.${name}`;
     return async (...args: A): Promise<R> => {
+      // Captured when the call is issued, before the store load and the latency: what an HTTP client puts
+      // into the request. A session deleted meanwhile (logout, password change) answers 401 sessionExpired.
+      const issuedWith = token;
       await ready;
       callCounter += 1;
       // A method never resolves synchronously, even with zero latency.
@@ -432,7 +459,7 @@ export function createMockApiClient(options: MockApiClientOptions = {}): MockApi
         if (forced) throw forcedErrorFor(member, fullName, forced);
         // Lazy transitions: checks and plan generations that became due are applied inside this call.
         ctx.jobs.runDue();
-        return await method(...args);
+        return await runAs(issuedWith, () => method(...args));
       } finally {
         persistence.schedule(store);
       }

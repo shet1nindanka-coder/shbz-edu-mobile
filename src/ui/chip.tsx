@@ -31,7 +31,7 @@ export function chipColors(tone: ChipTone, t: Theme): { bg: string; text: string
   }
 }
 
-/** Borderless chip (`.shbz-chip`, `.shbz-badge-muted`): soft fill + status text, never wraps. */
+/** Borderless chip (`.shbz-chip`, `.shbz-badge-muted`): soft fill + status text, never wraps — a label longer than the row is cut with «…». */
 export function Chip({ label, tone = 'muted', size = 'sm', icon, accessibilityLabel, style }: ChipProps) {
   const theme = useTheme();
   const styles = useStyles();
@@ -47,7 +47,7 @@ export function Chip({ label, tone = 'muted', size = 'sm', icon, accessibilityLa
       <Text
         variant={row ? 'smallStrong' : tone === 'muted' ? 'badgeMuted' : 'chip'}
         numberOfLines={1}
-        style={{ color: colors.text }}
+        style={[styles.label, { color: colors.text }]}
       >
         {label}
       </Text>
@@ -56,7 +56,10 @@ export function Chip({ label, tone = 'muted', size = 'sm', icon, accessibilityLa
 }
 
 const useStyles = makeStyles((t) => ({
-  base: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6 },
+  // Never wider than its row: a long label (a 60-character journal action) ends in «…» inside the row
+  // instead of running past the screen edge. The icon keeps its size; only the label gives way.
+  base: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, maxWidth: '100%', flexShrink: 1 },
+  label: { flexShrink: 1, minWidth: 0 },
   sm: { paddingVertical: 6, paddingHorizontal: 13, borderRadius: t.radii.sm },
   row: { height: t.sizes.button, paddingHorizontal: 16, borderRadius: t.radii.md, justifyContent: 'center' },
 }));

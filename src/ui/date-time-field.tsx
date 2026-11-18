@@ -30,6 +30,11 @@ export type DateTimeFieldLabels = {
   /** Buttons of the Android system date / time dialogs («ОК» / «Отмена»), in the app's language. */
   ok?: string;
   cancel?: string;
+  /**
+   * Spoken value of an empty field («не выбрано»). Without it an empty field has no spoken value — never
+   * the placeholder, which screen readers would read as if it were the value («Дедлайн, Дедлайн»).
+   */
+  notSet?: string;
 };
 
 export type DateTimeFieldProps = {
@@ -108,7 +113,7 @@ export function DateTimeField({
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label ?? placeholder}
-      accessibilityValue={{ text: display || placeholder }}
+      accessibilityValue={display ? { text: display } : labels.notSet ? { text: labels.notSet } : undefined}
       accessibilityHint={withErrorHint(error, undefined)}
       accessibilityState={{ disabled, expanded: open }}
       disabled={disabled}

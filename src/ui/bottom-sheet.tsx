@@ -19,7 +19,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { IconButton } from './icon-button';
 import { MODAL_ORIENTATIONS, absoluteFill } from './internal/layout';
 import { useDismissKeyboardWhen, useKeyboardCoversHomeIndicator } from './internal/keyboard';
-import { useCloseOnBlur } from './internal/close-on-blur';
+import { useCloseOnBlur, useNavigationFocused } from './internal/close-on-blur';
 import { easing } from './internal/motion';
 import { OverlayCoverSlot, coveredAccessibilityProps, useOverlayCovered } from './overlay-cover';
 import { Text } from './text';
@@ -96,6 +96,10 @@ export function BottomSheet({
   // Leaving the screen (a reminder tap, a notification row) closes its sheet: a modal window would stay
   // above the next screen. Also while a request is pending — the owner decides what its close means.
   useCloseOnBlur(visible, onClose);
+  // An owner may keep the sheet open on blur (a request is pending, a password is shown once): then only
+  // its native window leaves while the screen is not the focused one, and comes back on return. The
+  // sheet's own state (mounted, the animation, `onClosed`) is not touched — hiding is not closing.
+  const screenFocused = useNavigationFocused();
   const keyboardShown = useKeyboardCoversHomeIndicator();
 
   useEffect(() => {
@@ -170,7 +174,7 @@ export function BottomSheet({
 
   return (
     <Modal
-      visible
+      visible={screenFocused}
       transparent
       animationType="none"
       statusBarTranslucent

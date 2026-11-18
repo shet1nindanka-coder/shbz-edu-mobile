@@ -61,6 +61,28 @@ export function failQueriesWaitingWithoutData(client: QueryClient): () => void {
   });
 }
 
+/**
+ * Destroys a query that was removed from the cache (`clear()` on sign-out, a role change, «clear cache»)
+ * once its last observer leaves. Returns the unsubscribe function.
+ *
+ * WHY: `clear()` takes the queries out of the cache, but the screens on display still observe them. When
+ * those screens unmount, `removeObserver` schedules the query's garbage collection with its `gcTime` (24 h
+ * here) — on a query that is no longer in the cache, so no later `clear()` reaches it. Each such orphan
+ * kept the previous user's data and a live timer for a day, and they piled up with every account switch.
+ * Lowering `gcTime` cannot help (TanStack keeps the longest one seen), and the cache still announces
+ * `observerRemoved` for a removed query: that is where it is destroyed (timer cleared, fetch cancelled),
+ * after which nothing references it. The clear stays immediate, so the next user never sees old data.
+ */
+export function destroyOrphanedQueries(client: QueryClient): () => void {
+  const cache = client.getQueryCache();
+  return cache.subscribe((event) => {
+    if (event.type !== 'observerRemoved') return;
+    const { query } = event;
+    if (query.getObserversCount() > 0 || cache.get(query.queryHash) === query) return;
+    query.destroy();
+  });
+}
+
 export type AppQueryClientOptions = {
   /** Pause before the one retry; tests shorten it. */
   retryDelayMs?: number;
@@ -85,8 +107,9 @@ export function createAppQueryClient(options: AppQueryClientOptions = {}): Query
       },
     },
   });
-  // Lives as long as the client (a module-level singleton in the app).
+  // Both live as long as the client (a module-level singleton in the app).
   failQueriesWaitingWithoutData(client);
+  destroyOrphanedQueries(client);
   return client;
 }
 

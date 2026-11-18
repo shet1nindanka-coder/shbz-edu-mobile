@@ -53,7 +53,7 @@ export function LoginScreen() {
   const { locale, dict, m } = useI18n();
   const waitText = useWaitText();
   const { preferences, localePending, setLocale } = usePreferences();
-  const { signIn, notice, dismissNotice } = useSession();
+  const { signIn, notice, tokenNotRemoved, dismissNotice } = useSession();
   const navigation = useAppNavigation();
 
   const [login, setLogin] = useState('');
@@ -167,6 +167,16 @@ export function LoginScreen() {
             testID="login-session-notice"
           />
         ) : null}
+        {tokenNotRemoved ? (
+          <Notice
+            tone="warning"
+            text={m.shell.login.tokenNotRemoved}
+            onDismiss={dismissNotice}
+            dismissLabel={m.shell.login.sessionNoticeDismiss}
+            style={styles.notice}
+            testID="login-token-notice"
+          />
+        ) : null}
 
         <Card style={styles.card}>
           <View style={styles.form}>
@@ -196,6 +206,8 @@ export function LoginScreen() {
               placeholder={dict.login.passwordPlaceholder}
               showLabel={dict.login.showPassword}
               hideLabel={dict.login.hidePassword}
+              showAccessibilityLabel={dict.login.showPasswordAria}
+              hideAccessibilityLabel={dict.login.hidePasswordAria}
               maxLength={MAX_PASSWORD_LENGTH}
               returnKeyType="go"
               onSubmitEditing={() => void submit()}
@@ -240,6 +252,8 @@ export function LoginScreen() {
               <Text variant="smallBold">{m.shell.login.demoTitle}</Text>
               <TextButton
                 label={demoOpen ? m.shell.login.demoHide : m.shell.login.demoShow}
+                accessibilityLabel={demoOpen ? m.shell.login.demoHideAria : m.shell.login.demoShowAria}
+                expanded={demoOpen}
                 onPress={() => setDemoOpen((open) => !open)}
                 testID="login-demo-toggle"
               />

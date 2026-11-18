@@ -19,7 +19,9 @@
  * }
  * ```
  *
- * Rules every member follows: "now" is `ctx.now()` (never `Date.now()`); texts come from `ctx.dict()` /
+ * Rules every member follows: the user is resolved (`ctx.auth.require…`) before the method's first await —
+ * the client scopes the token a call was issued with to the synchronous part of the member only;
+ * "now" is `ctx.now()` (never `Date.now()`); texts come from `ctx.dict()` /
  * `ctx.m()`; colours of numbers change only through `ctx.progress.write`; a field the caller's role may not
  * see is absent from the DTO (docs/spec/09-data-i18n-math.md §1.5).
  */
@@ -154,8 +156,16 @@ export type CreateMockContextInput = {
   store: MockStore;
   clock: MockClock;
   getLocale: () => Locale;
-  /** The bearer token the client currently holds. */
+  /**
+   * The bearer token of the request being served: the token a call was issued with while its member runs,
+   * otherwise the token the client currently holds.
+   */
   getToken: () => string | null;
+  /**
+   * The token the client holds NOW, whatever call is running — for the realtime stream, which belongs to the
+   * device's current session. Default: `getToken`.
+   */
+  getLiveToken?: () => string | null;
   isOnline: () => boolean;
   /** Turns a bundled sample into a local file URI (device layer); see `MockApiClientOptions.materializeDocument`. */
   materializeDocument: (request: MockDocumentRequest) => Promise<string>;
@@ -176,8 +186,10 @@ export function createMockContext(input: CreateMockContextInput): MockContext {
   const jobs = createJobs(core);
   const files = createFiles(core, auth, input.fileHooks);
 
+  // A stale call (a logout of the previous session) must not close or open the stream of the current one.
+  const liveAuth = input.getLiveToken ? createAuth(core, input.getLiveToken) : auth;
   const realtime = createRealtime(core, {
-    auth,
+    auth: liveAuth,
     limits,
     isOnline: input.isOnline,
     takeForcedHandshakeError() {

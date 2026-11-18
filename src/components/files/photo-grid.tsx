@@ -78,6 +78,8 @@ export function PhotoGrid({
               key={photo.key}
               fileId={photo.fileId}
               name={photo.name}
+              // Each tile names its place in the set: three photos are not three identical «Удалить фото».
+              position={{ index, total: photos.length }}
               size={tile}
               localUri={photo.localUri}
               uploading={photo.uploading}

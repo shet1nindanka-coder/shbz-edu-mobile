@@ -97,8 +97,17 @@ function Themed({ children }: { children: ReactNode }) {
 
 /**
  * Status-bar icons and the window background follow the resolved theme (no white flash in dark mode), and
- * the native UI follows the in-app choice too: the Android date / time dialogs and navigation-bar icons,
- * iOS system sheets and alerts. `system` removes the override, so the OS scheme applies again.
+ * the native UI follows the in-app choice too: the Android date / time dialogs, iOS system sheets and
+ * alerts. `system` removes the override, so the OS scheme applies again.
+ *
+ * Known limit (Android): the navigation-bar buttons and their contrast scrim do NOT follow an in-app theme
+ * that differs from the system one. React Native sets them once, in the activity's `onCreate`
+ * (`Window.enableEdgeToEdge`, from the system night mode), and the activity is not recreated on a night-mode
+ * change (`uiMode` is in its configChanges); nothing installed can set them from JS (expo-system-ui only
+ * paints the window background, StatusBar only the status bar, react-native-screens only hides the bar).
+ * Sheets (RN `Modal` dialogs) run `enableEdgeToEdge` per dialog with the overridden mode, so under a sheet
+ * the bar does follow the app. With expo-navigation-bar (not a dependency) the fix is one line in the
+ * effect below: `if (Platform.OS === 'android') NavigationBar.setStyle(theme.dark ? 'light' : 'dark');`.
  */
 function SystemChrome({ mode }: { mode: ThemeMode }) {
   const theme = useTheme();
