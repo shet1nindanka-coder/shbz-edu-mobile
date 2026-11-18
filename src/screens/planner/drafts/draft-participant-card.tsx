@@ -113,6 +113,7 @@ export function DraftParticipantCard({
             canOpenStudent ? (
               <Button
                 label={t.studentHomework}
+                accessibilityLabel={format(m.planner.lessonBoard.forStudent, { action: t.studentHomework, name: participant.studentName })}
                 variant="outline"
                 rightIcon="forward"
                 onPress={onOpenStudent}
@@ -124,6 +125,7 @@ export function DraftParticipantCard({
             <View style={styles.actions}>
               <Button
                 label={t.regenerate}
+                accessibilityLabel={format(m.planner.lessonBoard.forStudent, { action: t.regenerate, name: participant.studentName })}
                 variant="outline"
                 loading={busy === 'regenerate'}
                 disabled={working || planState.pending || !aiAvailable || planBlocked}
@@ -133,6 +135,7 @@ export function DraftParticipantCard({
               />
               <Button
                 label={t.issue}
+                accessibilityLabel={format(m.planner.lessonBoard.forStudent, { action: t.issue, name: participant.studentName })}
                 loading={busy === 'issue'}
                 disabled={working || planState.pending || empty || issueBlocked}
                 onPress={onIssue}
@@ -176,6 +179,7 @@ export function DraftParticipantCard({
           {!issued ? (
             <Button
               label={dict.planner.lessonManualAdd.label}
+              accessibilityLabel={format(m.planner.lessonBoard.forStudent, { action: dict.planner.lessonManualAdd.label, name: participant.studentName })}
               variant="outline"
               leftIcon="plus"
               disabled={working || itemsBlocked}

@@ -179,10 +179,6 @@ export function isPollBroken(failures: number, rule: PollingRule): boolean {
 
 // ───────────────────────────── homework detail cache (A.6 rule 3) ─────────────────────────────
 
-function percentOf(done: number, total: number): number {
-  return total ? Math.round((done / total) * 100) : 0;
-}
-
 /** Photos were stored: append them to the current batch. */
 export function applyUploadedPhotos(
   detail: GetHomeworkResponse,
@@ -205,29 +201,34 @@ export function applyStartedCheck(detail: GetHomeworkResponse, check: StudentChe
   return { ...detail, assignment: { ...detail.assignment, latestCheck: check, latestCheckStatus: check.status } };
 }
 
+function isoMs(value: string | null | undefined): number {
+  const ms = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(ms) ? ms : Number.NaN;
+}
+
 /**
- * A poll answered: the latest check, the batch after a possible detach, the number statuses and the solved
- * counter replace what the detail holds — no second request is needed when the check completes.
+ * A poll answered: only the check itself is taken from it (the site's poll keeps nothing else either,
+ * `components/student-homework-check.tsx`). The batch, the number statuses and the counters stay as the
+ * detail has them — the poll may have been read on the server before a photo was uploaded or deleted
+ * here, and copying its batch would undo that. When the check ends the caller re-reads the detail, as the
+ * site's `router.refresh()` does.
+ *
+ * An answer about an OLDER check than the cached one (another id, created earlier), or one that takes the
+ * same check back from DONE / FAILED to running, left before what the screen already shows: it is ignored.
  */
 export function applyLatestCheck(detail: GetHomeworkResponse, latest: LatestHomeworkCheckResponse): GetHomeworkResponse {
-  const statuses = new Map<string, HomeworkNumberStatus | null>(
-    latest.numbers.map((number) => [number.homeworkNumberId, number.status]),
-  );
-  const numbers = detail.assignment.numbers.map((number) =>
-    statuses.has(number.homeworkNumberId) ? { ...number, status: statuses.get(number.homeworkNumberId) ?? null } : number,
-  );
+  const cached = detail.assignment.latestCheck;
+  const fresh = latest.check;
+  if (cached && fresh) {
+    if (fresh.id !== cached.id && isoMs(fresh.createdAt) < isoMs(cached.createdAt)) return detail;
+    if (fresh.id === cached.id && !isCheckRunning(cached.status) && isCheckRunning(fresh.status)) return detail;
+    // Nothing new (a check's results are written once, together with `checkedAt`).
+    if (fresh.id === cached.id && fresh.status === cached.status && fresh.checkedAt === cached.checkedAt) return detail;
+  }
+  if (!cached && !fresh) return detail;
   return {
     ...detail,
-    assignment: {
-      ...detail.assignment,
-      latestCheck: latest.check,
-      latestCheckStatus: latest.check?.status ?? null,
-      photos: latest.photos,
-      photosCount: latest.photos.length,
-      numbers,
-      solvedCount: latest.solvedCount,
-      solvedPercent: percentOf(latest.solvedCount, detail.assignment.totalNumbers),
-    },
+    assignment: { ...detail.assignment, latestCheck: fresh, latestCheckStatus: fresh?.status ?? null },
   };
 }
 
@@ -306,6 +307,18 @@ function sameSubmission(left: LessonSubmissionDto | null, right: LessonSubmissio
 }
 
 /**
+ * The fresh submission of an item was read on the server BEFORE the one the screen already shows: a /state
+ * answer that left before this device sent a new photo (or before a newer read landed). Submissions of
+ * one item only move forward — a later `submittedAt`, or the same submission from running to finished.
+ */
+export function isOlderSubmission(fresh: LessonSubmissionDto | null, cached: LessonSubmissionDto | null): boolean {
+  if (!cached) return false;
+  if (!fresh) return true;
+  if (fresh.id !== cached.id) return isoMs(fresh.submittedAt) < isoMs(cached.submittedAt);
+  return !isCheckRunning(cached.status) && isCheckRunning(fresh.status);
+}
+
+/**
  * Merges a `/state` poll into the lesson. `resultChanged` — an item result differs (lesson results are
  * mirrored into number statuses, so homework queries become stale); `changed` — anything differs at all.
  */
@@ -318,8 +331,17 @@ export function applyLessonState(
   let changed = false;
   let resultChanged = false;
   const items = lesson.active.items.map((item) => {
-    const fresh = byId.get(item.id);
-    if (!fresh) return item;
+    const found = byId.get(item.id);
+    if (!found) return item;
+    let fresh = found;
+    if (isOlderSubmission(found.submission, item.submission)) {
+      // A stale answer must not bring the previous submission back (and with it an enabled «Пересдать»):
+      // the item keeps its submission and the flags that go with it, so the poll keeps following it.
+      // A result the teacher set meanwhile still comes through, and closes the item with it.
+      const resultMoved = found.result !== item.result;
+      const closed = resultMoved ? found.closed : item.closed;
+      fresh = { ...found, submission: item.submission, closed, canSubmit: closed ? false : item.canSubmit };
+    }
     const same =
       fresh.result === item.result &&
       fresh.closed === item.closed &&
@@ -332,6 +354,26 @@ export function applyLessonState(
   });
   if (!changed) return { next: lesson, changed: false, resultChanged: false };
   return { next: { ...lesson, active: { ...lesson.active, items } }, changed, resultChanged };
+}
+
+/**
+ * Which items' checks ended since the last call. `running` maps an item id to the submission seen
+ * `PENDING` / `CHECKING` on this screen; an item whose submission is finished now (DONE / FAILED) and was
+ * seen running is reported once. A submission that was already finished when the screen opened is not
+ * reported — only a change the student is waiting for.
+ */
+export function trackLessonOutcomes(
+  running: ReadonlyMap<string, string>,
+  items: readonly Pick<LessonItemDto, 'id' | 'submission'>[],
+): { running: Map<string, string>; finished: string[] } {
+  const next = new Map<string, string>();
+  const finished: string[] = [];
+  for (const item of items) {
+    const submission = item.submission;
+    if (submission && isCheckRunning(submission.status)) next.set(item.id, submission.id);
+    else if (submission && running.has(item.id)) finished.push(item.id);
+  }
+  return { running: next, finished };
 }
 
 /** A submission was accepted for checking: the item shows "checking" and cannot be submitted again. */

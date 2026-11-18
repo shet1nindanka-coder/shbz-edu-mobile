@@ -25,6 +25,7 @@ import {
   toggleSelection,
   withConditions,
 } from "../src/screens/teacher/card/assign-logic";
+import * as store from "../src/screens/teacher/card/kept-reports";
 import {
   bankNumbersGap,
   freeBankNumbers,
@@ -47,6 +48,7 @@ import {
   canAcceptVerdicts,
   completedAssignmentIds,
   chunkChanges,
+  claimWrites,
   countVerdicts,
   hasDiagnostics,
   injectionResults,
@@ -54,6 +56,7 @@ import {
   isAssignmentOverdue,
   latestDoneCheck,
   patchHomeworkStatuses,
+  releaseWrites,
   reviewRowIndex,
   shortenRecognizedAnswer,
   unmarkedCount,
@@ -497,5 +500,55 @@ describe("student report viewer titles", () => {
     const en = getMobileDictionary("en").teacher.report;
     assert.deepEqual([ru.title7d, ru.title30d, ru.titleYear], ["Отчёт: 7 дней", "Отчёт: 30 дней", "Отчёт: учебный год"]);
     for (const title of [en.title7d, en.title30d, en.titleYear]) assert.match(title, /^Report: /);
+  });
+});
+
+describe("review: who may release a number's in-flight colour (#317)", () => {
+  it("an accept that settles after its undo started does not release the undo's numbers", () => {
+    const owners = new Map<string, number>();
+    claimWrites(owners, ["n1", "n2"], 1); // accept
+    claimWrites(owners, ["n1", "n2"], 2); // undo, sent while the accept is in flight
+    assert.deepEqual(releaseWrites(owners, ["n1", "n2"], 1), []);
+    assert.deepEqual([...owners.entries()], [["n1", 2], ["n2", 2]]);
+    assert.deepEqual(releaseWrites(owners, ["n1", "n2"], 2), ["n1", "n2"]);
+    assert.equal(owners.size, 0);
+  });
+
+  it("releases only the numbers the write still owns", () => {
+    const owners = new Map<string, number>();
+    claimWrites(owners, ["n1", "n2", "n3"], 1);
+    claimWrites(owners, ["n2"], 2); // a tap on one number of the batch
+    assert.deepEqual(releaseWrites(owners, ["n1", "n2", "n3"], 1), ["n1", "n3"]);
+    assert.deepEqual(releaseWrites(owners, ["n2"], 2), ["n2"]);
+  });
+});
+
+describe("student card: a finished report outlives the card (#324)", () => {
+  const report = { period: "7d" as const, file: { uri: "file:///cache/r.pdf", fileName: "r.pdf" } };
+
+  it("is kept by student and offered until it is opened or dismissed", () => {
+    store.resetKeptReports();
+    let calls = 0;
+    const unsubscribe = store.subscribeKeptReports(() => {
+      calls += 1;
+    });
+    store.keepReport("usr_ilya", 3, report);
+    assert.equal(calls, 1);
+    assert.deepEqual(store.keptReportOf("usr_ilya", 3), { ...report, generation: 3 });
+    // The snapshot keeps its identity while nothing changes (useSyncExternalStore).
+    assert.equal(store.keptReportOf("usr_ilya", 3), store.keptReportOf("usr_ilya", 3));
+    assert.equal(store.keptReportOf("usr_maria", 3), null);
+    store.forgetReport("usr_ilya");
+    assert.equal(calls, 2);
+    assert.equal(store.keptReportOf("usr_ilya", 3), null);
+    store.forgetReport("usr_ilya");
+    assert.equal(calls, 2);
+    unsubscribe();
+  });
+
+  it("is never offered in another session (sign-out, another account)", () => {
+    store.resetKeptReports();
+    store.keepReport("usr_ilya", 3, report);
+    assert.equal(store.keptReportOf("usr_ilya", 4), null);
   });
 });

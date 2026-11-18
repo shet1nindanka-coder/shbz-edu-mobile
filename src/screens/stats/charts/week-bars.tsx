@@ -40,8 +40,12 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
   const { locale, dict, m } = useI18n();
   const t = dict.planner.teacherStats;
   const [width, setWidth] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
+  // Kept by the week's Monday, not by position: a refetch after a new week began shifts every column.
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const bars = weekBars(counts, weekStarts, locale);
+  const selectedIndex = selectedWeek === null ? -1 : weekStarts.indexOf(selectedWeek);
+  const selected = selectedIndex === -1 ? null : selectedIndex;
+  const setSelected = (index: number | null) => setSelectedWeek(index === null ? null : (weekStarts[index] ?? null));
   const selectedBar = selected !== null ? bars[selected] : undefined;
 
   const slot = bars.length > 0 ? width / bars.length : 0;
@@ -76,15 +80,18 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
                 ) : null,
               )}
             </Svg>
-            {columns.map(({ bar, height }) =>
-              bar.count > 0 ? (
-                <View key={bar.index} style={[styles.column, { left: slot * bar.index, width: slot, paddingBottom: height + 3 }]}>
-                  <Text variant="captionStrong" color="textMuted" tabular numberOfLines={1}>
-                    {bar.count}
-                  </Text>
-                </View>
-              ) : null,
-            )}
+            {/* The counts repeat the chart's accessible summary: hidden like the axis, never read as bare numbers. */}
+            <View style={styles.counts} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+              {columns.map(({ bar, height }) =>
+                bar.count > 0 ? (
+                  <View key={bar.index} style={[styles.column, { left: slot * bar.index, width: slot, paddingBottom: height + 3 }]}>
+                    <Text variant="captionStrong" color="textMuted" tabular numberOfLines={1}>
+                      {bar.count}
+                    </Text>
+                  </View>
+                ) : null,
+              )}
+            </View>
             <ChartHitArea
               count={bars.length}
               selected={selected}
@@ -137,6 +144,7 @@ const useStyles = makeStyles((t) => ({
   plot: { height: PLOT_HEIGHT + 1 },
   // Not a touch target: the counts sit above their columns, the plot's hit area lies over them.
   column: { position: 'absolute', top: 0, height: PLOT_HEIGHT, alignItems: 'center', justifyContent: 'flex-end', pointerEvents: 'none' },
+  counts: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, pointerEvents: 'none' },
   axis: { height: 16 },
   tickLabel: { position: 'absolute', top: 0, width: LABEL_WIDTH },
 }));

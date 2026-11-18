@@ -27,14 +27,20 @@ const ru = {
     // The site's review tab hides the statement; on a phone it opens on demand under the number.
     hideCondition: "Скрыть условие и ответ",
     noCondition: "Условие для этого номера не добавлено.",
-    noAnswer: "Ответ для этого номера не добавлен."
+    noAnswer: "Ответ для этого номера не добавлен.",
+    // Accessible names of the per-number buttons: in a list of numbers each one names its number.
+    showConditionOf: "Условие и ответ № {n}",
+    hideConditionOf: "Скрыть условие и ответ № {n}",
+    historyOf: "История статуса № {n}"
   },
   // Student card (`teacher.student.*`): chrome the site does not have.
   card: {
     reports: "Отчёты в PDF",
     reportsHint: "Отчёт формируется на сервере и открывается в просмотре файлов — оттуда им можно поделиться.",
     expand: "Развернуть: {title}",
-    collapse: "Свернуть: {title}"
+    collapse: "Свернуть: {title}",
+    // «Открыть занятие» repeats on every lesson card: its accessible name says which lesson.
+    openLessonOf: "Открыть занятие: {title}, {meta}"
   },
   assign: {
     // Touch wording of the site's "click the problems below" hint.
@@ -72,13 +78,17 @@ const en: typeof ru = {
     statusAria: "Status of problem {n}",
     hideCondition: "Hide the statement and answer",
     noCondition: "No statement has been added for this problem.",
-    noAnswer: "No answer has been added for this problem."
+    noAnswer: "No answer has been added for this problem.",
+    showConditionOf: "Statement and answer of problem {n}",
+    hideConditionOf: "Hide the statement and answer of problem {n}",
+    historyOf: "Status history of problem {n}"
   },
   card: {
     reports: "PDF reports",
     reportsHint: "The report is built on the server and opens in the file viewer — you can share it from there.",
     expand: "Expand: {title}",
-    collapse: "Collapse: {title}"
+    collapse: "Collapse: {title}",
+    openLessonOf: "Open the lesson: {title}, {meta}"
   },
   assign: {
     steps: "1. Tap the problems below to select them · 2. Set a deadline · 3. Press “Assign homework”.",

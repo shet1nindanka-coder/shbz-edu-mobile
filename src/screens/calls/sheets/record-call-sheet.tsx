@@ -87,7 +87,11 @@ export function RecordCallSheet({ target, onClose, onSaved, onMissing }: RecordC
   return (
     <BottomSheet
       visible={target !== null}
-      onClose={onClose}
+      // While the call is being saved the sheet stays open, also when the screen loses focus (it is only
+      // hidden until the user returns): a refusal and the typed comment must not go away with it.
+      onClose={() => {
+        if (!inFlight.current) onClose();
+      }}
       onClosed={reset}
       closeLabel={m.common.actions.close}
       title={t.record}

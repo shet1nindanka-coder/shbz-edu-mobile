@@ -121,6 +121,30 @@ export function chunkChanges<T>(changes: readonly T[], size = STATUS_BATCH_MAX):
   return chunks;
 }
 
+/**
+ * Which write a number's in-flight colour and lock belong to. A number can be written by several requests
+ * in a row (the accept batch, then its undo; a tap after either): only the LAST one that took the number may
+ * release it, so an earlier request that settles later does not unlock the number or bring back its colour
+ * while the newer write is still on its way.
+ */
+export type WriteOwners = Map<string, number>;
+
+/** The write `token` takes these numbers over. */
+export function claimWrites(owners: WriteOwners, ids: readonly string[], token: number): void {
+  for (const id of ids) owners.set(id, token);
+}
+
+/** The write `token` has settled: returns the numbers it still owned (now released); the others were taken over. */
+export function releaseWrites(owners: WriteOwners, ids: readonly string[], token: number): string[] {
+  const released: string[] = [];
+  for (const id of ids) {
+    if (owners.get(id) !== token) continue;
+    owners.delete(id);
+    released.push(id);
+  }
+  return released;
+}
+
 function percent(done: number, total: number): number {
   return total ? Math.round((done / total) * 100) : 0;
 }

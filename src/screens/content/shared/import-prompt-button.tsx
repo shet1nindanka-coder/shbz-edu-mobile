@@ -6,7 +6,7 @@ import { qk, useApi } from '@/api';
 import { TOPIC_IMPORT_PROMPT } from '@/domain/topic-import-prompt';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, IconButton, isOverlayCovered, Text, useAnnounce, useCopyFeedback } from '@/ui';
+import { Button, IconButton, isOverlayCovered, Text, useCopyFeedback, useStatusAnnouncement } from '@/ui';
 
 /** The site keeps the "copied" pill for 2 s. */
 const COPIED_HOLD_MS = 2000;
@@ -30,7 +30,8 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
   // `busy` reaches the controls one render late: a second tap handled before it would open a second
   // share sheet (IconButton has no press guard). The ref is the synchronous lock.
   const running = useRef(false);
-  useAnnounce(error);
+  // Spoken on both platforms: the error text is mounted when it appears, and role="alert" says nothing on Android.
+  useStatusAnnouncement(error);
 
   const loadPrompt = async (): Promise<string> => {
     try {
@@ -105,7 +106,7 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
         )}
       </View>
       {error ? (
-        <Text variant="caption" color="dangerText" accessibilityRole="alert" accessibilityLiveRegion="polite" testID="import-prompt-error">
+        <Text variant="caption" color="dangerText" accessibilityRole="alert" testID="import-prompt-error">
           {error}
         </Text>
       ) : null}

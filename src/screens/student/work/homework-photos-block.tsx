@@ -1,19 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, View } from 'react-native';
+import { View } from 'react-native';
 
 import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { AttachedPhoto, GetHomeworkResponse, PhotoUpload } from '@/api/types';
-import { PhotoGrid, PhotoSourceSheet, type PhotoGridItem } from '@/components/files';
+import { PhotoGrid, PhotoSourceSheet, photoPlaceLabel, type PhotoGridItem } from '@/components/files';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
-import { mergeQueryData } from '@/services/query';
 import { makeStyles } from '@/theme';
-import { Badge, Dialog, Notice, ProgressBar, Text } from '@/ui';
+import { Badge, Dialog, Notice, ProgressBar, Text, useEventAnnouncement } from '@/ui';
 
 import { applyDeletedPhoto, applyUploadedPhotos, freePhotoSlots } from './logic';
+import { mergeLocalWrite } from './merge-local-write';
 import { PickProblemNotice, usePhotoSource } from './use-photo-source';
 
 /** How long the "photos added" confirmation stays (the site's `SUCCESS_HOLD_MS`). */
@@ -53,6 +53,9 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
   const [deleting, setDeleting] = useState<AttachedPhoto | null>(null);
   // Upload and delete share one per-user bucket (60 / 60 s).
   const limit = useRetryWait();
+  // «Фото добавлено» is spoken only on this screen; an upload that ends while another tab is in front is
+  // spoken when the student comes back.
+  const announce = useEventAnnouncement();
 
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -74,12 +77,12 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
       setPending(files.map((file, index) => ({ key: `pending-${index}-${file.uri}`, uri: file.uri, name: file.name })));
     },
     onSuccess: (result) => {
-      mergeQueryData<GetHomeworkResponse>(queryClient, detailKey, (detail) =>
+      mergeLocalWrite<GetHomeworkResponse>(queryClient, detailKey, (detail) =>
         applyUploadedPhotos(detail, result.photos, result.photosCount),
       );
       afterListChange();
       setAdded(true);
-      AccessibilityInfo.announceForAccessibility(m.studentWork.photos.added);
+      announce(m.studentWork.photos.added);
       if (addedTimer.current) clearTimeout(addedTimer.current);
       addedTimer.current = setTimeout(() => setAdded(false), SUCCESS_HOLD_MS);
     },
@@ -100,7 +103,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
     mutationFn: (photo: AttachedPhoto) => api.studentWork.deleteHomeworkPhoto(assignmentId, photo.id),
     onMutate: () => setError(null),
     onSuccess: (result, photo) => {
-      mergeQueryData<GetHomeworkResponse>(queryClient, detailKey, (detail) =>
+      mergeLocalWrite<GetHomeworkResponse>(queryClient, detailKey, (detail) =>
         applyDeletedPhoto(detail, photo.id, result.photosCount),
       );
       afterListChange();
@@ -136,6 +139,14 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
   };
 
   const counter = `${photos.length} / ${maxPhotos}`;
+
+  // The dialog names the photo («Фото 2 из 3, IMG_2.jpg»): its place is looked up by id in the current
+  // batch, so a batch that changed while the dialog is open still names the right one.
+  const deletingIndex = deleting ? photos.findIndex((photo) => photo.id === deleting.id) : -1;
+  const deleteDescription =
+    deleting && deletingIndex >= 0
+      ? `${t.deleteDescription} ${photoPlaceLabel(m.common.photos.photoOf, deletingIndex, photos.length, deleting.originalName)}`
+      : t.deleteDescription;
 
   return (
     <View style={styles.block} testID="homework-photos">
@@ -217,7 +228,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
         visible={deleting !== null}
         kicker={confirm.kicker}
         title={t.deleteTitle}
-        description={t.deleteDescription}
+        description={deleteDescription}
         confirmLabel={confirm.confirm}
         pendingLabel={confirm.pending}
         cancelLabel={confirm.cancel}

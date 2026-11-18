@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import { format, plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Text, TextButton, useAnnounce } from '@/ui';
+import { Button, Text, TextButton, useStatusAnnouncement } from '@/ui';
 
 export type OwnerSaveBarProps = {
   /** How many students have an unsaved owner change — rows hidden by the search or the other tab included. */
@@ -23,7 +23,9 @@ export function OwnerSaveBar({ count, saving, error, onDiscard, onSave }: OwnerS
   const styles = useStyles();
   const { dict, locale } = useI18n();
   const t = dict.students.studentsManager;
-  useAnnounce(error);
+  // The refusal appears without moving the focus: spoken on both platforms (on Android a live region on a
+  // freshly mounted text may stay silent, and role="alert" alone says nothing).
+  useStatusAnnouncement(error);
 
   return (
     <View style={styles.bar} testID="owner-save-bar">
@@ -35,7 +37,7 @@ export function OwnerSaveBar({ count, saving, error, onDiscard, onSave }: OwnerS
         <TextButton label={t.reset} tone="muted" disabled={saving} onPress={onDiscard} testID="owner-save-discard" />
       </View>
       {error ? (
-        <Text variant="captionMedium" color="dangerSolid" accessibilityRole="alert" accessibilityLiveRegion="polite" testID="owner-save-error">
+        <Text variant="captionMedium" color="dangerSolid" accessibilityRole="alert" testID="owner-save-error">
           {error}
         </Text>
       ) : null}

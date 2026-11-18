@@ -49,7 +49,7 @@ export const TopicNumberCard = memo(function TopicNumberCard({ number, answerSho
         <View style={styles.block}>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={answerShown ? m.content.topic.hideAnswer : t.showAnswer}
+            accessibilityLabel={format(answerShown ? m.content.topic.hideAnswerOf : m.content.topic.showAnswerOf, { number: number.number })}
             accessibilityState={{ expanded: answerShown }}
             onPress={() => onToggleAnswer(number.id)}
             scaleTo={0.99}

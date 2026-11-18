@@ -35,6 +35,7 @@ import {
   homeworkNumbersA11yParts,
   isCheckRunning,
   isHomeworkCompleted,
+  isOlderSubmission,
   isPollBroken,
   lessonItemChip,
   lessonParts,
@@ -43,6 +44,7 @@ import {
   secondsUntil,
   shortenRecognizedAnswer,
   splitHomeworks,
+  trackLessonOutcomes,
 } from "@/screens/student/work/logic";
 import { serverClockOffset } from "@/domain/server-clock";
 
@@ -259,14 +261,21 @@ describe("homework detail cache", () => {
     assert.equal(next.assignment.latestCheckStatus, "PENDING");
   });
 
-  it("a finished poll replaces the check, the batch, the statuses and the counters; notes stay", () => {
+  it("a finished poll replaces only the check: the batch, the statuses and the counters stay (#341)", () => {
     const done: StudentCheckDto = {
       ...pendingCheck,
       status: "DONE",
       checkedAt: "2026-11-16T10:00:09.000Z",
       results: [{ number: "118", homeworkNumberId: "n1", verdict: "CORRECT", recognizedAnswer: "x = 3", comment: "Верно." }]
     };
-    const next = applyLatestCheck(detail(), {
+    // A photo was uploaded on this screen after the server read this answer: the answer's empty batch
+    // and its statuses must not undo it — the detail is re-read when the check ends.
+    const uploaded = applyUploadedPhotos(
+      applyStartedCheck(detail(), pendingCheck),
+      [{ id: "p2", fileId: "f2", originalName: "IMG_2.jpg", mimeType: "image/jpeg", createdAt: "2026-11-16T10:00:05.000Z" }],
+      2
+    );
+    const next = applyLatestCheck(uploaded, {
       check: done,
       photos: [],
       numbers: [
@@ -278,12 +287,29 @@ describe("homework detail cache", () => {
     });
     assert.equal(next.assignment.latestCheck?.status, "DONE");
     assert.equal(next.assignment.latestCheckStatus, "DONE");
-    assert.deepEqual(next.assignment.photos, []);
-    assert.equal(next.assignment.photosCount, 0);
-    assert.deepEqual(next.assignment.numbers.map((number) => number.status), ["YELLOW", null, "GREEN"]);
+    assert.deepEqual(next.assignment.photos.map((photo) => photo.id), ["p1", "p2"]);
+    assert.equal(next.assignment.photosCount, 2);
+    assert.deepEqual(next.assignment.numbers.map((number) => number.status), ["RED", null, "GREEN"]);
     assert.equal(next.assignment.numbers[1].note, "спросить");
-    assert.equal(next.assignment.solvedCount, 2);
-    assert.equal(next.assignment.solvedPercent, 67);
+    assert.equal(next.assignment.solvedCount, 1);
+  });
+
+  it("a deleted photo is not brought back by a poll answer read before the deletion (#341)", () => {
+    const deleted = applyDeletedPhoto(applyStartedCheck(detail(), pendingCheck), "p1", 0);
+    const next = applyLatestCheck(deleted, { check: { ...pendingCheck, status: "CHECKING" }, photos: detail().assignment.photos, numbers: [], solvedCount: 1 });
+    assert.deepEqual(next.assignment.photos, []);
+    assert.equal(next.assignment.latestCheckStatus, "CHECKING");
+  });
+
+  it("an answer about an older check, or one that takes a finished check back to running, is ignored", () => {
+    const done: StudentCheckDto = { ...pendingCheck, status: "DONE", checkedAt: "2026-11-16T10:00:09.000Z" };
+    const finished = applyStartedCheck(detail(), done);
+    const regress = applyLatestCheck(finished, { check: { ...pendingCheck, status: "CHECKING" }, photos: [], numbers: [], solvedCount: 0 });
+    assert.equal(regress, finished);
+    const older: StudentCheckDto = { ...done, id: "old", createdAt: "2026-11-15T10:00:00.000Z" };
+    assert.equal(applyLatestCheck(finished, { check: older, photos: [], numbers: [], solvedCount: 0 }), finished);
+    // The same answer twice changes nothing (same object: no re-render).
+    assert.equal(applyLatestCheck(finished, { check: done, photos: [], numbers: [], solvedCount: 0 }), finished);
   });
 
   it("a poll that knows no check clears the latest one", () => {
@@ -454,6 +480,68 @@ describe("live lesson", () => {
     assert.equal(merged.changed, true);
     assert.equal(merged.resultChanged, false);
     assert.equal(merged.next.active?.items[0].canSubmit, true);
+  });
+
+  it("a /state answer read before a new submission keeps the new one, its flags and the 'checking' state (#342)", () => {
+    const old = submission("a", { id: "old", status: "DONE", verdict: "UNCERTAIN", submittedAt: "2026-11-16T10:01:00.000Z", checkedAt: "2026-11-16T10:01:09.000Z" });
+    const before = applySubmission(lesson([item("a", 0, { submission: old }), item("b", 1)]), submission("a", { id: "new", submittedAt: "2026-11-16T10:06:00.000Z" }));
+    const merged = applyLessonState(before, {
+      serverNow: "2026-11-16T10:06:01.000Z",
+      status: "ACTIVE",
+      items: [
+        { id: "a", result: null, submission: old, closed: false, canSubmit: true },
+        { id: "b", result: null, submission: null, closed: false, canSubmit: true }
+      ]
+    });
+    assert.equal(merged.changed, false);
+    assert.equal(merged.next.active?.items[0].submission?.id, "new");
+    assert.equal(merged.next.active?.items[0].canSubmit, false);
+    assert.equal(hasRunningSubmission(merged.next.active?.items ?? []), true);
+    // An answer with no submission at all is older too.
+    assert.equal(applyLessonState(before, { serverNow: "", status: "ACTIVE", items: [{ id: "a", result: null, submission: null, closed: false, canSubmit: true }] }).changed, false);
+  });
+
+  it("a stale answer still brings a result the teacher set, which closes the item", () => {
+    const before = applySubmission(lesson([item("a", 0)]), submission("a", { id: "new", submittedAt: "2026-11-16T10:06:00.000Z" }));
+    const merged = applyLessonState(before, {
+      serverNow: "2026-11-16T10:06:01.000Z",
+      status: "ACTIVE",
+      items: [{ id: "a", result: "SOLVED", submission: null, closed: true, canSubmit: false }]
+    });
+    assert.equal(merged.resultChanged, true);
+    assert.equal(merged.next.active?.items[0].result, "SOLVED");
+    assert.equal(merged.next.active?.items[0].closed, true);
+    assert.equal(merged.next.active?.items[0].submission?.id, "new");
+  });
+
+  it("a finished submission is not taken back to running by an older read of it", () => {
+    const done = submission("a", { status: "DONE", verdict: "CORRECT", checkedAt: "2026-11-16T10:05:08.000Z" });
+    const before = applySubmission(lesson([item("a", 0)]), done);
+    const merged = applyLessonState(before, {
+      serverNow: "",
+      status: "ACTIVE",
+      items: [{ id: "a", result: null, submission: submission("a", { status: "CHECKING" }), closed: false, canSubmit: false }]
+    });
+    assert.equal(merged.changed, false);
+    assert.equal(isOlderSubmission(submission("a", { id: "x", submittedAt: "2026-11-16T10:07:00.000Z" }), done), false);
+  });
+
+  it("outcomes: a check seen running is reported once when it ends; the opening state is not (#330)", () => {
+    const opened = trackLessonOutcomes(new Map(), [
+      item("a", 0, { submission: submission("a", { status: "DONE", verdict: "CORRECT" }) }),
+      item("b", 1, { submission: submission("b", { status: "CHECKING" }) }),
+      item("c", 2)
+    ]);
+    assert.deepEqual(opened.finished, []);
+    assert.deepEqual([...opened.running.keys()], ["b"]);
+    const ended = trackLessonOutcomes(opened.running, [
+      item("a", 0, { submission: submission("a", { status: "DONE", verdict: "CORRECT" }) }),
+      item("b", 1, { submission: submission("b", { status: "FAILED", errorCode: "timeout" }) }),
+      item("c", 2, { submission: submission("c") })
+    ]);
+    assert.deepEqual(ended.finished, ["b"]);
+    assert.deepEqual([...ended.running.keys()], ["c"]);
+    assert.deepEqual(trackLessonOutcomes(ended.running, [item("b", 1, { submission: submission("b", { status: "FAILED" }) })]).finished, []);
   });
 
   it("nothing is merged when no lesson is active", () => {

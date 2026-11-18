@@ -85,6 +85,7 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, recordDi
           <Button
             label={historyButtonLabel(student.totalCalls, t)}
             accessibilityLabel={format(hasHistory ? m.calls.row.historyAria : m.calls.row.historyEmptyAria, {
+              n: student.totalCalls,
               name: student.studentName,
             })}
             variant="outline"

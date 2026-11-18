@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
 import { Icon, PressableScale, Spinner, Text } from '@/ui';
 
+import { photoGridPositions } from './photo-label';
 import { PhotoThumb } from './photo-thumb';
 
 export type PhotoGridItem = {
@@ -65,6 +66,8 @@ export function PhotoGrid({
   // Whole pixels: a fractional tile makes the last one of a row wrap on some densities.
   const tile = width > 0 ? Math.floor((width - GAP * (columns - 1)) / columns) : 0;
 
+  const positions = photoGridPositions(photos);
+
   const onLayout = (event: LayoutChangeEvent) => {
     const next = Math.round(event.nativeEvent.layout.width);
     if (next !== width) setWidth(next);
@@ -79,7 +82,8 @@ export function PhotoGrid({
               fileId={photo.fileId}
               name={photo.name}
               // Each tile names its place in the set: three photos are not three identical «Удалить фото».
-              position={{ index, total: photos.length }}
+              // Photos still uploading are not counted (`photoGridPositions`).
+              position={positions[index]}
               size={tile}
               localUri={photo.localUri}
               uploading={photo.uploading}

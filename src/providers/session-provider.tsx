@@ -41,7 +41,10 @@ export type SessionValue = {
    * `TokenStorage.clear()` failed). The sign-out itself completed; the login screen says so.
    */
   tokenNotRemoved: boolean;
+  /** Hides the session-expired `notice` only; the token warning has its own dismiss. */
   dismissNotice: () => void;
+  /** Hides the `tokenNotRemoved` warning only (an independent message about a session left on the device). */
+  dismissTokenNotice: () => void;
   /** Rejects with the `ApiError` of `POST /auth/login`; on success the role's tree replaces the auth stack. */
   signIn: (input: LoginRequest) => Promise<AuthenticatedUser>;
   /**
@@ -342,7 +345,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissNotice = useCallback(() => {
-    setState((current) => (current.notice === null && !current.tokenNotRemoved ? current : { ...current, notice: null, tokenNotRemoved: false }));
+    setState((current) => (current.notice === null ? current : { ...current, notice: null }));
+  }, []);
+
+  const dismissTokenNotice = useCallback(() => {
+    setState((current) => (!current.tokenNotRemoved ? current : { ...current, tokenNotRemoved: false }));
   }, []);
 
   const retryRestore = useCallback(() => {
@@ -364,6 +371,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       notice: state.notice,
       tokenNotRemoved: state.tokenNotRemoved,
       dismissNotice,
+      dismissTokenNotice,
       signIn,
       signOut,
       applyUser,
@@ -371,7 +379,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       refreshUser,
       retryRestore,
     }),
-    [state, dismissNotice, signIn, signOut, applyUser, applyRotatedToken, refreshUser, retryRestore],
+    [state, dismissNotice, dismissTokenNotice, signIn, signOut, applyUser, applyRotatedToken, refreshUser, retryRestore],
   );
 
   return (

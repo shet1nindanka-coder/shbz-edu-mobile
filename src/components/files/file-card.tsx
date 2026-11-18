@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { formatFileSize } from '@/domain/files';
-import { useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers/preferences-provider';
 import { SHARE_IS_DOWNLOAD } from '@/services/files/file-actions';
 import { useFileService } from '@/services/files/file-service-context';
@@ -40,6 +40,9 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
   const t = dict.student.fileCard;
   const kind = file ? viewerFileKind(file) : 'other';
   const sharing = file !== null && actions.pending?.fileId === file.id && actions.pending.action === 'share';
+  const shareLabel = SHARE_IS_DOWNLOAD ? t.download : m.common.actions.share;
+  // A topic shows two cards with the same buttons: out of context the slot tells them apart.
+  const named = (action: string) => format(m.common.files.actionOf, { action, slot: title });
 
   return (
     <Card variant="surface" padded={16} testID={testID} style={style}>
@@ -118,6 +121,7 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
             {onOpen ? (
               <Button
                 label={dict.student.fullscreen.open}
+                accessibilityLabel={named(dict.student.fullscreen.open)}
                 onPress={() => onOpen(file)}
                 style={styles.action}
                 testID={testID ? `${testID}-open` : undefined}
@@ -126,7 +130,8 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
             {hideShare ? null : (
               <Button
                 variant="outline"
-                label={SHARE_IS_DOWNLOAD ? t.download : m.common.actions.share}
+                label={shareLabel}
+                accessibilityLabel={named(shareLabel)}
                 leftIcon={SHARE_IS_DOWNLOAD ? 'download' : 'share'}
                 loading={sharing}
                 disabled={actions.pending !== null && !sharing}

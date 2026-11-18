@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { RetryWaitLine, useWaitUntil } from '@/components/retry-wait';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
@@ -29,8 +29,9 @@ export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: Not
   const { dict, m } = useI18n();
   const t = dict.student.numberCard;
   const editor = useNoteEditor(homeworkNumberId, serverNote, t.noteSaveFailed);
-  // The server's wait, counted down as a duration from the refusal on (a clock set back does not lengthen it).
-  const wait = useWaitUntil(editor.error?.retryAt ?? null);
+  // The server's wait is the editor's own gate (a duration: a clock set back does not lengthen it), so
+  // «Повторить» appears exactly when it can send.
+  const wait = editor.error ? editor.waitSeconds : 0;
 
   if (editor.disabledByServer) return null;
 

@@ -19,6 +19,8 @@ export type SubmissionInfoProps = {
   live: boolean;
   /** Opens the photos of the submission full screen at `index`. */
   onOpenPhoto: (index: number) => void;
+  /** «№ 215»: every row has photos, so their names carry the number. */
+  numberLabel?: string;
   testID?: string;
 };
 
@@ -30,7 +32,7 @@ const PHOTO_SIZE = 56;
  * the photos. Correct / incorrect verdicts set the result automatically, so only "not recognised" and
  * the instruction-text flag are spelled out.
  */
-export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhoto, testID }: SubmissionInfoProps) {
+export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhoto, numberLabel, testID }: SubmissionInfoProps) {
   const styles = useStyles();
   const { dict, locale } = useI18n();
   const t = dict.planner.lessonBoard;
@@ -77,7 +79,15 @@ export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhot
       {submission.photoFileIds.length > 0 ? (
         <View style={styles.photos}>
           {submission.photoFileIds.map((fileId, index) => (
-            <PhotoThumb key={fileId} fileId={fileId} name={format(t.photo, { n: index + 1 })} size={PHOTO_SIZE} onPress={() => onOpenPhoto(index)} />
+            // «Открыть фото 1 из 2, № 215»: the place in the set and the number (no file name is known here).
+            <PhotoThumb
+              key={fileId}
+              fileId={fileId}
+              name={numberLabel}
+              position={{ index, total: submission.photoFileIds.length }}
+              size={PHOTO_SIZE}
+              onPress={() => onOpenPhoto(index)}
+            />
           ))}
         </View>
       ) : null}

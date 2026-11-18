@@ -205,7 +205,7 @@ export function TeacherStudentsScreen() {
       <CredentialsSheet
         credentials={overlay?.kind === 'credentials' ? overlay.credentials : null}
         title={dict.students.createForm.createdTitle}
-        onClose={() => {
+        onDone={() => {
           closeOverlay();
           announce({ tone: 'success', text: t.notices.studentCreated });
         }}

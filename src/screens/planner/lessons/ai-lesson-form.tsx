@@ -8,7 +8,7 @@ import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Checkbox, DateTimeField, Notice, Screen, Select, Text, TextArea, TextField, useAnnounce, type SelectOption } from '@/ui';
+import { Button, Checkbox, DateTimeField, Notice, Screen, Select, Text, TextArea, TextField, useStatusAnnouncement, type SelectOption } from '@/ui';
 
 import { useDateTimeLabels } from '@/components/date-time';
 import { DurationStepper } from './duration-stepper';
@@ -56,8 +56,9 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
   const create = useCreateLesson();
   const wait = useRetryWait();
   const nobodyChecked = studentIds.length === 0;
-  // The inline error appears without moving focus: VoiceOver says it (Android reads the alert).
-  useAnnounce(nobodyChecked ? dict.apiPlanner.lessons.selectAtLeastOneStudent : null);
+  // The inline error appears without moving focus: spoken on both platforms (an Android `alert` role alone
+  // is silent).
+  useStatusAnnouncement(nobodyChecked ? dict.apiPlanner.lessons.selectAtLeastOneStudent : null);
 
   const speedOptions: SelectOption<number>[] = [
     { value: NO_SPEED, label: t.speedNotSet },

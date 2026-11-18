@@ -165,7 +165,11 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
 
       <BottomSheet
         visible={renameOpen}
-        onClose={() => setRenameOpen(false)}
+        // While the rename runs the sheet stays open, also when the screen loses focus (it is only hidden
+        // until the user returns): a refusal must be seen, with the typed name for another try.
+        onClose={() => {
+          if (!renameInFlight.current) setRenameOpen(false);
+        }}
         closeLabel={m.common.actions.close}
         title={t.detail.rename}
         dismissible={!rename.isPending}

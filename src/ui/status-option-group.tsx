@@ -10,6 +10,8 @@ export type StatusOption<T extends string> = {
   label: string;
   /** Style of the option while active: a traffic-light status, or `neutral` (ink outline). */
   tone: HomeworkNumberStatus | 'neutral';
+  /** Accessible name when the label alone is ambiguous out of context (e.g. «№ 215: решил»). Default: `label`. */
+  accessibilityLabel?: string;
 };
 
 export type StatusOptionGroupProps<T extends string> = {
@@ -57,6 +59,7 @@ export function StatusOptionGroup<T extends string>({
         <StatusOptionButton
           key={option.value}
           label={option.label}
+          accessibilityLabel={option.accessibilityLabel}
           tone={option.tone}
           active={option.value === value}
           size={size}

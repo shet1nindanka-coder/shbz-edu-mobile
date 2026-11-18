@@ -1,4 +1,4 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
@@ -154,9 +154,15 @@ export function PlannerLessonsScreen() {
     </View>
   );
 
-  const renderRow = ({ item }: { item: LessonListRow }) =>
+  const renderRow = ({ item, target }: ListRenderItemInfo<LessonListRow>) =>
     item.type === 'section' ? (
-      <View style={styles.sectionHeader}>
+      <View
+        style={styles.sectionHeader}
+        // FlashList keeps the in-list cell and draws the pinned copy beside it: only the cell is read.
+        {...(target === 'StickyHeader'
+          ? { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const, 'aria-hidden': true }
+          : null)}
+      >
         <Text variant="kicker" accessibilityRole="header" tabular>
           {`${sectionTitle[item.key]} · ${item.count}`}
         </Text>

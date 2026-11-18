@@ -45,9 +45,12 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
 
   const [pickedTopicId, setPickedTopicId] = useState<string | null>(null);
   const [numberId, setNumberId] = useState<string | null>(null);
-  // The first topic is the default, as on the site; changing the topic resets the number.
-  const topicId = pickedTopicId ?? topics?.[0]?.topicId ?? null;
-  const topic = topics?.find((entry) => entry.topicId === topicId);
+  // The first topic is the default, as on the site; changing the topic resets the number. It is pinned as
+  // soon as the bank arrives, so a refetch that reorders the topics does not switch the topic (and drop the
+  // picked number) under the teacher; the first topic takes over only when the pinned one is gone.
+  if (visible && pickedTopicId === null && topics && topics.length > 0) setPickedTopicId(topics[0].topicId);
+  const topic = topics?.find((entry) => entry.topicId === pickedTopicId) ?? topics?.[0];
+  const topicId = topic?.topicId ?? null;
   const free = useMemo(() => freeBankNumbers(topic, existingIds), [topic, existingIds]);
   const gap = bankNumbersGap(topic, free.length);
   const picked = numberId !== null && free.some((number) => number.id === numberId) ? numberId : null;

@@ -27,15 +27,16 @@ export type LessonItemRowProps = {
 export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, onRemove }: LessonItemRowProps) {
   const styles = useStyles();
   const theme = useTheme();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.students.lessons;
   const results = dict.students.lessonResult;
+  const numberSign = format(t.number, { n: item.number });
   return (
     <View style={[styles.row, item.isExtra ? styles.extra : null]} testID={`lesson-item-${item.id}`}>
       <View style={styles.head}>
         <View style={styles.titles}>
           <Text variant="bodyBold" tabular>
-            {format(t.number, { n: item.number })}
+            {numberSign}
           </Text>
           <Text variant="caption" color="textMuted" numberOfLines={2}>
             {item.topicTitle}
@@ -52,8 +53,15 @@ export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, on
         />
       </View>
       <StatusOptionGroup
-        accessibilityLabel={results.aria}
-        options={LESSON_RESULT_ORDER.map((value) => ({ value, label: results[value], tone: lessonResultMeta[value].tone }))}
+        // Every row has the same group and options: the number tells them apart out of context (as on the
+        // lesson board).
+        accessibilityLabel={format(m.planner.lessonBoard.resultGroupAria, { number: numberSign })}
+        options={LESSON_RESULT_ORDER.map((value) => ({
+          value,
+          label: results[value],
+          accessibilityLabel: format(m.planner.lessonBoard.resultOptionAria, { number: numberSign, result: results[value] }),
+          tone: lessonResultMeta[value].tone,
+        }))}
         value={item.result}
         onChange={onResult}
         disabled={busy || saving || resultsBlocked}

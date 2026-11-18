@@ -567,6 +567,25 @@ describe("query client: queries cleared while observed do not linger (#309)", ()
       assert.equal(live.size, 0, `live timers: ${live.size}`);
       assert.equal(client.getQueryCache().getAll().length, 0);
       assert.deepEqual(orphans, []);
+
+      // A clear while fetches are still running: an observed query (a screen refetching at sign-out) and
+      // an unobserved one (a prefetch). Their fetches settle after the clear — and must not re-arm the gc.
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        const slow = (value: string) => () => new Promise<{ secret: string }>((resolve) => setTimeout(() => resolve({ secret: value }), 20));
+        const observer = new QueryObserver(client, { queryKey: ["inflight-observed", cycle], queryFn: slow(`o${cycle}`) });
+        const unsubscribe = observer.subscribe(() => undefined);
+        void client.prefetchQuery({ queryKey: ["inflight-prefetch", cycle], queryFn: slow(`p${cycle}`) });
+        // A fetch started directly on the query (cancelled by the clear, settles as an error).
+        const direct = client.getQueryCache().build(client, { queryKey: ["inflight-direct", cycle], queryFn: slow(`d${cycle}`) });
+        const settled = direct.fetch().catch(() => undefined);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        client.clear();
+        unsubscribe();
+        await settled;
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      }
+      assert.equal(live.size, 0, `live timers after in-flight clears: ${live.size}`);
+      assert.equal(client.getQueryCache().getAll().length, 0);
     } finally {
       // A leaked 24 h timer would otherwise keep the test process alive instead of failing it.
       for (const id of live) clearTimeout(id as ReturnType<typeof setTimeout>);

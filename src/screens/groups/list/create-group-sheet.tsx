@@ -74,7 +74,11 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
   return (
     <BottomSheet
       visible={visible}
-      onClose={onClose}
+      // While the group is being created the sheet stays open, also when the screen loses focus (it is only
+      // hidden until the user returns): a refusal must be seen, with the typed name for another try.
+      onClose={() => {
+        if (!inFlight.current) onClose();
+      }}
       onClosed={reset}
       closeLabel={m.common.actions.close}
       title={t.list.create}

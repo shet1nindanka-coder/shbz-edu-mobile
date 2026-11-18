@@ -135,6 +135,7 @@ export function LessonCard({
 
       <Button
         label={t.openLesson}
+        accessibilityLabel={format(m.teacher.card.openLessonOf, { title: lesson.title, meta })}
         variant="outline"
         size="sm"
         rightIcon="chevronRight"

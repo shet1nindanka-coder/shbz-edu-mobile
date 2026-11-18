@@ -1,8 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { AccessibilityInfo, Platform } from 'react-native';
 
 import { announcementStep, type AnnounceOn } from './a11y';
 import { useNavigationFocused } from './internal/close-on-blur';
+
+/** One announcement on iOS (queued behind what VoiceOver is saying) and Android; the web has live regions. */
+function speakNative(text: string): void {
+  if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(text, { queue: true });
+  else AccessibilityInfo.announceForAccessibility(text);
+}
 
 function useAnnouncement(message: string | null | undefined, enabled: boolean, on: AnnounceOn): void {
   const last = useRef<string | null>(null);
@@ -14,8 +20,7 @@ function useAnnouncement(message: string | null | undefined, enabled: boolean, o
     const step = announcementStep(last.current, text, { platform: Platform.OS, focused, on });
     last.current = step.last;
     if (step.speak === null) return;
-    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(step.speak, { queue: true });
-    else AccessibilityInfo.announceForAccessibility(step.speak);
+    speakNative(step.speak);
   }, [text, focused, on]);
 }
 
@@ -58,6 +63,36 @@ export function useAnnounce(message: string | null | undefined, enabled = true):
  */
 export function useStatusAnnouncement(message: string | null | undefined, enabled = true): void {
   useAnnouncement(message, enabled, 'native');
+}
+
+/**
+ * The imperative form of `useStatusAnnouncement` for an EVENT of a screen (a check finished, a result came
+ * in), spoken on iOS and Android by calling the returned function — with the same focus rule: while the
+ * screen is not the focused one (`useNavigationFocused()`) or `active` is false (e.g. the app is in the
+ * background), the message is held back, and only the LATEST held message is spoken when the screen is in
+ * front again. A screen that keeps polling from a background tab therefore never speaks over another tab.
+ *
+ *   const announce = useEventAnnouncement(live);   // call it BEFORE the effects that announce
+ *   useEffect(() => { if (finished) announce(text); }, [finished, announce, text]);
+ */
+export function useEventAnnouncement(active = true): (message: string) => void {
+  const navigationFocused = useNavigationFocused();
+  const focused = navigationFocused && active;
+  const focusedRef = useRef(focused);
+  const held = useRef<string | null>(null);
+  useEffect(() => {
+    focusedRef.current = focused;
+    if (!focused || held.current === null) return;
+    const text = held.current;
+    held.current = null;
+    speakNative(text);
+  }, [focused]);
+  return useCallback((message: string) => {
+    const text = message.trim();
+    if (text === '') return;
+    if (focusedRef.current) speakNative(text);
+    else held.current = text;
+  }, []);
 }
 
 /**

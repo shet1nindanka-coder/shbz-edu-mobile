@@ -86,7 +86,12 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const data = board.data;
   const enabled = data?.deadlinesEnabled ?? false;
   const topics = data?.topics;
-  const topic = topics && enabled ? pickTopic(topics, topicId) : null;
+  // The first topic is pinned as soon as the board arrives (the site's `useState(topics[0]?.id)`): a refetch
+  // that reorders the topics (the developer moved one, pull-to-refresh) must not switch the topic under the
+  // teacher and drop the numbers they picked. `pickTopic` falls back to the first one only when the pinned
+  // topic has left the list.
+  if (topicId === null && topics && topics.length > 0) setTopicId(topics[0].id);
+  const topic = topics && enabled ? pickTopic(topics, topicId ?? topics[0]?.id ?? null) : null;
 
   // Statements come with the first topic only; any other topic fetches its own once (04 S5 "Data").
   // The board works without them when the read fails.

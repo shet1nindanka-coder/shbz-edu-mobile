@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { AccessibilityInfo, Platform, View } from 'react-native';
 
 import type { ReasoningEffort } from '@/api/types';
 import { REASONING_EFFORTS } from '@/api/types';
@@ -116,6 +116,16 @@ function EffortSetting({ form }: { form: SettingsFormState }) {
   );
 }
 
+/**
+ * A ± step changes the field's value while the focus stays on the button, so nothing reads the new value:
+ * it is said on both platforms (the field has no live region, so TalkBack does not read it twice). The web
+ * has no screen-reader announcement API here.
+ */
+function announceStep(message: string): void {
+  if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(message, { queue: true });
+  else if (Platform.OS === 'android') AccessibilityInfo.announceForAccessibility(message);
+}
+
 function NumberSetting({ field, form }: { field: NumberFieldSpec; form: SettingsFormState }) {
   const styles = useStyles();
   const { dict, m } = useI18n();
@@ -123,7 +133,11 @@ function NumberSetting({ field, form }: { field: NumberFieldSpec; form: Settings
   const text = form.draft[field.key];
   const label = t[field.label];
   const range = { min: field.min, max: field.max };
-  const step = (direction: 1 | -1) => form.set(field.key, stepNumberInput(text, field, direction));
+  const step = (direction: 1 | -1) => {
+    const next = stepNumberInput(text, field, direction);
+    form.set(field.key, next);
+    if (next !== text) announceStep(format(m.developer.settings.stepped, { label, value: next }));
+  };
 
   return (
     <TextField

@@ -8,7 +8,8 @@ const ru = {
   },
   row: {
     recordAria: "Записать звонок: {name}",
-    historyAria: "История звонков: {name}",
+    // starts with the visible «История (23)» (label in name), so the count is heard too
+    historyAria: "История ({n}) — звонки родителям: {name}",
     historyEmptyAria: "Звонков ещё не было: {name}"
   },
   log: {
@@ -33,7 +34,7 @@ const en: typeof ru = {
   },
   row: {
     recordAria: "Log a call: {name}",
-    historyAria: "Call history: {name}",
+    historyAria: "History ({n}) — parent calls: {name}",
     historyEmptyAria: "No calls yet: {name}"
   },
   log: {

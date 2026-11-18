@@ -17,10 +17,16 @@ export type CredentialsSheetProps = {
   credentials: CreatedCredentials | null;
   /** Heading, e.g. `dict.students.createForm.createdTitle`. */
   title: string;
-  onClose: () => void;
+  /**
+   * «Готово»: the only way the sheet ends. Leaving the screen (a reminder tap) only hides the sheet's
+   * window; the owner keeps `credentials` and the sheet comes back when the screen is focused again.
+   */
+  onDone: () => void;
 };
 
 const WHOLE_MESSAGE = 'all';
+
+const ignoreClose = () => undefined;
 
 /** The system share sheet exists on a device; in a browser only where `navigator.share` does. */
 function canShare(): boolean {
@@ -35,7 +41,7 @@ function canShare(): boolean {
  * message; «Поделиться» hands it to a messenger. After «Готово» the password cannot be shown again —
  * only replaced — so the sheet ignores the backdrop, the drag and the back button.
  */
-export function CredentialsSheet({ credentials, title, onClose }: CredentialsSheetProps) {
+export function CredentialsSheet({ credentials, title, onDone }: CredentialsSheetProps) {
   const styles = useStyles();
   const { dict, m } = useI18n();
   const t = dict.students.credentials;
@@ -77,13 +83,16 @@ export function CredentialsSheet({ credentials, title, onClose }: CredentialsShe
 
   const close = () => {
     setFeedback(null);
-    onClose();
+    onDone();
   };
 
   return (
     <BottomSheet
       visible={credentials !== null}
-      onClose={close}
+      // With `dismissible={false}` the sheet is asked to close only when its screen loses focus (a reminder
+      // tap). That must not end it: the password exists nowhere else. BottomSheet hides its window while the
+      // screen is not focused and shows it again on return, so ignoring the request keeps the credentials.
+      onClose={ignoreClose}
       closeLabel={t.done}
       showClose={false}
       // SPEC-GAP: the site's dialog closes on an overlay click; on a phone a stray tap or drag would throw

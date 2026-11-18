@@ -5,7 +5,7 @@ import { MathContent } from '@/components/math';
 import { LESSON_RESULT_ORDER, lessonResultMeta } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Chip, IconButton, StatusOptionGroup, Text, TextButton, useAnnounce, type ChipTone } from '@/ui';
+import { Chip, IconButton, StatusOptionGroup, Text, TextButton, useStatusAnnouncement, type ChipTone } from '@/ui';
 
 import { SubmissionInfo } from './submission-info';
 
@@ -39,12 +39,14 @@ const STATUS_CHIP: Record<'GREEN' | 'YELLOW' | 'RED', ChipTone> = { GREEN: 'gree
  */
 export function ItemRow({ item, ordinal, busy, saving, resultsBlocked, error, spentMinutes, now, live, onResult, onRemove, onHistory, onOpenPhoto }: ItemRowProps) {
   const styles = useStyles();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const common = dict.planner.common;
+  const numberSign = format(common.numberSign, { n: item.number });
   const reasons: Record<string, string> = dict.planner.reasons;
   const results = dict.students.lessonResult;
-  // The row's error appears without moving focus: VoiceOver says it (Android reads the alert).
-  useAnnounce(error);
+  // The row's error appears without moving focus: spoken on both platforms (an Android `alert` role alone
+  // is silent), the web reads the alert.
+  useStatusAnnouncement(error);
 
   return (
     <View style={styles.row} testID={`lesson-item-${item.id}`}>
@@ -54,7 +56,7 @@ export function ItemRow({ item, ordinal, busy, saving, resultsBlocked, error, sp
             {`${ordinal}.`}
           </Text>
           <Text variant="smallBold" tabular>
-            {format(common.numberSign, { n: item.number })}
+            {numberSign}
           </Text>
           {/* The reason of selection is not a status: neutral chip next to the traffic-light one. */}
           <Chip tone="muted" label={reasons[item.reason] ?? dict.planner.reasons.NEW} />
@@ -74,8 +76,14 @@ export function ItemRow({ item, ordinal, busy, saving, resultsBlocked, error, sp
       </View>
 
       <StatusOptionGroup
-        accessibilityLabel={results.aria}
-        options={LESSON_RESULT_ORDER.map((value) => ({ value, label: results[value], tone: lessonResultMeta[value].tone }))}
+        // Every row has the same group and options: the number tells them apart out of context.
+        accessibilityLabel={format(m.planner.lessonBoard.resultGroupAria, { number: numberSign })}
+        options={LESSON_RESULT_ORDER.map((value) => ({
+          value,
+          label: results[value],
+          accessibilityLabel: format(m.planner.lessonBoard.resultOptionAria, { number: numberSign, result: results[value] }),
+          tone: lessonResultMeta[value].tone,
+        }))}
         value={item.result}
         onChange={onResult}
         disabled={busy || saving || resultsBlocked}
@@ -85,10 +93,25 @@ export function ItemRow({ item, ordinal, busy, saving, resultsBlocked, error, sp
       {item.conditionLatex ? <MathContent value={item.conditionLatex} variant="bare" /> : null}
 
       {item.submission ? (
-        <SubmissionInfo submission={item.submission} spentMinutes={spentMinutes} now={now} live={live} onOpenPhoto={onOpenPhoto} testID={`lesson-item-submission-${item.id}`} />
+        <SubmissionInfo
+          submission={item.submission}
+          spentMinutes={spentMinutes}
+          now={now}
+          live={live}
+          onOpenPhoto={onOpenPhoto}
+          numberLabel={numberSign}
+          testID={`lesson-item-submission-${item.id}`}
+        />
       ) : null}
 
-      <TextButton label={dict.topics.history.show} tone="muted" onPress={onHistory} testID={`lesson-item-history-${item.id}`} style={styles.history} />
+      <TextButton
+        label={dict.topics.history.show}
+        accessibilityLabel={format(m.planner.lessonBoard.historyAria, { number: numberSign })}
+        tone="muted"
+        onPress={onHistory}
+        testID={`lesson-item-history-${item.id}`}
+        style={styles.history}
+      />
 
       {error ? (
         <Text variant="captionStrong" color="dangerText" accessibilityRole="alert" testID={`lesson-item-error-${item.id}`}>

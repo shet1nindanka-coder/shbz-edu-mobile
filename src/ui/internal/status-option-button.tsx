@@ -15,6 +15,8 @@ import { PressableScale } from './pressable-scale';
 
 export type StatusOptionButtonProps = {
   label: string;
+  /** Accessible name; default: `label`. */
+  accessibilityLabel?: string;
   /** Style while active: a traffic-light status, or `neutral` (ink outline). */
   tone: HomeworkNumberStatus | 'neutral';
   active: boolean;
@@ -27,6 +29,7 @@ export type StatusOptionButtonProps = {
 /** One button of `StatusOptionGroup`; plays the "stamp" when it becomes active. */
 export function StatusOptionButton({
   label,
+  accessibilityLabel,
   tone,
   active,
   size,
@@ -59,7 +62,7 @@ export function StatusOptionButton({
     <Animated.View style={[{ flexBasis: basis, flexGrow: 1 }, stampStyle]}>
       <PressableScale
         accessibilityRole="radio"
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ checked: active, disabled }}
         disabled={disabled}
         onPress={onPress}

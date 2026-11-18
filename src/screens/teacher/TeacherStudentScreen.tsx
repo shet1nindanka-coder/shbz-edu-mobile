@@ -193,7 +193,10 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
         onClosed={runQueued}
       />
 
-      {/* S8: generation takes seconds — a blocking indicator; the report opens when the sheet is gone. */}
+      {/* S8: generation takes seconds — a blocking indicator; the report opens when the sheet is gone.
+          Leaving the card (a deep link pushes a screen over it) does not end the build: BottomSheet hides its
+          window while the card is not focused and shows it again on return; a report that finishes meanwhile
+          is kept and offered on the card (`report.ready`). */}
       <BottomSheet
         visible={report.pendingPeriod !== null}
         onClose={() => undefined}

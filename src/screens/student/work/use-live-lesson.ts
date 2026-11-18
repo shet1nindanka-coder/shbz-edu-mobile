@@ -4,10 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { ActiveLessonDto, GetLessonResponse, LessonItemDto, PhotoUpload } from '@/api/types';
 import { useRetryWait, type RetryWait } from '@/components/retry-wait';
-import { useI18n } from '@/i18n';
+import { checkErrorText } from '@/domain/solution-check-error-text';
+import { format, useI18n } from '@/i18n';
 import { mergeQueryData } from '@/services/query';
+import { useEventAnnouncement } from '@/ui';
 
-import { applyLessonState, applySubmission, hasRunningSubmission } from './logic';
+import { applyLessonState, applySubmission, hasRunningSubmission, lessonItemChip, trackLessonOutcomes } from './logic';
+import { mergeLocalWrite } from './merge-local-write';
 import { usePoller } from './use-poller';
 
 export type LiveLessonState = {
@@ -42,7 +45,7 @@ function withoutKey(record: Record<string, string>, key: string): Record<string,
 export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLessonState {
   const api = useApi();
   const queryClient = useQueryClient();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.student.lessonView;
   const lessonId = lesson.lessonId;
 
@@ -98,6 +101,9 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
       if (hasErrorCode(failure, 'lessonNotFound')) void queryClient.invalidateQueries({ queryKey: lessonKey });
       throw failure;
     }
+    // `applyLessonState` keeps an item's submission when the answer is older than it (read on the server
+    // before a photo sent from here), so the item stays "checking" and the loop keeps polling until the
+    // server state catches up.
     let resultChanged = false;
     mergeQueryData<GetLessonResponse>(queryClient, lessonKey, (current) => {
       if (!current.active || current.active.lessonId !== lessonId) return current;
@@ -117,6 +123,37 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
     if (state.status !== 'ACTIVE') void queryClient.invalidateQueries({ queryKey: lessonKey });
   }, [api, lessonId, queryClient]);
 
+  // The outcome of a photo the student is waiting for is spoken: the "checking" line it replaces was the
+  // only live region, and the chip, the comment and the failure line that appear instead have none (an
+  // `alert` role is silent on Android, iOS has no live regions). One direct announcement per finished
+  // check, on both platforms, and nothing for the state the screen opened with (`trackLessonOutcomes`).
+  // Only the screen the student is on speaks (another tab can be updated by a realtime re-read): an
+  // outcome met in the background is held and spoken on return (`useEventAnnouncement`).
+  const announce = useEventAnnouncement(live);
+  const runningSeen = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    const tracked = trackLessonOutcomes(runningSeen.current, lesson.items);
+    runningSeen.current = tracked.running;
+    if (tracked.finished.length === 0) return;
+    const texts: string[] = [];
+    for (const itemId of tracked.finished) {
+      const item = lesson.items.find((candidate) => candidate.id === itemId);
+      const submission = item?.submission;
+      if (!item || !submission) continue;
+      let outcome: string;
+      if (submission.status === 'FAILED') {
+        outcome = checkErrorText(submission.errorCode, dict.student.checkErrors);
+      } else {
+        const chip = lessonItemChip(item);
+        const label = chip?.kind === 'result' ? t.results[chip.result] : chip?.kind === 'verdict' ? t.verdicts[chip.verdict] : '';
+        outcome = [label, submission.comment ?? ''].filter((part) => part.trim() !== '').join('. ');
+      }
+      if (outcome) texts.push(format(m.studentWork.lesson.outcomeA11y, { number: item.number, outcome }));
+    }
+    if (texts.length === 0) return;
+    announce(texts.join(' '));
+  }, [announce, dict.student.checkErrors, lesson.items, m.studentWork.lesson.outcomeA11y, t]);
+
   const checking = hasRunningSubmission(lesson.items);
   const poller = usePoller({ active: checking && live, poll, resetKey: `${lessonId}:${submitEpoch}` });
 
@@ -130,7 +167,7 @@ export function useLiveLesson(lesson: ActiveLessonDto, live: boolean): LiveLesso
       setSubmitErrors((current) => withoutKey(current, item.id));
     },
     onSuccess: (result) => {
-      mergeQueryData<GetLessonResponse>(queryClient, qk('studentWork', 'getLiveLesson'), (current) =>
+      mergeLocalWrite<GetLessonResponse>(queryClient, qk('studentWork', 'getLiveLesson'), (current) =>
         applySubmission(current, result.submission),
       );
       setSubmitEpoch((value) => value + 1);

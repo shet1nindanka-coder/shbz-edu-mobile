@@ -10,3 +10,15 @@ import { accessibilityLabelOf } from '@/ui/a11y';
 export function photoPlaceLabel(template: string, index: number, total: number, name?: string | null): string {
   return accessibilityLabelOf([format(template, { n: index + 1, total }), name]);
 }
+
+/**
+ * The place of every tile of a grid in its set (`PhotoGrid`): only photos that are in the set count — a photo
+ * still uploading is not one of them yet (it has no remove button and may still fail), so it gets no place,
+ * and the others are numbered among themselves. «Удалить фото 1 из 3» on the tile then matches «Фото 1 из 3»
+ * in the confirmation, which counts the attached photos only.
+ */
+export function photoGridPositions(items: readonly { uploading?: boolean }[]): ({ index: number; total: number } | undefined)[] {
+  const total = items.filter((item) => !item.uploading).length;
+  let next = 0;
+  return items.map((item) => (item.uploading ? undefined : { index: next++, total }));
+}

@@ -103,7 +103,7 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
                         <PressableScale
                           key={value}
                           accessibilityRole="radio"
-                          accessibilityLabel={labels[value].label}
+                          accessibilityLabel={format(m.groups.attendance.markAria, { name: member.name, mark: labels[value].label })}
                           accessibilityState={{ selected, disabled: disabled || saving, busy: saving }}
                           disabled={disabled || saving}
                           onPress={() => {

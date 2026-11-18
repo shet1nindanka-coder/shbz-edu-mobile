@@ -13,9 +13,12 @@ import {
   acceptVerdictChanges,
   applyStatuses,
   chunkChanges,
+  claimWrites,
   patchHomeworkStatuses,
+  releaseWrites,
   type StatusChangeEntry,
   type VerdictChange,
+  type WriteOwners,
 } from './review-logic';
 
 /** The 10-second "AI verdicts accepted — Undo" toast: what to restore and where the batch came from. */
@@ -74,8 +77,16 @@ export function useReview(studentId: string) {
     [],
   );
 
+  // The write each number's override and lock belong to (see `releaseWrites`).
+  const owners = useRef<WriteOwners>(new Map());
+  const nextToken = useRef(0);
+
+  /** A write starts: its colours are shown and its numbers locked. Returns the write's token for `finish`. */
   const begin = useCallback((entries: readonly StatusChangeEntry[]) => {
     const ids = entries.map((entry) => entry.homeworkNumberId);
+    nextToken.current += 1;
+    const token = nextToken.current;
+    claimWrites(owners.current, ids, token);
     setOverrides((current) => {
       const next = { ...current };
       for (const entry of entries) next[entry.homeworkNumberId] = entry.status;
@@ -83,12 +94,21 @@ export function useReview(studentId: string) {
     });
     setSavingIds((current) => [...current.filter((id) => !ids.includes(id)), ...ids]);
     setNumberErrors((current) => without(current, ids));
+    return token;
   }, []);
 
+  /**
+   * A write has settled: its numbers go back to the cache colours and are unlocked — only those a newer
+   * write (the undo of this accept, a tap) has not taken over meanwhile. An undo sent after the accept
+   * keeps its restored colour and lock until it settles itself.
+   */
   const finish = useCallback(
-    (ids: readonly string[]) => {
-      setOverrides((current) => without(current, ids));
-      setSavingIds((current) => current.filter((id) => !ids.includes(id)));
+    (ids: readonly string[], token: number | undefined) => {
+      const released = token === undefined ? [] : releaseWrites(owners.current, ids, token);
+      if (released.length > 0) {
+        setOverrides((current) => without(current, released));
+        setSavingIds((current) => current.filter((id) => !released.includes(id)));
+      }
       invalidateStudentData(queryClient);
     },
     [queryClient],
@@ -127,7 +147,7 @@ export function useReview(studentId: string) {
       setNumberErrors((current) => ({ ...current, [entry.homeworkNumberId]: errorText(error, t.errors.saveStatus) }));
       noteWait(error);
     },
-    onSettled: (_result, _error, entry) => finish([entry.homeworkNumberId]),
+    onSettled: (_result, _error, entry, token) => finish([entry.homeworkNumberId], token),
   });
 
   // ───────────────────────────── accept AI verdicts / undo ─────────────────────────────
@@ -142,7 +162,7 @@ export function useReview(studentId: string) {
     mutationFn: (input: { assignmentId: string; changes: VerdictChange[] }) =>
       sendBatch(input.changes.map((change) => ({ homeworkNumberId: change.homeworkNumberId, status: change.next }))),
     onMutate: (input) => {
-      begin(input.changes.map((change) => ({ homeworkNumberId: change.homeworkNumberId, status: change.next })));
+      const token = begin(input.changes.map((change) => ({ homeworkNumberId: change.homeworkNumberId, status: change.next })));
       setAssignmentErrors((current) => without(current, [input.assignmentId]));
       // A new "accept" replaces the pending undo.
       if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -152,6 +172,7 @@ export function useReview(studentId: string) {
         previous: input.changes.map((change) => ({ homeworkNumberId: change.homeworkNumberId, status: change.previous })),
       });
       undoTimer.current = setTimeout(() => setUndo(null), ACCEPT_UNDO_MS);
+      return token;
     },
     onSuccess: (results) => patchCache(results),
     onError: (error, input) => {
@@ -160,7 +181,7 @@ export function useReview(studentId: string) {
       setAssignmentErrors((current) => ({ ...current, [input.assignmentId]: errorText(error, t.errors.applyVerdicts) }));
       noteWait(error);
     },
-    onSettled: (_result, _error, input) => finish(input.changes.map((change) => change.homeworkNumberId)),
+    onSettled: (_result, _error, input, token) => finish(input.changes.map((change) => change.homeworkNumberId), token),
   });
 
   const revert = useMutation({
@@ -174,7 +195,7 @@ export function useReview(studentId: string) {
       setAssignmentErrors((current) => ({ ...current, [input.assignmentId]: errorText(error, t.errors.undoVerdicts) }));
       noteWait(error);
     },
-    onSettled: (_result, _error, input) => finish(input.previous.map((entry) => entry.homeworkNumberId)),
+    onSettled: (_result, _error, input, token) => finish(input.previous.map((entry) => entry.homeworkNumberId), token),
   });
 
   const effectiveStatus = useCallback(

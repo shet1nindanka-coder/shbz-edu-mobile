@@ -161,6 +161,57 @@ describe('session isolation, round 4', () => {
     await app.unmount();
   });
 
+  it('the session-expired notice and the token warning are dismissed separately (#345)', async () => {
+    const app = await visit({ as: 'ilya@example.com', url: '/student' });
+    const keychain = device().secureStore;
+    const originalSet = keychain.set.bind(keychain);
+    const originalDelete = keychain.delete.bind(keychain);
+    keychain.set = (key: string, value: string) => {
+      if (key === 'shbz.session.token') throw new Error('keychain busy');
+      return originalSet(key, value);
+    };
+    keychain.delete = (key: string) => {
+      if (key === 'shbz.session.token') throw new Error('keychain busy');
+      return originalDelete(key);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const storageModule = require('@react-native-async-storage/async-storage') as { default?: StorageLike } & StorageLike;
+    const storage = storageModule.default ?? storageModule;
+    const spy = jest.spyOn(storage, 'setItem').mockImplementation(async (key: string) => {
+      if (key === 'shbz-signed-out-token') throw new Error('storage busy');
+    });
+    const dismissIn = async (id: string): Promise<void> => {
+      const notice = byTestId(app, id);
+      if (!notice) throw new Error(`no #${id}`);
+      const button = app.rntl.within(notice as never).getByLabelText('Скрыть сообщение');
+      await app.rntl.act(async () => {
+        app.rntl.fireEvent.press(button);
+      });
+      await app.advance(100);
+    };
+    try {
+      // A forced expiry whose token removal fails: both messages are on the login screen.
+      app.mock.controls.set('forceNextError', { method: '*', error: 'sessionExpired', times: 1 });
+      await press(app, 'tab-homeworks');
+      await app.settle();
+      expect(app.path()).toMatch(/^\/login/);
+      expect(byTestId(app, 'login-session-notice')).not.toBeNull();
+      expect(byTestId(app, 'login-token-notice')).not.toBeNull();
+      // Closing the routine «session expired» line keeps the security warning…
+      await dismissIn('login-session-notice');
+      expect(byTestId(app, 'login-session-notice')).toBeNull();
+      expect(byTestId(app, 'login-token-notice')).not.toBeNull();
+      // …which is closed by its own button.
+      await dismissIn('login-token-notice');
+      expect(byTestId(app, 'login-token-notice')).toBeNull();
+    } finally {
+      spy.mockRestore();
+      keychain.set = originalSet;
+      keychain.delete = originalDelete;
+    }
+    await app.unmount();
+  });
+
   it('no notice when the token was removed normally (#345)', async () => {
     const app = await visit({ as: 'ilya@example.com', url: '/student' });
     await press(app, 'app-bar-settings');

@@ -53,7 +53,7 @@ export function LoginScreen() {
   const { locale, dict, m } = useI18n();
   const waitText = useWaitText();
   const { preferences, localePending, setLocale } = usePreferences();
-  const { signIn, notice, tokenNotRemoved, dismissNotice } = useSession();
+  const { signIn, notice, tokenNotRemoved, dismissNotice, dismissTokenNotice } = useSession();
   const navigation = useAppNavigation();
 
   const [login, setLogin] = useState('');
@@ -171,7 +171,7 @@ export function LoginScreen() {
           <Notice
             tone="warning"
             text={m.shell.login.tokenNotRemoved}
-            onDismiss={dismissNotice}
+            onDismiss={dismissTokenNotice}
             dismissLabel={m.shell.login.sessionNoticeDismiss}
             style={styles.notice}
             testID="login-token-notice"

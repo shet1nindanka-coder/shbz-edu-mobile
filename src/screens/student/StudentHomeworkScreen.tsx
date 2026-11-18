@@ -81,7 +81,13 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
     navigation.open({ screen: 'student.homeworks' });
   }, [assignmentId, gone, live, navigation, queryClient]);
 
-  const check = useHomeworkCheck({ assignmentId, check: data?.assignment.latestCheck ?? null, live, onGone: leave });
+  const check = useHomeworkCheck({
+    assignmentId,
+    check: data?.assignment.latestCheck ?? null,
+    loaded: data !== undefined,
+    live,
+    onGone: leave,
+  });
 
   // Back on the screen (another tab, the photo viewer, the background): statuses and the batch may have
   // changed meanwhile, and a check that is still running resumes its polling by itself.

@@ -43,12 +43,14 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
   const t = dict.students.timelineChart;
   const [period, setPeriod] = useState<TimelinePeriod>('7d');
   const [width, setWidth] = useState(0);
-  // The selection belongs to one period's points.
-  const [selected, setSelected] = useState<{ period: TimelinePeriod; index: number } | null>(null);
+  // The selection belongs to one period's points and is kept by the point's key (its day or week), not by
+  // position: a refetch after midnight shifts every point of the period.
+  const [selected, setSelected] = useState<{ period: TimelinePeriod; key: string } | null>(null);
 
   const view = buildProgressTimelineView([...entries], period, dict.students.timeline, locale);
   const chart = buildTimelineChartGeometry(view.points.map((point) => point.closedCount));
-  const selectedIndex = selected && selected.period === period && selected.index < view.points.length ? selected.index : null;
+  const keptIndex = selected && selected.period === period ? view.points.findIndex((point) => point.key === selected.key) : -1;
+  const selectedIndex = keptIndex === -1 ? null : keptIndex;
   const selectedPoint = selectedIndex === null ? null : view.points[selectedIndex];
 
   const plotWidth = Math.max(0, width - SIDE * 2);
@@ -64,7 +66,10 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
     return format(t.pointTitle, { label: point?.label ?? '', n: point?.closedCount ?? 0 });
   };
   const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
-  const select = (index: number | null) => setSelected(index === null ? null : { period, index });
+  const select = (index: number | null) => {
+    const point = index === null ? undefined : view.points[index];
+    setSelected(point ? { period, key: point.key } : null);
+  };
 
   return (
     <View style={styles.root} testID="stats-timeline">

@@ -41,7 +41,9 @@ const ru = {
     unsaved: "Есть несохранённые изменения",
     reset: "Сбросить изменения",
     decrease: "Уменьшить: {label}",
-    increase: "Увеличить: {label}"
+    increase: "Увеличить: {label}",
+    /** Spoken after a ± step: the focus stays on the button, so the new value is said. */
+    stepped: "{label}: {value}"
   },
   journal: {
     filters: "Фильтры",
@@ -99,7 +101,8 @@ const en: typeof ru = {
     unsaved: "There are unsaved changes",
     reset: "Discard changes",
     decrease: "Decrease: {label}",
-    increase: "Increase: {label}"
+    increase: "Increase: {label}",
+    stepped: "{label}: {value}"
   },
   journal: {
     filters: "Filters",

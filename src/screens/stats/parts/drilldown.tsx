@@ -44,13 +44,18 @@ export function Drilldown({ topics, students }: DrilldownProps) {
   const { locale, dict, m } = useI18n();
   const waitText = useWaitText();
   const t = dict.planner.drilldown;
-  const [topicId, setTopicId] = useState<string | null>(null);
-  const [studentId, setStudentId] = useState<string | null>(null);
+  // The pair is pinned by id when the lists first arrive, as the site's `useState(topics[0]?.id)`: a refetch
+  // that reorders the rows (a topic moved up, a new student sorted first) must not change the slice.
+  const [topicId, setTopicId] = useState<string | null>(topics[0]?.id ?? null);
+  const [studentId, setStudentId] = useState<string | null>(students[0]?.id ?? null);
   const [homeworkId, setHomeworkId] = useState(WHOLE_TOPIC);
 
-  // A selection that left the lists (a deleted topic or student) falls back to the first row.
+  // A selection that left the lists (a deleted topic or student), or none yet, falls back to the first
+  // row, which is then pinned in its turn.
   const topic = topics.find((item) => item.id === topicId) ?? topics[0] ?? null;
   const student = students.find((item) => item.id === studentId) ?? students[0] ?? null;
+  if (topic && topic.id !== topicId) setTopicId(topic.id);
+  if (student && student.id !== studentId) setStudentId(student.id);
 
   const slice = useQuery({
     queryKey: qk('groups', 'getStatisticsDrilldown', topic?.id ?? '', student?.id ?? ''),

@@ -1,4 +1,6 @@
-import { Text, useAnnounce } from '@/ui';
+import { Platform } from 'react-native';
+
+import { Text, useStatusAnnouncement } from '@/ui';
 
 /** Outcome of a panel call: the server's `{ ok, message }`, or a failed request shown the same way. */
 export type PanelResult = { ok: boolean; message: string };
@@ -16,8 +18,10 @@ export type ResultLineProps = {
  * hint then.
  */
 export function ResultLine({ pendingText, result, testID }: ResultLineProps) {
-  // The outcome appears under the button without moving the focus: spoken on iOS (Android has the live region).
-  useAnnounce(pendingText ? null : result?.message);
+  // The outcome appears under the button without moving the focus: spoken on both platforms. A live region
+  // would not do on Android: the line is often mounted with its text (nothing pending before it), and a
+  // freshly attached region stays silent.
+  useStatusAnnouncement(pendingText ? null : result?.message);
   if (pendingText) {
     return (
       <Text variant="caption" color="textMuted" accessibilityLiveRegion="polite" testID={testID}>
@@ -31,7 +35,9 @@ export function ResultLine({ pendingText, result, testID }: ResultLineProps) {
       variant="captionMedium"
       color={result.ok ? 'greenText' : 'dangerText'}
       accessibilityRole={result.ok ? undefined : 'alert'}
-      accessibilityLiveRegion="polite"
+      // The browser has no announcement API here: its live region speaks a success line (an error also has
+      // role="alert"). On a device the hook above speaks it once.
+      accessibilityLiveRegion={Platform.OS === 'web' ? 'polite' : undefined}
       testID={testID}
     >
       {result.message}

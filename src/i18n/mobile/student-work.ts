@@ -15,7 +15,9 @@ const ru = {
     refreshFailed: "Не удалось обновить список. Показываем сохранённые данные."
   },
   homework: {
-    refreshFailed: "Не удалось обновить ДЗ. Показываем сохранённые данные."
+    refreshFailed: "Не удалось обновить ДЗ. Показываем сохранённые данные.",
+    // «Повторить» of a refused note save: every card of the list has its own, so it names the number.
+    noteRetryA11y: "Повторить сохранение заметки к № {number}"
   },
   photos: {
     // replaces `dict.student.photos.dropHint` / `dragTitle` (no drag & drop on a phone)
@@ -53,6 +55,8 @@ const ru = {
     // replaces `dict.student.lessonView.noItems` («обновите страницу»)
     noItems: "Учитель ещё не собрал набор — подождите минуту и потяните экран вниз, чтобы обновить.",
     itemA11y: "{index}. № {number}",
+    // Spoken when the check of a photo sent from this screen ends: «№ 010208: Перерешай. Ошибка …»
+    outcomeA11y: "№ {number}: {outcome}",
     refreshFailed: "Не удалось обновить урок. Показываем сохранённые данные."
   },
   preview: {
@@ -71,7 +75,8 @@ const en: typeof ru = {
     refreshFailed: "Could not refresh the list. Showing saved data."
   },
   homework: {
-    refreshFailed: "Could not refresh the homework. Showing saved data."
+    refreshFailed: "Could not refresh the homework. Showing saved data.",
+    noteRetryA11y: "Retry saving the note for No. {number}"
   },
   photos: {
     addHint: "Photograph your solution or choose a picture from the gallery",
@@ -100,6 +105,7 @@ const en: typeof ru = {
     remainingLessThanMinute: "Less than a minute left",
     noItems: "Your teacher hasn't put the set together yet — wait a minute and pull down to refresh.",
     itemA11y: "{index}. No. {number}",
+    outcomeA11y: "No. {number}: {outcome}",
     refreshFailed: "Could not refresh the lesson. Showing saved data."
   },
   preview: {

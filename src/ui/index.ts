@@ -9,7 +9,7 @@ export { OverlayCoverSlot, coveredAccessibilityProps, isOverlayCovered, setOverl
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './button';
 export { Card, CardPressArea, type CardPressAreaProps, type CardProps, type CardVariant } from './card';
 export { accessibilityLabelOf, withErrorHint, type AccessibilityPart } from './a11y';
-export { announceOnIOS, useAnnounce, useStatusAnnouncement } from './use-announce';
+export { announceOnIOS, useAnnounce, useEventAnnouncement, useStatusAnnouncement } from './use-announce';
 export { useCloseOnBlur, useNavigationFocused } from './internal/close-on-blur';
 export { effectiveFontScale, minimumFontScaleFor, widthForText } from './font-scale';
 export { useTextScale, type TextScale } from './use-text-scale';

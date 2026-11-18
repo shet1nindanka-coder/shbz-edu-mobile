@@ -6,7 +6,7 @@ import { MathContent } from '@/components/math';
 import { HOMEWORK_STATUS_ORDER } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Chip, PressableScale, StatusBadge, StatusOptionGroup, Text, TextButton, useAnnounce, type ChipTone } from '@/ui';
+import { Chip, PressableScale, StatusBadge, StatusOptionGroup, Text, TextButton, useStatusAnnouncement, type ChipTone } from '@/ui';
 
 import { DisclosureRow } from './disclosure-row';
 import { hasResultDiagnostics, shortenRecognizedAnswer } from './review-logic';
@@ -40,8 +40,9 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
   const styles = useStyles();
   const theme = useTheme();
   const { dict, m } = useI18n();
-  // A refused mark appears under the toggle without moving the focus: VoiceOver has to be told.
-  useAnnounce(error);
+  // A refused mark appears under the toggle without moving the focus: VoiceOver and TalkBack have to be told
+  // (on Android role="alert" alone says nothing).
+  useStatusAnnouncement(error);
   const t = dict.students.review;
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [conditionOpen, setConditionOpen] = useState(false);
@@ -139,6 +140,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
       <View>
         <DisclosureRow
           label={conditionOpen ? m.teacher.review.hideCondition : dict.topics.singleNumber.sectionTitle}
+          accessibilityLabel={format(conditionOpen ? m.teacher.review.hideConditionOf : m.teacher.review.showConditionOf, { n: number.number })}
           variant="captionStrong"
           color="textMuted"
           expanded={conditionOpen}
@@ -187,6 +189,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
 
       <TextButton
         label={dict.topics.history.show}
+        accessibilityLabel={format(m.teacher.review.historyOf, { n: number.number })}
         tone="muted"
         onPress={onHistory}
         testID={`review-number-history-${number.homeworkNumberId}`}

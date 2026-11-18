@@ -45,7 +45,9 @@ const ru = {
     imageFailed: "Не удалось показать изображение.",
     pdfExternalOnly: "На этом устройстве PDF открывается в отдельном приложении.",
     preparing: "Готовим файл…",
-    untitled: "Файл"
+    untitled: "Файл",
+    /** A file card button named after its slot: every topic shows two cards with the same buttons. */
+    actionOf: "{action}: {slot}"
   },
   photos: {
     add: "Добавить фото",
@@ -120,7 +122,8 @@ const en: typeof ru = {
     imageFailed: "Could not show the image.",
     pdfExternalOnly: "On this device a PDF opens in a separate app.",
     preparing: "Preparing the file…",
-    untitled: "File"
+    untitled: "File",
+    actionOf: "{action}: {slot}"
   },
   photos: {
     add: "Add a photo",

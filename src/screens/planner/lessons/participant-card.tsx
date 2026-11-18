@@ -197,6 +197,7 @@ export function ParticipantCard({
 
           <Button
             label={dict.planner.lessonManualAdd.label}
+            accessibilityLabel={format(m.planner.lessonBoard.forStudent, { action: dict.planner.lessonManualAdd.label, name: participant.studentName })}
             variant="outline"
             leftIcon="plus"
             disabled={busy !== undefined || itemsBlocked}

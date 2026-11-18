@@ -11,7 +11,7 @@ import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation, useStillHere } from '@/navigation';
 import { useHintsEnabled } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, CheckRow, DateTimeField, Notice, Screen, Select, Text, TextArea, useAnnounce } from '@/ui';
+import { Button, CheckRow, DateTimeField, Notice, Screen, Select, Text, TextArea, useStatusAnnouncement } from '@/ui';
 
 import { DurationStepper } from '../lessons/duration-stepper';
 import { checkedMemberIds, toggleId } from '../lessons/new-lesson-logic';
@@ -62,8 +62,9 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
   // one who left is not sent.
   const checkedIds = checkedMemberIds(form.members, uncheckedIds);
   const nobodyChecked = checkedIds.length === 0;
-  // The inline error appears without moving focus: VoiceOver says it (Android reads the alert).
-  useAnnounce(nobodyChecked ? dict.apiPlanner.lessons.selectAtLeastOneStudent : null);
+  // The inline error appears without moving focus: spoken on both platforms (an Android `alert` role alone
+  // is silent).
+  useStatusAnnouncement(nobodyChecked ? dict.apiPlanner.lessons.selectAtLeastOneStudent : null);
   const budget = draftBudget(dailyMinutes, deadlineAt, now);
 
   const create = useMutation({

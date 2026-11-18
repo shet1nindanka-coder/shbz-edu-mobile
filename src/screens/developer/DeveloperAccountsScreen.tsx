@@ -343,7 +343,7 @@ export function DeveloperAccountsScreen() {
         title={
           createdRole === 'TEACHER' ? dict.students.actions.createAccount.teacherCreated : dict.students.actions.createAccount.studentCreated
         }
-        onClose={() => {
+        onDone={() => {
           const role = overlay?.kind === 'credentials' ? overlay.role : 'STUDENT';
           closeOverlay();
           // The new account is on the tab of its role; show it there with the banner.

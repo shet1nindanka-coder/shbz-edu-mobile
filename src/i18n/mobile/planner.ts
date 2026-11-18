@@ -22,7 +22,13 @@ const ru = {
     noNumbers: "В этой теме пока нет номеров.",
     bankLoading: "Загружаем банк номеров…",
     bankFailed: "Не удалось загрузить банк номеров.",
-    numberPlaceholder: "Сначала выберите тему"
+    numberPlaceholder: "Сначала выберите тему",
+    // names of a row's controls out of context (explore by touch, the rotor): every row has the same ones
+    resultGroupAria: "Итог урока, {number}",
+    resultOptionAria: "{result}, {number}",
+    historyAria: "История статуса, {number}",
+    // a button repeated on every participant's card names the student
+    forStudent: "{action}: {name}"
   },
   lessonsList: {
     openLesson: "Открыть урок «{title}»",
@@ -81,7 +87,11 @@ const en: typeof ru = {
     noNumbers: "This topic has no problems yet.",
     bankLoading: "Loading the problem bank…",
     bankFailed: "Could not load the problem bank.",
-    numberPlaceholder: "Pick a topic first"
+    numberPlaceholder: "Pick a topic first",
+    resultGroupAria: "Lesson result, {number}",
+    resultOptionAria: "{result}, {number}",
+    historyAria: "Status history, {number}",
+    forStudent: "{action}: {name}"
   },
   lessonsList: {
     openLesson: "Open lesson “{title}”",

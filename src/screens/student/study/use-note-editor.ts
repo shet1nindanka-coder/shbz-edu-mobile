@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { isApiError, isRateLimited, qk } from '@/api';
 import type { StudentNumberDetailResponse } from '@/api/types';
+import { advanceWaitClock, startWaitClock, waitClockSeconds, type WaitClock } from '@/components/retry-wait';
 import {
   STUDENT_NOTE_WRITE,
   discardStudentNote,
@@ -28,8 +29,8 @@ import {
 export type NoteSaveError = {
   /** Localised text to show (the server's, or the fallback). */
   message: string;
-  /** Epoch ms before which the server will refuse again (`rateLimited`); null otherwise. */
-  retryAt: number | null;
+  /** The refusal named a wait (`rateLimited`): see `NoteEditor.waitSeconds`. */
+  rateLimited: boolean;
 };
 
 export type NoteEditor = {
@@ -42,6 +43,12 @@ export type NoteEditor = {
   /** «Сохраняем…» / waiting for a connection / waiting for a re-try while online / «Сохранено» / nothing. */
   status: NoteStatus;
   error: NoteSaveError | null;
+  /**
+   * Seconds until a save may be sent again after `429` (0 when nothing waits). It is the very clock that
+   * blocks sending — a duration, so a device clock set back does not lengthen it — so «Повторить» is shown
+   * exactly when it can send.
+   */
+  waitSeconds: number;
   /** The server reported that notes are switched off (`notesEnabled: false` in a save response). */
   disabledByServer: boolean;
 };
@@ -68,10 +75,19 @@ type SaveLoop = {
    * not say which. It counts as saved only once the server's note confirms it.
    */
   delivering: string | null;
-  blockedUntil: number;
+  /** The rate-limit wait (a duration, `wait-clock.ts`): nothing is sent while it runs. */
+  block: WaitClock | null;
+  /** The kept refusal's `retryAt` the wait was last taken from: a stored moment is read once. */
+  blockSource: number | null;
   debounce: Timer | null;
   flash: Timer | null;
 };
+
+/** A wait stored as a wall-clock moment (`retryAt` of a kept refusal), read once as a duration from `nowMs`. */
+function clockUntil(retryAt: number | null | undefined, nowMs: number): WaitClock | null {
+  if (!retryAt || !Number.isFinite(retryAt) || retryAt <= nowMs) return null;
+  return startWaitClock((retryAt - nowMs) / 1000, nowMs);
+}
 
 /**
  * The personal note of one problem (02 S3 "Note editing behaviour", §4.7): debounce 650 ms, flush on blur
@@ -113,6 +129,9 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
   const [disabledByServer, setDisabledByServer] = useState(false);
   /** A kept refusal the student has started typing over (its banner goes, like the editor's own error). */
   const [hiddenRefusalAt, setHiddenRefusalAt] = useState<number | null>(null);
+  // The rate-limit wait at mount (a refusal kept in the queue), and its seconds as shown.
+  const [initialBlock] = useState(() => clockUntil(refusal?.retryAt, Date.now()));
+  const [waitSeconds, setWaitSeconds] = useState(() => waitClockSeconds(initialBlock));
   const refusalRef = useRef(refusal);
   useEffect(() => {
     refusalRef.current = refusal;
@@ -127,10 +146,41 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     submittedAt: 0,
     lastEntry: pendingNote,
     delivering: null,
-    blockedUntil: refusal?.retryAt ?? 0,
+    block: initialBlock,
+    blockSource: refusal?.retryAt ?? null,
     debounce: null,
     flash: null,
   });
+
+  /** Seconds left of the rate-limit wait, measured now (the one gate of sending and of «Повторить»). */
+  const readBlock = useCallback((): number => {
+    const loop = loopRef.current;
+    if (!loop.block) return 0;
+    loop.block = advanceWaitClock(loop.block, Date.now());
+    const seconds = waitClockSeconds(loop.block);
+    if (seconds === 0) loop.block = null;
+    return seconds;
+  }, []);
+
+  /** A refusal named a wait: it runs from now, unless the wait already running is longer. */
+  const startBlock = useCallback(
+    (clock: WaitClock | null) => {
+      const loop = loopRef.current;
+      if (!clock || waitClockSeconds(clock) <= readBlock()) return;
+      loop.block = clock;
+      if (loop.mounted) setWaitSeconds(waitClockSeconds(clock));
+    },
+    [readBlock],
+  );
+
+  // The shown seconds follow the same clock once a second while it runs (timers stop in the background;
+  // the first tick after the return subtracts the whole time away, a clock set back adds nothing).
+  const blocked = waitSeconds > 0;
+  useEffect(() => {
+    if (!blocked) return;
+    const timer = setInterval(() => setWaitSeconds(readBlock()), 1000);
+    return () => clearInterval(timer);
+  }, [blocked, readBlock]);
 
   const showSaved = useCallback(() => {
     const loop = loopRef.current;
@@ -181,7 +231,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
         return;
       }
       // After `429` nothing is sent until the wait is over; the draft stays in the field for blur / retry.
-      if (loop.blockedUntil > Date.now()) return;
+      if (readBlock() > 0) return;
 
       loop.seq += 1;
       const token = loop.seq;
@@ -213,15 +263,14 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
         // The queue keeps the refused draft (with its refusal) until it is replaced or discarded.
         const failure = outcome.error;
         const retryAfter = isRateLimited(failure) && isApiError(failure) ? failure.retryAfterSeconds : undefined;
-        const retryAt = retryAfter ? Date.now() + retryAfter * 1000 : null;
-        if (retryAt) loop.blockedUntil = retryAt;
+        if (retryAfter) startBlock(startWaitClock(retryAfter, Date.now()));
         if (loop.mounted) {
-          setError({ message: isApiError(failure) && failure.message ? failure.message : fallbackError, retryAt });
+          setError({ message: isApiError(failure) && failure.message ? failure.message : fallbackError, rateLimited: Boolean(retryAfter) });
         }
       }
       // `queued`: the entry holds the draft; its status comes from the entry.
     },
-    [homeworkNumberId, fallbackError, showSaved, rememberSavedNote, waitingNow],
+    [homeworkNumberId, fallbackError, showSaved, rememberSavedNote, waitingNow, readBlock, startBlock],
   );
 
   // The server's note changed under the editor (rules in `adoptServerNote`). A draft still waiting in the
@@ -271,7 +320,11 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     }
     loop.lastEntry = refusal ? null : entryNote;
     loop.delivering = null;
-    if (refusal?.retryAt) loop.blockedUntil = Math.max(loop.blockedUntil, refusal.retryAt);
+    if (refusal?.retryAt && refusal.retryAt !== loop.blockSource) {
+      // The queue stores the wait as a moment; it is taken as a duration once, when it is first seen.
+      loop.blockSource = refusal.retryAt;
+      startBlock(clockUntil(refusal.retryAt, Date.now()));
+    }
     if (loop.debounce !== null) return;
     if (loop.mine.includes(entryNote)) return;
     // Stamped before this editor's latest submit: older than what this editor sent (a late notification).
@@ -279,7 +332,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     if (entryNote === loop.draft) return;
     loop.draft = entryNote;
     setText(entryNote);
-  }, [entryNote, entryAt, refusal]);
+  }, [entryNote, entryAt, refusal, startBlock]);
 
   // Each value of the server's note is news once. A value that arrived while a write of this editor was on
   // its way (in flight or queued) is older than that write and is dropped for good: re-reading it once the
@@ -312,16 +365,17 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
       setText(value);
       setSavedFlash(false);
       // The banner goes on the next keystroke — unless it is a rate-limit wait, which still holds.
-      setError((current) => (current?.retryAt && current.retryAt > Date.now() ? current : null));
+      const waiting = readBlock() > 0;
+      setError((current) => (current?.rateLimited && waiting ? current : null));
       const kept = refusalRef.current;
-      if (kept && !(kept.retryAt && kept.retryAt > Date.now())) setHiddenRefusalAt(kept.at);
+      if (kept && !(kept.retryAt !== null && waiting)) setHiddenRefusalAt(kept.at);
       if (loop.debounce) clearTimeout(loop.debounce);
       loop.debounce = setTimeout(() => {
         loop.debounce = null;
         void send(loop.draft);
       }, NOTE_DEBOUNCE_MS);
     },
-    [send],
+    [send, readBlock],
   );
 
   const flush = useCallback(() => {
@@ -332,10 +386,10 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
   }, [send]);
 
   // A refusal kept in the queue (this editor's or one met in the background) is shown like the editor's own;
-  // a `retryAt` in the past counts as no wait (`useCountdown`).
+  // its wait is the editor's own clock (`waitSeconds`).
   const keptError: NoteSaveError | null =
     refusal && refusal.at !== hiddenRefusalAt && !saving
-      ? { message: refusal.message ?? fallbackError, retryAt: refusal.retryAt }
+      ? { message: refusal.message ?? fallbackError, rateLimited: refusal.retryAt !== null }
       : null;
 
   return {
@@ -346,6 +400,7 @@ export function useNoteEditor(homeworkNumberId: string, serverNote: string, fall
     // An entry whose request is in flight (here, in the other editor or in a flush) is «Сохраняем…».
     status: noteStatus({ saving, queued: pendingNote !== null && !saving, savedFlash, online, sending: entrySending }),
     error: error ?? keptError,
+    waitSeconds,
     disabledByServer,
   };
 }

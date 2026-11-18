@@ -12,7 +12,7 @@
  *   can say so. A mutation is NEVER retried automatically (CLAUDE.md "Errors"). The one exception with a
  *   retry — the student's note — goes through the pending-writes queue (`pending-writes.ts`).
  */
-import { CancelledError, QueryClient, defaultShouldDehydrateQuery, onlineManager } from '@tanstack/react-query';
+import { CancelledError, QueryClient, defaultShouldDehydrateQuery, onlineManager, type Query } from '@tanstack/react-query';
 import type { PersistQueryClientProviderProps } from '@tanstack/react-query-persist-client';
 
 import { isApiError, isNetworkError } from '@/api/errors';
@@ -72,16 +72,42 @@ export function failQueriesWaitingWithoutData(client: QueryClient): () => void {
  * Lowering `gcTime` cannot help (TanStack keeps the longest one seen), and the cache still announces
  * `observerRemoved` for a removed query: that is where it is destroyed (timer cleared, fetch cancelled),
  * after which nothing references it. The clear stays immediate, so the next user never sees old data.
+ *
+ * A query removed while its fetch is still running needs a second destroy: destroying cancels the fetch,
+ * but the fetch's own `finally` then schedules the gc again (24 h) on the removed query — and the same
+ * happens to a fetch that simply settles later. So such a query is destroyed once more after its fetch
+ * settles. This covers both a removed query whose last observer leaves and one removed with no observers
+ * at all (the cache destroys that one itself, before the fetch has settled).
  */
 export function destroyOrphanedQueries(client: QueryClient): () => void {
   const cache = client.getQueryCache();
+  const isOrphan = (query: Query): boolean => query.getObserversCount() === 0 && cache.get(query.queryHash) !== query;
+  const destroyAfterFetch = (query: Query): void => {
+    const inFlight = query.promise;
+    if (!inFlight) return;
+    // The extra hop runs after the fetch's `finally` (which re-arms the gc timer) has completed.
+    void inFlight
+      .then(noop, noop)
+      .then(() => {
+        if (!isOrphan(query)) return;
+        query.destroy();
+        destroyAfterFetch(query);
+      });
+  };
   return cache.subscribe((event) => {
+    if (event.type === 'removed') {
+      if (isOrphan(event.query)) destroyAfterFetch(event.query);
+      return;
+    }
     if (event.type !== 'observerRemoved') return;
     const { query } = event;
-    if (query.getObserversCount() > 0 || cache.get(query.queryHash) === query) return;
+    if (!isOrphan(query)) return;
     query.destroy();
+    destroyAfterFetch(query);
   });
 }
+
+function noop(): void {}
 
 export type AppQueryClientOptions = {
   /** Pause before the one retry; tests shorten it. */

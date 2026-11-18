@@ -48,6 +48,9 @@ const ru = {
   },
   topic: {
     hideAnswer: "Скрыть ответ",
+    // Accessible names of the answer toggle: every number of the topic has one.
+    showAnswerOf: "Показать ответ № {number}",
+    hideAnswerOf: "Скрыть ответ № {number}",
     numbersCount: "Всего: {count}",
     openEdit: "Открыть редактирование темы"
   },
@@ -120,6 +123,8 @@ const en: typeof ru = {
   },
   topic: {
     hideAnswer: "Hide answer",
+    showAnswerOf: "Show the answer to problem {number}",
+    hideAnswerOf: "Hide the answer to problem {number}",
     numbersCount: "Total: {count}",
     openEdit: "Open the topic editor"
   },

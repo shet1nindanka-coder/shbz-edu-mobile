@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import type { StudentHomeworkNumberDto } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { RetryWaitLine, useWaitUntil } from '@/components/retry-wait';
+import { RetryWaitLine } from '@/components/retry-wait';
 import { homeworkStatusShortLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
@@ -33,8 +33,9 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
   const { dict, m } = useI18n();
   const t = dict.student.numberCard;
   const note = useNoteEditor(number.homeworkNumberId, number.note, t.noteSaveFailed);
-  // The server's wait, counted down as a duration from the refusal on (a clock set back does not lengthen it).
-  const wait = useWaitUntil(note.error?.retryAt ?? null);
+  // The server's wait is the editor's own gate (a duration: a clock set back does not lengthen it), so
+  // «Повторить» appears exactly when it can send.
+  const wait = note.error ? note.waitSeconds : 0;
 
   const statusLine =
     note.status === 'saving'
@@ -60,6 +61,7 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
             wait > 0 ? undefined : (
               <TextButton
                 label={m.common.actions.retry}
+                accessibilityLabel={format(m.studentWork.homework.noteRetryA11y, { number: number.number })}
                 tone="danger"
                 onPress={note.retry}
                 testID={`number-note-retry-${number.number}`}

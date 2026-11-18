@@ -1,4 +1,4 @@
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
@@ -72,7 +72,10 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
 
   // ── highlight from a notification ──────────────────────────────────────────────────────────────
   // Which `studentId` has been dealt with; reset when the parameter goes away, so the same
-  // notification can point at the row again.
+  // notification can point at the row again. The tab is a tab root and stays mounted: when the user left
+  // it during the flash, the parameter cannot be dropped from the background, so the id is marked as not
+  // dealt with and the highlight runs again when the tab is in front again (a later tap on the same
+  // notification lands here with unchanged params) — and then drops the parameter.
   const handledId = useRef<string | null>(null);
   const latest = useRef({ rows, focused, navigation });
   useEffect(() => {
@@ -85,7 +88,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
       handledId.current = null;
       return;
     }
-    if (!listed || handledId.current === studentId) return;
+    if (!listed || !focused || handledId.current === studentId) return;
     // One frame later: the list has to lay its rows out before it can scroll to one of them.
     const timer = setTimeout(() => {
       handledId.current = studentId;
@@ -95,7 +98,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
     }, 50);
     return () => clearTimeout(timer);
-  }, [studentId, listed]);
+  }, [studentId, listed, focused]);
 
   useEffect(() => {
     if (flashId === null) return;
@@ -104,6 +107,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
       // The site drops `?studentId=` from the address once the highlight is over; the tab does the same
       // while it is the screen in front (a replace from the background would switch tabs).
       if (latest.current.focused) latest.current.navigation.replace({ screen: 'calls.list' });
+      else handledId.current = null;
     }, HIGHLIGHT_FLASH_MS);
     return () => clearTimeout(timer);
   }, [flashId]);
@@ -178,10 +182,17 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
     </View>
   );
 
-  const renderRow = ({ item }: { item: CallListRow }) =>
+  const renderRow = ({ item, target }: ListRenderItemInfo<CallListRow>) =>
     item.type === 'summary' ? (
       data ? (
-        <SummaryBar counts={data.counts} />
+        target === 'StickyHeader' ? (
+          // FlashList keeps the in-list cell and draws this pinned copy beside it: only the cell is read.
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+            <SummaryBar counts={data.counts} />
+          </View>
+        ) : (
+          <SummaryBar counts={data.counts} />
+        )
       ) : null
     ) : (
       <View style={styles.item}>

@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { META_LIMITS } from '@/api/types/limits';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { IconButton, Text } from '@/ui';
+import { IconButton, Text, announceOnIOS } from '@/ui';
 
 import { stepDuration } from './new-lesson-logic';
 
@@ -27,21 +27,30 @@ export function DurationStepper({ value, onChange, accessibilityLabel, disabled 
   const styles = useStyles();
   const { dict, m } = useI18n();
   const text = format(dict.planner.common.minutesShort, { n: value });
+  const valueLabel = (minutes: number) => `${accessibilityLabel}: ${format(dict.planner.common.minutesShort, { n: minutes })}`;
+  // The focus stays on the pressed button: Android reads the value's live region, VoiceOver has none and
+  // is told the new value explicitly.
+  const step = (direction: 1 | -1) => {
+    const next = stepDuration(value, direction);
+    if (next === value) return;
+    onChange(next);
+    announceOnIOS(valueLabel(next));
+  };
   return (
     <View testID={testID} style={styles.row}>
       <IconButton
         icon="minus"
         accessibilityLabel={m.planner.lessonNew.durationDecrease}
         disabled={disabled || value <= RANGE.min}
-        onPress={() => onChange(stepDuration(value, -1))}
+        onPress={() => step(-1)}
         testID={testID ? `${testID}-minus` : undefined}
       />
-      {/* The two buttons are the controls; the value between them is announced when it changes. */}
+      {/* The two buttons are the controls; the value between them is a live region (Android). */}
       <Text
         variant="bodyStrong"
         tabular
         align="center"
-        accessibilityLabel={`${accessibilityLabel}: ${text}`}
+        accessibilityLabel={valueLabel(value)}
         accessibilityLiveRegion="polite"
         style={styles.value}
         testID={testID ? `${testID}-value` : undefined}
@@ -52,7 +61,7 @@ export function DurationStepper({ value, onChange, accessibilityLabel, disabled 
         icon="plus"
         accessibilityLabel={m.planner.lessonNew.durationIncrease}
         disabled={disabled || value >= RANGE.max}
-        onPress={() => onChange(stepDuration(value, 1))}
+        onPress={() => step(1)}
         testID={testID ? `${testID}-plus` : undefined}
       />
     </View>
