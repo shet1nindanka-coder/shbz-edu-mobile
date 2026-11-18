@@ -159,8 +159,10 @@ export function useLessonBoard(lessonId: string) {
       statusData.participants,
       participants.map((participant) => participant.id),
     );
-    if (planSignature(rows) !== planSignature(participants)) void refetchBoard();
-  }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refetchBoard]);
+    // A server-side change: `refreshBoard` (not `refetchBoard`), so a realtime read that started after this
+    // render is never cancelled.
+    if (planSignature(rows) !== planSignature(participants)) refreshBoard();
+  }, [polling, participants, statusData, statusUpdatedAt, boardUpdatedAt, boardFetching, refreshBoard]);
 
   // A plan that arrived or failed (seen by the poll, a realtime refresh or a refetch on focus) also changes
   // the lessons list's «подбор идёт», the student card's lessons tab and the group pages.
@@ -207,7 +209,7 @@ export function useLessonBoard(lessonId: string) {
   // with the status the board arrived with.
   useEffect(() => {
     if (boardStatus === null || boardFetching) return;
-    if (hasScheduleMovedOn({ status: boardStatus, startsAt, durationMinutes, finishedAt }, Date.now() + clockOffset)) void refetchBoard();
+    if (hasScheduleMovedOn({ status: boardStatus, startsAt, durationMinutes, finishedAt }, Date.now() + clockOffset)) refreshBoard();
     // Only the 30-second tick drives this check: a re-read must never trigger the next one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceNow]);
