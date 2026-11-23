@@ -19,14 +19,14 @@ export type FieldShellProps = {
   children: ReactNode;
 };
 
-/** Label → control → error/helper stack shared by every form field (label gap 9). */
+/** Label → control → error/helper stack shared by every form field (label gap 4). */
 export function FieldShell({ label, error, helper, labelAside, style, children }: FieldShellProps) {
   const theme = useTheme();
   // iOS has no live regions: the error is spoken when it appears. The control itself carries it as its
   // hint (`withErrorHint`), so focusing the field later reads it too.
   useAnnounce(error);
   return (
-    <View style={[{ gap: theme.space.sm }, style]}>
+    <View style={[{ gap: theme.space.xxs }, style]}>
       {label || labelAside ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space.md }}>
           {label ? (

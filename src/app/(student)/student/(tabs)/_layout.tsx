@@ -1,7 +1,7 @@
-// STUDENT — 5 tabs in site order: обзор · урок · дз · дедлайны · теория («общая инфа» is a row on Home and in Settings).
+// STUDENT — every primary section is a tab: обзор · урок · дз · дедлайны · теория · инфа. The dock (one
+// overlay for the whole app, `DockHost`) shows the first five on a phone and all six on a tablet.
 import { Tabs } from 'expo-router/js-tabs';
 
-import { RoleTabBar } from '@/navigation';
 import { useTheme } from '@/theme';
 
 export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
@@ -13,15 +13,13 @@ export const unstable_settings = { anchor: '(home)' };
 export default function StudentTabsLayout() {
   const theme = useTheme();
   return (
-    <Tabs
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: theme.colors.pageBg } }}
-      tabBar={(props) => <RoleTabBar {...props} role="STUDENT" />}
-    >
+    <Tabs screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: theme.colors.pageBg } }} tabBar={() => null}>
       <Tabs.Screen name="(home)" />
       <Tabs.Screen name="lesson" />
       <Tabs.Screen name="homeworks" />
       <Tabs.Screen name="deadlines" />
       <Tabs.Screen name="theory" />
+      <Tabs.Screen name="info" />
     </Tabs>
   );
 }

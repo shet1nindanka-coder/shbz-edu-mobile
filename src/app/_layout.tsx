@@ -16,7 +16,7 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router, type ErrorBoundaryProps, type Href } from 'expo-router';
 import { useMemo } from 'react';
 
-import { useRootStackKeeper } from '@/navigation';
+import { DockHost, useRootStackKeeper } from '@/navigation';
 import { AppProviders, IS_MOCK_BUILD, useSession } from '@/providers';
 import { LaunchScreen, LockGate, ReminderOpener } from '@/screens/shell';
 import { RootErrorBoundary } from '@/screens/shell/RouteErrorBoundary';
@@ -86,6 +86,8 @@ function RootNavigator() {
     <NavigationThemeProvider value={navigationTheme}>
       <OfflineBannerHost>
         <LockGate>
+          {/* The dock floats above the role tree and settings; it is not a navigator's tab bar. */}
+          <DockHost>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.pageBg } }}>
             <Stack.Screen name="index" options={{ animation: 'none' }} />
 
@@ -110,7 +112,11 @@ function RootNavigator() {
                 name="notifications"
                 options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }}
               />
-              <Stack.Screen name="number-search" options={{ presentation: 'modal' }} />
+              {/* The search panel drops from the top over the dimmed screen it was opened from. */}
+              <Stack.Screen
+                name="number-search"
+                options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
+              />
               <Stack.Screen name="file-viewer" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             </Stack.Protected>
 
@@ -122,6 +128,7 @@ function RootNavigator() {
             <Stack.Screen name="dev-ui" />
             <Stack.Screen name="dev-math" />
           </Stack>
+          </DockHost>
           <ReminderOpener />
         </LockGate>
       </OfflineBannerHost>

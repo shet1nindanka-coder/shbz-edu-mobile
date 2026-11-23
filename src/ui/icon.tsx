@@ -1,142 +1,46 @@
-import Feather from '@expo/vector-icons/Feather';
-import type { ComponentProps } from 'react';
 import { View } from 'react-native';
+import Svg, { Circle, Ellipse, Line, Path, Polygon, Polyline, Rect } from 'react-native-svg';
 
 import { useTheme, type ColorToken } from '@/theme';
 
-import { CUSTOM_ICON_NAMES, CustomIcon, type CustomIconName } from './internal/custom-icon';
+import { LUCIDE_ICONS, type IconShape, type LucideIconName } from './internal/generated/lucide-icons';
 
-type FeatherName = ComponentProps<typeof Feather>['name'];
-
-// The site's inline SVG icons (gear, bell, chevron, check, calendar, copy…) are Feather glyphs, so the
-// app's icon set is Feather. Screens use the semantic names below, never a raw glyph name.
-const FEATHER = {
-  // chrome
-  bell: 'bell',
-  bellOff: 'bell-off',
-  settings: 'settings',
-  menu: 'menu',
-  close: 'x',
-  back: 'arrow-left',
-  forward: 'arrow-right',
-  arrowUp: 'arrow-up',
-  arrowDown: 'arrow-down',
-  chevronDown: 'chevron-down',
-  chevronUp: 'chevron-up',
-  chevronLeft: 'chevron-left',
-  chevronRight: 'chevron-right',
-  check: 'check',
-  plus: 'plus',
-  minus: 'minus',
-  search: 'search',
-  more: 'more-horizontal',
-  moreVertical: 'more-vertical',
-  logout: 'log-out',
-  login: 'log-in',
-  externalLink: 'external-link',
-  filter: 'filter',
-  refresh: 'refresh-cw',
-  // content
-  home: 'home',
-  calendar: 'calendar',
-  clock: 'clock',
-  copy: 'copy',
-  edit: 'edit-2',
-  trash: 'trash-2',
-  file: 'file-text',
-  filePlus: 'file-plus',
-  folder: 'folder',
-  image: 'image',
-  camera: 'camera',
-  upload: 'upload',
-  download: 'download',
-  share: 'share',
-  paperclip: 'paperclip',
-  link: 'link',
-  eye: 'eye',
-  eyeOff: 'eye-off',
-  lock: 'lock',
-  key: 'key',
-  mail: 'mail',
-  send: 'send',
-  star: 'star',
-  award: 'award',
-  zap: 'zap',
-  target: 'target',
-  list: 'list',
-  grid: 'grid',
-  hash: 'hash',
-  globe: 'globe',
-  sun: 'sun',
-  moon: 'moon',
-  smartphone: 'smartphone',
-  wifiOff: 'wifi-off',
-  cloudOff: 'cloud-off',
-  code: 'code',
-  terminal: 'terminal',
-  database: 'database',
-  activity: 'activity',
-  trendingUp: 'trending-up',
-  printer: 'printer',
-  message: 'message-square',
-  // people
-  user: 'user',
-  users: 'users',
-  userPlus: 'user-plus',
-  userCheck: 'user-check',
-  // feedback
-  info: 'info',
-  help: 'help-circle',
-  alert: 'alert-triangle',
-  alertCircle: 'alert-circle',
-  checkCircle: 'check-circle',
-  closeCircle: 'x-circle',
-  // sections
-  playCircle: 'play-circle',
-  clipboard: 'clipboard',
-  bookOpen: 'book-open',
-  book: 'book',
-  layers: 'layers',
-  phone: 'phone',
-  phoneCall: 'phone-call',
-  phoneMissed: 'phone-missed',
-  barChart: 'bar-chart-2',
-  sliders: 'sliders',
-} as const satisfies Record<string, FeatherName>;
-
-export type IconName = keyof typeof FEATHER | CustomIconName;
+// The icon set is Lucide (stroke 2, round caps and joins, 24 × 24 view box), generated into
+// `internal/generated/lucide-icons.ts` by `scripts/build-lucide-icons.mjs`. Screens use the semantic names
+// of that file, never a raw glyph name; a new icon is added to the script's table.
+export type IconName = LucideIconName;
 
 /** Every icon name, for galleries and pickers. */
-export const ICON_NAMES: readonly IconName[] = [...(Object.keys(FEATHER) as (keyof typeof FEATHER)[]), ...CUSTOM_ICON_NAMES];
+export const ICON_NAMES = Object.keys(LUCIDE_ICONS) as readonly IconName[];
 
 /**
- * Tab-bar / section icons per role (docs/spec/01-shell-auth.md §1.3 proposal). Keys are the last
+ * Section icons per role (docs/design/glass-over-paper.md §6, the owner's choice). Keys are the last
  * segment of the site's `dict.nav.<role>.<item>` label key.
  */
 export const navIcons = {
   student: {
     overview: 'home',
-    lesson: 'playCircle',
-    homeworks: 'clipboard',
-    deadlines: 'calendar',
+    lesson: 'presentation',
+    homeworks: 'notebookPen',
+    deadlines: 'calendarDays',
     theory: 'bookOpen',
     info: 'info',
   },
   teacher: {
     overview: 'home',
-    topics: 'layers',
+    topics: 'folderOpen',
     students: 'users',
-    groups: 'usersGroup',
+    groups: 'bookUser',
     lessons: 'calendarCheck',
     calls: 'phone',
     more: 'more',
   },
   developer: {
-    topics: 'layers',
-    accounts: 'idCard',
+    topics: 'folderOpen',
+    accounts: 'key',
     calls: 'phone',
     statistics: 'barChart',
-    panel: 'sliders',
+    panel: 'terminal',
   },
   settings: 'settings',
   notifications: 'bell',
@@ -152,55 +56,58 @@ export const navIcons = {
 
 export type IconProps = {
   name: IconName;
-  /** Size in dp. Default 20. */
+  /** Size in dp: 16, 20 (default) or 24. */
   size?: number;
   /** Colour token; default `textStrong`. */
   color?: ColorToken;
-  /** Raw colour, for icons that sit on a status or streak fill. Wins over `color`. */
+  /** Raw colour, for icons that sit on a status or gradient fill. Wins over `color`. */
   tint?: string;
   /** Icons are decorative by default; give a label only when the icon alone carries the meaning. */
   accessibilityLabel?: string;
 };
 
-function isCustom(name: IconName): name is CustomIconName {
-  return (CUSTOM_ICON_NAMES as readonly string[]).includes(name);
+const SHAPES = { path: Path, circle: Circle, rect: Rect, line: Line, polyline: Polyline, polygon: Polygon, ellipse: Ellipse } as const;
+
+/** Lucide attribute names → react-native-svg props. */
+const ATTRIBUTE_PROPS: Record<string, string> = {
+  'stroke-width': 'strokeWidth',
+  'stroke-linecap': 'strokeLinecap',
+  'stroke-linejoin': 'strokeLinejoin',
+  'fill-rule': 'fillRule',
+  'clip-rule': 'clipRule',
+};
+
+function shapeProps(attrs: IconShape[1], color: string): Record<string, string> {
+  const props: Record<string, string> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    props[ATTRIBUTE_PROPS[key] ?? key] = value === 'currentColor' ? color : value;
+  }
+  return props;
 }
 
 /**
- * The app's icon primitive: a semantic name, a size and a colour token.
- *
- * Every icon occupies exactly `size` × `size`. A Feather glyph is text, and its line box is taller than its
- * font size (23 px for a 20 px glyph on web) while a drawn icon is exactly `size` — without the common box
- * a row of icons with labels (the tab bar) sits on two different baselines.
+ * The app's icon primitive: a semantic name, a size and a colour token. Every icon occupies exactly
+ * `size` × `size`, so a row of icons with labels (the dock) sits on one baseline.
  */
 export function Icon({ name, size = 20, color = 'textStrong', tint, accessibilityLabel }: IconProps) {
   const theme = useTheme();
   const resolved = tint ?? theme.colors[color];
-  const box = { width: size, height: size, alignItems: 'center', justifyContent: 'center' } as const;
-  if (isCustom(name)) {
-    return (
-      <View
-        style={box}
-        accessible={Boolean(accessibilityLabel)}
-        accessibilityRole={accessibilityLabel ? 'image' : undefined}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityElementsHidden={!accessibilityLabel}
-        importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}
-      >
-        <CustomIcon name={name} size={size} color={resolved} />
-      </View>
-    );
-  }
+  const shapes: readonly IconShape[] = LUCIDE_ICONS[name];
   return (
-    <View style={box}>
-      <Feather
-        name={FEATHER[name]}
-        size={size}
-        color={resolved}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityElementsHidden={!accessibilityLabel}
-        importantForAccessibility={accessibilityLabel ? 'yes' : 'no'}
-      />
+    <View
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      accessible={Boolean(accessibilityLabel)}
+      accessibilityRole={accessibilityLabel ? 'image' : undefined}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityElementsHidden={!accessibilityLabel}
+      importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}
+    >
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={resolved} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        {shapes.map(([tag, attrs], index) => {
+          const Shape = SHAPES[tag];
+          return <Shape key={index} {...shapeProps(attrs, resolved)} />;
+        })}
+      </Svg>
     </View>
   );
 }

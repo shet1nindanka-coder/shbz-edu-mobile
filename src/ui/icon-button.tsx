@@ -3,10 +3,11 @@ import { StyleSheet, View, type GestureResponderEvent, type StyleProp, type View
 import { makeStyles, useTheme } from '@/theme';
 
 import { CountBadge } from './count-badge';
+import { Glass } from './glass';
 import { Icon, type IconName } from './icon';
 import { hitSlopFor, PressableScale } from './internal/pressable-scale';
 
-export type IconButtonVariant = 'circle' | 'ghost' | 'danger' | 'dangerRaised';
+export type IconButtonVariant = 'circle' | 'glass' | 'ghost' | 'danger' | 'dangerRaised';
 
 export type IconButtonProps = {
   icon: IconName;
@@ -14,8 +15,9 @@ export type IconButtonProps = {
   accessibilityLabel: string;
   onPress?: (event: GestureResponderEvent) => void;
   /**
-   * `circle` — 40px outlined circle (bell, gear); `ghost` — no outline (back arrow);
-   * `danger` — 26px "×" remove; `dangerRaised` — the same over an image.
+   * `circle` — the 44 outlined mark (`.st`: white, radius 12) for buttons inside content: close, «⋯», arrows;
+   * `glass` — the 44 round glass button of the screen header (search, bell); navigation only;
+   * `ghost` — no outline; `danger` — 24px "×" remove; `dangerRaised` — the same over an image.
    */
   variant?: IconButtonVariant;
   /** Highlights a `circle` whose screen is open (the gear on the settings screen). */
@@ -23,7 +25,7 @@ export type IconButtonProps = {
   disabled?: boolean;
   /** Unread counter in the top-right corner (hidden at 0, `9+` above 9). */
   badge?: number;
-  /** Glyph size override (default 18 for circles, 15 for danger). */
+  /** Glyph size override (default 20; 16 for danger). */
   iconSize?: number;
   /** Raw glyph colour, for a button that sits on a tinted surface (a notice). */
   tint?: string;
@@ -32,7 +34,7 @@ export type IconButtonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Round icon-only button. The visual is 40 (or 26) px; the touch target is always at least 44. */
+/** Icon-only button. The visual is 44 (24 for the remove cross); the touch target is always at least 44. */
 export function IconButton({
   icon,
   accessibilityLabel,
@@ -72,6 +74,7 @@ export function IconButton({
         styles.base,
         { width: diameter, height: diameter },
         variant === 'circle' ? (active ? styles.circleActive : styles.circle) : null,
+        variant === 'glass' ? styles.glass : null,
         variant === 'dangerRaised' ? [styles.raised, theme.shadows.raisedIcon] : null,
         disabled ? { opacity: variant === 'danger' ? 0.3 : 0.4 } : null,
         style,
@@ -81,15 +84,18 @@ export function IconButton({
           ? { backgroundColor: c.redSoft, borderColor: c.dangerOutline }
           : variant === 'circle'
             ? { borderColor: c.outlineHover }
-            : { backgroundColor: c.tabHover }
+            : variant === 'glass'
+              ? { opacity: 0.7 }
+              : { backgroundColor: c.tabHover }
       }
     >
       {({ pressed }) => (
         <>
+          {variant === 'glass' ? <Glass style={styles.glassFill} /> : null}
           <View style={variant === 'danger' && !pressed ? styles.dimmed : null}>
             <Icon
               name={icon}
-              size={iconSize ?? (small ? 15 : 18)}
+              size={iconSize ?? (small ? theme.sizes.icon.sm : theme.sizes.icon.md)}
               tint={
                 tint ??
                 (variant === 'danger'
@@ -98,7 +104,11 @@ export function IconButton({
                     ? pressed
                       ? c.dangerText
                       : c.textMuted
-                    : c.textStrong)
+                    : variant === 'circle' && !active
+                      ? c.textMuted
+                      : variant === 'glass'
+                        ? c.label
+                        : c.textStrong)
               }
             />
           </View>
@@ -117,10 +127,12 @@ const useStyles = makeStyles((t) => ({
     borderWidth: t.borders.interactive,
     borderColor: 'transparent',
   },
-  circle: { backgroundColor: t.colors.cardBg, borderColor: t.colors.outlineBorder },
-  circleActive: { backgroundColor: t.colors.tabHover, borderColor: t.colors.textStrong },
-  raised: { backgroundColor: t.colors.cardBg, borderColor: t.colors.softBorder },
+  circle: { borderRadius: t.radii.md, backgroundColor: t.colors.cardBg, borderColor: t.colors.line2 },
+  circleActive: { borderRadius: t.radii.md, backgroundColor: t.colors.soft2, borderColor: t.colors.textStrong },
+  glass: { borderWidth: 0 },
+  glassFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  raised: { backgroundColor: t.colors.cardBg, borderColor: t.colors.line2 },
   // The remove glyph is quiet until touched (opacity 0.55 → 1 on the site).
   dimmed: { opacity: 0.55 },
-  badge: { position: 'absolute', top: -5.5, right: -5.5 },
+  badge: { position: 'absolute', top: -t.space.xxs, right: -t.space.xxs },
 }));

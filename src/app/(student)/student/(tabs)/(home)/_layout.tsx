@@ -1,4 +1,4 @@
-// Stack of the student's first tab: `student.home` → `student.info`.
+// Stack of the student's first tab: `student.home`.
 import { Stack } from 'expo-router';
 
 import { useTheme } from '@/theme';

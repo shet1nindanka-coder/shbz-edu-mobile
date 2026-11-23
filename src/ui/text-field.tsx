@@ -28,14 +28,16 @@ export type TextFieldProps = Omit<TextInputProps, 'style' | 'editable'> & {
   right?: ReactNode;
   /** Right-aligned node on the label row. */
   labelAside?: ReactNode;
+  /** `md` 44 (default) · `lg` 52 — the login form. */
+  size?: 'md' | 'lg';
   ref?: Ref<TextInputInstance>;
   containerStyle?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
 };
 
 /**
- * Single-line input (`.shbz-input`): 52 high, 16px text (iOS zooms below 16), radius 12; the focused
- * state is the gradient border. `accessibilityLabel` defaults to `label`.
+ * Single-line input (`.inp`): 44 high (52 on the login form), 15 / 500 text, radius 12, 1.5 outline; the
+ * focused state is the gradient border. `accessibilityLabel` defaults to `label`.
  */
 export function TextField({
   label,
@@ -48,6 +50,7 @@ export function TextField({
   ref,
   containerStyle,
   inputStyle,
+  size = 'md',
   onFocus,
   onBlur,
   accessibilityLabel,
@@ -60,7 +63,7 @@ export function TextField({
 
   return (
     <FieldShell label={label} error={error} helper={helper} labelAside={labelAside} style={containerStyle}>
-      <InputFrame focused={focused} disabled={disabled} height={theme.sizes.field}>
+      <InputFrame focused={focused} disabled={disabled} height={size === 'lg' ? theme.sizes.fieldLg : theme.sizes.field}>
         {left ? <View style={styles.left}>{left}</View> : null}
         <TextInput
           ref={ref}
@@ -84,7 +87,7 @@ export function TextField({
             setFocused(false);
             onBlur?.(event);
           }}
-          style={[styles.input, left ? styles.withLeft : null, right ? styles.withRight : null, inputStyle]}
+          style={[styles.input, size === 'lg' ? styles.inputLg : null, left ? styles.withLeft : null, right ? styles.withRight : null, inputStyle]}
         />
         {right}
       </InputFrame>
@@ -98,7 +101,7 @@ const useStyles = makeStyles((t) => ({
     flex: 1,
     minWidth: 0,
     alignSelf: 'stretch',
-    paddingHorizontal: 16,
+    paddingHorizontal: t.space.md,
     paddingVertical: 0,
     color: t.colors.textStrong,
     // The browser's own focus outline would double the gradient border on web. Chromium paints
@@ -107,7 +110,8 @@ const useStyles = makeStyles((t) => ({
     outlineStyle: 'solid',
   },
   // The slot is inset like the text of a field without an icon; the icon never sits on the border.
-  left: { paddingLeft: t.space.lg - t.space.xxs },
-  withLeft: { paddingLeft: 10 },
-  withRight: { paddingRight: 8 },
+  inputLg: { paddingHorizontal: t.space.lg },
+  left: { paddingLeft: t.space.md },
+  withLeft: { paddingLeft: t.space.sm },
+  withRight: { paddingRight: t.space.sm },
 }));

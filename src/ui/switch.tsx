@@ -80,7 +80,7 @@ export function Switch({
       {trailing ? null : track}
       {hasText ? (
         <View style={styles.texts}>
-          {label ? <Text variant="smallStrong">{label}</Text> : null}
+          {label ? <Text variant="bodyStrong">{label}</Text> : null}
           {description ? <Text variant="caption">{description}</Text> : null}
         </View>
       ) : null}
@@ -90,17 +90,15 @@ export function Switch({
 }
 
 const useStyles = makeStyles((t) => ({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 11, borderRadius: t.radii.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, borderRadius: t.radii.md },
   rowText: { minHeight: t.sizes.minTouch },
   bare: { alignSelf: 'flex-start' },
-  texts: { flex: 1, minWidth: 0, gap: 1 },
+  texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
   track: { width: t.sizes.switchTrack.width, height: t.sizes.switchTrack.height },
   trackOff: {
     ...absoluteFill,
     borderRadius: t.radii.full,
-    borderWidth: t.borders.interactive,
-    borderColor: t.colors.inputBorder,
-    backgroundColor: t.colors.segBg,
+    backgroundColor: t.colors.switchOff,
   },
   trackOn: { flex: 1, borderRadius: t.radii.full },
   knob: {

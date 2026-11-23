@@ -5,7 +5,7 @@ export { RouteErrorBoundary as ErrorBoundary } from '@/screens/shell';
 
 export default function NumberSearchRoute() {
   return (
-    <ModalRouteFrame presentation="sheet">
+    <ModalRouteFrame presentation="fullScreen">
       <NumberSearchScreen />
     </ModalRouteFrame>
   );

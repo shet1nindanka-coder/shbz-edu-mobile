@@ -96,7 +96,7 @@ export function Dialog({
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: 10, paddingTop: 4 },
+  content: { gap: 12, paddingTop: 4 },
   description: { lineHeight: 24 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md, marginTop: t.space.lg },
   action: { flexGrow: 1, flexBasis: 120 },

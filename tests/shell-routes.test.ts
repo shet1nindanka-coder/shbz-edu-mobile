@@ -31,7 +31,7 @@ import {
   type AppLink,
 } from "@/navigation/routes";
 import { clearViewerHandoff, handOverViewerFiles, handedOverTitle, viewerRouteFiles, withHandedOverUris } from "@/navigation/viewer-handoff";
-import { MORE_TAB_NAME, moreSections, navItemOf, navLabel, tabsForRole } from "@/navigation/tabs";
+import { dockActiveIndex, dockHasMore, dockOverflow, dockSections, moreSections, navItemOf, navLabel, sectionOfPath, tabsForRole } from "@/navigation/tabs";
 import { resolveHrefTarget } from "@/navigation/targets";
 import { getDictionary } from "@/i18n/get-dictionary";
 
@@ -220,12 +220,8 @@ describe("navigation plans (00 §3.1)", () => {
     });
   });
 
-  it("opens info over the student's home", () => {
-    assert.deepEqual(planNavigation({ screen: "student.info" }, "STUDENT"), {
-      kind: "tab",
-      root: { pathname: "/student" },
-      detail: { pathname: "/student/info" },
-    });
+  it("opens the student's info as a section of its own", () => {
+    assert.deepEqual(planNavigation({ screen: "student.info" }, "STUDENT"), { kind: "tab", root: { pathname: "/student/info" } });
   });
 
   it("selects a tab for a primary section", () => {
@@ -237,16 +233,18 @@ describe("navigation plans (00 §3.1)", () => {
     assert.deepEqual(planNavigation({ screen: "content.topics" }, "DEVELOPER"), { kind: "tab", root: { pathname: "/developer/topics" } });
   });
 
-  it("keeps the teacher's topics and groups under «ещё»", () => {
-    assert.deepEqual(planNavigation({ screen: "content.topics" }, "TEACHER"), {
-      kind: "tab",
-      root: { pathname: EXTRA_ROUTES.teacherMore },
-      detail: { pathname: "/teacher/topics" },
-    });
+  it("gives the teacher's topics and groups tabs of their own", () => {
+    assert.deepEqual(planNavigation({ screen: "content.topics" }, "TEACHER"), { kind: "tab", root: { pathname: "/teacher/topics" } });
+    assert.deepEqual(planNavigation({ screen: "groups.list" }, "TEACHER"), { kind: "tab", root: { pathname: "/teacher/groups" } });
     assert.deepEqual(planNavigation({ screen: "groups.detail", groupId: "g" }, "TEACHER"), {
       kind: "tab",
-      root: { pathname: EXTRA_ROUTES.teacherMore },
+      root: { pathname: "/teacher/groups" },
       detail: { pathname: "/teacher/groups/[groupId]", params: { groupId: "g" } },
+    });
+    assert.deepEqual(planNavigation({ screen: "content.topic", topicId: "t" }, "TEACHER"), {
+      kind: "tab",
+      root: { pathname: "/teacher/topics" },
+      detail: { pathname: "/teacher/topics/[topicId]", params: { topicId: "t" } },
     });
   });
 
@@ -388,36 +386,76 @@ describe("route params", () => {
   });
 });
 
-describe("tab bars (00 §3.1)", () => {
-  const sections = (role: UserRole) => tabsForRole(role).map((tab) => tab.section);
+describe("tabs and the dock (docs/design/glass-over-paper.md §5)", () => {
+  const tabs = (role: UserRole) => tabsForRole(role).map((tab) => tab.section);
+  const dock = (role: UserRole, layout: "phone" | "tablet") => dockSections(role, layout).map((section) => section.screen);
 
-  it("lists the tabs of each role in site order", () => {
-    assert.deepEqual(sections("STUDENT"), ["student.home", "student.lesson", "student.homeworks", "student.deadlines", "student.theory"]);
-    assert.deepEqual(sections("TEACHER"), ["teacher.home", "teacher.students", "planner.lessons", "calls.list", "more"]);
-    assert.deepEqual(sections("DEVELOPER"), ["content.topics", "developer.accounts", "calls.list", "stats.main", "developer.panel"]);
-    assert.equal(tabsForRole("TEACHER").at(-1)?.name, MORE_TAB_NAME);
-  });
-
-  it("keeps the order of the registry's sections", () => {
+  it("makes every primary section a tab route, in site order", () => {
+    assert.deepEqual(tabs("STUDENT"), ["student.home", "student.lesson", "student.homeworks", "student.deadlines", "student.theory", "student.info"]);
+    assert.deepEqual(tabs("TEACHER"), ["teacher.home", "content.topics", "teacher.students", "groups.list", "planner.lessons", "calls.list"]);
+    assert.deepEqual(tabs("DEVELOPER"), ["content.topics", "developer.accounts", "calls.list", "stats.main", "developer.panel"]);
     for (const role of USER_ROLES) {
-      const order = NAV_SECTIONS[role].filter((section) => section.placement === "tab").map((section) => section.screen);
-      assert.deepEqual(
-        sections(role).filter((section) => section !== "more"),
-        order,
-      );
+      const order = NAV_SECTIONS[role].filter((section) => section.placement !== "gear").map((section) => section.screen);
+      assert.deepEqual(tabs(role), order);
     }
   });
 
-  it("puts the teacher's topics and groups under «ещё» and the student's info nowhere in the bar", () => {
+  it("shows five sections in the phone dock and every section in the tablet dock", () => {
+    assert.deepEqual(dock("STUDENT", "phone"), ["student.home", "student.lesson", "student.homeworks", "student.deadlines", "student.theory"]);
+    assert.deepEqual(dock("STUDENT", "tablet"), [...dock("STUDENT", "phone"), "student.info"]);
+    // The owner's decision: groups are in the phone dock, calls are behind «ещё».
+    assert.deepEqual(dock("TEACHER", "phone"), ["teacher.home", "teacher.students", "groups.list", "planner.lessons"]);
+    assert.deepEqual(dock("TEACHER", "tablet"), ["teacher.home", "content.topics", "teacher.students", "groups.list", "planner.lessons", "calls.list"]);
+    assert.deepEqual(dock("DEVELOPER", "phone"), ["content.topics", "developer.accounts", "calls.list", "stats.main", "developer.panel"]);
+    assert.deepEqual(dock("DEVELOPER", "tablet"), dock("DEVELOPER", "phone"));
+  });
+
+  it("puts «ещё» only in the teacher's phone dock: topics and calls live behind it", () => {
+    assert.equal(dockHasMore("TEACHER", "phone"), true);
+    assert.equal(dockHasMore("TEACHER", "tablet"), false);
+    assert.equal(dockHasMore("STUDENT", "phone"), false);
+    assert.equal(dockHasMore("DEVELOPER", "phone"), false);
     assert.deepEqual(
-      moreSections("TEACHER").map((section) => section.screen),
-      ["content.topics", "groups.list"],
+      dockOverflow("TEACHER", "phone").map((section) => section.screen),
+      ["content.topics", "calls.list"],
     );
+    assert.deepEqual(dockOverflow("TEACHER", "tablet"), []);
+    // The student's info is not behind «ещё»: a phone opens it from the profile.
+    assert.deepEqual(dockOverflow("STUDENT", "phone"), []);
     assert.deepEqual(
       moreSections("STUDENT").map((section) => section.screen),
       ["student.info"],
     );
     assert.deepEqual(moreSections("DEVELOPER"), []);
+  });
+
+  it("finds the section of a path", () => {
+    assert.equal(sectionOfPath("STUDENT", "/student"), "student.home");
+    assert.equal(sectionOfPath("STUDENT", "/student/homeworks/a1"), "student.homeworks");
+    assert.equal(sectionOfPath("STUDENT", "/student/numbers/051004"), "student.homeworks");
+    assert.equal(sectionOfPath("STUDENT", "/student/info"), "student.info");
+    assert.equal(sectionOfPath("TEACHER", "/teacher"), "teacher.home");
+    assert.equal(sectionOfPath("TEACHER", "/teacher/students/s1/assign"), "teacher.students");
+    assert.equal(sectionOfPath("TEACHER", "/teacher/homework-plans/p1"), "planner.lessons");
+    assert.equal(sectionOfPath("TEACHER", "/teacher/lessons/new"), "planner.lessons");
+    assert.equal(sectionOfPath("TEACHER", "/teacher/topics/t1/numbers/051004"), "content.topics");
+    assert.equal(sectionOfPath("DEVELOPER", "/developer/panel/journal"), "developer.panel");
+    assert.equal(sectionOfPath("TEACHER", "/settings"), null);
+    assert.equal(sectionOfPath("STUDENT", "/teacher/students"), null);
+  });
+
+  it("lights the dock item of the current path, «ещё» for its sections, nothing for the rest", () => {
+    assert.equal(dockActiveIndex("STUDENT", "phone", "/student/homeworks/a1"), 2);
+    assert.equal(dockActiveIndex("STUDENT", "phone", "/student/info"), -1);
+    assert.equal(dockActiveIndex("STUDENT", "tablet", "/student/info"), 5);
+    assert.equal(dockActiveIndex("STUDENT", "phone", "/settings"), -1);
+    assert.equal(dockActiveIndex("TEACHER", "phone", "/teacher/groups/g1"), 2);
+    assert.equal(dockActiveIndex("TEACHER", "phone", "/teacher/calls"), 4);
+    assert.equal(dockActiveIndex("TEACHER", "phone", "/teacher/topics/t1"), 4);
+    assert.equal(dockActiveIndex("TEACHER", "phone", "/settings"), 4);
+    assert.equal(dockActiveIndex("TEACHER", "tablet", "/teacher/calls"), 5);
+    assert.equal(dockActiveIndex("TEACHER", "tablet", "/settings"), -1);
+    assert.equal(dockActiveIndex("DEVELOPER", "phone", "/developer/topics/t1/edit"), 0);
   });
 
   it("has a route (file or folder) for every tab", () => {
@@ -435,15 +473,12 @@ describe("tab bars (00 §3.1)", () => {
     }
   });
 
-  it("labels the tabs with the site's lower-case section names", () => {
+  it("labels the dock with the site's lower-case section names", () => {
     const ru = getDictionary("ru").nav;
     const en = getDictionary("en").nav;
-    const labels = (role: UserRole, nav: typeof ru) =>
-      tabsForRole(role)
-        .filter((tab) => tab.labelKey !== null)
-        .map((tab) => navLabel(nav, tab.labelKey ?? ""));
+    const labels = (role: UserRole, nav: typeof ru) => dockSections(role, "phone").map((section) => navLabel(nav, section.labelKey));
     assert.deepEqual(labels("STUDENT", ru), ["обзор", "урок", "дз", "дедлайны", "теория"]);
-    assert.deepEqual(labels("TEACHER", ru), ["обзор", "ученики", "занятия", "звонки"]);
+    assert.deepEqual(labels("TEACHER", ru), ["обзор", "ученики", "группы", "занятия"]);
     assert.deepEqual(labels("DEVELOPER", ru), ["темы", "аккаунты", "звонки", "статистика", "дев-панель"]);
     assert.deepEqual(labels("DEVELOPER", en), ["topics", "accounts", "calls", "statistics", "dev panel"]);
     assert.equal(navItemOf("nav.teacher.lessons"), "lessons");

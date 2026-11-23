@@ -158,7 +158,7 @@ const useStyles = makeStyles((t) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.md,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderRadius: t.radii.md,
     borderWidth: t.borders.interactive,
     borderColor: t.colors.inputBorder,

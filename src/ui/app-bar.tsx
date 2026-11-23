@@ -1,25 +1,25 @@
 import type { ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { StyleProp, ViewStyle } from 'react-native';
 
-import { makeStyles } from '@/theme';
-
-import { IconButton } from './icon-button';
-import { Text } from './text';
+import { ScreenHeader } from './screen-header';
 
 export type AppBarProps = {
-  /** Screen title (one line). Ignored when `left` is given. */
+  /** Screen title. Ignored when `left` is given. */
   title?: string;
   /** Small line under the title. */
   subtitle?: string;
-  /** Replaces the title block — the logo on tab roots. */
+  /** Replaces the title block. */
   left?: ReactNode;
-  /** Trailing controls: icon circles (search, bell, gear). */
+  /** Trailing controls: round glass buttons (search, bell, avatar). */
   right?: ReactNode;
-  /** Shows the back arrow; needs `backLabel`. */
+  /** Shows the "back" link above the title; needs `backLabel` (what a screen reader says). */
   onBack?: () => void;
   backLabel?: string;
-  /** Bottom hairline; default on. */
+  /** Visible text of the back link («Домашние задания»); default: `backLabel`. */
+  backTitle?: string;
+  /** Screen controls of the header (segments, the main button): in the header row on a tablet, under it on a phone. */
+  aside?: ReactNode;
+  /** Kept for the callers of the previous design: the header has no bar and no hairline any more. */
   border?: boolean;
   /** Pad the status-bar inset; default on. Switch off inside a modal sheet. */
   safeTop?: boolean;
@@ -28,66 +28,21 @@ export type AppBarProps = {
 };
 
 /**
- * Slim top bar (`.shbz-topbar`): opaque page fill, bottom hairline, logo or title on the left, 40px icon
- * circles on the right.
+ * The screen header under its previous name: the title on the left (with the "back" link above it), the
+ * round buttons on the right. See `ScreenHeader`.
  */
-export function AppBar({
-  title,
-  subtitle,
-  left,
-  right,
-  onBack,
-  backLabel,
-  border = true,
-  safeTop = true,
-  testID,
-  style,
-}: AppBarProps) {
-  const styles = useStyles();
-  const insets = useSafeAreaInsets();
+export function AppBar({ title, subtitle, left, right, onBack, backLabel, backTitle, aside, safeTop = true, testID, style }: AppBarProps) {
   return (
-    <View
+    <ScreenHeader
       testID={testID}
-      style={[styles.bar, border ? styles.border : null, { paddingTop: safeTop ? insets.top : 0 }, style]}
-    >
-      <View style={styles.row}>
-        {onBack && backLabel ? (
-          <IconButton icon="back" variant="ghost" accessibilityLabel={backLabel} onPress={onBack} style={styles.backButton} />
-        ) : null}
-        <View style={styles.left}>
-          {left ?? (
-            <>
-              {title ? (
-                <Text variant="cardTitle" numberOfLines={1} accessibilityRole="header">
-                  {title}
-                </Text>
-              ) : null}
-              {subtitle ? (
-                <Text variant="caption" color="textSoft" numberOfLines={1}>
-                  {subtitle}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </View>
-        {right ? <View style={styles.right}>{right}</View> : null}
-      </View>
-    </View>
+      title={title}
+      titleNode={left}
+      subtitle={subtitle}
+      back={onBack && backLabel ? { label: backTitle ?? backLabel, onPress: onBack, accessibilityLabel: backLabel } : undefined}
+      actions={right}
+      aside={aside}
+      safeTop={safeTop}
+      style={style}
+    />
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  bar: { backgroundColor: t.colors.pageBg },
-  border: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.headerBorder },
-  row: {
-    minHeight: t.sizes.appBar,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: t.space.md,
-    paddingHorizontal: t.space.gutter,
-    paddingVertical: 8,
-  },
-  backButton: { marginLeft: -8 },
-  left: { flex: 1, minWidth: 0, justifyContent: 'center', alignItems: 'flex-start' },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-}));

@@ -70,6 +70,8 @@ export function Segmented<T extends string>({
   const theme = useTheme();
   const styles = useStyles();
   const { minimumFontScale } = useTextScale();
+  // The selected segment is always ink on white now; `plain` stays in the API for its callers.
+  void plain;
   const activeIndex = options.findIndex((option) => option.value === value);
   const { onItemLayout, indicatorStyle } = useSlidingIndicator(activeIndex);
   // Scrollable bar: keep the selected segment in view (centred when the bar is wider than the row), from
@@ -106,7 +108,7 @@ export function Segmented<T extends string>({
               onSpanLayout(index, event);
               onItemLayout(index)(event);
             }}
-            hitSlop={{ top: 5, bottom: 5 }}
+            hitSlop={{ top: 4, bottom: 4 }}
             style={[
               styles.segment,
               scrollable ? styles.segmentScrollable : fill ? styles.segmentFill : null,
@@ -120,7 +122,7 @@ export function Segmented<T extends string>({
               // would cut a label drawn at a large OS font size («Системн…»): it shrinks instead.
               adjustsFontSizeToFit={!scrollable}
               minimumFontScale={minimumFontScale}
-              color={selected ? (plain ? 'textStrong' : 'accentSolid') : 'segText'}
+              color={selected ? 'textStrong' : 'segText'}
             >
               {compact && option.shortLabel ? option.shortLabel : option.label}
             </Text>
@@ -149,8 +151,8 @@ export function Segmented<T extends string>({
 const useStyles = makeStyles((t) => ({
   track: {
     flexDirection: 'row',
-    gap: t.space.xxs,
-    padding: 5,
+    gap: t.space.xxxs,
+    padding: t.space.xxs,
     borderRadius: t.radii.md,
     backgroundColor: t.colors.segBg,
   },
@@ -168,15 +170,14 @@ const useStyles = makeStyles((t) => ({
     backgroundColor: t.colors.segActiveBg,
   },
   segment: {
-    minHeight: 36,
+    minHeight: t.sizes.control.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 16,
+    paddingHorizontal: t.space.md,
     borderRadius: t.radii.seg,
   },
   // Equal growth from the label's own width: a long label is not truncated while short ones have room.
-  segmentFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6 },
+  segmentFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: t.space.xxs },
   // Never narrower than the label; spare room is shared equally, as in `fill`.
   segmentScrollable: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: 4 },
   disabled: { opacity: 0.55 },

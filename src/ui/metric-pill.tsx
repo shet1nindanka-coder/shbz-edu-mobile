@@ -34,7 +34,7 @@ const useStyles = makeStyles((t) => ({
     minHeight: 72,
     flexGrow: 1,
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: t.radii.lg,

@@ -19,24 +19,23 @@
  * │ (mock builds) Demo data   │ /demo                                         │ root stack               │
  * ├───────────────────────────┼───────────────────────────────────────────────┼──────────────────────────┤
  * │ student.home              │ /student                                      │ tab 1 «обзор» (stack)    │
- * │ student.info              │ /student/info                                 │ tab 1 stack              │
  * │ student.lesson            │ /student/lesson                               │ tab 2 «урок»             │
  * │ student.homeworks         │ /student/homeworks                            │ tab 3 «дз» (stack)       │
  * │ student.homework          │ /student/homeworks/[assignmentId]             │ tab 3 stack              │
  * │ student.deadlines         │ /student/deadlines                            │ tab 4 «дедлайны»         │
  * │ student.theory            │ /student/theory                               │ tab 5 «теория»           │
+ * │ student.info              │ /student/info                                 │ tab 6 «инфа» (tablet dock; a phone opens it from the profile) │
  * │ student.number            │ /student/numbers/[number]                     │ student stack, over tabs │
  * ├───────────────────────────┼───────────────────────────────────────────────┼──────────────────────────┤
  * │ teacher.home              │ /teacher                                      │ tab 1 «обзор»            │
- * │ teacher.students          │ /teacher/students                             │ tab 2 «ученики»          │
- * │ planner.lessons           │ /teacher/lessons                              │ tab 3 «занятия» (stack)  │
- * │ planner.drafts            │ /teacher/homework-plans                       │ tab 3 stack (segment 2)  │
- * │ calls.list                │ /teacher/calls ?studentId                     │ tab 4 «звонки»           │
- * │ (more list)               │ /teacher/more                                 │ tab 5 «ещё» (stack)      │
- * │ content.topics            │ /teacher/topics                               │ tab 5 stack              │
- * │ content.topic             │ /teacher/topics/[topicId]                     │ tab 5 stack              │
- * │ groups.list               │ /teacher/groups                               │ tab 5 stack              │
- * │ groups.detail             │ /teacher/groups/[groupId]                     │ tab 5 stack              │
+ * │ content.topics            │ /teacher/topics                               │ tab «темы» (stack)       │
+ * │ content.topic             │ /teacher/topics/[topicId]                     │ tab «темы» stack         │
+ * │ teacher.students          │ /teacher/students                             │ tab «ученики»            │
+ * │ groups.list               │ /teacher/groups                               │ tab «группы» (stack)     │
+ * │ groups.detail             │ /teacher/groups/[groupId]                     │ tab «группы» stack       │
+ * │ planner.lessons           │ /teacher/lessons                              │ tab «занятия» (stack)    │
+ * │ planner.drafts            │ /teacher/homework-plans                       │ tab «занятия» (segment 2)│
+ * │ calls.list                │ /teacher/calls ?studentId                     │ tab «звонки»             │
  * │ teacher.student.review    │ /teacher/students/[studentId] ?assignmentId   │ teacher stack, over tabs │
  * │ teacher.student.assign    │ /teacher/students/[studentId]/assign          │ teacher stack, over tabs │
  * │ teacher.student.lessons   │ /teacher/students/[studentId]/lessons         │ teacher stack, over tabs │
@@ -166,7 +165,7 @@ export type RouteDefinition = {
 
 const STUDENT_ROUTES: Partial<Record<ScreenId, RouteDefinition>> = {
   "student.home": { pattern: "/student", placement: "tabRoot" },
-  "student.info": { pattern: "/student/info", placement: "tabDetail", root: "/student" },
+  "student.info": { pattern: "/student/info", placement: "tabRoot" },
   "student.lesson": { pattern: "/student/lesson", placement: "tabRoot" },
   "student.homeworks": { pattern: "/student/homeworks", placement: "tabRoot" },
   "student.homework": { pattern: "/student/homeworks/[assignmentId]", placement: "tabDetail", root: "/student/homeworks" },
@@ -182,11 +181,11 @@ const TEACHER_ROUTES: Partial<Record<ScreenId, RouteDefinition>> = {
   // The second segment of the same section: it replaces the lessons list, it is not pushed over it.
   "planner.drafts": { pattern: "/teacher/homework-plans", placement: "tabSegment", root: "/teacher/lessons" },
   "calls.list": { pattern: "/teacher/calls", placement: "tabRoot" },
-  // Under the «ещё» tab: more → topics → topic, more → groups → group.
-  "content.topics": { pattern: "/teacher/topics", placement: "tabDetail", root: "/teacher/more" },
-  "content.topic": { pattern: "/teacher/topics/[topicId]", placement: "tabDetail", root: "/teacher/more" },
-  "groups.list": { pattern: "/teacher/groups", placement: "tabDetail", root: "/teacher/more" },
-  "groups.detail": { pattern: "/teacher/groups/[groupId]", placement: "tabDetail", root: "/teacher/more" },
+  // Every primary section is a tab of its own; the phone dock shows five of them and «ещё».
+  "content.topics": { pattern: "/teacher/topics", placement: "tabRoot" },
+  "content.topic": { pattern: "/teacher/topics/[topicId]", placement: "tabDetail", root: "/teacher/topics" },
+  "groups.list": { pattern: "/teacher/groups", placement: "tabRoot" },
+  "groups.detail": { pattern: "/teacher/groups/[groupId]", placement: "tabDetail", root: "/teacher/groups" },
   "teacher.student.review": { pattern: "/teacher/students/[studentId]", placement: "stack" },
   "teacher.student.assign": { pattern: "/teacher/students/[studentId]/assign", placement: "stack" },
   "teacher.student.lessons": { pattern: "/teacher/students/[studentId]/lessons", placement: "stack" },
@@ -225,9 +224,8 @@ const ROLE_ROUTES: Record<UserRole, Partial<Record<ScreenId, RouteDefinition>>> 
   DEVELOPER: DEVELOPER_ROUTES,
 };
 
-/** Routes that are not registered screens: the teacher's «ещё» list and the mock-only "Demo data". */
+/** Routes that are not registered screens: the mock-only "Demo data". */
 export const EXTRA_ROUTES = {
-  teacherMore: "/teacher/more",
   demoData: "/demo",
 } as const;
 

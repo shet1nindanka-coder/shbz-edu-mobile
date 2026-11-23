@@ -10,7 +10,7 @@ import { easing } from './internal/motion';
 export type ProgressBarProps = {
   /** 0–100; clamped. */
   value: number;
-  /** Track height: `sm` 8 (default) · `md` 10 · `lg` 12. */
+  /** Kept for the callers: every bar is 8 high. */
   size?: 'sm' | 'md' | 'lg';
   /** What the bar measures, for screen readers. */
   accessibilityLabel?: string;
@@ -24,7 +24,7 @@ export function completionPercent(done: number, total: number): number {
   return total ? Math.round((done / total) * 100) : 0;
 }
 
-/** Progress bar (`.shbz-progress-track` / `-fill`): gradient fill growing on a soft track. */
+/** Progress bar (`.track` / `.fill`): 8 high, round, the mint gradient growing on a neutral track. */
 export function ProgressBar({ value, size = 'sm', accessibilityLabel, transition = 'spring', style }: ProgressBarProps) {
   const theme = useTheme();
   const styles = useStyles();
@@ -52,7 +52,7 @@ export function ProgressBar({ value, size = 'sm', accessibilityLabel, transition
       style={[styles.track, { height: theme.sizes.progress[size] }, style]}
     >
       <Animated.View style={[styles.fillWrap, fillStyle]}>
-        <AccentGradient style={styles.fill} />
+        <AccentGradient flat style={styles.fill} />
       </Animated.View>
     </View>
   );

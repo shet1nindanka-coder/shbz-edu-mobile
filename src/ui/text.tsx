@@ -35,6 +35,10 @@ const STRONG: ReadonlySet<TextVariant> = new Set<TextVariant>([
   'smallBold',
   'smallExtra',
   'mono',
+  'bodyMedium',
+  'tile',
+  'avatar',
+  'avatarSm',
 ]);
 const KICKER: ReadonlySet<TextVariant> = new Set<TextVariant>([
   'kicker',
@@ -44,7 +48,7 @@ const KICKER: ReadonlySet<TextVariant> = new Set<TextVariant>([
   'hint',
   'badgeMuted',
 ]);
-const MUTED: ReadonlySet<TextVariant> = new Set<TextVariant>(['caption', 'captionMedium', 'meta']);
+const MUTED: ReadonlySet<TextVariant> = new Set<TextVariant>(['caption', 'captionMedium', 'meta', 'small', 'dock']);
 
 function defaultColor(variant: TextVariant): ColorToken {
   if (STRONG.has(variant)) return 'textStrong';
@@ -56,7 +60,7 @@ function defaultColor(variant: TextVariant): ColorToken {
 // The cap lives with the other pure font-scale helpers; `Text` is where most code imports it from.
 export { MAX_FONT_SCALE };
 
-/** The app's text primitive: Montserrat, a typography role and a colour token. */
+/** The app's text primitive: Onest, a typography role and a colour token. */
 export function Text({ variant = 'body', color, align, tabular, style, ...rest }: TextProps) {
   const theme = useTheme();
   return (

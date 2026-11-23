@@ -1,4 +1,4 @@
-// UI kit of the app: every primitive of docs/spec/08-design-system.md §5. Components take their texts
+// UI kit of the app: every primitive of the «Стекло над листом» design (docs/design/glass-over-paper.md). Components take their texts
 // through props (no i18n import) and read every colour, radius and font from the theme.
 export { AccentGradient, type AccentGradientProps } from './accent-gradient';
 export { AppBar, type AppBarProps } from './app-bar';
@@ -7,7 +7,10 @@ export { Badge, type BadgeProps, type BadgeTone } from './badge';
 export { BottomSheet, type BottomSheetProps } from './bottom-sheet';
 export { OverlayCoverSlot, coveredAccessibilityProps, isOverlayCovered, setOverlayCover, useOverlayCovered } from './overlay-cover';
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './button';
-export { Card, CardPressArea, type CardPressAreaProps, type CardProps, type CardVariant } from './card';
+export { Card, CardPressArea, SurfaceScope, useInsideSurface, type CardPressAreaProps, type CardProps, type CardVariant } from './card';
+export { DockInsetProvider, useDockInset } from './dock-inset';
+export { Glass, type GlassProps } from './glass';
+export { ScreenHeader, type ScreenHeaderProps } from './screen-header';
 export { accessibilityLabelOf, withErrorHint, type AccessibilityPart } from './a11y';
 export { announceOnIOS, useAnnounce, useEventAnnouncement, useStatusAnnouncement } from './use-announce';
 export { useCloseOnBlur, useNavigationFocused } from './internal/close-on-blur';

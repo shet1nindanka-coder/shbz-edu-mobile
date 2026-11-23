@@ -1,14 +1,15 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { View, type TextInputInstance } from 'react-native';
+import { Pressable, View, type TextInputInstance } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { isApiError, useApi } from '@/api';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useStillHere } from '@/navigation';
 import { numberFindTarget } from '@/navigation/targets';
 import { Hint, useCurrentUser } from '@/providers';
-import { makeStyles } from '@/theme';
-import { AppBar, IconButton, Screen, SearchField, Text } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { IconButton, SearchField, SurfaceScope, Text } from '@/ui';
 
 const DIGITS_ONLY = /^\d+$/;
 const ALL_ZEROS = /^0+$/;
@@ -16,13 +17,17 @@ const ALL_ZEROS = /^0+$/;
 const MAX_DIGITS = 20;
 
 /**
- * `shell.numberSearch` (docs/spec/01-shell-auth.md §1.5.4, §3.9; 90-addendum-2 N5): one field, digits
- * only. The number is sent as typed — leading zeros are significant in the recorded spelling, the server
+ * `shell.numberSearch` (docs/spec/01-shell-auth.md §1.5.4, §3.9; 90-addendum-2 N5): the search panel that
+ * drops from the top of the screen when the round search button of a header is pressed
+ * (docs/design/glass-over-paper.md §5) — one field, digits only, and a close mark; the dimmed screen under
+ * it closes the panel too. The number is sent as typed — leading zeros are significant in the recorded spelling, the server
  * matches the normalised form. A hit opens the number's card of the current role; a miss shows the
  * server's text, or the generic "not found" line when there is none.
  */
 export function NumberSearchScreen() {
   const styles = useStyles();
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.numberSearch;
@@ -75,44 +80,47 @@ export function NumberSearchScreen() {
   };
 
   return (
-    <Screen
-      testID="number-search-screen"
-      header={
-        <AppBar
-          title={m.shell.numberSearch.title}
-          right={
-            <IconButton icon="close" variant="ghost" accessibilityLabel={m.common.actions.close} onPress={navigation.back} testID="number-search-close" />
-          }
-        />
-      }
-    >
-      <View style={styles.block}>
-        <SearchField
-          ref={input}
-          value={value}
-          onChangeText={(text) => {
-            // Non-digits are stripped while typing, as on the site.
-            setValue(text.replace(/\D+/g, '').slice(0, MAX_DIGITS));
-            if (error) setError(null);
-          }}
-          onSubmit={submit}
-          submitLabel={t.submit}
-          placeholder={search.isPending ? t.searching : t.placeholder}
-          accessibilityLabel={t.aria}
-          keyboardType="number-pad"
-          inputMode="numeric"
-          maxLength={MAX_DIGITS}
-          autoFocus
-          disabled={search.isPending}
-          busy={search.isPending}
-          error={error}
-          testID="number-search-input"
-        />
-        <Hint>
-          <Text variant="hint">{m.shell.numberSearch.hint}</Text>
-        </Hint>
+    <View testID="number-search-screen" style={styles.layer}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={m.common.actions.close}
+        focusable={false}
+        onPress={navigation.back}
+        style={styles.backdrop}
+      />
+      <View style={[styles.panel, theme.shadows.popover, { marginTop: insets.top + theme.space.sm }]} accessibilityViewIsModal>
+        <SurfaceScope>
+          <View style={styles.row}>
+            <SearchField
+              ref={input}
+              value={value}
+              onChangeText={(text) => {
+                // Non-digits are stripped while typing, as on the site.
+                setValue(text.replace(/\D+/g, '').slice(0, MAX_DIGITS));
+                if (error) setError(null);
+              }}
+              onSubmit={submit}
+              submitLabel={t.submit}
+              placeholder={search.isPending ? t.searching : t.placeholder}
+              accessibilityLabel={t.aria}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              maxLength={MAX_DIGITS}
+              autoFocus
+              disabled={search.isPending}
+              busy={search.isPending}
+              error={error}
+              style={styles.field}
+              testID="number-search-input"
+            />
+            <IconButton icon="close" accessibilityLabel={m.common.actions.close} onPress={navigation.back} testID="number-search-close" />
+          </View>
+          <Hint>
+            <Text variant="hint">{m.shell.numberSearch.hint}</Text>
+          </Hint>
+        </SurfaceScope>
       </View>
-    </Screen>
+    </View>
   );
 }
 
@@ -126,5 +134,21 @@ export function numberSearchErrorText(failure: unknown, notFound: string): strin
 }
 
 const useStyles = makeStyles((t) => ({
-  block: { gap: t.space.md },
+  layer: { flex: 1 },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: t.colors.overlay },
+  panel: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: t.sizes.dialogMaxWidth + t.space.gutter * 2,
+    marginHorizontal: t.space.gutter,
+    padding: t.space.md,
+    gap: t.space.sm,
+    borderRadius: t.radii.xl,
+    borderWidth: t.borders.hairline,
+    borderColor: t.colors.cardBorder,
+    backgroundColor: t.colors.cardBg,
+  },
+  // The error line hangs under the field, so the close mark stays level with the field itself.
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
+  field: { flex: 1, alignSelf: 'auto' },
 }));

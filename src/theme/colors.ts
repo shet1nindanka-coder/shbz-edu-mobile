@@ -1,103 +1,134 @@
-// Colour tokens of the site's `--shbz-*` layer (app/globals.css), light and dark. Values are the
-// cascade-resolved ones from docs/spec/08-design-system.md §1. Never hard-code a colour in a component:
-// read it from `useTheme().colors`.
+// Colour tokens of the «Стекло над листом» design (docs/design/glass-over-paper.md §2), light and dark.
+// The values are the `.tk` custom properties of the approved mockups' `a.css`. Never hard-code a colour in
+// a component: read it from `useTheme().colors`.
+//
+// The token names of the previous (site-derived) palette are kept so every screen keeps compiling; each
+// one now resolves to its counterpart in the new palette. The base tokens of the new design come first.
+
+const CLEAR = 'rgba(0, 0, 0, 0)';
 
 export const lightColors = {
-  // surfaces
-  pageBg: '#ffffff',
+  // ── base palette (a.css: --bg, --card, --ink, --ink2, --mut, --line, --line2, --soft, --soft2) ──
+  pageBg: '#f4f6f6',
   cardBg: '#ffffff',
-  cardBorder: '#ececee',
-  softBg: '#f8f9fa',
-  softBorder: '#f0f0f1',
-  panelBg: '#fbfbfc',
-  rowBorder: '#f4f4f5',
-  headerBg: 'rgba(255, 255, 255, 0.85)',
-  headerBorder: '#efefef',
-  divider: '#e4e5e7',
-  // text
+  /** Cards have no border in light mode; in dark mode a faint edge replaces the invisible shadow. */
+  cardBorder: CLEAR,
   textStrong: '#0a0a0a',
+  /** Secondary text. */
   label: '#2c2e33',
-  textMuted: '#6a6e75',
-  textSoft: '#8b8f96',
-  kicker: '#63676d',
-  placeholder: '#6d7076',
-  onAccent: '#ffffff',
-  // inputs / outlines
-  inputBg: '#ffffff',
-  inputBorder: '#e4e5e7',
-  inputBorderFocus: '#0a0a0a',
-  inputRing: 'rgba(54, 224, 164, 0.15)',
-  dropzoneBg: '#fbfcfd',
-  outlineBorder: '#e4e5e7',
-  outlineHover: '#0a0a0a',
-  // tabs / segments / progress
-  tabBorder: '#0a0a0a',
-  tabText: '#14161a',
-  tabActiveBg: '#0a0a0a',
-  tabActiveText: '#ffffff',
-  tabHover: '#f2f3f4',
-  segBg: '#ecedef',
-  segActiveBg: '#ffffff',
-  segText: '#6a6e75',
-  progressTrack: '#efeff1',
-  // accent
-  accentSolid: '#16b07e',
+  textMuted: '#5f646b',
+  /** Hairline between rows. */
+  line: '#ececee',
+  /** Outline of controls (inputs, outline buttons, unselected marks). */
+  line2: '#dcdee1',
+  /** Panel inside a card (condition, stat box). */
+  softBg: '#f4f5f6',
+  /** Neutral fill: segments track, tiles without a status, progress track, list avatars. */
+  soft2: '#eceef0',
+
+  // ── accent (--a1 → --a2 gradient lives in `gradients.accent`; --acc is the accent as text) ──
+  accentSolid: '#0d7a57',
+  /** Text and icons on the mint gradient. */
+  onAccent: '#06281c',
   accentSoft: 'rgba(54, 224, 164, 0.12)',
   accentSoftStrong: 'rgba(54, 224, 164, 0.18)',
   accentBorder: 'rgba(22, 176, 126, 0.35)',
-  accentShadow: 'rgba(54, 224, 164, 0.3)',
-  // status
-  greenSoft: '#eaf7ef',
-  greenText: '#127a4c',
-  greenBorder: 'rgba(27, 158, 99, 0.25)',
-  yellowSoft: '#fef4e3',
-  yellowText: '#8a5d05',
-  yellowBorder: 'rgba(201, 138, 30, 0.3)',
-  redSoft: '#fceded',
-  redText: '#b3202c',
-  redBorder: '#f3c7c9',
-  // danger
-  dangerSolid: '#e5484d',
-  dangerOutline: '#f3c7c9',
-  dangerBg: '#fceded',
-  dangerBorder: '#f3c7c9',
-  dangerText: '#b3202c',
-  // calendar
-  calOkBg: '#fff7ea',
-  calOkBorder: '#f5dfb8',
-  calOkMark: '#f2a93b',
-  calLateBg: '#fff5f5',
-  calLateBorder: '#f5c6c9',
-  calLateMark: '#e5484d',
-  calCellBg: '#fbfbfc',
-  calCellBorder: '#f0f0f1',
-  calOutBg: '#fdfdfe',
-  calOutText: '#c7cad0',
-  calRing: 'rgba(10, 10, 10, 0.12)',
-  // statistics charts: the "solved / green" mark of the donut and the mastery ranking (06 §1.6.a)
-  chartGreen: '#36c77e',
-  // streak (tier "starter")
-  streakBgStart: '#fff3e4',
-  streakBgEnd: '#ffe9d2',
-  streakBorder: '#fbdfbe',
-  streakText: '#b5701a',
+  accentShadow: 'rgba(54, 224, 164, 0.28)',
+
+  // ── statuses: soft fill / text / solid (bars, dots). Used for number statuses only. ──
+  greenSoft: '#e6f6ed',
+  greenText: '#0f6b41',
+  greenSolid: '#1b9e63',
+  greenBorder: CLEAR,
+  yellowSoft: '#fdf1dc',
+  yellowText: '#7d5200',
+  yellowSolid: '#e8b04a',
+  yellowBorder: CLEAR,
+  redSoft: '#fbe9ea',
+  redText: '#a8262f',
+  redSolid: '#c2313c',
+  redBorder: CLEAR,
+
+  // ── glass: navigation only (dock, round header buttons) ──
+  glass: 'rgba(255, 255, 255, 0.62)',
+  /** Glass without a blur behind it (Android, reduced transparency): nearly opaque. */
+  glassSolid: 'rgba(255, 255, 255, 0.92)',
+  glassLine: 'rgba(255, 255, 255, 0.9)',
+  glow1: 'rgba(90, 200, 234, 0.36)',
+  glow2: 'rgba(54, 224, 164, 0.2)',
+  lensTop: 'rgba(255, 255, 255, 0.97)',
+  lensBottom: 'rgba(255, 255, 255, 0.6)',
+
+  // ── streak («огонёк») ──
+  streakBgStart: '#fff1e0',
+  streakBgEnd: '#fff1e0',
+  streakBorder: CLEAR,
+  streakText: '#8a4a00',
   streakFlame: '#f2922e',
   streakPillBg: 'rgba(255, 255, 255, 0.7)',
-  weekCell: '#f1f2f4',
-  weekDotOff: '#d7d9dd',
-  // misc
-  overlay: 'rgba(15, 23, 42, 0.45)',
-  menuOverlay: 'rgba(0, 0, 0, 0.2)',
-  skeleton: 'rgba(139, 143, 150, 0.14)',
+
+  // ── aliases of the previous token names ──
+  softBorder: CLEAR,
+  panelBg: '#f4f5f6',
+  rowBorder: '#ececee',
+  headerBg: 'rgba(255, 255, 255, 0.62)',
+  headerBorder: '#ececee',
+  divider: '#ececee',
+  textSoft: '#5f646b',
+  kicker: '#5f646b',
+  placeholder: '#5f646b',
+  inputBg: '#ffffff',
+  inputBorder: '#dcdee1',
+  inputBorderFocus: '#36e0a4',
+  inputRing: 'rgba(54, 224, 164, 0.15)',
+  dropzoneBg: '#f4f5f6',
+  outlineBorder: '#dcdee1',
+  outlineHover: '#0a0a0a',
+  tabBorder: '#0a0a0a',
+  tabText: '#5f646b',
+  /** The inverted pill: current number tile, active filter chip, dark button. */
+  tabActiveBg: '#0a0a0a',
+  tabActiveText: '#f4f6f6',
+  tabHover: '#eceef0',
+  segBg: '#eceef0',
+  segActiveBg: '#ffffff',
+  segText: '#5f646b',
+  progressTrack: '#eceef0',
+  dangerSolid: '#c2313c',
+  dangerOutline: '#c2313c',
+  dangerBg: '#fbe9ea',
+  dangerBorder: '#c2313c',
+  dangerText: '#a8262f',
+  calOkBg: '#f4f5f6',
+  calOkBorder: CLEAR,
+  calOkMark: '#e8b04a',
+  calLateBg: '#f4f5f6',
+  calLateBorder: CLEAR,
+  calLateMark: '#c2313c',
+  calCellBg: '#f4f5f6',
+  calCellBorder: CLEAR,
+  calOutBg: CLEAR,
+  calOutText: '#5f646b',
+  /** "Today" ring of a calendar cell. */
+  calRing: '#0a0a0a',
+  chartGreen: '#1b9e63',
+  weekCell: '#eceef0',
+  weekDotOff: '#dcdee1',
+
+  // ── misc ──
+  overlay: 'rgba(10, 12, 14, 0.38)',
+  menuOverlay: 'rgba(10, 12, 14, 0.2)',
+  skeleton: 'rgba(95, 100, 107, 0.12)',
   skeletonShine: 'rgba(255, 255, 255, 0.6)',
   /** Zero-alpha twin of `skeletonShine`: gradient ends must fade the same hue, not black. */
   skeletonShineClear: 'rgba(255, 255, 255, 0)',
   switchKnob: '#ffffff',
+  switchOff: '#dcdee1',
   // brand
   brand: '#16c79f',
   brandDeep: '#0e9b80',
   logoInk: '#0a0a0a',
-  /** `LOGO_DARK_BG` of the site: a dark plate for the `onDark` logo. */
+  /** A dark plate for the `onDark` logo. */
   logoDarkBg: '#101212',
 };
 
@@ -107,113 +138,119 @@ export type ColorToken = keyof ThemeColors;
 export const darkColors: ThemeColors = {
   pageBg: '#0b0c0e',
   cardBg: '#131417',
-  cardBorder: '#26282c',
-  softBg: '#1a1c1f',
-  softBorder: '#26282c',
-  panelBg: '#17181b',
-  rowBorder: '#222428',
-  headerBg: 'rgba(11, 12, 14, 0.85)',
-  headerBorder: '#222428',
-  divider: '#34373c',
-  textStrong: '#f5f6f7',
-  label: '#c9ccd1',
-  textMuted: '#9ba0a6',
-  textSoft: '#85898f',
-  kicker: '#7c8087',
-  placeholder: '#6a6e75',
-  onAccent: '#ffffff',
-  inputBg: '#0f1012',
-  inputBorder: '#2c2e33',
-  inputBorderFocus: '#f5f6f7',
-  inputRing: 'rgba(54, 224, 164, 0.18)',
-  dropzoneBg: '#0f1012',
-  outlineBorder: '#34373c',
-  outlineHover: '#f5f6f7',
-  tabBorder: '#e8e9ea',
-  tabText: '#d6d8db',
-  tabActiveBg: '#f5f6f7',
-  tabActiveText: '#0a0a0a',
-  tabHover: '#24262a',
-  segBg: '#222428',
-  segActiveBg: '#0f1012',
-  segText: '#9ba0a6',
-  progressTrack: '#26282c',
-  accentSolid: '#36e0a4',
+  cardBorder: 'rgba(255, 255, 255, 0.07)',
+  textStrong: '#f2f3f4',
+  label: '#d5d8dc',
+  textMuted: '#a3a8b0',
+  line: '#24272c',
+  line2: '#363a41',
+  softBg: '#191b1f',
+  soft2: '#24272c',
+
+  accentSolid: '#5fe6ac',
+  onAccent: '#06281c',
   accentSoft: 'rgba(54, 224, 164, 0.14)',
   accentSoftStrong: 'rgba(54, 224, 164, 0.2)',
   accentBorder: 'rgba(54, 224, 164, 0.35)',
-  accentShadow: 'rgba(54, 224, 164, 0.3)',
-  greenSoft: 'rgba(27, 158, 99, 0.16)',
-  greenText: '#59d49d',
-  greenBorder: 'rgba(89, 212, 157, 0.3)',
-  yellowSoft: 'rgba(201, 138, 30, 0.16)',
-  yellowText: '#e8b45c',
-  yellowBorder: 'rgba(232, 180, 92, 0.3)',
-  redSoft: 'rgba(214, 69, 80, 0.16)',
-  redText: '#ff8f94',
-  redBorder: 'rgba(229, 72, 77, 0.4)',
-  dangerSolid: '#ff6b70',
-  dangerOutline: 'rgba(229, 72, 77, 0.4)',
-  dangerBg: 'rgba(229, 72, 77, 0.12)',
-  dangerBorder: 'rgba(229, 72, 77, 0.35)',
-  dangerText: '#ff8f94',
-  calOkBg: 'rgba(242, 169, 59, 0.1)',
-  calOkBorder: 'rgba(242, 169, 59, 0.35)',
-  calOkMark: '#f2a93b',
-  calLateBg: 'rgba(229, 72, 77, 0.1)',
-  calLateBorder: 'rgba(229, 72, 77, 0.35)',
-  calLateMark: '#ff6b70',
-  calCellBg: '#17181b',
-  calCellBorder: '#26282c',
-  calOutBg: '#131417',
-  calOutText: '#4a4d52',
-  calRing: 'rgba(255, 255, 255, 0.18)',
-  chartGreen: '#36c77e',
-  streakBgStart: 'rgba(242, 146, 46, 0.18)',
-  streakBgEnd: 'rgba(242, 146, 46, 0.08)',
-  streakBorder: 'rgba(242, 146, 46, 0.35)',
-  streakText: '#e8a35c',
+  accentShadow: 'rgba(54, 224, 164, 0.28)',
+
+  greenSoft: '#143024',
+  greenText: '#5fe6ac',
+  greenSolid: '#36e0a4',
+  greenBorder: CLEAR,
+  yellowSoft: '#33290f',
+  yellowText: '#f3c56f',
+  yellowSolid: '#e8b04a',
+  yellowBorder: CLEAR,
+  redSoft: '#3a1a1e',
+  redText: '#ff8f97',
+  redSolid: '#ff6b75',
+  redBorder: CLEAR,
+
+  glass: 'rgba(30, 33, 38, 0.6)',
+  glassSolid: 'rgba(30, 33, 38, 0.94)',
+  glassLine: 'rgba(255, 255, 255, 0.14)',
+  glow1: 'rgba(90, 200, 234, 0.16)',
+  glow2: 'rgba(54, 224, 164, 0.1)',
+  lensTop: 'rgba(255, 255, 255, 0.2)',
+  lensBottom: 'rgba(255, 255, 255, 0.06)',
+
+  streakBgStart: '#33230f',
+  streakBgEnd: '#33230f',
+  streakBorder: CLEAR,
+  streakText: '#ffb561',
   streakFlame: '#f2922e',
   streakPillBg: 'rgba(0, 0, 0, 0.25)',
-  weekCell: '#222428',
-  weekDotOff: '#3a3d42',
-  overlay: 'rgba(15, 23, 42, 0.45)',
-  menuOverlay: 'rgba(0, 0, 0, 0.2)',
-  skeleton: 'rgba(30, 41, 59, 0.78)',
+
+  softBorder: CLEAR,
+  panelBg: '#191b1f',
+  rowBorder: '#24272c',
+  headerBg: 'rgba(30, 33, 38, 0.6)',
+  headerBorder: '#24272c',
+  divider: '#24272c',
+  textSoft: '#a3a8b0',
+  kicker: '#a3a8b0',
+  placeholder: '#a3a8b0',
+  inputBg: '#131417',
+  inputBorder: '#363a41',
+  inputBorderFocus: '#36e0a4',
+  inputRing: 'rgba(54, 224, 164, 0.18)',
+  dropzoneBg: '#191b1f',
+  outlineBorder: '#363a41',
+  outlineHover: '#f2f3f4',
+  tabBorder: '#f2f3f4',
+  tabText: '#a3a8b0',
+  tabActiveBg: '#f2f3f4',
+  tabActiveText: '#0b0c0e',
+  tabHover: '#24272c',
+  segBg: '#24272c',
+  segActiveBg: '#131417',
+  segText: '#a3a8b0',
+  progressTrack: '#24272c',
+  dangerSolid: '#ff6b75',
+  dangerOutline: '#ff6b75',
+  dangerBg: '#3a1a1e',
+  dangerBorder: '#ff6b75',
+  dangerText: '#ff8f97',
+  calOkBg: '#191b1f',
+  calOkBorder: CLEAR,
+  calOkMark: '#e8b04a',
+  calLateBg: '#191b1f',
+  calLateBorder: CLEAR,
+  calLateMark: '#ff6b75',
+  calCellBg: '#191b1f',
+  calCellBorder: CLEAR,
+  calOutBg: CLEAR,
+  calOutText: '#a3a8b0',
+  calRing: '#f2f3f4',
+  chartGreen: '#36e0a4',
+  weekCell: '#24272c',
+  weekDotOff: '#363a41',
+
+  overlay: 'rgba(0, 0, 0, 0.55)',
+  menuOverlay: 'rgba(0, 0, 0, 0.3)',
+  skeleton: 'rgba(255, 255, 255, 0.07)',
   skeletonShine: 'rgba(255, 255, 255, 0.08)',
   skeletonShineClear: 'rgba(255, 255, 255, 0)',
   switchKnob: '#ffffff',
+  switchOff: '#5a606a',
   brand: '#16c79f',
   brandDeep: '#0e9b80',
   logoInk: '#ffffff',
   logoDarkBg: '#101212',
 };
 
-/** Opaque equivalents of the translucent dark tokens, blended over cardBg #131417 (use where a
- *  translucent fill would stack badly, e.g. over an Android elevation shadow). */
+/**
+ * Opaque equivalents of the translucent tokens, blended over the card fill (use where a translucent fill
+ * would stack badly, e.g. over an Android elevation shadow). The status fills of the new palette are
+ * opaque already; only the accent washes remain.
+ */
 export const darkFlattenedOnCard = {
-  greenSoft: '#142a23',
-  yellowSoft: '#302718',
-  redSoft: '#321c20',
-  greenBorder: '#284e3f',
-  yellowBorder: '#53442c',
-  redBorder: '#67292d',
-  dangerOutline: '#67292d',
-  dangerBg: '#2c1a1d',
-  dangerBorder: '#5c262a',
-  accentSoft: '#18312b',
-  accentSoftStrong: '#1a3d33',
-  accentBorder: '#1f5b48',
-  inputRing: '#193930',
-  calOkBg: '#29231b',
-  calOkBorder: '#614824',
-  calLateBg: '#28191c',
-  calLateBorder: '#5c262a',
-  calRing: '#3d3e41',
-  streakBgStart: '#3b2b1b',
-  streakBgEnd: '#251e19',
-  streakBorder: '#61401f',
-  skeleton: '#1c2433',
+  accentSoft: '#163029',
+  accentSoftStrong: '#193d33',
+  accentBorder: '#1e5b48',
+  inputRing: '#19392f',
+  skeleton: '#232427',
 } as const;
 
 /** Opaque equivalents of the translucent light tokens, blended over #ffffff. */
@@ -221,11 +258,8 @@ export const lightFlattenedOnCard = {
   accentSoft: '#e7fbf4',
   accentSoftStrong: '#dbf9ef',
   accentBorder: '#ade3d2',
-  greenBorder: '#c6e7d8',
-  yellowBorder: '#efdcbc',
   inputRing: '#e1faf1',
-  calRing: '#e2e2e2',
-  skeleton: '#efeff0',
+  skeleton: '#ebecec',
 } as const;
 
 type GradientPoint = { x: number; y: number };
@@ -236,35 +270,39 @@ type GradientToken = {
 };
 
 export const gradients = {
-  /** linear-gradient(90deg, #5ac8ea 0%, #36e0a4 100%) — the only brand accent. */
-  accent: { colors: ['#5ac8ea', '#36e0a4'], start: { x: 0, y: 0.5 }, end: { x: 1, y: 0.5 } },
-  /** linear-gradient(135deg, #5ac8ea, #36e0a4) — avatar. */
+  /** linear-gradient(120deg, #5ac8ea, #36e0a4) — the only accent: the main action and avatars. */
+  accent: { colors: ['#5ac8ea', '#36e0a4'], start: { x: 0, y: 0.2 }, end: { x: 1, y: 0.8 } },
+  /** The same gradient for round things (avatar, icon tile). */
   accentDiag: { colors: ['#5ac8ea', '#36e0a4'], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
+  /** linear-gradient(90deg, …) — progress fill. */
+  accentFlat: { colors: ['#5ac8ea', '#36e0a4'], start: { x: 0, y: 0.5 }, end: { x: 1, y: 0.5 } },
+  /** linear-gradient(180deg, …) — chart bars. */
+  accentDown: { colors: ['#5ac8ea', '#36e0a4'], start: { x: 0.5, y: 0 }, end: { x: 0.5, y: 1 } },
   /** Midpoint of the accent gradient, for single-colour fallbacks. */
   accentMid: '#48d4c7',
-  /** Streak hero: 135deg from streakBgStart to streakBgEnd. */
+  /** Streak chip: flat fill (start = end). */
   streakDirection: { start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
   /**
-   * Page glows: radial mint → transparent sky, fading out at 70 %.
-   * login — `radial-gradient(720px 420px at 50% -8%, …)`, dashboard — `radial-gradient(640px 320px at 100% 0%, …)`.
+   * Page glow: `radial-gradient(<rx> <ry> at 50% <cy>, glow1, glow2 48%, transparent 72%)` at the top
+   * centre of every screen. The colours are `colors.glow1` / `colors.glow2`.
    */
   glow: {
-    from: '#36e0a4',
-    to: '#5ac8ea',
-    fadeAt: 0.7,
-    login: { width: 720, height: 420, opacityLight: 0.12, opacityDark: 0.09 },
-    dashboard: { width: 640, height: 320, opacity: 0.07 },
+    midAt: 0.48,
+    fadeAt: 0.72,
+    phone: { rx: 420, ry: 240, cy: -70 },
+    tablet: { rx: 760, ry: 300, cy: -90 },
   },
 } as const satisfies {
   accent: GradientToken;
   accentDiag: GradientToken;
+  accentFlat: GradientToken;
+  accentDown: GradientToken;
   accentMid: string;
   streakDirection: { start: GradientPoint; end: GradientPoint };
   glow: {
-    from: string;
-    to: string;
+    midAt: number;
     fadeAt: number;
-    login: { width: number; height: number; opacityLight: number; opacityDark: number };
-    dashboard: { width: number; height: number; opacity: number };
+    phone: { rx: number; ry: number; cy: number };
+    tablet: { rx: number; ry: number; cy: number };
   };
 };

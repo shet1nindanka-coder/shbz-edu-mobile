@@ -64,10 +64,10 @@ const useStyles = makeStyles((t) => ({
     borderStyle: 'dashed',
     borderColor: t.colors.softBorder,
     backgroundColor: t.colors.softBg,
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
   },
   content: { alignItems: 'center', gap: 8 },
   action: { marginTop: 12, alignItems: 'center' },
-  plain: { alignItems: 'center', gap: 6, paddingVertical: 40, paddingHorizontal: 20 },
+  plain: { alignItems: 'center', gap: 8, paddingVertical: 32, paddingHorizontal: 24 },
 }));

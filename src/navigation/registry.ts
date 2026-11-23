@@ -150,9 +150,11 @@ export const HOME: Readonly<Record<UserRole, ScreenId>> = {
 
 /**
  * The navigation model of each role: its primary sections in site order, then the settings gear.
- * `labelKey` is a path under `dict` (the lower-case `dict.nav.<role>.<item>` strings); `placement` follows
- * 00 §3.1 — STUDENT: 5 tabs, info under "more"; TEACHER: 4 tabs, topics and groups under "more";
- * DEVELOPER: exactly 5 tabs.
+ * `labelKey` is a path under `dict` (the lower-case `dict.nav.<role>.<item>` strings); `placement` is where
+ * the section sits on a PHONE (docs/design/glass-over-paper.md §5): "tab" — in the dock; "more" — not in
+ * the phone dock (the teacher's topics and calls are behind «ещё», the student's info is in the profile);
+ * a tablet shows every section in the dock. STUDENT: 5 + info; TEACHER: обзор · ученики · группы · занятия
+ * + «ещё» (the owner's decision: groups in the dock, calls behind «ещё»); DEVELOPER: exactly 5.
  */
 export const NAV_SECTIONS: Readonly<Record<UserRole, readonly NavSection[]>> = {
   STUDENT: [
@@ -168,9 +170,9 @@ export const NAV_SECTIONS: Readonly<Record<UserRole, readonly NavSection[]>> = {
     { screen: "teacher.home", labelKey: "nav.teacher.overview", webPath: "/teacher", placement: "tab" },
     { screen: "content.topics", labelKey: "nav.teacher.topics", webPath: "/teacher/topics", placement: "more" },
     { screen: "teacher.students", labelKey: "nav.teacher.students", webPath: "/teacher/students", placement: "tab" },
-    { screen: "groups.list", labelKey: "nav.teacher.groups", webPath: "/teacher/groups", placement: "more" },
+    { screen: "groups.list", labelKey: "nav.teacher.groups", webPath: "/teacher/groups", placement: "tab" },
     { screen: "planner.lessons", labelKey: "nav.teacher.lessons", webPath: "/teacher/lessons", placement: "tab" },
-    { screen: "calls.list", labelKey: "nav.teacher.calls", webPath: "/teacher/calls", placement: "tab" },
+    { screen: "calls.list", labelKey: "nav.teacher.calls", webPath: "/teacher/calls", placement: "more" },
     { screen: "shell.settings", labelKey: "nav.teacher.settings", webPath: "/teacher/settings", placement: "gear" },
   ],
   DEVELOPER: [

@@ -1,4 +1,4 @@
-// Topics inside the teacher's «ещё» tab: `content.topics` → `content.topic`.
+// Stack of the teacher's «темы» tab: `content.topics` → `content.topic`.
 import { Stack } from 'expo-router';
 
 import { useTheme } from '@/theme';

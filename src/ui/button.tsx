@@ -23,7 +23,7 @@ export type ButtonProps = {
   onPress?: GuardedPress;
   /** Default `primary`. Never place two gradient (primary) buttons next to each other. */
   variant?: ButtonVariant;
-  /** `sm` 36 · `md` 44 (default) · `lg` 48 · `field` 52 (pairs with an input). */
+  /** `sm` 36 (compact, in rows) · `md` 44 (default) · `lg` 52 (the main action of a screen) · `field` = `lg`. */
   size?: ButtonSize;
   /** Shows the inline spinner and blocks presses. Pass the pending text as `label` ("Входим…"). */
   loading?: boolean;
@@ -62,42 +62,46 @@ type VariantSpec = {
 function variantSpec(variant: ButtonVariant, t: Theme): VariantSpec {
   const c = t.colors;
   switch (variant) {
+    // White with an outline: an ordinary action.
     case 'outline':
       return {
         bg: c.cardBg,
-        border: c.outlineBorder,
-        text: c.tabText,
+        border: c.line2,
+        text: c.textStrong,
         pressedBorder: c.outlineHover,
         paddingX: 16,
-        strong: false,
-        disabledOpacity: 0.6,
+        strong: true,
+        disabledOpacity: 0.5,
       };
+    // Ink: an action with consequences («Завершить урок»).
     case 'dark':
-      return { bg: c.tabActiveBg, border: 'transparent', text: c.tabActiveText, paddingX: 22, strong: true, disabledOpacity: 0.45 };
+      return { bg: c.tabActiveBg, border: 'transparent', text: c.tabActiveText, paddingX: 16, strong: true, disabledOpacity: 0.45 };
+    // Red outline: delete and sign out.
     case 'danger':
       return {
         bg: c.cardBg,
         border: c.dangerOutline,
-        text: c.dangerSolid,
+        text: c.dangerText,
         pressedBg: c.redSoft,
-        paddingX: 20,
-        strong: false,
+        paddingX: 16,
+        strong: true,
         disabledOpacity: 0.45,
       };
     case 'dangerSolid':
-      return { bg: c.dangerSolid, border: 'transparent', text: c.onAccent, paddingX: 20, strong: true, disabledOpacity: 0.45 };
+      return { bg: c.dangerSolid, border: 'transparent', text: c.tabActiveText, paddingX: 16, strong: true, disabledOpacity: 0.45 };
     case 'tonal':
       return {
-        bg: c.accentSoft,
+        bg: c.soft2,
         border: 'transparent',
-        text: c.greenText,
-        pressedBg: c.accentSoftStrong,
+        text: c.textStrong,
+        pressedBg: c.line2,
         paddingX: 16,
-        strong: false,
+        strong: true,
         disabledOpacity: 0.45,
       };
+    // Gradient: the main action, one per screen.
     default:
-      return { bg: 'transparent', border: 'transparent', text: c.onAccent, paddingX: 22, strong: true, disabledOpacity: 1 };
+      return { bg: 'transparent', border: 'transparent', text: c.onAccent, paddingX: 16, strong: true, disabledOpacity: 1 };
   }
 }
 
@@ -108,8 +112,10 @@ function labelVariant(size: ButtonSize, strong: boolean): TextVariant {
 }
 
 /**
- * Action button (`.shbz-btn-*`): 44 high, radius 12, one line. Press feedback is the system scale
- * (0.97 in 60 ms). A disabled primary button turns neutral grey instead of fading.
+ * Action button: 52 / 44 / 36 high, radius 12, 15 / 700 (13 at `sm`), one line. Roles: gradient — the main
+ * action (one per screen); outline — an ordinary action; dark — an action with consequences; danger —
+ * delete and sign out; a transition is a `TextButton`. Press feedback is the system scale (0.97 in 60 ms).
+ * A disabled primary button turns neutral grey instead of fading.
  */
 export function Button({
   label,
@@ -140,11 +146,11 @@ export function Button({
       : size === 'lg'
         ? theme.sizes.buttonLg
         : size === 'field'
-          ? theme.sizes.field
+          ? theme.sizes.buttonLg
           : theme.sizes.button;
-  const paddingX = size === 'sm' ? 14 : size === 'lg' || size === 'field' ? 24 : spec.paddingX;
+  const paddingX = size === 'sm' ? theme.space.md : size === 'lg' || size === 'field' ? theme.space.xl : spec.paddingX;
   const textColor = isPrimary && inactive ? theme.colors.segText : spec.text;
-  const iconSize = size === 'sm' ? 14 : 16;
+  const iconSize = size === 'sm' ? theme.sizes.icon.sm : theme.sizes.icon.md;
 
   return (
     <PressableScale

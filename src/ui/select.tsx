@@ -43,7 +43,7 @@ export type SelectProps<T extends string | number> = {
 
 const SIZE = {
   md: { radius: 'select', text: 'bodyStrong', paddingX: 16 },
-  sm: { radius: 'md', text: 'smallStrong', paddingX: 14 },
+  sm: { radius: 'md', text: 'smallStrong', paddingX: 16 },
   xs: { radius: 'selectXs', text: 'label', paddingX: 12 },
 } as const satisfies Record<string, { radius: 'select' | 'md' | 'selectXs'; text: TextVariant; paddingX: number }>;
 
@@ -167,7 +167,7 @@ const useStyles = makeStyles((t) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: t.radii.md,
   },

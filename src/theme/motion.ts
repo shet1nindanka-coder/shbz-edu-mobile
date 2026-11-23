@@ -1,4 +1,4 @@
-// Motion tokens (docs/spec/08-design-system.md §6). Motion is feedback, never decoration: animate only
+// Motion tokens (docs/design/glass-over-paper.md §5). Motion is feedback, never decoration: animate only
 // transform and opacity, exit faster than entry, and drop movement under reduced motion.
 
 export type BezierPoints = readonly [number, number, number, number];
@@ -14,6 +14,9 @@ export const motion = {
     enterStagger: 45,
     enterMaxIndex: 6,
     tabSlide: 260,
+    /** the dock lens: spring travel, squeeze and the glint that runs across it */
+    lens: 500,
+    lensGlint: 850,
     sheetIn: 260,
     sheetOut: 160,
     dialogIn: 200,
@@ -47,11 +50,14 @@ export const motion = {
     overshoot: [0.34, 1.56, 0.64, 1],
     bounce: [0.22, 1.4, 0.36, 1],
   },
+  /** Reanimated spring of the dock lens (about half a second, a slight overshoot). */
+  lensSpring: { damping: 16, stiffness: 190, mass: 0.9 },
   pressScale: 0.97,
   checkboxPressScale: 0.92,
 } as const satisfies {
   duration: Record<string, number>;
   easing: Record<string, BezierPoints>;
+  lensSpring: { damping: number; stiffness: number; mass: number };
   pressScale: number;
   checkboxPressScale: number;
 };

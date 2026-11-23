@@ -9,7 +9,19 @@ export {
 } from './colors';
 export { appFonts, useAppFonts, type AppFontsState } from './fonts';
 export { makeStyles } from './make-styles';
-export { borders, radii, sizes, space, type RadiusToken, type SpaceToken } from './metrics';
+export {
+  TABLET_MIN_WIDTH,
+  borders,
+  layoutClassFor,
+  radii,
+  sizes,
+  sizesFor,
+  space,
+  spaceFor,
+  type LayoutClass,
+  type RadiusToken,
+  type SpaceToken,
+} from './metrics';
 export { motion, type BezierPoints, type EasingToken } from './motion';
 export { darkShadows, lightShadows, type ShadowStyle, type ShadowToken, type ThemeShadows } from './shadows';
 export {
@@ -34,8 +46,12 @@ export {
   type StreakTier,
 } from './status';
 export {
+  darkTabletTheme,
   darkTheme,
+  fonts,
+  lightTabletTheme,
   lightTheme,
+  typography,
   resolveTheme,
   resolveThemeName,
   type Theme,
@@ -43,4 +59,4 @@ export {
   type ThemeName,
 } from './theme';
 export { ThemeProvider, useTheme, type ThemeProviderProps } from './theme-provider';
-export { fonts, typography, type TextStyleToken, type TextVariant } from './typography';
+export { fontFamilies, typographyFor, type TextStyleToken, type TextVariant, type ThemeTypography } from './typography';

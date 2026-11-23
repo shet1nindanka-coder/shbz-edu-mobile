@@ -320,7 +320,7 @@ describe("screen registry — A2 B.4 – B.5, 00 §3", () => {
     }
   });
 
-  it("places tabs and 'more' rows as in 00 §3.1", () => {
+  it("places the sections of the phone dock and the rest (docs/design/glass-over-paper.md §5)", () => {
     assert.deepEqual(
       navSections("STUDENT", "tab").map((section) => section.labelKey),
       ["nav.student.overview", "nav.student.lesson", "nav.student.homeworks", "nav.student.deadlines", "nav.student.theory"],
@@ -328,9 +328,9 @@ describe("screen registry — A2 B.4 – B.5, 00 §3", () => {
     assert.deepEqual(navSections("STUDENT", "more").map((section) => section.screen), ["student.info"]);
     assert.deepEqual(
       navSections("TEACHER", "tab").map((section) => section.labelKey),
-      ["nav.teacher.overview", "nav.teacher.students", "nav.teacher.lessons", "nav.teacher.calls"],
+      ["nav.teacher.overview", "nav.teacher.students", "nav.teacher.groups", "nav.teacher.lessons"],
     );
-    assert.deepEqual(navSections("TEACHER", "more").map((section) => section.screen), ["content.topics", "groups.list"]);
+    assert.deepEqual(navSections("TEACHER", "more").map((section) => section.screen), ["content.topics", "calls.list"]);
     assert.deepEqual(
       navSections("DEVELOPER", "tab").map((section) => section.labelKey),
       ["nav.developer.topics", "nav.developer.accounts", "nav.developer.calls", "nav.developer.statistics", "nav.developer.panel"],

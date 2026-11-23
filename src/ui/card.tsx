@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createContext, use, type ReactNode } from 'react';
 import { View, type GestureResponderEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles, useTheme } from '@/theme';
@@ -9,17 +9,32 @@ import { PressableScale } from './internal/pressable-scale';
 
 export type CardVariant = 'card' | 'surface' | 'soft' | 'panel' | 'outline';
 
+/**
+ * How deep the current subtree sits: 0 = on the page, 1 = inside a card (or a sheet). The design has two
+ * floors only — page → card → soft panel — so a `Card` decides its look from the depth, not from where
+ * the screen author thought it would be used.
+ */
+const SurfaceDepthContext = createContext(0);
+
+/** True inside a card or a sheet: the next surface must be a soft panel. */
+export function useInsideSurface(): boolean {
+  return use(SurfaceDepthContext) > 0;
+}
+
+/** Marks its subtree as sitting on a card-coloured surface (a bottom sheet, a dialog). */
+export function SurfaceScope({ children }: { children: ReactNode }) {
+  return <SurfaceDepthContext value={1}>{children}</SurfaceDepthContext>;
+}
+
 export type CardProps = {
   /**
-   * `card` — `.shbz-card`: white, hairline, the wide soft shadow (default).
-   * `surface` — the legacy surface: same, lighter shadow (state shells, file cards).
-   * `soft` — nested soft panel: tone + hairline, no shadow.
-   * `panel` — week/calendar panel tone, no shadow.
-   * `outline` — card fill with a soft hairline and no shadow (number cards).
+   * Kept for the callers; the look follows the nesting, not the variant:
+   * - on the page every variant is THE card — white, no border, soft shadow, radius 24;
+   * - inside a card or a sheet every variant is a soft panel — soft fill, radius 16, no shadow.
    * Two floors only: page → card → soft panel. Never nest a third level.
    */
   variant?: CardVariant;
-  /** Inner padding: `true` = 18 (20 for soft panels), a number, or `false` for none. Default `true`. */
+  /** Inner padding: `true` = 16 (24 for a card on a tablet), a number, or `false` for none. Default `true`. */
   padded?: boolean | number;
   /** Dashed hairline: an invitation / empty state. Becomes solid once there is content. */
   dashed?: boolean;
@@ -63,17 +78,18 @@ export function Card({
 }: CardProps) {
   const theme = useTheme();
   const styles = useStyles();
-  const padding =
-    padded === true ? (variant === 'soft' || variant === 'panel' ? theme.space.lg : theme.space.card) : padded || 0;
+  const nested = use(SurfaceDepthContext) > 0;
+  const padding = padded === true ? (nested ? theme.space.lg : theme.space.card) : padded || 0;
   const composed: StyleProp<ViewStyle> = [
-    styles.base,
-    styles[variant],
-    variant === 'card' ? theme.shadows.card : variant === 'surface' ? theme.shadows.surface : null,
+    nested ? styles.panel : styles.card,
+    nested ? null : theme.shadows.card,
     dashed ? styles.dashed : null,
     { padding },
     style,
   ];
-  const ring = selected ? <View style={styles.ring} /> : null;
+  const ring = selected ? <View style={[styles.ring, nested ? styles.ringPanel : null]} /> : null;
+  // `variant` no longer selects a look; it is read so the prop stays part of the API.
+  void variant;
   const label = accessibilityParts ? accessibilityLabelOf([accessibilityLabel, ...accessibilityParts]) : accessibilityLabel;
 
   if (onPress) {
@@ -88,14 +104,14 @@ export function Card({
         testID={testID}
         style={[composed, disabled ? styles.disabled : null]}
       >
-        {children}
+        <SurfaceDepthContext value={1}>{children}</SurfaceDepthContext>
         {ring}
       </PressableScale>
     );
   }
   return (
     <View accessibilityLabel={label} testID={testID} style={composed}>
-      {children}
+      <SurfaceDepthContext value={1}>{children}</SurfaceDepthContext>
       {ring}
     </View>
   );
@@ -166,20 +182,30 @@ export function CardPressArea({
 }
 
 const useStyles = makeStyles((t) => ({
-  base: { borderRadius: t.radii.lg, borderWidth: t.borders.hairline },
-  card: { backgroundColor: t.colors.cardBg, borderColor: t.colors.cardBorder },
-  surface: { backgroundColor: t.colors.cardBg, borderColor: t.colors.cardBorder },
-  soft: { backgroundColor: t.colors.softBg, borderColor: t.colors.softBorder },
-  panel: { backgroundColor: t.colors.panelBg, borderColor: t.colors.softBorder },
-  outline: { backgroundColor: t.colors.cardBg, borderColor: t.colors.softBorder },
-  dashed: { borderStyle: 'dashed' },
+  // The card: white on the grey page, no border (a faint edge in the dark theme), soft shadow.
+  card: {
+    borderRadius: t.radii.xl,
+    borderWidth: t.borders.hairline,
+    borderColor: t.colors.cardBorder,
+    backgroundColor: t.colors.cardBg,
+  },
+  // A panel inside a card: soft fill, nothing else.
+  panel: {
+    borderRadius: t.radii.lg,
+    borderWidth: t.borders.interactive,
+    borderColor: 'transparent',
+    backgroundColor: t.colors.softBg,
+  },
+  // An invitation / empty slot: dashed outline (`.note`, `.drop`).
+  dashed: { borderStyle: 'dashed', borderWidth: t.borders.interactive, borderColor: t.colors.line2 },
   ring: {
     ...absoluteFill,
     margin: -t.borders.hairline,
-    borderRadius: t.radii.lg,
+    borderRadius: t.radii.xl,
     borderWidth: t.borders.strong,
-    borderColor: t.colors.accentSolid,
+    borderColor: t.colors.textStrong,
     pointerEvents: 'none',
   },
+  ringPanel: { margin: -t.borders.interactive, borderRadius: t.radii.lg },
   disabled: { opacity: 0.55 },
 }));

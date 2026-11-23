@@ -1,4 +1,4 @@
-// Groups inside the teacher's «ещё» tab: `groups.list` → `groups.detail`.
+// Stack of the teacher's «группы» tab: `groups.list` → `groups.detail`.
 import { Stack } from 'expo-router';
 
 import { useTheme } from '@/theme';

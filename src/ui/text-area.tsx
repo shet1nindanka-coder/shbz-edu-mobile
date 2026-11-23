@@ -127,7 +127,7 @@ const useStyles = makeStyles((t) => ({
     alignSelf: 'stretch',
     minHeight: t.sizes.textareaMin - 2 * t.borders.interactive,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     color: t.colors.textStrong,
     // No browser focus ring (see `text-field.tsx`): width 0 alone does not hide `outline-style: auto`.
     outlineWidth: 0,
@@ -152,8 +152,8 @@ const useStyles = makeStyles((t) => ({
     ...t.typography.small,
     lineHeight: 21,
     minHeight: t.sizes.noteMin - 2 * t.borders.interactive,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: t.colors.textStrong,
     // No browser focus ring (see `text-field.tsx`): width 0 alone does not hide `outline-style: auto`.
     outlineWidth: 0,

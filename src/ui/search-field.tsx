@@ -64,7 +64,7 @@ export function SearchField({
   return (
     <View style={[styles.wrap, style]}>
       <View style={[styles.pill, focused ? styles.pillFocused : null, disabled ? styles.disabled : null]}>
-        <Icon name="search" size={16} color="kicker" />
+        <Icon name="search" size={20} color="textMuted" />
         <TextInput
           ref={ref}
           accessibilityLabel={accessibilityLabel ?? placeholder}
@@ -126,15 +126,15 @@ const useStyles = makeStyles((t) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.sm,
-    paddingHorizontal: 18,
+    paddingHorizontal: t.space.md,
     borderRadius: t.radii.md,
-    borderWidth: t.borders.interactive,
-    borderColor: t.colors.outlineBorder,
-    backgroundColor: t.colors.cardBg,
+    borderWidth: t.borders.strong,
+    borderColor: 'transparent',
+    backgroundColor: t.colors.softBg,
   },
   pillFocused: { borderColor: t.colors.accentSolid },
   input: {
-    ...t.typography.small,
+    ...t.typography.input,
     // A fixed line box misaligns the caret in a single-line input.
     lineHeight: undefined,
     flex: 1,

@@ -16,6 +16,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { makeStyles, useTheme } from '@/theme';
 
+import { SurfaceScope } from './card';
 import { IconButton } from './icon-button';
 import { MODAL_ORIENTATIONS, absoluteFill } from './internal/layout';
 import { useDismissKeyboardWhen, useKeyboardCoversHomeIndicator } from './internal/keyboard';
@@ -31,7 +32,7 @@ export type BottomSheetProps = {
   onClose: () => void;
   /** Accessible name of the backdrop and of the close button, e.g. "Закрыть". */
   closeLabel: string;
-  /** Title row (17/700). */
+  /** Title row (17 / 700; 20 on a tablet). */
   title?: string;
   /** Show the "×" button in the title row. Default: on when there is a title. */
   showClose?: boolean;
@@ -56,9 +57,9 @@ const CLOSE_DISTANCE = 96;
 const CLOSE_VELOCITY = 900;
 
 /**
- * Modal bottom sheet — the phone form of every site dialog and popover: full width, radius 16 16 0 0,
- * slides up in 260 ms and leaves in 160 ms. Drag the handle down to close. On wide screens it becomes a
- * centered card.
+ * Modal bottom sheet (`.sheet`) — where the details of a screen open: full width, radius 24 24 0 0, slides
+ * up in 260 ms and leaves in 160 ms. Drag the handle down to close. On wide screens it becomes a centred
+ * card 520 wide. Its surface is a card: panels inside it are soft (`SurfaceScope`).
  */
 export function BottomSheet({
   visible,
@@ -211,7 +212,7 @@ export function BottomSheet({
             style={[
               styles.sheet,
               wide ? styles.sheetWide : styles.sheetPhone,
-              theme.shadows.card,
+              theme.shadows.popover,
               { maxHeight: Math.round((window.height - insets.top) * maxHeightRatio) },
               sheetStyle,
             ]}
@@ -221,13 +222,12 @@ export function BottomSheet({
                 <View style={styles.grabber} />
                 {title || closeVisible ? (
                   <View style={styles.titleRow}>
-                    <Text variant="cardTitle" numberOfLines={2} accessibilityRole="header" style={styles.title}>
+                    <Text variant="dialogTitle" numberOfLines={2} accessibilityRole="header" style={styles.title}>
                       {title}
                     </Text>
                     {closeVisible ? (
                       <IconButton
                         icon="close"
-                        variant="ghost"
                         accessibilityLabel={closeLabel}
                         disabled={!dismissible}
                         onPress={requestClose}
@@ -245,12 +245,18 @@ export function BottomSheet({
                 showsVerticalScrollIndicator={false}
                 bounces={false}
               >
-                {body}
+                <SurfaceScope>{body}</SurfaceScope>
               </ScrollView>
             ) : (
-              <View style={styles.scroll}>{body}</View>
+              <View style={styles.scroll}>
+                <SurfaceScope>{body}</SurfaceScope>
+              </View>
             )}
-            {footer ? <View style={[styles.footer, { paddingBottom: bottomPad }]}>{footer}</View> : null}
+            {footer ? (
+              <View style={[styles.footer, { paddingBottom: bottomPad }]}>
+                <SurfaceScope>{footer}</SurfaceScope>
+              </View>
+            ) : null}
           </Animated.View>
         </KeyboardAvoidingView>
         {/* A modal is its own native window: the app-wide cover (biometric lock) is repeated inside it. */}
@@ -273,35 +279,35 @@ const useStyles = makeStyles((t) => ({
   },
   sheetPhone: {
     alignSelf: 'stretch',
-    borderTopLeftRadius: t.radii.lg,
-    borderTopRightRadius: t.radii.lg,
+    borderTopLeftRadius: t.radii.xl,
+    borderTopRightRadius: t.radii.xl,
     borderBottomWidth: 0,
   },
-  sheetWide: { width: '100%', maxWidth: t.sizes.dialogMaxWidth, borderRadius: t.radii.lg },
+  sheetWide: { width: '100%', maxWidth: t.sizes.dialogMaxWidth, borderRadius: t.radii.xl },
   header: { paddingTop: 8, paddingBottom: 4 },
   grabber: {
     alignSelf: 'center',
     width: 36,
     height: 4,
     borderRadius: t.radii.full,
-    backgroundColor: t.colors.divider,
+    backgroundColor: t.colors.line2,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.md,
-    paddingHorizontal: t.space.lg,
-    paddingTop: 10,
+    paddingHorizontal: t.space.card,
+    paddingTop: t.space.md,
     minHeight: t.sizes.minTouch,
   },
   title: { flex: 1, minWidth: 0 },
-  close: { marginRight: -8 },
+  close: {},
   scroll: { flexShrink: 1 },
-  padded: { paddingHorizontal: t.space.lg, paddingTop: 8 },
+  padded: { paddingHorizontal: t.space.card, paddingTop: t.space.md },
   footer: {
-    paddingHorizontal: t.space.lg,
+    paddingHorizontal: t.space.card,
     paddingTop: t.space.md,
     borderTopWidth: t.borders.hairline,
-    borderTopColor: t.colors.softBorder,
+    borderTopColor: t.colors.line,
   },
 }));

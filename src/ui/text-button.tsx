@@ -29,7 +29,7 @@ export type TextButtonProps = {
 
 const TONE: Record<TextButtonTone, ColorToken> = {
   accent: 'accentSolid',
-  danger: 'dangerSolid',
+  danger: 'dangerText',
   soft: 'textSoft',
   muted: 'textMuted',
 };

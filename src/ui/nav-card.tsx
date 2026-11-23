@@ -80,5 +80,5 @@ const useStyles = makeStyles((t) => ({
   title: { minHeight: 46 },
   stats: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 26, rowGap: t.space.md },
   statValue: { marginTop: 2 },
-  footer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
 }));

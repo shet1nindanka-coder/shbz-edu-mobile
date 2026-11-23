@@ -1,5 +1,5 @@
 // Traffic-light status palette, lesson-result palette and streak colour tiers
-// (docs/spec/08-design-system.md §1.5, §4). Green / yellow / red are reserved for statuses and direct
+// (docs/design/glass-over-paper.md §2). Green / yellow / red are reserved for number statuses and direct
 // signals; they are never decorative.
 //
 // The string unions below are structural copies of the canonical API types so the theme does not import
@@ -9,19 +9,19 @@ import type { ThemeColors } from './colors';
 export type HomeworkNumberStatus = 'GREEN' | 'YELLOW' | 'RED';
 export type LessonResultValue = 'SOLVED' | 'PARTIAL' | 'NOT_SOLVED' | 'SKIPPED';
 export type StatusTone = HomeworkNumberStatus | 'none' | 'neutral' | 'idle';
-export type StatusColors = { bg: string; text: string; border: string };
+export type StatusColors = { bg: string; text: string; border: string; /** bars and dots */ solid: string };
 
 export function statusPalette(c: ThemeColors): Record<StatusTone, StatusColors> {
   return {
-    GREEN: { bg: c.greenSoft, text: c.greenText, border: c.greenBorder },
-    YELLOW: { bg: c.yellowSoft, text: c.yellowText, border: c.yellowBorder },
-    RED: { bg: c.redSoft, text: c.redText, border: c.redBorder },
-    /** `null` status badge ("Не отмечено") */
-    none: { bg: c.tabHover, text: c.kicker, border: 'transparent' },
+    GREEN: { bg: c.greenSoft, text: c.greenText, border: c.greenBorder, solid: c.greenSolid },
+    YELLOW: { bg: c.yellowSoft, text: c.yellowText, border: c.yellowBorder, solid: c.yellowSolid },
+    RED: { bg: c.redSoft, text: c.redText, border: c.redBorder, solid: c.redSolid },
+    /** `null` status: a tile or a chip without a mark */
+    none: { bg: c.soft2, text: c.label, border: 'transparent', solid: c.soft2 },
     /** active "SKIPPED" lesson result */
-    neutral: { bg: c.tabHover, text: c.textStrong, border: c.textStrong },
-    /** inactive status option button */
-    idle: { bg: c.cardBg, text: c.tabText, border: c.outlineBorder },
+    neutral: { bg: c.soft2, text: c.textStrong, border: c.textStrong, solid: c.textMuted },
+    /** inactive status mark: white with an outline */
+    idle: { bg: c.cardBg, text: c.textMuted, border: c.line2, solid: c.soft2 },
   };
 }
 
@@ -117,24 +117,17 @@ export function mixHex(a: string, weightA: number, b: string): string {
 
 export type StreakPalette = { bgStart: string; bgEnd: string; border: string; text: string; flame: string };
 
-/** Mirrors the `color-mix()` rules of `.shbz-streak-hero[data-streak-tier]`. */
-export function streakPalette(tier: StreakTier, colors: ThemeColors): StreakPalette {
-  const accent = streakTiers[tier].accent;
-  if (!accent) {
-    return {
-      bgStart: colors.streakBgStart,
-      bgEnd: colors.streakBgEnd,
-      border: colors.streakBorder,
-      text: colors.streakText,
-      flame: colors.streakFlame,
-    };
-  }
+/**
+ * Colours of the «огонёк». The design has one streak colour (`.fl`: #fff1e0 / #8a4a00, flame #f2922e), so
+ * every tier paints the same; the tiers still drive the «next goal» text (`streakColorMeta`).
+ */
+export function streakPalette(_tier: StreakTier, colors: ThemeColors): StreakPalette {
   return {
-    bgStart: mixHex(accent, 0.16, colors.cardBg),
-    bgEnd: mixHex(accent, 0.07, colors.cardBg),
-    border: mixHex(accent, 0.38, colors.cardBg),
-    text: mixHex(accent, 0.45, colors.textStrong),
-    flame: accent,
+    bgStart: colors.streakBgStart,
+    bgEnd: colors.streakBgEnd,
+    border: colors.streakBorder,
+    text: colors.streakText,
+    flame: colors.streakFlame,
   };
 }
 

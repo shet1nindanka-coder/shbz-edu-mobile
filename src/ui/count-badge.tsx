@@ -31,7 +31,7 @@ export function CountBadge({ count, max = 9, style }: CountBadgeProps) {
   if (count <= 0) return null;
   return (
     <Animated.View style={[styles.badge, animatedStyle, style]}>
-      <Text variant="counter" color="onAccent" tabular numberOfLines={1}>
+      <Text variant="counter" color="tabActiveText" tabular numberOfLines={1}>
         {count > max ? `${max}+` : String(count)}
       </Text>
     </Animated.View>
@@ -40,8 +40,8 @@ export function CountBadge({ count, max = 9, style }: CountBadgeProps) {
 
 const useStyles = makeStyles((t) => ({
   badge: {
-    minWidth: 18,
-    height: 18,
+    minWidth: t.sizes.icon.md,
+    height: t.sizes.icon.md,
     paddingHorizontal: 4,
     borderRadius: t.radii.full,
     backgroundColor: t.colors.dangerSolid,

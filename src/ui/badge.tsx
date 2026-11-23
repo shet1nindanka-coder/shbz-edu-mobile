@@ -9,38 +9,36 @@ export type BadgeTone = 'GREEN' | 'YELLOW' | 'RED' | 'none' | 'neutral' | 'count
 export type BadgeProps = {
   label: string;
   /**
-   * `GREEN` / `YELLOW` / `RED` — bordered status surface (radius 12, 12/500).
-   * `none` — the borderless "not marked" badge (radius 8, 12/600).
+   * `GREEN` / `YELLOW` / `RED` — status label: soft fill + status text.
+   * `none` — the neutral "not marked" label.
    * `neutral` — ink outline (an active "not reached" result).
-   * `count` — soft hairline counter chip.
+   * `count` — neutral counter.
    */
   tone?: BadgeTone;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-/** Small label (`Badge`): 28 high, one line. */
+/** Small label (`.chip`): 28 high, radius 8, 12 / 600, one line. */
 export function Badge({ label, tone = 'none', accessibilityLabel, style }: BadgeProps) {
   const theme = useTheme();
   const styles = useStyles();
   const palette =
     tone === 'count'
-      ? { bg: theme.colors.softBg, text: theme.colors.textMuted, border: theme.colors.softBorder }
+      ? { bg: theme.colors.soft2, text: theme.colors.label, border: 'transparent' }
       : theme.status[tone satisfies StatusTone];
-  const soft = tone === 'none';
   return (
     <View
       accessible
       accessibilityLabel={accessibilityLabel ?? label}
       style={[
         styles.base,
-        soft ? styles.soft : styles.bordered,
         { backgroundColor: palette.bg, borderColor: palette.border },
         style,
       ]}
     >
       <Text
-        variant={soft ? 'badgeStrong' : 'badge'}
+        variant="badge"
         tabular={tone === 'count'}
         numberOfLines={1}
         style={{ color: palette.text }}
@@ -57,10 +55,10 @@ const useStyles = makeStyles((t) => ({
     // Never wider than its row: a long label ends in «…» (`numberOfLines={1}`) instead of overflowing.
     maxWidth: '100%',
     flexShrink: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    minHeight: t.sizes.chip,
+    justifyContent: 'center',
+    paddingHorizontal: t.space.sm,
+    borderRadius: t.radii.sm,
     borderWidth: t.borders.hairline,
   },
-  bordered: { borderRadius: t.radii.md },
-  soft: { borderRadius: t.radii.sm },
 }));

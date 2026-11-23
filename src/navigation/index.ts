@@ -37,8 +37,20 @@ export {
   type ScreenParams,
 } from './routes';
 export { LAUNCH_ROUTE, normalizeRootStack, sessionBottomRoute } from './root-stack';
-export { RoleTabBar, type RoleTabBarProps } from './tab-bar';
+export { Dock, DockHost, type DockProps } from './dock';
 export { useRefetchOnFocus, type FocusQuery, type RefetchOnFocusOptions } from './use-refetch-on-focus';
 export { useScreenLive } from './use-screen-live';
 export { useStillHere } from './use-still-here';
-export { MORE_TAB_NAME, moreSections, navItemOf, navLabel, tabsForRole, type TabDefinition } from './tabs';
+export {
+  dockActiveIndex,
+  dockHasMore,
+  dockOverflow,
+  dockSections,
+  moreSections,
+  navItemOf,
+  navLabel,
+  sectionOfPath,
+  tabsForRole,
+  type DockLayout,
+  type TabDefinition,
+} from './tabs';

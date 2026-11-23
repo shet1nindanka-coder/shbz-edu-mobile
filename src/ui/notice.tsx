@@ -111,5 +111,5 @@ const useStyles = makeStyles((t) => ({
   },
   body: { flex: 1, minWidth: 0, gap: 4 },
   action: { marginTop: 4, alignItems: 'flex-start' },
-  dismiss: { width: 28, height: 28, marginVertical: -4, marginRight: -6 },
+  dismiss: { width: 28, height: 28, marginVertical: -4, marginRight: -8 },
 }));

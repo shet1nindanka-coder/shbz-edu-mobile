@@ -72,6 +72,8 @@ const ru = {
     msk: "МСК",
     notSet: "не выбрано"
   },
+  // The link above a screen title when the parent screen has no shorter name.
+  back: "Назад",
   a11y: {
     goBack: "Вернуться назад",
     loading: "Идёт загрузка"
@@ -148,6 +150,7 @@ const en: typeof ru = {
     msk: "MSK",
     notSet: "not set"
   },
+  back: "Back",
   a11y: {
     goBack: "Go back",
     loading: "Loading"

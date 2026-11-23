@@ -89,7 +89,7 @@ function findTabs(state: NavState | null | undefined): NavState | null {
 /** The tab route (its name) whose root is `root`; null when the role has no such tab. */
 function tabNameOf(root: AppHref, role: UserRole): string | null {
   const tab = tabsForRole(role).find((candidate) => {
-    const href = candidate.section === 'more' ? { pathname: EXTRA_ROUTES.teacherMore } : hrefFor({ screen: candidate.section } as AppLink, role);
+    const href = hrefFor({ screen: candidate.section } as AppLink, role);
     return href?.pathname === root.pathname;
   });
   return tab?.name ?? null;
@@ -286,8 +286,6 @@ export type AppNavigation = {
   openFiles: (files: FileViewerFile[], options?: { initialIndex?: number; title?: string }) => void;
   /** Mock builds only. */
   openDemoData: () => void;
-  /** The teacher's «ещё» list. */
-  openTeacherMore: () => void;
 };
 
 /**
@@ -337,15 +335,6 @@ export function useAppNavigation(): AppNavigation {
         router.push(toHref(href));
       },
       openDemoData: () => router.push(toHref({ pathname: EXTRA_ROUTES.demoData })),
-      openTeacherMore: () => {
-        if (positionOf(currentSegments) === 'tabs') {
-          const deep = role !== null && tabIsAboveItsRoot({ pathname: EXTRA_ROUTES.teacherMore }, role);
-          router.navigate(toHref({ pathname: EXTRA_ROUTES.teacherMore }));
-          if (deep) router.dismissAll();
-        } else {
-          router.dismissTo(toHref({ pathname: EXTRA_ROUTES.teacherMore }));
-        }
-      },
     };
   }, [role]);
 }

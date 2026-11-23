@@ -25,8 +25,10 @@ const ru = {
   nav: {
     // Label of the teacher's fifth tab, lower-case like the site's section names.
     more: "ещё",
-    moreTopicsHint: "Темы, теория и номера",
-    moreGroupsHint: "Состав групп, статистика и посещаемость"
+    moreClose: "Закрыть меню",
+    // «общая инфа» does not fit a dock item.
+    infoShort: "инфа",
+    profile: "Профиль и настройки"
   },
   launch: {
     loading: "Открываем кабинет…",
@@ -144,8 +146,9 @@ const en: typeof ru = {
   },
   nav: {
     more: "more",
-    moreTopicsHint: "Topics, theory and problems",
-    moreGroupsHint: "Group members, statistics and attendance"
+    moreClose: "Close the menu",
+    infoShort: "info",
+    profile: "Profile and settings"
   },
   launch: {
     loading: "Opening your account…",

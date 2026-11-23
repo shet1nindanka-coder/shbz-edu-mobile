@@ -88,7 +88,7 @@ const useStyles = makeStyles((t) => ({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: t.radii.md,
     borderWidth: t.borders.hairline,
   },

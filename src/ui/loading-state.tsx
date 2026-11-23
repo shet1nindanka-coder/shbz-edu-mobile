@@ -87,8 +87,8 @@ export function LoadingState({
 const useStyles = makeStyles((t) => ({
   cards: { gap: t.space.lg },
   tabs: { flexDirection: 'row', gap: t.space.md, overflow: 'hidden' },
-  row: { flexDirection: 'row', gap: 10, paddingVertical: 12, paddingHorizontal: 16 },
-  dot: { marginTop: 5 },
+  row: { flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 16 },
+  dot: { marginTop: 4 },
   rowTexts: { flex: 1, gap: 8 },
-  spinner: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
+  spinner: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
 }));

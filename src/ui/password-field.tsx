@@ -27,7 +27,7 @@ export function PasswordField({ showLabel, hideLabel, showAccessibilityLabel, hi
       {...props}
       secureTextEntry={!visible}
       right={
-        <View style={{ paddingRight: 14, paddingLeft: 4 }}>
+        <View style={{ paddingRight: 16, paddingLeft: 4 }}>
           <TextButton
             label={visible ? hideLabel : showLabel}
             accessibilityLabel={visible ? (hideAccessibilityLabel ?? hideLabel) : (showAccessibilityLabel ?? showLabel)}
