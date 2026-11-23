@@ -272,7 +272,7 @@ const useStyles = makeStyles((t) => ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: t.space.xxs,
-    paddingHorizontal: t.space.xxxs,
+    // No side padding: five items on a 360-pt phone leave «статистика» exactly its own width.
     borderRadius: t.radii.full,
   },
   label: { maxWidth: '100%' },

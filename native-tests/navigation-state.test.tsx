@@ -4,7 +4,7 @@
 // "hardware back" does what the native back handler does: `canGoBack() ? goBack() : leave the app`.
 import { describe, expect, it } from '@jest/globals';
 
-import { byTestId, pressTestId, root, typeTestId, visit } from './support/drive';
+import { byTestId, pressTestId, typeTestId, visit } from './support/drive';
 import type { AppHandle } from './support/launch';
 import { all, flattenStyle, isHidden, type HostNode } from './support/tree';
 
@@ -63,7 +63,7 @@ describe('the bottom of the root stack', () => {
   it('back from a second tab returns to the first one without rebuilding the role tree', async () => {
     const app = await signIn('ilya@example.com', 'student123');
     const homeKey = ref().getRootState().routes[0].state?.routes[0].key;
-    await pressTestId(app, 'tab-deadlines');
+    await pressTestId(app, 'dock-deadlines');
     expect(app.path()).toBe('/student/deadlines');
     expect(await hardwareBack(app)).toBe('went-back');
     expect(app.path()).toBe('/student');
@@ -144,7 +144,10 @@ describe('links into the teacher «занятия» tab keep one list in its sta
   it('the lessons link from another tab while the drafts segment is the root', async () => {
     const app = await visit({ as: 'teacher@example.com', url: '/teacher/homework-plans' });
     expect(tabStack('(planner)')).toEqual(['homework-plans']);
-    await pressTestId(app, 'tab-(more)');
+    // Another tab: «звонки», reached through the «ещё» sheet of the dock.
+    await pressTestId(app, 'dock-more');
+    await pressTestId(app, 'dock-more-calls');
+    expect(app.path()).toBe('/teacher/calls');
     await open(app, { screen: 'planner.lessons' });
     expect(app.path()).toBe('/teacher/lessons');
     expect(tabStack('(planner)')).toEqual(['lessons']);
@@ -171,22 +174,31 @@ describe('links into the teacher «занятия» tab keep one list in its sta
   });
 });
 
-describe('tab bar on a wide screen', () => {
-  it('sizes the active pill by the centred row of items, not by the full-width bar', async () => {
+// The dock replaced the tab bar; its «lens» is what the active pill was.
+describe('dock on a wide screen', () => {
+  it('sizes the lens by the row of items, not by the full-width bar', async () => {
     const app = await visit({ as: 'teacher@example.com', url: '/teacher/calls' });
-    const bar = all(root(app), (node) => node.props.accessibilityRole === 'tablist' && !isHidden(node) && all(node, (child) => child.props.testID === 'tab-calls').length > 0)[0];
-    expect(bar).toBeDefined();
-    // A 768 pt tablet: the bar spans the screen, the items share the row capped at 560 pt.
+    const dock = byTestId(app, 'dock');
+    expect(dock).not.toBeNull();
+    const row = all(dock as HostNode, (node) => node.props.accessibilityRole === 'tablist' && !isHidden(node))[0];
+    expect(row).toBeDefined();
+    const items = all(row, (node) => node.props.accessibilityRole === 'tab');
+    expect(items.map((node) => node.props.testID)).toEqual(['dock-overview', 'dock-students', 'dock-groups', 'dock-lessons', 'dock-more']);
+    // A wide window: the capsule spans 768 pt, the row of items inside it measures 560 pt.
     const layout = (node: HostNode, width: number) =>
       (node.props.onLayout as (event: unknown) => void)({ nativeEvent: { layout: { x: 0, y: 0, width, height: 56 } } });
     await app.rntl.act(async () => {
-      for (const node of all(bar, (candidate) => typeof candidate.props.onLayout === 'function')) {
-        layout(node, node === bar ? 768 : 560);
+      for (const node of all(dock as HostNode, (candidate) => typeof candidate.props.onLayout === 'function')) {
+        layout(node, node === row ? 560 : 768);
       }
     });
     await app.advance(50);
-    const pill = all(bar, (node) => node.props.pointerEvents === 'none' && typeof flattenStyle(node.props.style).width === 'number')[0];
-    expect(pill).toBeDefined();
-    expect(flattenStyle(pill.props.style).width).toBe(112);
+    const lens = all(row, (node) => {
+      const style = flattenStyle(node.props.style);
+      return style.pointerEvents === 'none' && typeof style.width === 'number';
+    })[0];
+    expect(lens).toBeDefined();
+    // One fifth of the row: as wide as the item it lies under.
+    expect(flattenStyle(lens.props.style).width).toBe(112);
   });
 });

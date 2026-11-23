@@ -2,12 +2,16 @@
 // mock server: the note of a homework card after a refused save and with overlapping saves, the "I am in
 // class" call after a failure, the photo preview of a lesson that must never lock the submit buttons, and
 // photos picked beyond the free slots.
+//
+// A homework and a live lesson show ONE card — of the number selected in the strip of tiles — so a test
+// first brings its number on screen (`showHomeworkNumber`, a `lesson-tile-<number>`).
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { byTestId, fill, tap, visibleText, visit } from './support/drive';
+import { byTestId, fill, root, tap, visibleText, visit } from './support/drive';
 import { device } from './support/fakes';
 import type { AppHandle } from './support/launch';
-import { all, flattenStyle, textOf, type HostNode } from './support/tree';
+import { showHomeworkNumber } from './support/student';
+import { all, flattenStyle, isHidden, pressables, textOf, type HostNode } from './support/tree';
 
 // jest-expo answers the image manipulator's native calls with `undefined`, so every picked photo would fail
 // to re-encode. A pass-through stand-in: the "re-encoded" JPEG is the picked file itself.
@@ -49,9 +53,29 @@ async function blur(app: AppHandle, testID: string): Promise<void> {
   await app.rntl.fireEvent(node as never, 'blur');
 }
 
+/** The dashed "add" tile of a homework's photo row. */
+const ADD_PHOTO = '#homework-photos-grid-add';
+
 function isDisabled(node: HostNode | null): boolean {
   const state = node?.props.accessibilityState as { disabled?: boolean } | undefined;
   return Boolean(state?.disabled ?? node?.props.disabled);
+}
+
+/** Numbers of the live lesson that can be submitted now and have a tile in the strip, in lesson order. */
+async function submittableNumbers(app: AppHandle): Promise<string[]> {
+  const lesson = await call(app, () => app.mock.studentWork.getLiveLesson());
+  return [...(lesson.active?.items ?? [])]
+    .sort((left, right) => left.order - right.order)
+    .filter((item) => item.canSubmit && byTestId(app, `lesson-tile-${item.number}`) !== null)
+    .map((item) => item.number);
+}
+
+/** A bare press (also of a control an open sheet would cover on a device), then the app settles. */
+async function pressNode(app: AppHandle, testID: string): Promise<void> {
+  const node = byTestId(app, testID);
+  expect(node).not.toBeNull();
+  await app.rntl.fireEvent.press(node as never);
+  await app.settle();
 }
 
 describe('homework card note', () => {
@@ -79,6 +103,7 @@ describe('homework card note', () => {
   it('a draft typed offline and refused when the queue sends it is never shown as saved, and blur sends it again', async () => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_open' });
     const { setSimulatedOffline } = require('@/services/network') as typeof import('@/services/network'); // eslint-disable-line @typescript-eslint/no-require-imports
+    await showHomeworkNumber(app, '305');
     await app.rntl.act(async () => setSimulatedOffline(true));
     await fill(app, '#number-note-305', 'заметка без сети');
     await app.advance(700);
@@ -120,6 +145,8 @@ describe('homework card note', () => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_open' });
     // Moves the mock's call counter, so the two saves below get different simulated latencies.
     for (let index = 0; index < warmup; index += 1) await call(app, () => app.mock.studentStudy.getHomeworkDeadlines());
+    // 301 is solved, so it is not in the strip: its card is reached through «Все номера».
+    await showHomeworkNumber(app, '301');
     await fill(app, '#number-note-301', 'one');
     await app.advance(700); // the debounce sends «one»
     await fill(app, '#number-note-301', 'one two');
@@ -149,22 +176,22 @@ describe('live lesson', () => {
 
   it('a preview that is still marked open does not lock the other submit buttons', async () => {
     const app = await visit({ as: 'polina@example.com', url: '/student/lesson' });
-    const submits = () =>
-      app.screen.queryAllByRole('button').filter((node) => /^lesson-submit-(?!error)/.test(String(node.props.testID)));
-    expect(submits().length).toBeGreaterThan(1);
+    const [first, other] = await submittableNumbers(app);
+    expect(other).toBeDefined();
     device().picker.nextAssets = [photo(1)];
-    await app.rntl.fireEvent.press(submits()[0]);
-    await app.settle();
+    await pressNode(app, `lesson-tile-${first}`);
+    await pressNode(app, `lesson-submit-${first}`);
     await tap(app, '#photo-source-library');
     await app.settle();
     expect(byTestId(app, 'lesson-preview')).not.toBeNull();
 
-    // If the sheet was refused by the OS, the cards are what the student sees: they must still work …
-    const other = submits()[1];
-    expect(isDisabled(other)).toBe(false);
-    // … and pressing one starts over with a fresh source sheet, not the stuck preview.
-    await app.rntl.fireEvent.press(other);
-    await app.settle();
+    // If the sheet was refused by the OS, the strip and the card are what the student sees: they must
+    // still work — another number can be chosen and its button is not locked …
+    await pressNode(app, `lesson-tile-${other}`);
+    expect(byTestId(app, `lesson-submit-${first}`)).toBeNull(); // one card at a time
+    expect(isDisabled(byTestId(app, `lesson-submit-${other}`))).toBe(false);
+    // … and pressing it starts over with a fresh source sheet, not the stuck preview.
+    await pressNode(app, `lesson-submit-${other}`);
     expect(byTestId(app, 'photo-source-library')).not.toBeNull();
     expect(byTestId(app, 'lesson-preview')).toBeNull();
   });
@@ -178,7 +205,9 @@ describe('homework photos', () => {
     expect(free).toBeGreaterThan(0);
     // The fake picker, like the web file input, ignores `selectionLimit`.
     device().picker.nextAssets = Array.from({ length: free + 2 }, (_, index) => photo(index));
-    await tap(app, 'button:Добавить фото');
+    // The tile is a plus without a text: its name is what a screen reader says.
+    expect(byTestId(app, ADD_PHOTO.slice(1))?.props.accessibilityLabel).toBe('Добавить фото');
+    await tap(app, ADD_PHOTO);
     await tap(app, '#photo-source-library');
     await app.settle();
     expect(byTestId(app, 'homework-photos-pick-problem')).not.toBeNull();
@@ -202,7 +231,7 @@ describe('cool-down stays explained after the error notice is dismissed', () => 
         mock.controls.set('forceNextError', { method: 'studentWork.uploadHomeworkPhotos', error: 'rateLimited', times: 1 }),
     });
     device().picker.nextAssets = [photo(1)];
-    await tap(app, 'button:Добавить фото');
+    await tap(app, ADD_PHOTO);
     await tap(app, '#photo-source-library');
     await app.settle();
     expect(byTestId(app, 'homework-photos-error')).not.toBeNull();
@@ -219,7 +248,7 @@ describe('cool-down stays explained after the error notice is dismissed', () => 
   it('homework check: the start button stays explained (daily budget)', async () => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_soon' });
     device().picker.nextAssets = [photo(1)];
-    await tap(app, 'button:Добавить фото');
+    await tap(app, ADD_PHOTO);
     await tap(app, '#photo-source-library');
     await app.advance(3000);
     await app.settle();
@@ -242,11 +271,23 @@ describe('cool-down stays explained after the error notice is dismissed', () => 
 
   it('live lesson: one line in the header explains every locked card, also after the dismiss', async () => {
     const app = await visit({ as: 'polina@example.com', url: '/student/lesson' });
+    const numbers = await submittableNumbers(app);
+    expect(numbers.length).toBeGreaterThan(1);
     await app.rntl.act(async () => app.mock.controls.exhaust('api:lesson-checks:global', 'global'));
     const submits = () =>
       app.screen.queryAllByRole('button').filter((node) => /^lesson-submit-(?!error|wait)/.test(String(node.props.testID)));
+    // The lesson shows one card at a time: every number that can be submitted is looked at in turn.
+    const everyCardLocked = async (): Promise<boolean> => {
+      let locked = true;
+      for (const number of [...numbers].reverse()) {
+        await pressNode(app, `lesson-tile-${number}`);
+        locked = locked && isDisabled(byTestId(app, `lesson-submit-${number}`)) && byTestId(app, 'lesson-submit-wait') !== null;
+      }
+      return locked;
+    };
     expect(byTestId(app, 'lesson-submit-wait')).toBeNull();
     device().picker.nextAssets = [photo(1)];
+    await pressNode(app, `lesson-tile-${numbers[0]}`);
     await app.rntl.fireEvent.press(submits()[0]);
     await app.settle();
     await tap(app, '#photo-source-library');
@@ -267,21 +308,42 @@ describe('cool-down stays explained after the error notice is dismissed', () => 
     expect(app.screen.queryAllByTestId(/^lesson-submit-error-/).length).toBe(0);
     expect(submits().every((node) => isDisabled(node))).toBe(true);
     expect(byTestId(app, 'lesson-submit-wait')).not.toBeNull();
+    // The numbers never tried are locked and explained by the same single line.
+    expect(await everyCardLocked()).toBe(true);
+    expect(waitLines(app)).toBe(1);
   });
 });
 
 // Finding #119: on web a Text keeps `min-width: auto` (its longest word), so a flex-item title needs
 // `minWidth: 0` to shrink and wrap a long unbroken word inside the card instead of leaving it.
 describe('deadline card title wraps inside the card', () => {
-  it('the title Text of the home hero card can shrink below its longest word', async () => {
-    const app = await visit({ as: ILYA, url: '/student' });
-    const card = byTestId(app, 'home-hero-card');
-    expect(card).not.toBeNull();
+  // «Обзор» no longer has the hero deadline card; the card itself lives on in the day sheet of the calendar.
+  it('the title Text of a deadline card (the day sheet of the calendar) can shrink below its longest word', async () => {
+    const app = await visit({ as: ILYA, url: '/student/deadlines' });
+    const day = pressables(root(app)).find((node) => /^calendar-day-/.test(String(node.props.testID)));
+    expect(day).toBeDefined();
+    await tap(app, `#${String(day?.props.testID)}`);
+    const card = all(root(app), (node) => /^day-sheet-card-/.test(String(node.props.testID)) && !isHidden(node))[0];
+    expect(card).toBeDefined();
     // The first text of the card is its title (head → titleWrap → label).
-    const title = all(card as HostNode, (node) => node.type === 'Text')[0];
+    const title = all(card, (node) => node.type === 'Text')[0];
     expect(textOf(title).length).toBeGreaterThan(0);
     const style = flattenStyle(title.props.style);
     expect(style.flexShrink).toBe(1);
     expect(style.minWidth).toBe(0);
+  });
+
+  // What «Обзор» shows instead of the hero card: the lesson card and the homework rows. Their titles are
+  // one line that is cut, so it is the column of texts that must be able to shrink inside the card.
+  it.each(['home-lesson-card', 'home-upcoming-card-hw_ilya_overdue'])('the texts of #%s on «Обзор» can shrink inside the card', async (testID) => {
+    const app = await visit({ as: ILYA, url: '/student' });
+    const card = byTestId(app, testID);
+    expect(card).not.toBeNull();
+    const title = all(card as HostNode, (node) => node.type === 'Text')[0];
+    expect(textOf(title).length).toBeGreaterThan(0);
+    expect(title.props.numberOfLines).toBe(1);
+    const column = flattenStyle(title.parent?.props.style);
+    expect(column.flex).toBe(1);
+    expect(column.minWidth).toBe(0);
   });
 });

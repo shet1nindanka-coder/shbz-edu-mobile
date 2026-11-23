@@ -118,7 +118,7 @@ describe('login', () => {
   it('shows the notice of an expired session after a forced sign-out', async () => {
     const app = await visit({ as: 'ilya@example.com', url: '/student' });
     app.mock.controls.set('forceNextError', { method: '*', error: 'sessionExpired', times: 1 });
-    await pressTestId(app, 'tab-homeworks');
+    await pressTestId(app, 'dock-homeworks');
     await app.settle();
     checkScreen(app, 'login: after the session expired');
     expect(app.path()).toBe('/login');

@@ -8,6 +8,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { byTestId, fill, hasTestId, pressTestId, typeTestId, visibleText, visit } from './support/drive';
 import { passwordFor, type AppHandle } from './support/launch';
+import { showHomeworkNumber } from './support/student';
 import { textOf } from './support/tree';
 
 const ILYA = 'ilya@example.com';
@@ -166,6 +167,8 @@ describe('a note when the session expires', () => {
 describe('two editors of the same number', () => {
   it('the homework card shows the draft queued on the number screen and does not overwrite it', async () => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_overdue' });
+    // The homework shows one number card: № 120 is chosen in the strip and stays chosen under the pushed screen.
+    await showHomeworkNumber(app, '120');
     const original = inputValue(app, 'number-note-120');
     expect(original).toBeDefined();
     await app.open('/student/numbers/120');
