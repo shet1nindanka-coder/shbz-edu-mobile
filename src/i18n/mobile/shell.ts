@@ -30,6 +30,8 @@ const ru = {
     moreClose: "Закрыть меню",
     // «общая инфа» does not fit a dock item.
     infoShort: "инфа",
+    // «дев-панель» is cut on a narrow phone; the dock says «панель».
+    panelShort: "панель",
     profile: "Профиль и настройки"
   },
   launch: {
@@ -155,6 +157,7 @@ const en: typeof ru = {
     more: "more",
     moreClose: "Close the menu",
     infoShort: "info",
+    panelShort: "panel",
     profile: "Profile and settings"
   },
   launch: {

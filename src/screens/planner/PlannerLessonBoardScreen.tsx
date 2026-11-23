@@ -72,8 +72,10 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirming, setConfirming] = useState<'finish' | 'delete' | null>(null);
-  // The student whose numbers are shown: the open sheet on a phone, the tapped row on a tablet.
+  // The student whose numbers are shown: in the sheet of a phone (`openId`), in the panel of a tablet
+  // (`panelId`). Two states, so a window that becomes narrow does not pop a sheet up by itself.
   const [openId, setOpenId] = useState<string | null>(null);
+  const [panelId, setPanelId] = useState<string | null>(null);
   // The number picked in each student's grid; without a pick the board chooses (`pickBoardItemId`).
   const [pickedItems, setPickedItems] = useState<Record<string, string>>({});
   const [addFor, setAddFor] = useState<string | null>(null);
@@ -161,11 +163,31 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
 
   // Tablet: the tapped student, else the first one who needs the teacher, else the first of the class.
   const panelParticipant = theme.tablet
-    ? (participants.find((participant) => participant.id === openId) ??
+    ? (participants.find((participant) => participant.id === panelId) ??
       participants.find((participant) => views.get(participant.id)?.caption.attention) ??
       participants[0] ??
       null)
     : null;
+  // The board's own choices are pinned as soon as they are shown: the next re-read (a check that ended, a
+  // result that was marked) must not move the panel to another student, or the card to another number,
+  // under the teacher's hands.
+  if (panelParticipant && panelParticipant.id !== panelId) setPanelId(panelParticipant.id);
+  const pinned = panelParticipant ?? (single && !theme.tablet ? (participants[0] ?? null) : null);
+  if (pinned) {
+    const picked = pickedItems[pinned.id];
+    const auto = pickBoardItemId(pinned.items);
+    if (auto !== null && !pinned.items.some((item) => item.id === picked)) setPickedItems((current) => ({ ...current, [pinned.id]: auto }));
+  }
+  /** A tap on a student's row. The sheet opens on the number that needs the teacher now. */
+  const showParticipant = (participant: LessonBoardParticipant) => {
+    if (theme.tablet) {
+      setPanelId(participant.id);
+      return;
+    }
+    const auto = pickBoardItemId(participant.items);
+    if (auto !== null) setPickedItems((current) => ({ ...current, [participant.id]: auto }));
+    setOpenId(participant.id);
+  };
 
   const openPhotos = (item: LessonBoardItem, index: number) => {
     const photos = item.submission?.photoFileIds ?? [];
@@ -262,7 +284,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
         planPending={view.planState.pending}
         selected={panelParticipant?.id === participant.id}
         divider={index < participants.length - 1}
-        onPress={() => setOpenId(participant.id)}
+        onPress={() => showParticipant(participant)}
       />
     );
   });

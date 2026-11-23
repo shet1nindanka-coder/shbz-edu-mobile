@@ -69,8 +69,10 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // The student whose set is shown: the open sheet on a phone, the tapped row on a tablet.
+  // The student whose set is shown: in the sheet of a phone (`openId`), in the panel of a tablet
+  // (`panelId`). Two states, so a window that becomes narrow does not pop a sheet up by itself.
   const [openId, setOpenId] = useState<string | null>(null);
+  const [panelId, setPanelId] = useState<string | null>(null);
   // The number picked in each student's grid; without a pick the first of the set is shown.
   const [pickedItems, setPickedItems] = useState<Record<string, string>>({});
   const [addFor, setAddFor] = useState<string | null>(null);
@@ -138,11 +140,14 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
 
   // Tablet: the tapped student, else the first one whose plan failed, else the first of the list.
   const panelParticipant = theme.tablet
-    ? (participants.find((participant) => participant.id === openId) ??
+    ? (participants.find((participant) => participant.id === panelId) ??
       participants.find((participant) => views.get(participant.id)?.caption.attention) ??
       participants[0] ??
       null)
     : null;
+  // The board's own choice is pinned as soon as it is shown: a plan that arrives or fails meanwhile must
+  // not move the panel to another student under the teacher's hands.
+  if (panelParticipant && panelParticipant.id !== panelId) setPanelId(panelParticipant.id);
 
   /** Runs `action` once the student's sheet has left (at once where there is no sheet). */
   const leaveSheetFor = (action: () => void) => {
@@ -211,7 +216,7 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
         planPending={view.planState.pending}
         selected={panelParticipant?.id === participant.id}
         divider={index < participants.length - 1}
-        onPress={() => setOpenId(participant.id)}
+        onPress={() => (theme.tablet ? setPanelId(participant.id) : setOpenId(participant.id))}
       />
     );
   });

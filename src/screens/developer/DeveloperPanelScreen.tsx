@@ -26,7 +26,7 @@ import { useSettingsForm } from './panel/use-settings-form';
 /** Route params of `developer.panel` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type DeveloperPanelScreenProps = ScreenParams['developer.panel'];
 
-/** From this window width the five segments and the save button fit the header row at full size. */
+/** From this window width the five segments and the save button fit the header row next to the title. */
 const ROOMY_HEADER_FROM = 1024;
 
 /** The last segment of the header is not a tab of this screen: it opens the journal. */
@@ -38,8 +38,8 @@ type PanelSegment = DeveloperPanelTab | typeof JOURNAL;
  * mockup D-panel): the developer's service panel — status, service actions, broadcast and site settings.
  * The segments of the panel are in the header; the fifth one, «Журнал», is a link as on the site: the
  * journal is a screen of its own (07 §1.9 layout item 2). A tablet lays every tab out as two panels down
- * to the dock and keeps «Сохранить настройки» in the header; on a phone the header scrolls away with the
- * long form, so the save bar is pinned above the dock.
+ * to the dock and keeps «Сохранить настройки» in the header (on a narrow tablet — in the status row under
+ * it); on a phone the header scrolls away with the long form, so the save bar is pinned above the dock.
  *
  * The panel has neither a realtime event nor polling (07 §5): it is read on entry, on every return to the
  * screen, on pull-to-refresh and after each action. `tab` (a notification target, a web address) picks the
@@ -89,6 +89,7 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
   };
 
   const settingsShown = data !== undefined && form !== null && active === 'settings';
+  const roomyHeader = window.width >= ROOMY_HEADER_FROM;
   const budgets = budgetRows(data?.aiBudgets);
   // A budget that is running out is the one warning of the panel: a soft notice above every tab.
   const strained = budgets.filter((budget) => budget.state !== 'ok');
@@ -113,11 +114,11 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
                 role="tab"
                 // Five dictionary labels: shown in full on a phone, on a narrow tablet and with a large OS
                 // font (the bar scrolls when they cannot fit), never ellipsized.
-                scrollable={window.width < ROOMY_HEADER_FROM}
+                scrollable={!roomyHeader}
                 style={styles.segments}
                 testID="panel-tabs"
               />
-              {theme.tablet && settingsShown ? <SettingsSaveActions form={form} /> : null}
+              {theme.tablet && roomyHeader && settingsShown ? <SettingsSaveActions form={form} /> : null}
             </View>
           }
         />
@@ -148,9 +149,13 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
           {/* The counters live on «Статус»; the actions change them, so that tab repeats the three main ones. */}
           {active === 'actions' ? <StatusChips figures={panelFigures(data.stats, data.settings, t)} /> : null}
           {theme.tablet && active === 'settings' ? (
-            <View style={styles.statusLine}>
-              <SettingsStatusLine form={form} />
-              <RetryWaitLine seconds={form.waitSeconds} testID="settings-wait" />
+            <View style={styles.statusRow}>
+              <View style={styles.statusLine}>
+                <SettingsStatusLine form={form} />
+                <RetryWaitLine seconds={form.waitSeconds} testID="settings-wait" />
+              </View>
+              {/* A narrow tablet header has no room for the button next to the five segments and the title. */}
+              {roomyHeader ? null : <SettingsSaveActions form={form} />}
             </View>
           ) : null}
           {/* Every tab stays mounted: a half-written broadcast or an action result survives a tab switch. */}
@@ -182,6 +187,7 @@ const useStyles = makeStyles((t) => ({
   segments: { flexShrink: 1, flexGrow: t.tablet ? 0 : 1, minWidth: 0 },
   // A tablet tab is a row of panels that runs down to the dock.
   tabFill: { flex: 1, minHeight: 0 },
-  statusLine: { gap: t.space.xxs, paddingHorizontal: t.space.xxs },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingHorizontal: t.space.xxs },
+  statusLine: { flex: 1, minWidth: 0, gap: t.space.xxs },
   hidden: { display: 'none' },
 }));

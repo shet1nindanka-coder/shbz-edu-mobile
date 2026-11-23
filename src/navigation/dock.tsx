@@ -174,8 +174,9 @@ export function Dock({ role }: DockProps) {
           </Animated.View>
           {sections.map((section, index) => {
             const item = navItemOf(section.labelKey);
-            // «общая инфа» does not fit an item: the tablet dock says «инфа».
-            const label = item === 'info' ? m.shell.nav.infoShort : navLabel(dict.nav, section.labelKey);
+            // «общая инфа» and «дев-панель» do not fit an item: the dock says «инфа» and «панель».
+            const label =
+              item === 'info' ? m.shell.nav.infoShort : item === 'panel' ? m.shell.nav.panelShort : navLabel(dict.nav, section.labelKey);
             return tab(item, label, sectionIcon(role, section), index === activeIndex, () => open({ screen: section.screen } as AppLink));
           })}
           {hasMore

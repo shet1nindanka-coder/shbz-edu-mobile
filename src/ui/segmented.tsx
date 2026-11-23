@@ -179,6 +179,6 @@ const useStyles = makeStyles((t) => ({
   // Equal growth from the label's own width: a long label is not truncated while short ones have room.
   segmentFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: t.space.xxs },
   // Never narrower than the label; spare room is shared equally, as in `fill`.
-  segmentScrollable: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: 4 },
+  segmentScrollable: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: t.space.sm },
   disabled: { opacity: 0.55 },
 }));
