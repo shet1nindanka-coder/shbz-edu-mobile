@@ -84,7 +84,8 @@ export function Card({
     nested ? styles.panel : styles.card,
     nested ? null : theme.shadows.card,
     dashed ? styles.dashed : null,
-    { padding },
+    // No `padding: 0`: on web a shorthand written here would beat the `paddingVertical` of the caller's style.
+    padding ? { padding } : null,
     style,
   ];
   const ring = selected ? <View style={[styles.ring, nested ? styles.ringPanel : null]} /> : null;
