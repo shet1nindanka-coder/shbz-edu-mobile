@@ -169,9 +169,7 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
                   subtitle={metaOf(lesson)}
                   subtitleLines={2}
                   selected={lesson.id === selected?.id}
-                  inset={panelRow.inset}
-                  style={panelRow.style}
-                  divider={index < lessons.length - 1}
+                  {...panelRow(lesson.id === selected?.id, index < lessons.length - 1)}
                   onPress={() => setPickedId(lesson.id)}
                   testID={`student-lesson-toggle-${lesson.id}`}
                 />

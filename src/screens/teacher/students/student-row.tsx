@@ -47,8 +47,7 @@ export function StudentRow({ student, onPress, selected = false, panel = false, 
       }
       selected={selected}
       divider={divider}
-      inset={panel ? panelRow.inset : undefined}
-      style={panel ? panelRow.style : undefined}
+      {...(panel ? panelRow(selected, divider ?? true) : null)}
       onPress={() => onPress(student)}
       accessibilityLabel={[student.name, `${t.loginLabel}: ${student.email}`, fact].filter(Boolean).join('. ')}
       accessibilityHint={t.viewProgress}

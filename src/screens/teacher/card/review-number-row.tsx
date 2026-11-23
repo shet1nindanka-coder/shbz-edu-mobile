@@ -39,7 +39,12 @@ export function ReviewNumberRow({ number, result, saving, blocked, error, divide
   // A refused mark appears under the row without moving the focus: screen readers have to be told.
   useStatusAnnouncement(error);
   const t = dict.students.review;
-  const caption = result ? result.comment?.trim() || t.verdict[result.verdict].chip : number.note.trim() || statusLabel(number.status, m.common.statuses);
+  const comment = result?.comment?.trim() ?? '';
+  // What the AI said about the number. A verdict it could not reach leads the line — its comment alone
+  // («Верно.») would read as a verdict.
+  const verdict = result ? t.verdict[result.verdict].chip : '';
+  const said = result ? (comment && result.verdict !== 'UNCERTAIN' ? comment : [verdict, comment].filter(Boolean).join(' · ')) : '';
+  const caption = said || number.note.trim() || statusLabel(number.status, m.common.statuses);
 
   return (
     <View style={[styles.row, divider ? styles.divider : null]} testID={`review-number-${number.homeworkNumberId}`}>

@@ -8,6 +8,8 @@ export type ListSliceProps = {
   first: boolean;
   /** The last row of its card: rounds the bottom corners. */
   last: boolean;
+  /** The whole list already sits in a card (the tablet panel): the cell paints nothing of its own. */
+  inCard?: boolean;
   children: ReactNode;
 };
 
@@ -17,8 +19,9 @@ export type ListSliceProps = {
  * card's fill instead, and the first and the last one carry its corners and its inner padding. The card
  * shadow is left out: a shadow per cell would fall on the neighbouring rows.
  */
-export function ListSlice({ first, last, children }: ListSliceProps) {
+export function ListSlice({ first, last, inCard = false, children }: ListSliceProps) {
   const styles = useStyles();
+  if (inCard) return <>{children}</>;
   return <View style={[styles.slice, first ? styles.first : null, last ? styles.last : null]}>{children}</View>;
 }
 

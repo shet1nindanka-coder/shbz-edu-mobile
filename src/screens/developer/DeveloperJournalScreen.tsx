@@ -214,7 +214,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
       keyExtractor={(entry) => entry.id}
       renderItem={({ item, index }) => (
         <View style={switching ? styles.stale : null} testID={`journal-entry-${item.id}`}>
-          <ListSlice first={index === 0} last={index === entries.length - 1}>
+          <ListSlice first={index === 0} last={index === entries.length - 1} inCard={theme.tablet}>
             <JournalEntryCard
               entry={item}
               divider={index < entries.length - 1}
@@ -248,7 +248,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
       }
       onEndReached={journal.isFetchNextPageError || paused ? undefined : loadMore}
       onEndReachedThreshold={0.6}
-      contentContainerStyle={theme.tablet ? undefined : styles.listContent}
+      contentContainerStyle={theme.tablet ? styles.panelContent : styles.listContent}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       refreshControl={
@@ -361,5 +361,7 @@ const useStyles = makeStyles((t) => ({
   footer: { gap: t.space.md, paddingTop: t.space.md },
   // Tablet: the list is the content of the left panel, a card that runs down to the dock.
   listPanel: { flex: 3, minWidth: 0, minHeight: 0, overflow: 'hidden' },
+  // The inner padding of a card of rows.
+  panelContent: { paddingVertical: t.space.sm },
   footerPanel: { paddingHorizontal: t.space.card, paddingBottom: t.space.card },
 }));

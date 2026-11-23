@@ -1,6 +1,8 @@
-// Pure model of the teacher's overview (docs/spec/04-teacher-students.md S1): which three cards are shown,
-// with which numbers, and where each leads. No React, no React Native — unit-tested in
-// tests/teacher-home.test.ts.
+// Pure model of the counters of the teacher's overview (docs/spec/04-teacher-students.md S1): the site's
+// three cards with their numbers and links, and which of the two reads of the call counters wins. The
+// «Стекло над листом» overview shows the nearest lesson and who needs attention instead of the cards (the
+// sections are opened from the dock); it still uses `pickCallCounts`. No React, no React Native —
+// unit-tested in tests/teacher-home.test.ts.
 import type { ParentCallCounts, TeacherHomeSummary } from '@/api/types';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 

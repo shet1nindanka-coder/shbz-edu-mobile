@@ -311,8 +311,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
                     subtitleTone={summary.attention ? 'attention' : 'muted'}
                     meta={summary.done}
                     selected={row.assignment.id === selectedAssignment?.id}
-                    inset={panelRow.inset}
-                    style={panelRow.style}
+                    {...panelRow(row.assignment.id === selectedAssignment?.id, true)}
                     onPress={() => setPickedId(row.assignment.id)}
                     accessibilityLabel={`${summary.title}. ${summary.caption}. ${summary.done}`}
                     testID={`review-assignment-toggle-${row.assignment.id}`}

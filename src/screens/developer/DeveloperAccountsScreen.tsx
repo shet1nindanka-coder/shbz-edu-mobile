@@ -306,7 +306,7 @@ export function DeveloperAccountsScreen() {
             </SectionCaption>
           )
         ) : (
-          <ListSlice first={item.first} last={item.last}>
+          <ListSlice first={item.first} last={item.last} inCard={theme.tablet}>
             {item.kind === 'teacher' ? (
               <TeacherRow teacher={item.teacher} divider={!item.last} onPress={(teacher) => setOverlay({ kind: 'teacher', teacher })} />
             ) : (
