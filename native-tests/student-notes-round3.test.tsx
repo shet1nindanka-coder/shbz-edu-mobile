@@ -9,6 +9,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { byTestId, fill, hasTestId, pressTestId, typeTestId, visibleText, visit } from './support/drive';
 import { passwordFor, type AppHandle } from './support/launch';
+import { showHomeworkNumber } from './support/student';
 
 const ILYA = 'ilya@example.com';
 const HW = '/student/homeworks/hw_ilya_overdue';
@@ -57,6 +58,8 @@ function statusText(app: AppHandle, testID: string): string | null {
 describe('two editors of one number: the text typed last lands', () => {
   it('number screen → homework card: the card text typed after a slow save is not overwritten by the number screen draft', async () => {
     const app = await visit({ as: ILYA, url: HW });
+    // The homework shows one number card: № 120 is chosen in the strip and stays chosen under the pushed screen.
+    await showHomeworkNumber(app, '120');
     await app.rntl.act(async () => {
       app.router.push(NUM);
     });
@@ -89,6 +92,7 @@ describe('two editors of one number: the text typed last lands', () => {
 
   it('homework card → number screen: the note typed on the number screen is not overwritten by the card draft', async () => {
     const app = await visit({ as: ILYA, url: HW });
+    await showHomeworkNumber(app, '120');
     await app.open(NUM);
     await app.rntl.act(async () => {
       app.router.back();
@@ -234,6 +238,8 @@ describe('a stored draft of the wrong shape', () => {
     it(`(${JSON.stringify(payload)}) is dropped: the homework and number screens render`, async () => {
       const bad = [{ kind: 'studentStudy.saveNumberNote', id: 'num_301', userId: 'usr_ilya', createdAt: 1, updatedAt: 1, attempts: 0, payload }];
       const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_open', storage: { 'shbz-pending-writes': JSON.stringify(bad) } });
+      // 301 is solved, so it is not in the strip: its card is reached through «Все номера».
+      await showHomeworkNumber(app, '301');
       expect(hasTestId(app, 'number-card-301')).toBe(true);
       expect(visibleText(app)).not.toContain('Раздел временно недоступен');
       await app.open('/student/numbers/301');

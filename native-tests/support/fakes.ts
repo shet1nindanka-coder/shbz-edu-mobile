@@ -298,7 +298,7 @@ export function reanimatedMockFactory(): Record<string, unknown> {
   // gesture-handler's hooks subscribe to the shared values they are given; the mock's value has no
   // listener API at all.
   const useSharedValue = mock.useSharedValue as <T>(initial: T) => object;
-  const withListeners = <T>(initial: T) => {
+  const useSharedValueWithListeners = <T>(initial: T) => {
     const value = useSharedValue(initial);
     return new Proxy(value, {
       get(target, property, receiver) {
@@ -312,7 +312,7 @@ export function reanimatedMockFactory(): Record<string, unknown> {
       },
     });
   };
-  return { ...mock, useSharedValue: withListeners, interpolate: actual.interpolate, interpolateColor: actual.interpolateColor, clamp: actual.clamp, Easing: actual.Easing };
+  return { ...mock, useSharedValue: useSharedValueWithListeners, interpolate: actual.interpolate, interpolateColor: actual.interpolateColor, clamp: actual.clamp, Easing: actual.Easing };
 }
 
 /**

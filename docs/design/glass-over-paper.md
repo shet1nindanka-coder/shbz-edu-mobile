@@ -187,3 +187,34 @@ from `lucide-static` (a dev dependency) into `src/ui/internal/generated/lucide-i
   data for them (mockup placeholders, handoff §11).
 - The «Движение стекла» switch of the settings mockup (the owner's answer): the lens animation follows the
   system's reduced-motion setting.
+- Teacher mockups, no data in the requests the app makes: the group segments and «был сегодня» of the
+  students list, «осталось» as a fourth figure, the «Диагностика ИИ» / «За 30 дней по теме» / «Для
+  ИИ-подбора» cards of the student card (per-number diagnostics are in the number's sheet), the overview
+  rows «ДЗ просрочено» / «ИИ не уверена» / per-student «Пора позвонить» (calls are one row with counts),
+  the per-number status bars and «Подобрать ДЗ» of the topics panel, «План · N номеров» of the lessons
+  panel (sets are per student: the panel shows counters), «решает … / просит помощи» on the board (the
+  real states are shown: checking, not opened yet, no submissions for N min…), the «Условия» panel and a
+  whole-draft «Подобрать заново» of a homework draft, the period switch and the «За 30 дней» footer of
+  groups.
+- Developer mockups, no data: the class in a student's caption, the cards «ИИ-проверок», «Активных
+  учеников», «Где чаще всего красное» and the header period switch of statistics (the app's real views
+  and rankings are shown), the teacher filter of calls.
+- Kept from the site, not from the mockups: the four lesson results (решил / с ошибками / не решил / не
+  успел) instead of three; the texts of buttons and captions.
+
+## 9. Known deviations of behaviour that came with the layout
+
+The redesign changes the look and the layout only; these are the places where the layout itself moved a
+function:
+
+- A number tile of a topic opens the number screen for the teacher too (it used to be reachable from the
+  search only): the «show answer» toggles of the old per-number cards are gone.
+- The accounts list opens on «Все» (mockup) instead of «Учителя».
+- Row buttons are gone everywhere: a student's login copy / password reset / delete are in the student
+  card's «⋯» menu (phone) or the summary panel (tablet); a lesson's delete and handout are in the
+  board's «⋯» menu (phone) or the lesson panel (tablet); a call's history is in the row's sheet.
+- The floating undo toast of the lesson board is an inline notice in the student's sheet / panel.
+- Lists of students, lessons, drafts and calls are plain `ListCard`s inside the screen's scroll (past
+  lessons are paged by «Показать ещё»), not virtualised lists.
+- Tablet screens built of panels refetch on focus and through realtime; pull-to-refresh is a phone gesture
+  (a `Panel` takes `refreshing` / `onRefresh` where a list panel needs it).

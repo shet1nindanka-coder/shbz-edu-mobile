@@ -4,7 +4,6 @@ import { describe, expect, it } from '@jest/globals';
 
 import { byTestId, checkScreen, hasTestId, pressTestId, typeTestId, visibleText, visit } from './support/drive';
 import { device, setAppState } from './support/fakes';
-import { launch } from './support/launch';
 import { recordFailure } from './support/problems';
 
 const file = (id: string, originalName: string, mimeType: string) => ({ id, originalName, mimeType });

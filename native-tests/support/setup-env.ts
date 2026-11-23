@@ -1,5 +1,8 @@
 // Runs before the test framework: module mocks that must exist before any app module is loaded.
 // Each library's own jest entry is used; hand-written fakes are in ./fakes and are kept thin.
+// `jest.mock` factories and the native-module registry need `require`, and the environment flags must be
+// set between the imports.
+/* eslint-disable @typescript-eslint/no-require-imports, import/first */
 import { jest } from '@jest/globals';
 import 'react-native-gesture-handler/jestSetup';
 import '@shopify/flash-list/jestSetup';
