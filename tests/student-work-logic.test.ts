@@ -15,7 +15,6 @@ import type {
 } from "@/api/types";
 import { POLLING } from "@/api/types";
 import { getDictionary } from "@/i18n/get-dictionary";
-import { getMobileDictionary } from "@/i18n/mobile";
 import {
   applyDeletedPhoto,
   applyLatestCheck,

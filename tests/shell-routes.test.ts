@@ -11,7 +11,6 @@ import { describe, it } from "node:test";
 import { USER_ROLES, type NavTarget, type UserRole } from "@/api/types";
 import { HOME, NAV_SECTIONS, SCREENS, SCREEN_IDS, isScreenRegisteredFor } from "@/navigation/registry";
 import {
-  EXTRA_ROUTES,
   allRoutePatterns,
   canOpen,
   fileViewerFilesParam,
