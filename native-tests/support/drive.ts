@@ -172,7 +172,7 @@ export type CrawlOptions = LaunchOptions & {
   overlayLimit?: number;
 };
 
-const CHROME = /^#(tab-|app-bar-|shell-app-bar|detail-back)|^tab:|^button:(На главную|Home|Вернуться назад|Go back)$/;
+const CHROME = /^#(dock-|app-bar-|shell-app-bar|detail-app-bar-back)|^tab:|^button:(На главную|Home|Вернуться назад|Go back)$/;
 
 /**
  * Presses every control of the screen at `url`, one cold start per press that changed anything, and, when a

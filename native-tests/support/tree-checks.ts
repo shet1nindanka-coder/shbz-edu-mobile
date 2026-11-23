@@ -14,8 +14,6 @@ const styleAttributes = (): Record<string, AttributeConfig> =>
   require('react-native/Libraries/Components/View/ReactNativeStyleAttributes').default as Record<string, AttributeConfig>;
 const normalizeColor = (): ((color: unknown) => number | null | undefined) =>
   require('react-native/Libraries/StyleSheet/normalizeColor').default as (color: unknown) => number | null | undefined;
-const featherGlyphs = (): Record<string, number> =>
-  require('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Feather.json') as Record<string, number>;
 const loadedFonts = (): string[] => Object.keys((require('@/theme/fonts') as { appFonts: Record<string, unknown> }).appFonts);
 const platformOs = (): string => (require('react-native') as { Platform: { OS: string } }).Platform.OS;
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -205,7 +203,6 @@ function checkStyle(style: Record<string, unknown>, plainView: boolean, report: 
 /** Everything the walker can tell is wrong for native in the tree under `root`. */
 export function findViolations(root: HostNode): Violation[] {
   const violations: Violation[] = [];
-  const glyphs = new Set(Object.values(featherGlyphs()).map((code) => String.fromCodePoint(code)));
 
   walk(root, (node, ancestors) => {
     const report = (rule: string, message: string) => violations.push({ rule, message, node: describeNode(node), path: pathOf(node) });
@@ -241,12 +238,12 @@ export function findViolations(root: HostNode): Violation[] {
     if (node.type === 'Text') {
       const style = flattenStyle(node.props.style);
       const family = typeof style.fontFamily === 'string' ? style.fontFamily : null;
-      if (family && /^Montserrat_/.test(family) && style.fontWeight !== undefined && style.fontWeight !== 'normal' && style.fontWeight !== '400' && style.fontWeight !== 400) {
+      if (family && /^Onest_/.test(family) && style.fontWeight !== undefined && style.fontWeight !== 'normal' && style.fontWeight !== '400' && style.fontWeight !== 400) {
         report('font-weight-with-family', `fontWeight ${JSON.stringify(style.fontWeight)} is combined with the custom family ${family}`);
       }
       const inheritsFamily = ancestors.some((ancestor) => ancestor.type === 'Text' && typeof flattenStyle(ancestor.props.style).fontFamily === 'string');
       if (!family && !inheritsFamily && node.children.some((child) => typeof child === 'string' && child.trim() !== '')) {
-        report('text-without-font', 'the text has no fontFamily: it is drawn in the system font, not in Montserrat');
+        report('text-without-font', 'the text has no fontFamily: it is drawn in the system font, not in Onest');
       }
       if (typeof style.lineHeight === 'number' && typeof style.fontSize === 'number' && style.lineHeight < style.fontSize) {
         report('line-height-below-font-size', `lineHeight ${style.lineHeight} is smaller than fontSize ${style.fontSize}: glyphs are clipped on native`);
@@ -274,15 +271,8 @@ export function findViolations(root: HostNode): Violation[] {
       }
     }
 
-    // 4. Icon glyphs: an unknown Feather name renders "?".
-    if (isText) {
-      const style = flattenStyle(node.props.style);
-      if (typeof style.fontFamily === 'string' && /feather/i.test(style.fontFamily)) {
-        for (const child of node.children) {
-          if (typeof child === 'string' && !glyphs.has(child)) report('icon-glyph', `"${child}" is not a glyph of the Feather font (unknown icon name)`);
-        }
-      }
-    }
+    // 4. Icons are drawn with react-native-svg from generated Lucide data (`src/ui/icon.tsx`): an unknown
+    // name is a type error, so there is no glyph to check at run time.
 
     // 5. Accessibility and enum props.
     const { accessibilityRole, role } = node.props;
