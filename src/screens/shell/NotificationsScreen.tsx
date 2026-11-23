@@ -141,17 +141,17 @@ export function NotificationsScreen() {
                 index < items.length - 1 ? styles.rowDivider : null,
                 fresh.has(item.id) ? styles.rowFresh : null,
               ]}
-              pressedStyle={{ backgroundColor: theme.colors.tabHover }}
+              pressedStyle={{ opacity: 0.6 }}
             >
               <View style={[styles.dot, unread ? styles.dotUnread : null]} />
               <View style={styles.texts}>
-                <Text variant={unread ? 'smallExtra' : 'smallStrong'}>{item.title}</Text>
+                <Text variant={unread ? 'bodyBold' : 'bodyStrong'}>{item.title}</Text>
                 {item.body ? (
-                  <Text variant="caption" color="textMuted" style={styles.body}>
+                  <Text variant="small" color="textMuted">
                     {item.body}
                   </Text>
                 ) : null}
-                <Text variant="captionStrong" color="kicker" style={styles.time}>
+                <Text variant="small" color="textMuted">
                   {formatNotificationTime(item.createdAt, t, locale)}
                 </Text>
               </View>
@@ -164,21 +164,20 @@ export function NotificationsScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  actions: { alignItems: 'flex-end', paddingHorizontal: t.space.gutter, paddingBottom: t.space.xs },
-  loading: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.lg },
+  actions: { alignItems: 'flex-end', paddingHorizontal: t.space.card, paddingBottom: t.space.xs },
+  loading: { paddingHorizontal: t.space.card, paddingBottom: t.space.lg },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: t.space.md,
-    paddingHorizontal: t.space.gutter,
+    paddingHorizontal: t.space.card,
     paddingVertical: t.space.md,
-    minHeight: t.sizes.minTouch,
+    minHeight: t.sizes.row,
   },
-  rowDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
-  rowFresh: { backgroundColor: t.colors.accentSoft },
-  dot: { width: 8, height: 8, borderRadius: t.radii.full, marginTop: 6, backgroundColor: 'transparent' },
-  dotUnread: { backgroundColor: t.colors.accentSolid },
-  texts: { flex: 1, minWidth: 0 },
-  body: { marginTop: 2 },
-  time: { marginTop: t.space.xxs },
+  rowDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.line },
+  rowFresh: { backgroundColor: t.colors.softBg },
+  // The unread mark: a small ink dot before the title (the accent is kept for actions and progress).
+  dot: { width: t.space.sm, height: t.space.sm, borderRadius: t.radii.full, marginTop: t.space.sm, backgroundColor: 'transparent' },
+  dotUnread: { backgroundColor: t.colors.textStrong },
+  texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

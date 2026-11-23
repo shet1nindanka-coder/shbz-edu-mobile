@@ -56,9 +56,7 @@ export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
         </View>
 
         {hasCondition && number.conditionLatex ? (
-          <Card accessibilityLabel={t.condition}>
-            <MathContent value={number.conditionLatex} testID="number-condition" />
-          </Card>
+          <MathContent value={number.conditionLatex} testID="number-condition" />
         ) : null}
 
         {detail.notesEnabled ? (

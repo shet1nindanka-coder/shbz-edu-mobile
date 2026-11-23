@@ -36,7 +36,7 @@ export function Checkbox({ checked, onChange, disabled = false, label, accessibi
     >
       <CheckMark checked={checked} disabled={disabled} />
       {label ? (
-        <Text variant="small" color="label" style={[styles.label, disabled ? styles.disabled : null]}>
+        <Text variant="body" color="textStrong" style={[styles.label, disabled ? styles.disabled : null]}>
           {label}
         </Text>
       ) : null}

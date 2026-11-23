@@ -130,7 +130,7 @@ test("content CSS carries the site's three wrap overrides", () => {
 test("css variables follow the font scale", () => {
   const vars = buildMathCssVars({ text: "#111", dangerSoft: "#fee", dangerText: "#900", fontFamily: "X", fontScale: 1.3 });
 
-  assert.equal(vars["--mc-font-size"], "18.2px");
+  assert.equal(vars["--mc-font-size"], "19.5px");
   assert.equal(vars["--mc-scale"], "1.3");
   assert.equal(vars["--mc-text"], "#111");
 });

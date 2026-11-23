@@ -10,9 +10,11 @@ import { useAppNavigation } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
 import { refreshQueries, usePullRefresh } from '@/services/query';
-import { EmptyState, ListCard, LoadingState, Notice, Screen, Segmented } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen, SectionCaption, Segmented, Text } from '@/ui';
 
 import { HomeworkCard } from './work/homework-card';
+import { HomeworkDetail } from './work/homework-detail';
 import { splitHomeworks } from './work/logic';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
 
@@ -23,8 +25,13 @@ type Segment = 'active' | 'done';
  * glass-over-paper.md §8): every homework issued to the student as rows of one card — a title, the
  * deadline and «37 из 50» — in the server's "needs attention" order. «Активные» is what is still to do,
  * «Выполненные» what is closed. Number search lives in the header (shell action).
+ *
+ * A tablet shows both halves in the left panel and the selected homework in the right one, so a row
+ * selects instead of pushing a screen.
  */
 export function StudentHomeworksScreen() {
+  const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict, m } = useI18n();
@@ -55,6 +62,64 @@ export function StudentHomeworksScreen() {
   const hasHomeworks = Boolean(data && data.available && data.assignments.length > 0);
   const { active, archived } = splitHomeworks(data?.assignments ?? []);
   const shown = segment === 'active' ? active : archived;
+
+  // Tablet: the homework shown in the right panel — the picked one while it exists, else the first active.
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const all = [...active, ...archived];
+  const selectedId = (pickedId && all.some((homework) => homework.id === pickedId) ? pickedId : null) ?? all[0]?.id ?? null;
+
+  if (theme.tablet && data && hasHomeworks) {
+    const rows = (list: HomeworkSummaryDto[]) =>
+      list.map((homework, index) => (
+        <HomeworkCard
+          key={homework.id}
+          homework={homework}
+          nowMs={nowMs}
+          onOpen={(picked) => setPickedId(picked.id)}
+          selected={homework.id === selectedId}
+          divider={index < list.length - 1}
+        />
+      ));
+    return (
+      <Screen testID="student-homeworks-screen" header={<ShellAppBar title={screenTitle('student.homeworks', m.shell.tabs)} />} scroll={false} maxWidth="full">
+        {homeworks.isError ? (
+          <Notice tone="error" text={errorText(homeworks.error, m.studentWork.list.refreshFailed)} testID="homeworks-refresh-error" />
+        ) : null}
+        <Panels>
+          <Panel weight={2} padded={false} contentStyle={styles.listPanel} testID="homeworks-list">
+            {active.length > 0 ? <SectionCaption style={styles.caption}>{m.studentWork.list.active}</SectionCaption> : null}
+            {rows(active)}
+            {archived.length > 0 ? <SectionCaption style={styles.caption}>{m.studentWork.list.done}</SectionCaption> : null}
+            {rows(archived)}
+          </Panel>
+          {selectedId ? (
+            <HomeworkDetail key={selectedId} assignmentId={selectedId} grid>
+              {({ title, subtitle, body }) => (
+                <Panel
+                  weight={3}
+                  header={
+                    <>
+                      <Text variant="sectionTitle" accessibilityRole="header" numberOfLines={2}>
+                        {title}
+                      </Text>
+                      {subtitle ? (
+                        <Text variant="small" color="textMuted">
+                          {subtitle}
+                        </Text>
+                      ) : null}
+                    </>
+                  }
+                  testID="homeworks-detail"
+                >
+                  {body}
+                </Panel>
+              )}
+            </HomeworkDetail>
+          ) : null}
+        </Panels>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -114,3 +179,8 @@ export function StudentHomeworksScreen() {
     </Screen>
   );
 }
+
+const useStyles = makeStyles((t) => ({
+  listPanel: { gap: 0, paddingVertical: t.space.sm },
+  caption: { paddingHorizontal: t.space.card, paddingTop: t.space.md, paddingBottom: t.space.xxs },
+}));

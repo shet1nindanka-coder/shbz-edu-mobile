@@ -15,6 +15,8 @@ export type TheoryCardProps = {
   downloading: boolean;
   /** Hairline under the row; off on the last one. */
   divider?: boolean;
+  /** Tablet: this topic is shown in the panel next to the list. */
+  selected?: boolean;
 };
 
 /** A file the app can show itself (the site's "Открыть"); everything else is "Скачать файл". */
@@ -29,7 +31,7 @@ export function isPreviewableTheory(mimeType: string): boolean {
  * SPEC-GAP: 02 S2a leaves the DOCX strategy open (Q3); the file is downloaded and handed to another app,
  * as 09 §5.2 proposes — there is nothing to preview in a viewer.
  */
-export function TheoryCard({ topic, onOpen, onDownload, downloading, divider }: TheoryCardProps) {
+export function TheoryCard({ topic, onOpen, onDownload, downloading, divider, selected }: TheoryCardProps) {
   const { m } = useI18n();
   const previewable = isPreviewableTheory(topic.theoryFile.mimeType);
   return (
@@ -39,6 +41,7 @@ export function TheoryCard({ topic, onOpen, onDownload, downloading, divider }: 
       subtitle={previewable ? undefined : downloading ? m.student.theory.downloading : m.student.theory.external}
       right={downloading ? <Spinner size={16} /> : undefined}
       divider={divider}
+      selected={selected}
       disabled={downloading}
       onPress={() => (previewable ? onOpen(topic) : onDownload(topic))}
       accessibilityLabel={format(previewable ? m.student.theory.openAria : m.student.theory.downloadAria, { title: topic.title })}

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import type { HomeworkNumberStatus } from '@/api/types';
+import { statusLabel } from '@/components/numbers/status-labels';
 import { MathContent } from '@/components/math';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
@@ -28,7 +29,7 @@ export type NumberSelectCardProps = {
  */
 export function NumberSelectCard({ number, status, selected, conditionLatex, footnote, disabled, onToggle, testID }: NumberSelectCardProps) {
   const styles = useStyles();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const name = format(dict.topics.widgets.numberSelectAria, { number });
   // The card is one element for a screen reader (iOS reads none of its children): the student's status
   // — what the card exists to show — and the footnote are in the name, the statement in the hint.
@@ -36,8 +37,6 @@ export function NumberSelectCard({ number, status, selected, conditionLatex, foo
   const statement = conditionLatex?.trim() ?? '';
   return (
     <Card
-      variant="outline"
-      padded={16}
       selected={selected}
       disabled={disabled}
       onPress={onToggle}
@@ -51,9 +50,11 @@ export function NumberSelectCard({ number, status, selected, conditionLatex, foo
     >
       <View style={styles.top}>
         <CheckMark checked={selected} />
-        <StatusBadge status={status} label={status ? dict.status[status].shortLabel : dict.student.statusBadge.unmarked} />
+        <StatusBadge status={status} label={statusLabel(status, m.common.statuses)} accessibilityLabel={statusText} />
       </View>
-      <Text variant="numberTitle">{format(dict.topics.widgets.numberLabel, { number })}</Text>
+      <Text variant="numberTitle" tabular>
+        {number}
+      </Text>
       {conditionLatex ? (
         // A formula is a web view on a phone: without `pointerEvents` it would swallow the tap that toggles
         // the card. On web a pressable card is a <button>, whose centred text the formula markup would inherit.

@@ -1,5 +1,5 @@
 // The static HTML page every native math WebView loads (docs/spec/09-data-i18n-math.md §4.3 step 4, the
-// inline-HTML variant of step 8): KaTeX CSS with its woff2 fonts inlined, the Montserrat subset for the
+// inline-HTML variant of step 8): KaTeX CSS with its woff2 fonts inlined, the Onest subset for the
 // prose, the content CSS, the site's line-break script and a tiny bridge. It never changes at runtime —
 // content, colours and font size arrive through `window.__render`, so a recycled row re-renders without
 // reloading the page.
@@ -12,7 +12,7 @@ import { MATH_CONTENT_CSS, MATH_ROOT_CLASS } from './math-styles';
 /** The only URL the WebView may ever be at; any other navigation is refused. */
 export const MATH_SHELL_BASE_URL = 'about:blank';
 
-/** Prose font stack inside the shell: the bundled Montserrat subset, then the system face. */
+/** Prose font stack inside the shell: the bundled Onest subset, then the system face. */
 export const MATH_SHELL_FONT_FAMILY = `"${MATH_TEXT_FONT_FAMILY}",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif`;
 
 export type MathShellMessage = { ready: true } | { id: number; h: number };

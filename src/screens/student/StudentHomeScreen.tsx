@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { qk, useApi } from '@/api';
@@ -11,8 +12,9 @@ import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { useCurrentUser } from '@/providers';
 import { ShellAppBar, useStreakToday, useStudentStreak } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import {
+  Button,
   Card,
   CardPressArea,
   Enter,
@@ -22,6 +24,8 @@ import {
   ListRow,
   LoadingState,
   Notice,
+  Panel,
+  Panels,
   Screen,
   SectionCaption,
   Text,
@@ -29,7 +33,10 @@ import {
   navIcons,
 } from '@/ui';
 
-import { selectUpcoming, toDeadlineItems, type DeadlineItem } from './study/deadline-model';
+import { mskToday } from '@/domain/moscow-time';
+
+import { monthOfInstant, selectUpcoming, shiftMonth, toDeadlineItems, type CalendarMonth, type DeadlineItem } from './study/deadline-model';
+import { DeadlinesCalendar } from './study/deadlines-calendar';
 import { RefreshError } from './study/refresh-error';
 import { useNow } from './study/use-now';
 import { WeekCard } from './study/week-card';
@@ -45,8 +52,11 @@ import { WeekCard } from './study/week-card';
  */
 export function StudentHomeScreen() {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const user = useCurrentUser();
+  // Tablet: the month shown in the calendar panel; null = the current one.
+  const [chosenMonth, setChosenMonth] = useState<CalendarMonth | null>(null);
   const { dict, m, locale } = useI18n();
   const navigation = useAppNavigation();
 
@@ -82,6 +92,97 @@ export function StudentHomeScreen() {
         lessonOn: m.student.home.lessonOn,
       }) : null;
 
+  const homeworkRows = (inset?: number) =>
+    !upcoming ? null : upcoming.length === 0 ? (
+      <ListRow title={dict.student.upcoming.empty} inset={inset} testID="home-upcoming-empty" />
+    ) : (
+      upcoming.map((item, index) => {
+        const caption = deadlineCaption(item.deadlineAt, item.status === 'DONE', now, locale, m.common.deadline);
+        const done = format(m.common.numbers.doneOf, { done: item.solvedNumbers, total: item.totalNumbers });
+        return (
+          <ListRow
+            key={item.id}
+            title={item.label}
+            subtitle={caption.text}
+            subtitleTone={caption.attention ? 'attention' : 'muted'}
+            meta={done}
+            inset={inset}
+            divider={index < upcoming.length - 1}
+            onPress={() => openHomework(item)}
+            accessibilityLabel={format(m.studentWork.list.rowA11y, { title: item.label, caption: caption.text, done })}
+            testID={`home-upcoming-card-${item.id}`}
+          />
+        );
+      })
+    );
+  const streakFailure = isLoadFailed(streak) ? (
+    <Notice
+      tone="error"
+      text={m.student.home.streakFailed}
+      action={<TextButton label={dict.common.retry} tone="danger" onPress={() => void streak.refetch()} testID="home-streak-retry" />}
+      testID="home-streak-error"
+    />
+  ) : null;
+
+  // Tablet (docs/design/glass-over-paper.md §1 rule 7): the lesson card across the top, then three panels
+  // down to the dock — the homeworks, the week, the month with its deadlines.
+  if (theme.tablet && data && upcoming) {
+    const month = chosenMonth ?? monthOfInstant(now);
+    return (
+      <Screen testID="student-home-screen" header={<ShellAppBar title={title} />} scroll={false} maxWidth="full">
+        {deadlines.isError ? <RefreshError error={deadlines.error} testID="home-refresh-error" /> : null}
+        {nextLesson && when ? (
+          <Card testID="home-lesson">
+            <View style={styles.lessonWide}>
+              <IconTile icon={navIcons.student.lesson} />
+              <View style={styles.lessonTexts}>
+                <Text variant="sectionTitle" numberOfLines={1}>
+                  {nextLesson.title}
+                </Text>
+                <Text variant="body" color="textMuted" numberOfLines={1}>
+                  {when}
+                </Text>
+              </View>
+              <Button
+                label={dict.topics.lib.history.openLesson}
+                rightIcon="forward"
+                onPress={() => navigation.open({ screen: 'student.lesson' })}
+                testID="home-lesson-card"
+              />
+            </View>
+          </Card>
+        ) : null}
+        <Panels>
+          <Panel
+            padded={false}
+            header={
+              <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelTitle}>
+                {dict.student.homeworks.kicker}
+              </Text>
+            }
+            contentStyle={styles.rowsPanel}
+            testID="home-upcoming"
+          >
+            {homeworkRows()}
+          </Panel>
+          {streak.data ? <WeekCard streak={streak.data} today={streakToday} fill testID="home-streak" /> : <Panel>{streakFailure}</Panel>}
+          <Panel testID="home-calendar">
+            <DeadlinesCalendar
+              bare
+              items={toDeadlineItems(data.items, locale)}
+              month={month}
+              today={mskToday(now)}
+              openDayKey={null}
+              onChangeMonth={(delta) => setChosenMonth(shiftMonth(month, delta))}
+              // The day's homeworks are one tap further, in the deadlines section.
+              onOpenDay={() => navigation.open({ screen: 'student.deadlines' })}
+            />
+          </Panel>
+        </Panels>
+      </Screen>
+    );
+  }
+
   return (
     <Screen testID="student-home-screen" header={<ShellAppBar title={title} />} refreshing={refreshing} onRefresh={refresh}>
       {deadlines.isError && data ? <RefreshError error={deadlines.error} testID="home-refresh-error" /> : null}
@@ -114,26 +215,7 @@ export function StudentHomeScreen() {
         <Enter index={1} style={styles.block}>
           <SectionCaption>{dict.student.homeworks.kicker}</SectionCaption>
           <ListCard testID="home-upcoming">
-            {upcoming.length === 0 ? (
-              <ListRow title={dict.student.upcoming.empty} testID="home-upcoming-empty" />
-            ) : (
-              upcoming.map((item) => {
-                const caption = deadlineCaption(item.deadlineAt, item.status === 'DONE', now, locale, m.common.deadline);
-                const done = format(m.common.numbers.doneOf, { done: item.solvedNumbers, total: item.totalNumbers });
-                return (
-                  <ListRow
-                    key={item.id}
-                    title={item.label}
-                    subtitle={caption.text}
-                    subtitleTone={caption.attention ? 'attention' : 'muted'}
-                    meta={done}
-                    onPress={() => openHomework(item)}
-                    accessibilityLabel={format(m.studentWork.list.rowA11y, { title: item.label, caption: caption.text, done })}
-                    testID={`home-upcoming-card-${item.id}`}
-                  />
-                );
-              })
-            )}
+            {homeworkRows()}
           </ListCard>
         </Enter>
       ) : isLoadFailed(deadlines) ? (
@@ -157,14 +239,9 @@ export function StudentHomeScreen() {
         <Enter index={2}>
           <WeekCard streak={streak.data} today={streakToday} testID="home-streak" />
         </Enter>
-      ) : isLoadFailed(streak) ? (
-        <Notice
-          tone="error"
-          text={m.student.home.streakFailed}
-          action={<TextButton label={dict.common.retry} tone="danger" onPress={() => void streak.refetch()} testID="home-streak-retry" />}
-          testID="home-streak-error"
-        />
-      ) : null}
+      ) : (
+        streakFailure
+      )}
     </Screen>
   );
 }
@@ -172,5 +249,8 @@ export function StudentHomeScreen() {
 const useStyles = makeStyles((t) => ({
   block: { gap: t.space.sm },
   lesson: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, padding: t.space.card },
+  lessonWide: { flexDirection: 'row', alignItems: 'center', gap: t.space.lg },
+  panelTitle: { paddingHorizontal: t.space.card, paddingTop: t.space.card },
+  rowsPanel: { gap: 0, paddingBottom: t.space.sm },
   lessonTexts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

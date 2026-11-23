@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { makeStyles } from '@/theme';
-import { Card, Text } from '@/ui';
+import { Panel, Text } from '@/ui';
 
 export type ExamSectionProps = {
   title: string;
@@ -9,19 +8,21 @@ export type ExamSectionProps = {
   testID?: string;
 };
 
-/** A titled card of the exam info screen: the title (17 / 700) sits inside the card, above its content. */
+/**
+ * A titled block of the exam info screen: the title (17 / 700; 20 on a tablet) sits inside the card, above
+ * its content. On a tablet the blocks stand side by side as full-height panels.
+ */
 export function ExamSection({ title, children, testID }: ExamSectionProps) {
-  const styles = useStyles();
   return (
-    <Card style={styles.card} testID={testID}>
-      <Text variant="sectionTitle" accessibilityRole="header">
-        {title}
-      </Text>
+    <Panel
+      header={
+        <Text variant="sectionTitle" accessibilityRole="header">
+          {title}
+        </Text>
+      }
+      testID={testID}
+    >
       {children}
-    </Card>
+    </Panel>
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  card: { gap: t.space.sm },
-}));

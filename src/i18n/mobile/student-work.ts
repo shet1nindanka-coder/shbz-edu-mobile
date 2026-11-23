@@ -49,6 +49,8 @@ const ru = {
     startsIn: "Начнётся через {time}",
     startsSoon: "Урок начинается…",
     closedOf: "Закрыто {closed} из {total}",
+    // title of the tablet panel that lists every number of the lesson
+    plan: "План урока",
     remainingMinuteForms: ["Осталась {n} минута", "Осталось {n} минуты", "Осталось {n} минут"],
     remainingLessThanMinute: "Осталось меньше минуты",
     // replaces `dict.student.lessonView.noItems` («обновите страницу»)
@@ -99,6 +101,7 @@ const en: typeof ru = {
     startsIn: "Starts in {time}",
     startsSoon: "The lesson is starting…",
     closedOf: "{closed} of {total} closed",
+    plan: "Lesson plan",
     remainingMinuteForms: ["{n} minute left", "{n} minutes left"],
     remainingLessThanMinute: "Less than a minute left",
     noItems: "Your teacher hasn't put the set together yet — wait a minute and pull down to refresh.",

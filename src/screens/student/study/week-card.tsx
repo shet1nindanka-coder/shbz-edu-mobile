@@ -62,9 +62,9 @@ export function WeekCard({ streak: cached, today, barHeight = 44, fill = false, 
         </Text>
       </View>
 
-      <View style={[styles.chart, fill ? styles.fill : null]}>
+      <View style={[styles.chart, fill ? styles.chartFill : null]}>
         {cells.map((cell) => (
-          <View key={cell.date} accessible accessibilityRole="image" accessibilityLabel={cell.accessibilityLabel} style={styles.column}>
+          <View key={cell.date} accessible accessibilityRole="image" accessibilityLabel={cell.accessibilityLabel} style={[styles.column, fill ? styles.columnFill : null]}>
             <View style={[styles.barBox, fill ? styles.fill : { height: barHeight }]}>
               {cell.active ? (
                 <AccentGradient
@@ -102,6 +102,9 @@ const useStyles = makeStyles((t) => ({
   title: { flexShrink: 1 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.sm },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: t.space.sm },
+  // A tablet panel gives the chart all the height that is left: the columns stretch, the bars grow from the bottom.
+  chartFill: { flex: 1, minHeight: 0, alignItems: 'stretch' },
+  columnFill: { justifyContent: 'flex-end' },
   column: { flex: 1, alignItems: 'center', gap: t.space.xs },
   barBox: { alignSelf: 'stretch', justifyContent: 'flex-end' },
   bar: { alignSelf: 'stretch', borderRadius: t.radii.sm },

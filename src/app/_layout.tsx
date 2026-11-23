@@ -21,6 +21,7 @@ import { AppProviders, IS_MOCK_BUILD, useSession } from '@/providers';
 import { LaunchScreen, LockGate, ReminderOpener } from '@/screens/shell';
 import { RootErrorBoundary } from '@/screens/shell/RouteErrorBoundary';
 import { OfflineBannerHost } from '@/services/network';
+import { useOrientationPolicy } from '@/services/orientation';
 import { useTheme } from '@/theme';
 
 /**
@@ -44,6 +45,8 @@ function goHomeAfterRootError(retry: () => Promise<void>): void {
 export const unstable_settings = { anchor: 'index' };
 
 export default function RootLayout() {
+  // A phone stays upright; a tablet turns both ways.
+  useOrientationPolicy();
   return (
     <AppProviders>
       <RootNavigator />

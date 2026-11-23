@@ -66,7 +66,7 @@ export function Dialog({
     >
       <View style={styles.content} accessibilityRole="alert">
         {kicker ? (
-          <Text variant="kicker" color={tone === 'danger' ? 'dangerSolid' : 'kicker'}>
+          <Text variant="kicker" color={tone === 'danger' ? 'dangerText' : 'textMuted'}>
             {kicker}
           </Text>
         ) : null}
@@ -96,8 +96,8 @@ export function Dialog({
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: 12, paddingTop: 4 },
-  description: { lineHeight: 24 },
+  content: { gap: t.space.sm, paddingTop: t.space.xxs },
+  description: {},
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md, marginTop: t.space.lg },
   action: { flexGrow: 1, flexBasis: 120 },
 }));

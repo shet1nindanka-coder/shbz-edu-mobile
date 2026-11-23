@@ -42,7 +42,7 @@ export function CheckMark({ checked, disabled = false, style }: CheckMarkProps) 
         <Svg width={13} height={13} viewBox="0 0 12 12">
           <Path
             d="M2.2 6.4 4.9 9 9.8 3.4"
-            stroke={theme.colors.onAccent}
+            stroke={theme.colors.tabActiveText}
             strokeWidth={2.4}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -65,6 +65,7 @@ const useStyles = makeStyles((t) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxChecked: { borderColor: t.colors.accentSolid, backgroundColor: t.colors.accentSolid },
+  // Ink, not the accent: the mint gradient is kept for the main action and for progress.
+  boxChecked: { borderColor: t.colors.textStrong, backgroundColor: t.colors.textStrong },
   disabled: { opacity: 0.5 },
 }));

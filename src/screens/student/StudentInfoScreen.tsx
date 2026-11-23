@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { View } from 'react-native';
 
 import { EGE_PROFILE_MIN_PRIMARY, EGE_PROFILE_SCALE, getEgeProfileTasks, getOgeGrades, getOgeTasks } from '@/domain/exam-scores';
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { DetailAppBar, ShellAppBar } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { Enter, Screen, Segmented } from '@/ui';
+import { Enter, Panels, Screen, Segmented } from '@/ui';
 
 import { ExamSection } from './study/exam-section';
 import { GradeList } from './study/grade-list';
@@ -48,6 +47,8 @@ export function StudentInfoScreen() {
   return (
     <Screen
       testID="student-info-screen"
+      scroll={!theme.tablet}
+      maxWidth={theme.tablet ? 'full' : undefined}
       header={
         theme.tablet ? (
           <ShellAppBar title={m.shell.tabs.info} aside={exams} />
@@ -57,31 +58,31 @@ export function StudentInfoScreen() {
       }
     >
       {/* The key replays the panel's entrance when the exam changes. */}
-      <Enter key={exam} duration={180}>
+      <Enter key={exam} duration={180} style={theme.tablet ? styles.fill : undefined}>
         {exam === 'ege' ? (
-          <View style={styles.sections} testID="exam-panel-ege">
+          <Panels testID="exam-panel-ege">
             <ExamSection title={t.tasksTitle} testID="exam-section-tasks">
               <TaskScoringList items={getEgeProfileTasks(t)} />
             </ExamSection>
             <ExamSection title={t.scaleTitle} testID="exam-section-scale">
               <ScoreScaleGrid rows={EGE_PROFILE_SCALE} highlightPrimary={EGE_PROFILE_MIN_PRIMARY} />
             </ExamSection>
-          </View>
+          </Panels>
         ) : (
-          <View style={styles.sections} testID="exam-panel-oge">
+          <Panels testID="exam-panel-oge">
             <ExamSection title={t.tasksTitle} testID="exam-section-tasks">
               <TaskScoringList items={getOgeTasks(t)} />
             </ExamSection>
             <ExamSection title={t.gradesTitle} testID="exam-section-grades">
               <GradeList items={getOgeGrades(t)} />
             </ExamSection>
-          </View>
+          </Panels>
         )}
       </Enter>
     </Screen>
   );
 }
 
-const useStyles = makeStyles((t) => ({
-  sections: { gap: t.space.block },
+const useStyles = makeStyles(() => ({
+  fill: { flex: 1, minHeight: 0 },
 }));

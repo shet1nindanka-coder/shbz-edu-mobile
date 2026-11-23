@@ -12,17 +12,17 @@ export type MetricPillProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Page-header metric (`.ui-metric-pill`): soft panel, label over a toned value. */
+/** A summary figure (`.box`): a soft panel with the figure (20 / 800) over its caption. Red only when the tone asks for attention. */
 export function MetricPill({ label, value, tone = 'default', style }: MetricPillProps) {
   const theme = useTheme();
   const styles = useStyles();
   return (
     <View style={[styles.pill, style]} accessible accessibilityLabel={`${label}: ${value}`}>
-      <Text variant="captionStrong" color="kicker" numberOfLines={1}>
-        {label}
-      </Text>
-      <Text variant="smallExtra" tabular numberOfLines={1} style={{ color: metricToneColor(tone, theme.colors) }}>
+      <Text variant="miniStat" tabular numberOfLines={1} style={{ color: metricToneColor(tone, theme.colors) }}>
         {value}
+      </Text>
+      <Text variant="small" color="textMuted" numberOfLines={2}>
+        {label}
       </Text>
     </View>
   );
@@ -30,16 +30,14 @@ export function MetricPill({ label, value, tone = 'default', style }: MetricPill
 
 const useStyles = makeStyles((t) => ({
   pill: {
-    minWidth: 120,
-    minHeight: 72,
+    minWidth: 96,
     flexGrow: 1,
+    flexBasis: 0,
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    gap: t.space.xxs,
+    paddingVertical: t.space.md,
+    paddingHorizontal: t.space.lg,
     borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
     backgroundColor: t.colors.softBg,
   },
 }));

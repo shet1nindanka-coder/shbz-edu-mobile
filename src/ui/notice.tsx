@@ -38,18 +38,18 @@ export type NoticeProps = {
 function noticeColors(tone: NoticeTone, t: Theme) {
   const c = t.colors;
   switch (tone) {
+    // A soft status fill with the status text, no outline (`.box` in the status tone).
     case 'success':
-      // `shbz-notice-success`: fill and border are the same soft green, i.e. no visible hairline.
       return { bg: c.greenSoft, border: 'transparent', text: c.greenText };
     case 'warning':
-      return { bg: c.yellowSoft, border: c.yellowBorder, text: c.yellowText };
+      return { bg: c.yellowSoft, border: 'transparent', text: c.yellowText };
     default:
-      return { bg: c.dangerBg, border: c.dangerBorder, text: c.dangerText };
+      return { bg: c.redSoft, border: 'transparent', text: c.redText };
   }
 }
 
 /**
- * Inline banner (`shbz-notice-*`). The site has no toasts: feedback lives at the top of the card it
+ * Inline banner: a soft panel (radius 16) in the status tone. There are no toasts: feedback lives at the top of the card it
  * concerns and stays until the state changes. Errors and warnings are announced to screen readers: a
  * polite live region on Android, `useAnnounce` on iOS (where live regions do not exist); with an
  * `announcement`, that string on both platforms and no live region.
@@ -104,12 +104,12 @@ const useStyles = makeStyles((t) => ({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: t.space.sm,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: t.radii.md,
+    paddingVertical: t.space.md,
+    paddingHorizontal: t.space.lg,
+    borderRadius: t.radii.lg,
     borderWidth: t.borders.hairline,
   },
-  body: { flex: 1, minWidth: 0, gap: 4 },
-  action: { marginTop: 4, alignItems: 'flex-start' },
-  dismiss: { width: 28, height: 28, marginVertical: -4, marginRight: -8 },
+  body: { flex: 1, minWidth: 0, gap: t.space.xxs },
+  action: { marginTop: t.space.xxs, alignItems: 'flex-start' },
+  dismiss: { width: t.sizes.control.xs, height: t.sizes.control.xs, marginVertical: -t.space.xxs, marginRight: -t.space.sm },
 }));

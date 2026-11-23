@@ -11,7 +11,8 @@ import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { ShellAppBar } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
-import { ListCard, ListRow, Screen, Segmented, Text } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { ListCard, ListRow, Panel, Panels, Screen, Segmented, Text } from '@/ui';
 
 import { CalendarSkeleton } from './study/calendar-skeleton';
 import { DaySheet } from './study/day-sheet';
@@ -42,8 +43,10 @@ const LIST_LIMIT = 50;
  * marked in the calendar, done ones included.
  */
 export function StudentDeadlinesScreen() {
+  const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
-  const { m, locale } = useI18n();
+  const { dict, m, locale } = useI18n();
   const [view, setView] = useState<CalendarView>('week');
   const navigation = useAppNavigation();
 
@@ -80,6 +83,79 @@ export function StudentDeadlinesScreen() {
     setSheetVisible(true);
   };
 
+  const rows =
+    upcoming.length === 0 ? (
+      <ListRow title={m.student.calendar.nothingDue} titleLines={2} testID="deadlines-list-empty" />
+    ) : (
+      upcoming.map((item, index) => {
+        const caption = deadlineCaption(item.deadlineAt, false, now, locale, m.common.deadline);
+        return (
+          <ListRow
+            key={item.id}
+            title={item.label}
+            subtitle={caption.text}
+            subtitleTone={caption.attention ? 'attention' : 'muted'}
+            divider={index < upcoming.length - 1}
+            onPress={() => openHomework(item)}
+            accessibilityLabel={format(m.student.calendar.rowA11y, { title: item.label, caption: caption.text })}
+            testID={`deadlines-row-${item.id}`}
+          />
+        );
+      })
+    );
+  const calendar = (bare: boolean) => (
+    <DeadlinesCalendar
+      items={items}
+      month={month}
+      today={today}
+      openDayKey={openDayKey}
+      bare={bare}
+      onChangeMonth={(delta) => {
+        setSheetVisible(false);
+        setOpenDayKey(null);
+        setChosenMonth(shiftMonth(month, delta));
+      }}
+      onOpenDay={openDay}
+    />
+  );
+  const daySheet = (
+    <DaySheet
+      visible={sheetVisible}
+      dayKey={openDayKey}
+      items={dayItems}
+      now={now}
+      onClose={() => setSheetVisible(false)}
+      onClosed={() => setOpenDayKey(null)}
+      onOpenHomework={openHomework}
+    />
+  );
+
+  // A tablet has the room for the month and the list side by side: no week / month switch.
+  if (theme.tablet && data) {
+    return (
+      <Screen testID="student-deadlines-screen" header={<ShellAppBar title={m.shell.tabs.deadlines} />} scroll={false} maxWidth="full">
+        {deadlines.isError ? <RefreshError error={deadlines.error} testID="deadlines-refresh-error" /> : null}
+        <Panels>
+          <Panel weight={3}>{calendar(true)}</Panel>
+          <Panel
+            weight={2}
+            padded={false}
+            header={
+              <Text variant="sectionTitle" accessibilityRole="header" style={styles.listTitle}>
+                {dict.student.upcoming.title}
+              </Text>
+            }
+            contentStyle={styles.listPanel}
+            testID="deadlines-list"
+          >
+            {rows}
+          </Panel>
+        </Panels>
+        {daySheet}
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       testID="student-deadlines-screen"
@@ -115,44 +191,14 @@ export function StudentDeadlinesScreen() {
             <WeekStrip items={items} now={now} today={today} openDayKey={openDayKey} onOpenDay={openDay} />
           ) : (
             <>
-              <DeadlinesCalendar
-                items={items}
-                month={month}
-                today={today}
-                openDayKey={openDayKey}
-                onChangeMonth={(delta) => {
-                  setSheetVisible(false);
-                  setOpenDayKey(null);
-                  setChosenMonth(shiftMonth(month, delta));
-                }}
-                onOpenDay={openDay}
-              />
+              {calendar(false)}
               <Hint>
                 <Text variant="hint">{m.student.calendar.swipeHint}</Text>
               </Hint>
             </>
           )}
 
-          <ListCard testID="deadlines-list">
-            {upcoming.length === 0 ? (
-              <ListRow title={m.student.calendar.nothingDue} titleLines={2} testID="deadlines-list-empty" />
-            ) : (
-              upcoming.map((item) => {
-                const caption = deadlineCaption(item.deadlineAt, false, now, locale, m.common.deadline);
-                return (
-                  <ListRow
-                    key={item.id}
-                    title={item.label}
-                    subtitle={caption.text}
-                    subtitleTone={caption.attention ? 'attention' : 'muted'}
-                    onPress={() => openHomework(item)}
-                    accessibilityLabel={format(m.student.calendar.rowA11y, { title: item.label, caption: caption.text })}
-                    testID={`deadlines-row-${item.id}`}
-                  />
-                );
-              })
-            )}
-          </ListCard>
+          <ListCard testID="deadlines-list">{rows}</ListCard>
         </>
       ) : isLoadFailed(deadlines) ? (
         <LoadFailure query={deadlines} home testID="deadlines-error" />
@@ -160,15 +206,12 @@ export function StudentDeadlinesScreen() {
         <CalendarSkeleton />
       )}
 
-      <DaySheet
-        visible={sheetVisible}
-        dayKey={openDayKey}
-        items={dayItems}
-        now={now}
-        onClose={() => setSheetVisible(false)}
-        onClosed={() => setOpenDayKey(null)}
-        onOpenHomework={openHomework}
-      />
+      {daySheet}
     </Screen>
   );
 }
+
+const useStyles = makeStyles((t) => ({
+  listTitle: { paddingHorizontal: t.space.card, paddingTop: t.space.card },
+  listPanel: { gap: 0, paddingBottom: t.space.sm },
+}));

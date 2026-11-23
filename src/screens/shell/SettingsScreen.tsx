@@ -61,52 +61,62 @@ export function SettingsScreen() {
   const rowIcon = (name: Parameters<typeof Icon>[0]['name']) => <Icon name={name} size={theme.sizes.icon.md} color="label" />;
 
   return (
-    <Screen testID="settings-screen" header={<DetailAppBar title={m.shell.tabs.profile} backTitle={homeTitle} />}>
-      <Card testID="settings-profile-row">
-        <View style={styles.profile}>
-          <Avatar name={user.name} size={theme.sizes.avatarLg} />
-          <View style={styles.profileText}>
-            <Text variant="cardTitle" numberOfLines={1}>
-              {user.name}
-            </Text>
-            <Text variant="small" color="textMuted" numberOfLines={1} testID="settings-role">
-              {user.email} · {dict.roles[user.role].toLocaleLowerCase()}
-            </Text>
-            <Text variant="small" color="textMuted" numberOfLines={1}>
-              {format(m.shell.settings.onPlatformSince, { date: formatDate(user.createdAt, locale) })}
-            </Text>
-          </View>
-        </View>
-      </Card>
+    <Screen
+      testID="settings-screen"
+      maxWidth={theme.tablet ? 'full' : undefined}
+      header={<DetailAppBar title={m.shell.tabs.profile} backTitle={homeTitle} />}
+    >
+      {/* A tablet has two columns: who is signed in and where to go — and the switches. */}
+      <View style={theme.tablet ? styles.columns : styles.column}>
+        <View style={[styles.column, theme.tablet ? styles.half : null]}>
+          <Card testID="settings-profile-row">
+            <View style={styles.profile}>
+              <Avatar name={user.name} size={theme.sizes.avatarLg} />
+              <View style={styles.profileText}>
+                <Text variant="cardTitle" numberOfLines={1}>
+                  {user.name}
+                </Text>
+                <Text variant="small" color="textMuted" numberOfLines={1} testID="settings-role">
+                  {user.email} · {dict.roles[user.role].toLocaleLowerCase()}
+                </Text>
+                <Text variant="small" color="textMuted" numberOfLines={1}>
+                  {format(m.shell.settings.onPlatformSince, { date: formatDate(user.createdAt, locale) })}
+                </Text>
+              </View>
+            </View>
+          </Card>
 
-      <ListCard testID="settings-links">
-        {user.role === 'STUDENT' ? (
-          <ListRow
-            title={m.shell.settings.scores}
-            left={rowIcon(navIcons.student.info)}
-            chevron
-            onPress={() => navigation.open({ screen: 'student.info' })}
-            testID="settings-student-info"
+          <ListCard testID="settings-links">
+            {user.role === 'STUDENT' ? (
+              <ListRow
+                title={m.shell.settings.scores}
+                left={rowIcon(navIcons.student.info)}
+                chevron
+                onPress={() => navigation.open({ screen: 'student.info' })}
+                testID="settings-student-info"
+              />
+            ) : null}
+            <ListRow title={m.shell.settings.account} left={rowIcon('user')} chevron onPress={() => setAccountOpen(true)} testID="settings-account" />
+            {IS_MOCK_BUILD ? (
+              <ListRow title={m.shell.demo.title} left={rowIcon('database')} chevron onPress={navigation.openDemoData} testID="settings-demo-data" />
+            ) : null}
+          </ListCard>
+
+          <Button
+            label={signingOut ? m.shell.settings.signingOut : dict.nav.logout}
+            variant="danger"
+            leftIcon="logout"
+            fullWidth
+            loading={signingOut}
+            onPress={requestLogout}
+            testID="settings-logout"
           />
-        ) : null}
-        <ListRow title={m.shell.settings.account} left={rowIcon('user')} chevron onPress={() => setAccountOpen(true)} testID="settings-account" />
-        {IS_MOCK_BUILD ? (
-          <ListRow title={m.shell.demo.title} left={rowIcon('database')} chevron onPress={navigation.openDemoData} testID="settings-demo-data" />
-        ) : null}
-      </ListCard>
-
-      <InterfaceSection />
-      <AppSection />
-
-      <Button
-        label={signingOut ? m.shell.settings.signingOut : dict.nav.logout}
-        variant="danger"
-        leftIcon="logout"
-        fullWidth
-        loading={signingOut}
-        onPress={requestLogout}
-        testID="settings-logout"
-      />
+        </View>
+        <View style={[styles.column, theme.tablet ? styles.half : null]}>
+          <InterfaceSection />
+          <AppSection />
+        </View>
+      </View>
 
       <BottomSheet
         visible={accountOpen}
@@ -139,4 +149,7 @@ const useStyles = makeStyles((t) => ({
   profile: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   profileText: { flex: 1, minWidth: 0, gap: t.space.xxxs },
   forms: { gap: t.space.lg, paddingBottom: t.space.sm },
+  column: { gap: t.space.block },
+  columns: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.lg },
+  half: { flex: 1, minWidth: 0 },
 }));

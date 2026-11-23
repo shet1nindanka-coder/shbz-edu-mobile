@@ -90,9 +90,8 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
       </Hint>
 
       {number.conditionLatex ? (
-        <Card accessibilityLabel={t.condition}>
-          <MathContent value={number.conditionLatex} testID={`number-condition-${number.number}`} />
-        </Card>
+        // `MathContent` draws the soft panel of a statement itself.
+        <MathContent value={number.conditionLatex} testID={`number-condition-${number.number}`} />
       ) : null}
 
       {notesEnabled && !note.disabledByServer ? (

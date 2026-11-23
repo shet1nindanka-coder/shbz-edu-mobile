@@ -80,7 +80,7 @@ export function ActionSheet({ visible, title, actions, onClose, testID }: Action
               style={[styles.row, action.disabled ? styles.disabled : null]}
               pressedStyle={styles.pressed}
             >
-              <Icon name={action.icon} size={18} tint={tint} />
+              <Icon name={action.icon} size={20} tint={tint} />
               <Text variant="bodyStrong" numberOfLines={2} style={[styles.label, { color: tint }]}>
                 {action.label}
               </Text>

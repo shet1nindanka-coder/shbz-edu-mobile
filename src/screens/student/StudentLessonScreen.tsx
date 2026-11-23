@@ -9,6 +9,7 @@ import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
 import { useKeepScreenAwake } from '@/services/keep-awake';
 import { refreshQueries, usePullRefresh } from '@/services/query';
+import { useTheme } from '@/theme';
 import { LoadingState, Notice, Screen } from '@/ui';
 
 import { LessonLive } from './work/lesson-live';
@@ -60,6 +61,7 @@ export function StudentLessonScreen() {
   const api = useApi();
   const queryClient = useQueryClient();
   const { m } = useI18n();
+  const theme = useTheme();
   const live = useScreenLive();
 
   const lesson = useQuery({
@@ -117,6 +119,9 @@ export function StudentLessonScreen() {
             subtitle={active.groupName ? `${active.title} · ${active.groupName}` : active.title}
           />
         }
+        // A tablet shows the lesson as two panels down to the dock: the page itself does not scroll.
+        scroll={!theme.tablet}
+        maxWidth={theme.tablet ? 'full' : undefined}
         onRefresh={refresh}
         refreshing={refreshing}
       >

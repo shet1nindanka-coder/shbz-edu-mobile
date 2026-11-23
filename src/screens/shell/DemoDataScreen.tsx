@@ -196,7 +196,7 @@ export function DemoDataScreen() {
   const pinsOn = controls.limiterPins.length > 0;
 
   return (
-    <Screen testID="demo-data-screen" header={<DetailAppBar title={m.shell.demo.title} />}>
+    <Screen testID="demo-data-screen" dock={false} header={<DetailAppBar title={m.shell.demo.title} />}>
       <View style={styles.sections}>
         {notice ? <Notice tone="success" text={notice} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} /> : null}
 

@@ -12,6 +12,8 @@ export type HomeworkCardProps = {
   onOpen: (homework: HomeworkSummaryDto) => void;
   /** Hairline under the row; a `ListCard` switches it off on its last row. */
   divider?: boolean;
+  /** Tablet: this homework is shown in the panel next to the list. */
+  selected?: boolean;
 };
 
 /**
@@ -20,7 +22,7 @@ export type HomeworkCardProps = {
  * it has passed, or the running check — and the neutral fact «37 из 50» on the right. The whole row opens
  * the homework; the numbers and their statuses live inside it.
  */
-export function HomeworkCard({ homework, nowMs, onOpen, divider }: HomeworkCardProps) {
+export function HomeworkCard({ homework, nowMs, onOpen, divider, selected }: HomeworkCardProps) {
   const { dict, m, locale } = useI18n();
 
   const title = `${homeworkLabel(homework, dict.common.homeworkN)} · ${homework.topicTitle}`;
@@ -44,6 +46,7 @@ export function HomeworkCard({ homework, nowMs, onOpen, divider }: HomeworkCardP
       }
       subtitleTone={!running && deadline.attention ? 'attention' : 'muted'}
       divider={divider}
+      selected={selected}
       onPress={() => onOpen(homework)}
       accessibilityLabel={format(m.studentWork.list.rowA11y, { title, caption, done })}
       accessibilityHint={dict.student.submissions.open}

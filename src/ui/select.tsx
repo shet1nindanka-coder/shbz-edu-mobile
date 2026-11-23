@@ -42,9 +42,9 @@ export type SelectProps<T extends string | number> = {
 };
 
 const SIZE = {
-  md: { radius: 'select', text: 'bodyStrong', paddingX: 16 },
-  sm: { radius: 'md', text: 'smallStrong', paddingX: 16 },
-  xs: { radius: 'selectXs', text: 'label', paddingX: 12 },
+  md: { radius: 'md', text: 'bodyMedium', paddingX: 12 },
+  sm: { radius: 'md', text: 'bodyMedium', paddingX: 12 },
+  xs: { radius: 'md', text: 'label', paddingX: 12 },
 } as const satisfies Record<string, { radius: 'select' | 'md' | 'selectXs'; text: TextVariant; paddingX: number }>;
 
 /**
@@ -90,7 +90,7 @@ export function Select<T extends string | number>({
         accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
         onPress={() => setOpen(true)}
-        hitSlop={size === 'xs' ? { top: 3, bottom: 3 } : undefined}
+        hitSlop={size === 'xs' ? { top: 4, bottom: 4 } : undefined}
         testID={testID}
         style={[
           styles.trigger,
@@ -107,7 +107,7 @@ export function Select<T extends string | number>({
           {selected?.label ?? placeholder}
         </Text>
         <Animated.View style={chevronStyle}>
-          <Icon name="chevronDown" size={size === 'xs' ? 14 : 16} color="kicker" />
+          <Icon name="chevronDown" size={16} color="textMuted" />
         </Animated.View>
       </PressableScale>
       <BottomSheet
@@ -135,10 +135,10 @@ export function Select<T extends string | number>({
                 style={[styles.option, active ? styles.optionActive : null, option.disabled ? styles.disabled : null]}
                 pressedStyle={active ? null : styles.optionPressed}
               >
-                <Text variant="bodyStrong" color={active ? 'greenText' : 'textStrong'} style={styles.value}>
+                <Text variant={active ? 'bodyBold' : 'bodyStrong'} style={styles.value}>
                   {option.label}
                 </Text>
-                {active ? <Icon name="check" size={16} color="greenText" /> : null}
+                {active ? <Icon name="check" size={20} color="textStrong" /> : null}
               </PressableScale>
             );
           })}
@@ -171,7 +171,7 @@ const useStyles = makeStyles((t) => ({
     paddingHorizontal: 12,
     borderRadius: t.radii.md,
   },
-  optionActive: { backgroundColor: t.colors.accentSoft },
+  optionActive: { backgroundColor: t.colors.softBg },
   optionPressed: { backgroundColor: t.colors.tabHover },
   disabled: { opacity: 0.55 },
 }));

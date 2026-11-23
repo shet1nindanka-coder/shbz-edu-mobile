@@ -1,7 +1,7 @@
 // Generates the offline math assets used by `src/components/math` (docs/spec/09-data-i18n-math.md §4.3
 // step 8, "fallback that works without file access"): one CSS string with the KaTeX woff2 fonts inlined
 // as base64 data URLs — the same trick the site uses for print in `lib/print-theme.ts` — plus a small
-// subset of Montserrat Regular for the text around formulas inside the native WebView.
+// subset of Onest Regular (the app's UI font) for the text around formulas inside the native WebView.
 //
 // Usage: node scripts/build-katex-assets.mjs [--check]
 //   --check   exit 1 when the generated files are out of date (CI), write nothing.
@@ -10,8 +10,8 @@
 //   src/components/math/generated/katex-css.ts   KATEX_VERSION, KATEX_CSS
 //   src/components/math/generated/text-font.ts   MATH_TEXT_FONT_FAMILY, MATH_TEXT_FONT_BASE64
 //
-// The Montserrat subset lives next to them as `montserrat-400-subset.woff2`. It is rebuilt from
-// `@expo-google-fonts/montserrat` only when `pyftsubset` (fonttools + brotli) is available — set
+// The Onest subset lives next to them as `onest-400-subset.woff2`. It is rebuilt from
+// `@expo-google-fonts/onest` only when `pyftsubset` (fonttools + brotli) is available — set
 // PYFTSUBSET=/path/to/pyftsubset or have it on PATH; otherwise the committed subset is reused, so the
 // script has no hard dependency outside node_modules.
 import { execFileSync } from 'node:child_process';
@@ -41,7 +41,7 @@ if (fontCount === 0 || /url\(fonts\//.test(katexCss)) {
   throw new Error('katex.min.css has an unexpected @font-face layout: no font was inlined, or a relative URL is left.');
 }
 
-// ── Montserrat Regular subset: Latin, Latin-1, Cyrillic, punctuation and the few math signs in prose. ─
+// ── Onest Regular subset: Latin, Latin-1, Cyrillic, punctuation and the few math signs in prose. ─
 const SUBSET_UNICODES = [
   'U+0020-007E', // Basic Latin
   'U+00A0-00FF', // Latin-1: « » ° × ÷ ± …
@@ -62,8 +62,8 @@ const SUBSET_UNICODES = [
   'U+2260', // ≠
   'U+2264-2265', // ≤ ≥
 ].join(',');
-const subsetPath = join(outDir, 'montserrat-400-subset.woff2');
-const sourceTtf = join(root, 'node_modules', '@expo-google-fonts', 'montserrat', '400Regular', 'Montserrat_400Regular.ttf');
+const subsetPath = join(outDir, 'onest-400-subset.woff2');
+const sourceTtf = join(root, 'node_modules', '@expo-google-fonts', 'onest', '400Regular', 'Onest_400Regular.ttf');
 
 function findPyftsubset() {
   for (const candidate of [process.env.PYFTSUBSET, 'pyftsubset'].filter(Boolean)) {
@@ -97,7 +97,7 @@ if (pyftsubset) {
 } else if (!existsSync(subsetPath)) {
   throw new Error(`${subsetPath} is missing and pyftsubset is not available (pip install fonttools brotli).`);
 } else if (!check) {
-  console.log('pyftsubset not found: reusing the committed Montserrat subset');
+  console.log('pyftsubset not found: reusing the committed Onest subset');
 }
 const textFont = readFileSync(subsetPath);
 
@@ -113,8 +113,8 @@ const files = {
   'text-font.ts':
     header +
     `/** Family name the WebView shell declares for the prose around formulas. */\n` +
-    `export const MATH_TEXT_FONT_FAMILY = "ShbzMontserrat";\n\n` +
-    `/** Montserrat Regular subset (Latin, Cyrillic, punctuation), woff2, base64 — ${textFont.length} bytes. */\n` +
+    `export const MATH_TEXT_FONT_FAMILY = "ShbzOnest";\n\n` +
+    `/** Onest Regular subset (Latin, Cyrillic, punctuation), woff2, base64 — ${textFont.length} bytes. */\n` +
     `export const MATH_TEXT_FONT_BASE64 = ${JSON.stringify(textFont.toString('base64'))};\n`,
 };
 

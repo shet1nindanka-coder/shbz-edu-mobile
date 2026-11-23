@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
+import { useRole } from '@/providers';
 import { useTheme } from '@/theme';
 import { AppBar } from '@/ui';
 
@@ -41,6 +42,8 @@ export function DetailAppBar({ title, subtitle, backTitle, right, aside, onBack,
   const { m } = useI18n();
   const theme = useTheme();
   const navigation = useAppNavigation();
+  // The round buttons belong to a signed-in user; «Демо-данные» is also opened from the sign-in screen.
+  const signedIn = useRole() !== null;
   return (
     <AppBar
       testID={testID ?? 'detail-app-bar'}
@@ -48,7 +51,7 @@ export function DetailAppBar({ title, subtitle, backTitle, right, aside, onBack,
       subtitle={subtitle}
       aside={aside}
       right={
-        theme.tablet ? (
+        theme.tablet && signedIn ? (
           <>
             {right}
             <ShellActions />

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import type { LessonItemDto, LessonItemResult, SolutionVerdict } from '@/api/types';
 import { MathContent } from '@/components/math';
@@ -38,6 +38,8 @@ export type LessonItemCardProps = {
   onSubmit: (item: LessonItemDto) => void;
   /** Node on the right of the number: the time left until the end of the lesson. */
   aside?: ReactNode;
+  /** Layout of the card in its container (a tablet panel stretches it). */
+  style?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -61,6 +63,7 @@ export function LessonItemCard({
   preparing,
   onSubmit,
   aside,
+  style,
 }: LessonItemCardProps) {
   const styles = useStyles();
   const { dict, m, locale } = useI18n();
@@ -79,7 +82,7 @@ export function LessonItemCard({
   const remark = submission && submission.status === 'DONE' ? submission.comment : null;
 
   return (
-    <Card style={styles.card} testID={`lesson-item-${item.number}`}>
+    <Card style={[styles.card, style]} testID={`lesson-item-${item.number}`}>
       <View style={styles.head}>
         <Text
           variant="sectionTitle"
@@ -107,11 +110,7 @@ export function LessonItemCard({
         ) : null}
       </View>
 
-      {item.conditionLatex ? (
-        <Card>
-          <MathContent value={item.conditionLatex} testID={`lesson-condition-${item.number}`} />
-        </Card>
-      ) : null}
+      {item.conditionLatex ? <MathContent value={item.conditionLatex} testID={`lesson-condition-${item.number}`} /> : null}
 
       {remark ? (
         <View style={styles.remark}>

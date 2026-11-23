@@ -45,9 +45,9 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
   const named = (action: string) => format(m.common.files.actionOf, { action, slot: title });
 
   return (
-    <Card variant="surface" padded={16} testID={testID} style={style}>
+    <Card testID={testID} style={style}>
       <View style={styles.header}>
-        <Text variant="kicker" accessibilityRole="header">
+        <Text variant="bodyBold" accessibilityRole="header">
           {title}
         </Text>
         {description ? (
@@ -85,13 +85,13 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
 
           <View style={styles.fileRow}>
             <View style={styles.typeTile}>
-              <Icon name={fileIconName(kind)} size={20} color="greenText" />
+              <Icon name={fileIconName(kind)} size={24} color="label" />
             </View>
             <View style={styles.fileText}>
-              <Text variant="smallStrong" numberOfLines={2}>
+              <Text variant="bodyStrong" numberOfLines={2}>
                 {file.originalName}
               </Text>
-              <Text variant="caption" tabular>
+              <Text variant="small" color="textMuted" tabular>
                 {typeof file.size === 'number'
                   ? `${fileTypeLabel(file)} · ${formatFileSize(file.size, locale)}`
                   : fileTypeLabel(file)}
@@ -122,6 +122,7 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
               <Button
                 label={dict.student.fullscreen.open}
                 accessibilityLabel={named(dict.student.fullscreen.open)}
+                variant="outline"
                 onPress={() => onOpen(file)}
                 style={styles.action}
                 testID={testID ? `${testID}-open` : undefined}
@@ -150,36 +151,35 @@ export function FileCard({ title, description, file, onOpen, hideShare = false, 
 
 const useStyles = makeStyles((t) => ({
   header: { gap: t.space.xxs },
-  // `ui-card-soft border-dashed px-4 py-6`: an empty slot, not an error.
+  // An empty slot, not an error: a dashed outline.
   missing: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 24,
+    marginTop: t.space.md,
+    paddingHorizontal: t.space.lg,
+    paddingVertical: t.space.xl,
     borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
+    borderWidth: t.borders.interactive,
     borderStyle: 'dashed',
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
+    borderColor: t.colors.line2,
   },
-  body: { marginTop: 16, gap: t.space.md },
+  body: { marginTop: t.space.md, gap: t.space.md },
   preview: {
     height: 180,
-    padding: 8,
+    padding: t.space.sm,
     borderRadius: t.radii.lg,
-    backgroundColor: t.colors.softBg,
+    backgroundColor: t.colors.soft2,
   },
   previewImage: { flex: 1, borderRadius: t.radii.md },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   typeTile: {
-    width: 44,
-    height: 44,
+    width: t.sizes.tile,
+    height: t.sizes.tile,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: t.radii.md,
-    backgroundColor: t.colors.greenSoft,
+    backgroundColor: t.colors.soft2,
   },
-  fileText: { flex: 1, minWidth: 0, gap: 2 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  fileText: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   action: { flexGrow: 1 },
   footer: { marginTop: t.space.md },
 }));

@@ -57,7 +57,7 @@ export function ErrorState({
   const body = (
     <View style={styles.body} accessibilityRole="alert" testID={testID}>
       {numeral ? (
-        <Text variant="display" color="textMuted" tabular style={styles.numeral}>
+        <Text variant="metric" color="textMuted" tabular>
           {numeral}
         </Text>
       ) : (
@@ -71,7 +71,7 @@ export function ErrorState({
         {title}
       </Text>
       {description ? (
-        <Text variant="small" color="textMuted" align="center" style={styles.description}>
+        <Text variant="small" color="textMuted" align="center">
           {description}
         </Text>
       ) : null}
@@ -90,7 +90,7 @@ export function ErrorState({
   if (variant === 'plain') return <View style={style}>{body}</View>;
   return (
     <Enter duration={180} offset={8} style={style}>
-      <Card variant="surface" padded={24}>
+      <Card padded={24}>
         {body}
       </Card>
     </Enter>
@@ -98,25 +98,23 @@ export function ErrorState({
 }
 
 const useStyles = makeStyles((t) => ({
-  body: { alignItems: 'center', gap: 12 },
+  body: { alignItems: 'center', gap: t.space.md },
   tile: {
-    width: 56,
-    height: 56,
-    borderRadius: t.radii.sm,
+    width: t.sizes.control.lg,
+    height: t.sizes.control.lg,
+    borderRadius: t.radii.md,
     backgroundColor: t.colors.redSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: t.space.xxs,
   },
-  numeral: { fontFamily: t.fonts.bold, fontSize: 64, lineHeight: 72, letterSpacing: 0 },
-  description: { lineHeight: 22 },
   actions: {
     alignSelf: 'stretch',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: t.space.md,
-    marginTop: 8,
+    marginTop: t.space.sm,
   },
   actionButton: { flexGrow: 1 },
 }));

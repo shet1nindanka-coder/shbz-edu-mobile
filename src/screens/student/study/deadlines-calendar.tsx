@@ -21,6 +21,8 @@ export type DeadlinesCalendarProps = {
   openDayKey: string | null;
   onChangeMonth: (delta: -1 | 1) => void;
   onOpenDay: (dayKey: string) => void;
+  /** Draw the grid without a card of its own and without the legend: inside a tablet panel. */
+  bare?: boolean;
 };
 
 /** A horizontal drag this long, and clearly more horizontal than vertical, turns the month. */
@@ -37,7 +39,7 @@ function chunk<T>(list: readonly T[], size: number): T[][] {
  * (unbounded both ways), the grid always has 6 × 7 cells from the Monday on or before the 1st, and a
  * marked day opens its sheet. Days are MOSCOW days (02 §4.9).
  */
-export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMonth, onOpenDay }: DeadlinesCalendarProps) {
+export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMonth, onOpenDay, bare = false }: DeadlinesCalendarProps) {
   const styles = useStyles();
   const { dict, m, locale } = useI18n();
   const t = dict.student.calendar;
@@ -79,8 +81,9 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
     return parts.join(', ');
   };
 
+  const Frame = bare ? View : Card;
   return (
-    <Card testID="deadlines-calendar">
+    <Frame testID="deadlines-calendar">
       <View style={styles.header}>
         <IconButton icon="chevronLeft" accessibilityLabel={dict.topics.widgets.datetime.prevMonth} onPress={() => onChangeMonth(-1)} testID="calendar-prev" />
         <Text variant="calendarMonth" align="center" numberOfLines={1} accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.month} testID="calendar-month">
@@ -117,10 +120,12 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
         </Enter>
       </View>
 
-      <View style={styles.legend}>
-        <CalendarLegend />
-      </View>
-    </Card>
+      {bare ? null : (
+        <View style={styles.legend}>
+          <CalendarLegend />
+        </View>
+      )}
+    </Frame>
   );
 }
 
