@@ -166,6 +166,7 @@ describe('review: «Отменить» keeps the restored colour and the lock un
     return { checked: checked ? String(checked.props.accessibilityLabel) : null, disabled: options.some((node) => state(node).disabled === true) };
   }
 
+  // The three status marks are named by what they mean: «Решил сам / Исправил / Нужна помощь».
   it('the accept batch settling first does not unlock the numbers or bring back its colours', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
     if (!hasTestId(app, `review-accept-${HW}`)) {
@@ -174,12 +175,12 @@ describe('review: «Отменить» keeps the restored colour and the lock un
     }
     // № 118 green, so that the AI verdict (wrong → red) is a change to accept.
     const group = byTestId(app, GROUP)!;
-    const green = all(group, (node) => node.props.accessibilityRole === 'radio' && node.props.accessibilityLabel === 'Зеленый')[0];
-    if (radios(app).checked !== 'Зеленый') {
+    const green = all(group, (node) => node.props.accessibilityRole === 'radio' && node.props.accessibilityLabel === 'Решил сам')[0];
+    if (radios(app).checked !== 'Решил сам') {
       await press(app, green, 'green 118');
       await app.settle();
     }
-    expect(radios(app).checked).toBe('Зеленый');
+    expect(radios(app).checked).toBe('Решил сам');
 
     // Every batch takes 2.5 s.
     const api = app.runtime.api.teacherStudents;
@@ -192,18 +193,18 @@ describe('review: «Отменить» keeps the restored colour and the lock un
     // Pressed without settling: the requests must stay in flight.
     await app.rntl.fireEvent.press(app.screen.getByTestId(`review-accept-${HW}`));
     await app.advance(300);
-    expect(radios(app)).toEqual({ checked: 'Красный', disabled: true });
+    expect(radios(app)).toEqual({ checked: 'Нужна помощь', disabled: true });
     await app.rntl.fireEvent.press(app.screen.getByTestId('review-undo-toast-undo'));
     await app.advance(50);
-    expect(radios(app)).toEqual({ checked: 'Зеленый', disabled: true });
+    expect(radios(app)).toEqual({ checked: 'Решил сам', disabled: true });
 
     // The accept settles (≈ 2.5 s); the undo is sent only now and takes another 2.5 s.
     await app.advance(2700);
-    expect(radios(app)).toEqual({ checked: 'Зеленый', disabled: true });
+    expect(radios(app)).toEqual({ checked: 'Решил сам', disabled: true });
 
     await app.advance(3000);
     await app.settle();
-    expect(radios(app)).toEqual({ checked: 'Зеленый', disabled: false });
+    expect(radios(app)).toEqual({ checked: 'Решил сам', disabled: false });
   });
 });
 
@@ -233,35 +234,60 @@ describe('assign: a refetch that reorders the topics keeps the shown topic and t
 });
 
 describe('repeated buttons name their object (#338)', () => {
-  it('topic view: every answer toggle names its number', async () => {
+  // The per-number «Показать ответ» toggles are gone: a number is a tile that opens the number's screen.
+  it('topic view: every number tile names its number', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/topics/top_linear' });
-    const toggles = all(rootOf(app), (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('topic-number-answer-toggle-') && node.props.accessibilityLabel !== undefined);
-    expect(toggles.length).toBeGreaterThan(1);
-    const labels = toggles.map((node) => String(node.props.accessibilityLabel));
+    const tiles = all(rootOf(app), (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('topic-number-') && node.props.accessibilityRole === 'button');
+    expect(tiles.length).toBeGreaterThan(1);
+    const labels = tiles.map((node) => String(node.props.accessibilityLabel));
     expect(new Set(labels).size).toBe(labels.length);
-    expect(labels[0]).toMatch(/^Показать ответ № /);
+    for (const node of tiles) {
+      expect(String(node.props.accessibilityLabel)).toBe(`Открыть номер ${String(node.props.testID).slice('topic-number-'.length)}`);
+    }
+    // The answer is on the screen the tile opens.
+    expect(await pressTestId(app, String(tiles[0].props.testID))).toBe(true);
+    await app.settle();
+    expect(app.path()).toBe(`/teacher/topics/top_linear/numbers/${String(tiles[0].props.testID).slice('topic-number-'.length)}`);
   });
 
-  it('topic view and edit: the file cards\' «Открыть» / share buttons name their slot', async () => {
+  // A file is one row (view) / one box (edit) instead of a card with «Открыть» and share buttons: the
+  // row is the control, and it names its slot.
+  it('topic view and edit: the file rows name their slot', async () => {
     const app = await visit({ as: DEV, url: '/developer/topics/top_linear' });
-    const names = (prefix: string) =>
-      [`${prefix}-open`, `${prefix}-share`].map((id) => byTestId(app, id)?.props.accessibilityLabel).filter((label) => label !== undefined).map(String);
-    const theory = names('topic-theory-file');
-    const homework = names('topic-homework-file');
-    expect(theory.length).toBe(2);
-    expect(homework.length).toBe(2);
-    expect(theory[0]).toBe('Открыть: Теория');
-    expect(new Set([...theory, ...homework]).size).toBe(4);
-    for (const label of homework) expect(label).toMatch(/: Задания$/);
+    const name = (id: string) => String(byTestId(app, id)?.props.accessibilityLabel ?? '');
+    const theory = name('topic-theory-file');
+    const homework = name('topic-homework-file');
+    expect(theory).toMatch(/^Открыть: Теория\. /);
+    expect(homework).toMatch(/^Открыть: Задания\. /);
+    expect(theory).not.toBe(homework);
+    // What the eye reads on the row (the slot and the file) is in the name.
+    for (const id of ['topic-theory-file', 'topic-homework-file']) {
+      for (const text of all(byTestId(app, id)!, (node) => node.type === 'Text' && node.children.every((child) => typeof child === 'string')).map((node) => textOf(node).trim())) {
+        if (text !== '') expect(name(id)).toContain(text);
+      }
+    }
 
     await app.open('/developer/topics/top_linear/edit');
-    const edit = [...names('edit-theory-file'), ...names('edit-homework-file')];
-    expect(edit.length).toBeGreaterThan(1);
-    expect(new Set(edit).size).toBe(edit.length);
+    const edit = [name('edit-theory-file'), name('edit-homework-file')];
+    expect(edit[0]).toMatch(/^Теория/);
+    expect(edit[1]).toMatch(/^Задания/);
+    expect(new Set(edit).size).toBe(2);
+    // The actions of a file are in the sheet its box opens, titled with the slot.
+    expect(await pressTestId(app, 'edit-homework-file')).toBe(true);
+    await app.settle();
+    const sheets = openModals(app);
+    expect(sheets.length).toBe(1);
+    expect(sheets[0]).toContain('Задания');
   });
 
+  // «Открыть занятие» is inside an unfolded lesson card; «Условие и ответ» and «История статуса» are in the
+  // sheet a number row of the review opens.
   it('student card: «Открыть занятие», «Условие и ответ» and «История статуса» name their lesson / number', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya/lessons' });
+    for (const id of ['les_budget', 'les_d2']) {
+      expect(await pressTestId(app, `student-lesson-toggle-${id}`)).toBe(true);
+      await app.settle();
+    }
     const open = all(rootOf(app), (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('student-lesson-open-') && node.props.accessibilityLabel !== undefined);
     expect(open.length).toBeGreaterThan(1);
     const openLabels = open.map((node) => String(node.props.accessibilityLabel));
@@ -269,10 +295,14 @@ describe('repeated buttons name their object (#338)', () => {
     expect(openLabels[0]).toMatch(/^Открыть занятие: /);
 
     await app.open('/teacher/students/usr_ilya');
-    if (!hasTestId(app, 'review-number-history-num_118')) {
-      expect(await pressTestId(app, 'review-assignment-toggle-hw_ilya_overdue')).toBe(true);
-      await app.settle();
-    }
+    expect(await pressTestId(app, 'review-assignment-toggle-hw_ilya_overdue')).toBe(true);
+    await app.settle();
+    // The row itself names its number, and says what a tap shows.
+    const row = byTestId(app, 'review-number-open-num_118');
+    expect(String(row?.props.accessibilityLabel)).toMatch(/^№ 118\. /);
+    expect(row?.props.accessibilityHint).toBe('Условие и ответ № 118');
+    expect(await pressTestId(app, 'review-number-open-num_118')).toBe(true);
+    await app.settle();
     expect(byTestId(app, 'review-number-history-num_118')?.props.accessibilityLabel).toBe('История статуса № 118');
     const condition = byTestId(app, 'review-number-condition-num_118');
     expect(String(condition?.props.accessibilityLabel)).toBe('Условие и ответ № 118');
@@ -328,29 +358,70 @@ describe('developer panel: the ± setting steppers say the new value (#335, revi
 });
 
 describe('review: a refused status save is spoken on Android too (#329)', () => {
-  it('announced once, on both platforms', async () => {
+  const ROW_GROUP = 'review-number-status-num_118';
+  const SHEET_GROUP = 'review-number-sheet-status-num_118';
+
+  /** Ilya's overdue homework unfolded; the next status save is refused. Returns what gets spoken. */
+  async function openReview() {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
     // Spied after the launch: the app runs in its own module registry.
     const { AccessibilityInfo } = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
     const queued = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     const plain = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
-    try {
-      if (!hasTestId(app, 'review-number-status-num_118')) {
-        expect(await pressTestId(app, 'review-assignment-toggle-hw_ilya_overdue')).toBe(true);
-        await app.settle();
-      }
-      app.mock.controls.set('forceNextError', { method: 'teacherStudents.setNumberStatus', error: 'serviceUnavailable', times: 1 });
-      const group = byTestId(app, 'review-number-status-num_118')!;
-      const yellow = all(group, (node) => node.props.accessibilityRole === 'radio' && node.props.accessibilityLabel === 'Желтый')[0];
-      await press(app, yellow, 'yellow 118');
+    if (!hasTestId(app, ROW_GROUP)) {
+      expect(await pressTestId(app, 'review-assignment-toggle-hw_ilya_overdue')).toBe(true);
       await app.settle();
-      const error = byTestId(app, 'review-number-error-num_118');
-      expect(error).toBeTruthy();
-      const spoken = [...queued.mock.calls.map((call) => call[0]), ...plain.mock.calls.map((call) => call[0])];
-      expect(spoken.filter((text) => text === textOf(error!))).toHaveLength(1);
-    } finally {
+    }
+    const spoken = () => [...queued.mock.calls.map((call) => call[0]), ...plain.mock.calls.map((call) => call[0])];
+    const restore = () => {
       queued.mockRestore();
       plain.mockRestore();
+    };
+    return { app, spoken, restore };
+  }
+
+  async function pressMark(app: AppHandle, groupId: string) {
+    app.mock.controls.set('forceNextError', { method: 'teacherStudents.setNumberStatus', error: 'serviceUnavailable', times: 1 });
+    const group = byTestId(app, groupId)!;
+    const yellow = all(group, (node) => node.props.accessibilityRole === 'radio' && node.props.accessibilityLabel === 'Исправил')[0];
+    await press(app, yellow, 'yellow 118');
+    await app.settle();
+  }
+
+  it('a mark of the number row: announced once, on both platforms', async () => {
+    const { app, spoken, restore } = await openReview();
+    try {
+      await pressMark(app, ROW_GROUP);
+      const error = byTestId(app, 'review-number-row-error-num_118');
+      expect(error).toBeTruthy();
+      expect(textOf(error!)).not.toBe('');
+      expect(spoken().filter((text) => text === textOf(error!))).toHaveLength(1);
+    } finally {
+      restore();
+    }
+  });
+
+  // The number's sheet has the same marks, over the row that stays mounted under it.
+  it('a mark in the number sheet: announced once, not once by the sheet and once by the row under it', async () => {
+    const { app, spoken, restore } = await openReview();
+    try {
+      expect(await pressTestId(app, 'review-number-open-num_118')).toBe(true);
+      await app.settle();
+      await pressMark(app, SHEET_GROUP);
+      const error = byTestId(app, 'review-number-error-num_118');
+      expect(error).toBeTruthy();
+      expect(textOf(error!)).not.toBe('');
+      const message = textOf(error!);
+      expect(spoken().filter((text) => text === message)).toHaveLength(1);
+      // The sheet leaves; the refusal is still written under the row, and is not said again.
+      expect(await tap(app, 'button:Закрыть')).toBe(true);
+      await app.advance(1000);
+      await app.settle();
+      expect(hasTestId(app, 'review-number-error-num_118')).toBe(false);
+      expect(textOf(byTestId(app, 'review-number-row-error-num_118')!)).toBe(message);
+      expect(spoken().filter((text) => text === message)).toHaveLength(1);
+    } finally {
+      restore();
     }
   });
 });

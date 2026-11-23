@@ -10,7 +10,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { byTestId, fill, root, tap, visibleText, visit } from './support/drive';
 import { device } from './support/fakes';
 import type { AppHandle } from './support/launch';
-import { showHomeworkNumber } from './support/student';
+import { showHomeworkNumber, submittableLessonNumbers } from './support/student';
 import { all, flattenStyle, isHidden, pressables, textOf, type HostNode } from './support/tree';
 
 // jest-expo answers the image manipulator's native calls with `undefined`, so every picked photo would fail
@@ -59,15 +59,6 @@ const ADD_PHOTO = '#homework-photos-grid-add';
 function isDisabled(node: HostNode | null): boolean {
   const state = node?.props.accessibilityState as { disabled?: boolean } | undefined;
   return Boolean(state?.disabled ?? node?.props.disabled);
-}
-
-/** Numbers of the live lesson that can be submitted now and have a tile in the strip, in lesson order. */
-async function submittableNumbers(app: AppHandle): Promise<string[]> {
-  const lesson = await call(app, () => app.mock.studentWork.getLiveLesson());
-  return [...(lesson.active?.items ?? [])]
-    .sort((left, right) => left.order - right.order)
-    .filter((item) => item.canSubmit && byTestId(app, `lesson-tile-${item.number}`) !== null)
-    .map((item) => item.number);
 }
 
 /** A bare press (also of a control an open sheet would cover on a device), then the app settles. */
@@ -176,7 +167,7 @@ describe('live lesson', () => {
 
   it('a preview that is still marked open does not lock the other submit buttons', async () => {
     const app = await visit({ as: 'polina@example.com', url: '/student/lesson' });
-    const [first, other] = await submittableNumbers(app);
+    const [first, other] = await submittableLessonNumbers(app);
     expect(other).toBeDefined();
     device().picker.nextAssets = [photo(1)];
     await pressNode(app, `lesson-tile-${first}`);
@@ -271,7 +262,7 @@ describe('cool-down stays explained after the error notice is dismissed', () => 
 
   it('live lesson: one line in the header explains every locked card, also after the dismiss', async () => {
     const app = await visit({ as: 'polina@example.com', url: '/student/lesson' });
-    const numbers = await submittableNumbers(app);
+    const numbers = await submittableLessonNumbers(app);
     expect(numbers.length).toBeGreaterThan(1);
     await app.rntl.act(async () => app.mock.controls.exhaust('api:lesson-checks:global', 'global'));
     const submits = () =>

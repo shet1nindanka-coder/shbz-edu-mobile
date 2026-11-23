@@ -31,7 +31,10 @@ describe('review: the undo of an accept writes only what the accept applied (#41
     return { checked: checked ? String(checked.props.accessibilityLabel) : null, disabled: options.some((node) => state(node).disabled === true) };
   }
 
-  /** Opens Ilya's overdue homework with № 118 green, so that the AI verdict (wrong → red) is a change. */
+  /**
+   * Opens Ilya's overdue homework with № 118 green, so that the AI verdict (wrong → red) is a change. The
+   * three status marks are named by what they mean: «Решил сам / Исправил / Нужна помощь».
+   */
   async function openReview(): Promise<AppHandle> {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
     if (!hasTestId(app, `review-accept-${HW}`)) {
@@ -39,12 +42,12 @@ describe('review: the undo of an accept writes only what the accept applied (#41
       await app.settle();
     }
     const group = byTestId(app, GROUP)!;
-    const green = all(group, (node) => node.props.accessibilityRole === 'radio' && node.props.accessibilityLabel === 'Зеленый')[0];
-    if (radios(app).checked !== 'Зеленый') {
+    const green = all(group, (node) => node.props.accessibilityRole === 'radio' && node.props.accessibilityLabel === 'Решил сам')[0];
+    if (radios(app).checked !== 'Решил сам') {
       await press(app, green, 'green 118');
       await app.settle();
     }
-    expect(radios(app).checked).toBe('Зеленый');
+    expect(radios(app).checked).toBe('Решил сам');
     return app;
   }
 
@@ -75,7 +78,7 @@ describe('review: the undo of an accept writes only what the accept applied (#41
 
     expect(sent.length).toBe(2);
     expect(sent[1].find((entry) => entry.homeworkNumberId === 'num_118')?.status).toBe('GREEN');
-    expect(radios(app)).toEqual({ checked: 'Зеленый', disabled: false });
+    expect(radios(app)).toEqual({ checked: 'Решил сам', disabled: false });
   });
 
   it('accept fails → the undo pressed meanwhile sends nothing', async () => {
@@ -92,7 +95,7 @@ describe('review: the undo of an accept writes only what the accept applied (#41
     // Only the refused accept went out: no "reaffirmed" teacher mark the teacher never made.
     expect(sent.length).toBe(1);
     expect(app.mock.backend.store.progressEvents.count()).toBe(eventsBefore);
-    expect(radios(app)).toEqual({ checked: 'Зеленый', disabled: false });
+    expect(radios(app)).toEqual({ checked: 'Решил сам', disabled: false });
     expect(visibleText(app)).toContain('Сервис временно недоступен (тест)');
     expect(hasTestId(app, 'review-undo-toast')).toBe(false);
   });
@@ -319,11 +322,16 @@ function labelNotInName(app: AppHandle): string[] {
   const normalise = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
   const bad: string[] = [];
   for (const node of nodes) {
+    // The shell's "back" link shows where it leads («‹ Темы») and is named «Вернуться назад» by the shell's
+    // own rule (src/screens/shell/DetailAppBar.tsx); it is not a button of these areas.
+    if (/(^|-)app-bar-back$/.test(String(node.props.testID))) continue;
     // A control that shows one caption (a button, a link); composite cards name their title, not all text.
-    const captions = all(node, (child) => child.type === 'Text' && textOf(child).trim() !== '');
+    // Text hidden from accessibility is a picture, not a caption (the initials of the header's avatar).
+    const decorative = (child: HostNode) => child.props.importantForAccessibility === 'no' || child.props.accessibilityElementsHidden === true;
+    const captions = all(node, (child) => child.type === 'Text' && !decorative(child) && textOf(child).trim() !== '');
     const leaves = captions.filter((caption) => all(caption, (child) => child !== caption && child.type === 'Text').length === 0);
     if (leaves.length !== 1) continue;
-    const shown = normalise(textOf(node));
+    const shown = normalise(textOf(leaves[0]));
     const name = normalise(String(node.props.accessibilityLabel));
     if (shown !== '' && !name.includes(shown)) bad.push(`${String(node.props.testID)}: «${shown}» ∉ «${name}»`);
   }
@@ -332,26 +340,40 @@ function labelNotInName(app: AppHandle): string[] {
 
 describe('accessible names contain the visible label (#415)', () => {
   for (const locale of ['en', 'ru'] as const) {
-    it(`${locale}: topic view answer toggles`, async () => {
+    // The «Показать ответ» toggles are gone: a number is a tile that opens the number's screen.
+    it(`${locale}: topic view number tiles`, async () => {
       const app = await visit({ as: ANNA, url: '/teacher/topics/top_linear', locale });
-      const toggles = all(rootOf(app), (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('topic-number-answer-toggle-') && node.props.accessibilityLabel !== undefined);
-      expect(toggles.length).toBeGreaterThan(1);
-      expect(String(toggles[0].props.accessibilityLabel)).toMatch(locale === 'en' ? /^Show answer, problem / : /^Показать ответ № /);
+      const tiles = all(rootOf(app), (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('topic-number-') && node.props.accessibilityRole === 'button');
+      expect(tiles.length).toBeGreaterThan(1);
+      expect(String(tiles[0].props.accessibilityLabel)).toMatch(locale === 'en' ? /^Open problem / : /^Открыть номер /);
+      expect(labelNotInName(app)).toEqual([]);
+      // … where the answer is.
+      expect(await pressTestId(app, String(tiles[0].props.testID))).toBe(true);
+      await app.settle();
+      expect(app.path()).toMatch(/^\/teacher\/topics\/top_linear\/numbers\//);
       expect(labelNotInName(app)).toEqual([]);
     });
 
+    // «Открыть занятие» is inside an unfolded lesson card; the review's per-number buttons are in the sheet a
+    // number row opens.
     it(`${locale}: student card lessons and review`, async () => {
       const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya/lessons', locale });
+      for (const id of ['les_budget', 'les_d2']) {
+        expect(await pressTestId(app, `student-lesson-toggle-${id}`)).toBe(true);
+        await app.settle();
+      }
       const open = all(rootOf(app), (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('student-lesson-open-') && node.props.accessibilityLabel !== undefined);
       expect(open.length).toBeGreaterThan(1);
       expect(String(open[0].props.accessibilityLabel)).toMatch(locale === 'en' ? /^Open lesson: / : /^Открыть занятие: /);
       expect(labelNotInName(app)).toEqual([]);
 
       await app.open('/teacher/students/usr_ilya');
-      if (!hasTestId(app, 'review-number-history-num_118')) {
-        expect(await pressTestId(app, 'review-assignment-toggle-hw_ilya_overdue')).toBe(true);
-        await app.settle();
-      }
+      expect(await pressTestId(app, 'review-assignment-toggle-hw_ilya_overdue')).toBe(true);
+      await app.settle();
+      expect(labelNotInName(app)).toEqual([]);
+      expect(await pressTestId(app, 'review-number-open-num_118')).toBe(true);
+      await app.settle();
+      expect(hasTestId(app, 'review-number-history-num_118')).toBe(true);
       expect(labelNotInName(app)).toEqual([]);
 
       await app.open('/teacher/students/usr_maria/assign');

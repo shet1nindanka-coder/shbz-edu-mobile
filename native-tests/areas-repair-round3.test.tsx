@@ -111,6 +111,8 @@ describe('group report ready notice (#215)', () => {
     const voice = spyAnnouncements();
     try {
       fakeGroupReport(app, 2500);
+      // The three periods are folded behind the «PDF» button: a sheet of rows.
+      await tap(app, '#group-attendance-pdf');
       await app.rntl.fireEvent.press(app.screen.getByTestId('group-attendance-pdf-7d'));
       await app.advance(200);
       await app.rntl.act(async () => {

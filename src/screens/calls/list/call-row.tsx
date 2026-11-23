@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTimin
 import type { ParentCallStudentOverview } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Avatar, Chip, ListRow, accessibilityLabelOf } from '@/ui';
+import { Avatar, Chip, ListRow, accessibilityLabelOf, useTextScale } from '@/ui';
 
 import { attentionChip, callMetaLine, callRowCaption, teacherLine } from '../logic';
 
@@ -35,6 +35,9 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, selected
   const styles = useStyles();
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
+  // Large text: the chip («Пора позвонить») leaves the name a third of the row and would cut the surname;
+  // a name that does not fit next to it takes a second line instead.
+  const { large } = useTextScale();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.calls;
   const chip = attentionChip(student.reminder.state, t);
@@ -64,6 +67,7 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, selected
       <Animated.View style={[styles.glow, glowStyle]} testID={highlighted ? `call-row-highlight-${id}` : undefined} />
       <ListRow
         title={student.studentName}
+        titleLines={large ? 2 : 1}
         subtitle={caption}
         // The teacher's name in front makes a developer's caption a line longer.
         subtitleLines={showTeacher ? 3 : 2}

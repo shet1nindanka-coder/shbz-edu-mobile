@@ -10,7 +10,8 @@ describe('storage fixes, round 3', () => {
     const app = await visit({ as: 'ilya@example.com', url: '/student/theory' });
     // The session ends on the server side (TTL passed, revoked) while the screen is open.
     app.mock.backend.store.sessions.deleteWhere(() => true);
-    expect(await pressTestId(app, 'theory-open-top_linear')).toBe(true);
+    // The row of a topic opens its theory file (a PDF) in the viewer.
+    expect(await pressTestId(app, 'theory-card-top_linear')).toBe(true);
     await app.settle();
     expect(app.path()).toMatch(/^\/login/);
     expect(app.screen.queryByText('Файл не найден или был удалён.')).toBeNull();

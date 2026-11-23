@@ -7,9 +7,9 @@ import { byTestId, hasTestId, pressTestId, tap, visit } from './support/drive';
 import { device, setAppState } from './support/fakes';
 import type { AppHandle } from './support/launch';
 
+// Each launch has its own module registry: the app's modules are required where they are used.
 /* eslint-disable @typescript-eslint/no-require-imports */
 const rn = () => require('react-native') as typeof import('react-native');
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 const locked = { 'shbz-app-device': JSON.stringify({ biometricLock: true }) };
 
@@ -141,10 +141,11 @@ describe('«На главную» from a dead screen inside a tab stack (#411)',
     return state?.routes.find((route) => route.name === tabName)?.state?.routes.map((route) => route.name) ?? [];
   }
 
-  it('a group deleted elsewhere: 404 → «На главную» → the «ещё» tab shows its root again', async () => {
+  // The teacher's «ещё» screen is gone: the groups are a tab of their own, with the group pushed in its stack.
+  it('a group deleted elsewhere: 404 → «На главную» → the «группы» tab shows its root again', async () => {
     const app = await visit({ as: 'teacher@example.com', url: '/teacher' });
     await app.rntl.act(async () => {
-      app.router.navigate('/teacher/more' as never);
+      app.router.navigate('/teacher/groups' as never);
     });
     await app.settle();
     await app.rntl.act(async () => {
@@ -152,7 +153,7 @@ describe('«На главную» from a dead screen inside a tab stack (#411)',
     });
     await app.settle();
     expect(app.path()).toBe('/teacher/groups/grp_empty');
-    expect(tabStack('(more)').length).toBeGreaterThan(1);
+    expect(tabStack('groups').length).toBeGreaterThan(1);
 
     // Deleted on another device; the open detail re-reads and answers 404.
     await serverCall(app, () => app.runtime.api.groups.deleteGroup('grp_empty'));
@@ -166,8 +167,8 @@ describe('«На главную» from a dead screen inside a tab stack (#411)',
     await tap(app, 'button:На главную');
     await app.settle();
     expect(app.path()).toBe('/teacher');
-    // The dead screen is gone from the «ещё» stack: the tab opens on its root.
-    expect(tabStack('(more)')).toHaveLength(1);
+    // The dead screen is gone from the «группы» stack: the tab opens on its root.
+    expect(tabStack('groups')).toHaveLength(1);
     // Android back (`canGoBack() ? goBack() : leave the app`) never leads into the dead screen either.
     if (navRef().canGoBack()) {
       await app.rntl.act(async () => {
@@ -176,12 +177,12 @@ describe('«На главную» from a dead screen inside a tab stack (#411)',
       await app.settle();
     }
     expect(byTestId(app, 'not-found')).toBeNull();
-    await app.rntl.act(async () => {
-      app.router.navigate('/teacher/more' as never);
-    });
+    // The way a teacher gets there: the dock.
+    await tap(app, '#dock-groups');
     await app.settle();
-    expect(app.path()).toBe('/teacher/more');
+    expect(app.path()).toBe('/teacher/groups');
     expect(hasTestId(app, 'not-found')).toBe(false);
+    expect(hasTestId(app, 'groups-list-screen')).toBe(true);
   });
 
   it('the home tab itself above its root still returns to its root', async () => {
@@ -206,21 +207,25 @@ describe('progress-history sheet offline (#404)', () => {
     const app = await visit({ as: 'teacher@example.com', url: '/teacher/students/usr_ilya' });
     await tap(app, '#review-assignment-toggle-hw_ilya_overdue');
     await app.settle();
-    const ids = app.screen
-      .queryAllByTestId(/^review-number-history-/)
-      .map((node) => String(node.props.testID).replace('review-number-history-', ''));
-    let numberId: string | null = null;
-    for (const id of ids) {
-      const page = await serverCall(app, () => app.runtime.api.teacherStudents.getProgressHistory('usr_ilya', id));
+    // The history link is on the card of one number, which the «Все номера» sheet of the homework shows.
+    const homeworks = await serverCall(app, () => app.runtime.api.teacherStudents.getStudentHomeworks('usr_ilya'));
+    const numbers = homeworks.assignments.find((assignment) => assignment.id === 'hw_ilya_overdue')?.numbers ?? [];
+    let target: { homeworkNumberId: string; number: string } | null = null;
+    for (const number of numbers) {
+      const page = await serverCall(app, () => app.runtime.api.teacherStudents.getProgressHistory('usr_ilya', number.homeworkNumberId));
       if (page.nextCursor) {
-        numberId = id;
+        target = number;
         break;
       }
     }
-    expect(numberId).not.toBeNull();
-    await tap(app, `#review-number-history-${numberId}`);
+    expect(target).not.toBeNull();
+    if (!target) return;
+    await tap(app, '#review-all-numbers-hw_ilya_overdue');
+    await tap(app, `#review-numbers-sheet-${target.number}`);
+    await tap(app, `#review-number-history-${target.homeworkNumberId}`);
     await app.advance(1500);
     await app.settle();
+    expect(hasTestId(app, 'progress-history-sheet')).toBe(true);
     const entries = () => app.screen.queryAllByTestId(/^progress-history-entry-/).length;
     expect(entries()).toBe(20);
     expect(hasTestId(app, 'progress-history-offline')).toBe(false);

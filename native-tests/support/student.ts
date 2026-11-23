@@ -17,3 +17,17 @@ export async function showHomeworkNumber(app: AppHandle, number: string): Promis
   }
   if (await tap(app, '#homework-overview-all')) await tap(app, `#homework-overview-sheet-${number}`);
 }
+
+/**
+ * A live lesson shows ONE item card — of the number selected in the strip. Numbers that can be submitted
+ * now and have a tile in the strip, in lesson order (read from the mock server; app time moves 1.5 s).
+ */
+export async function submittableLessonNumbers(app: AppHandle): Promise<string[]> {
+  const pending = app.mock.studentWork.getLiveLesson();
+  await app.advance(1500);
+  const lesson = await pending;
+  return [...(lesson.active?.items ?? [])]
+    .sort((left, right) => left.order - right.order)
+    .filter((item) => item.canSubmit && byTestId(app, `lesson-tile-${item.number}`) !== null)
+    .map((item) => item.number);
+}

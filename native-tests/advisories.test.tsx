@@ -13,7 +13,7 @@ const SCREENS: [PersonaLogin | undefined, string, string[]][] = [
   ['dev@example.com', '/dev-ui', []],
   ['dev@example.com', '/dev-math', []],
   ['ilya@example.com', '/student', []],
-  ['ilya@example.com', '/student/homeworks/hw_ilya_open', ['button:Добавить фото']],
+  ['ilya@example.com', '/student/homeworks/hw_ilya_open', ['#homework-photos-grid-add']],
   ['polina@example.com', '/student/lesson', []],
   ['ilya@example.com', '/student/theory', []],
   ['ilya@example.com', '/student/deadlines', []],

@@ -4,9 +4,15 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { byTestId, tap, visibleText, visit } from './support/drive';
-import { textOf } from './support/tree';
+import { textOf, type HostNode } from './support/tree';
 
 const ANNA = 'teacher@example.com';
+
+/** Whether `node` is rendered inside `ancestor`. */
+function within(ancestor: HostNode, node: HostNode): boolean {
+  for (let current: HostNode | null = node; current; current = current.parent) if (current === ancestor) return true;
+  return false;
+}
 
 describe('lesson board «add a problem»: the fallback topic is pinned once the pinned one is deleted (#414)', () => {
   it('deleting the shown topic, then reordering, keeps the fallback topic and the picked number', async () => {
@@ -58,20 +64,41 @@ describe('lesson board «add a problem»: the fallback topic is pinned once the 
   });
 });
 
-describe('live lesson board: the date and the duration are in the body (#417)', () => {
-  it('ru: the kicker line with «90 мин» is shown below the app bar', async () => {
+describe('lesson board: when the lesson is and how long it lasts are in the body (#417)', () => {
+  // The caption line of the board (the site's page kicker) is in the content, above the class. While the
+  // lesson runs it says how long it still lasts (mockup «11А · осталось 52 минуты»); before and after —
+  // the date and the duration.
+  it('ru, live: the line with the minutes left is shown below the app bar', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/lessons/les_live' });
     const kicker = byTestId(app, 'lesson-board-kicker');
     expect(kicker).toBeTruthy();
-    expect(textOf(kicker!)).toMatch(/^8А — алгебра · \d{2}\.\d{2}\.\d{4}, \d{2}:\d{2} · 90 мин$/);
+    expect(textOf(kicker!)).toMatch(/^8А — алгебра · Идёт · осталось \d+ мин$/);
     expect(visibleText(app)).toContain(textOf(kicker!));
+    // Not a part of the header, whose one-line title would cut it.
+    expect(byTestId(app, 'lesson-board-app-bar')).toBeTruthy();
+    expect(within(byTestId(app, 'lesson-board-app-bar')!, kicker!)).toBe(false);
   });
 
-  it('en: the same line in English', async () => {
+  it('en, live: the same line in English', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/lessons/les_live', locale: 'en' });
     const kicker = byTestId(app, 'lesson-board-kicker');
     expect(kicker).toBeTruthy();
-    expect(textOf(kicker!)).toMatch(/ · 90 min$/);
+    expect(textOf(kicker!)).toMatch(/ · In progress · \d+ min left$/);
+  });
+
+  it('a lesson that is not running: the date and the duration', async () => {
+    const app = await visit({ as: ANNA, url: '/teacher/lessons' });
+    const pending = app.mock.planner.listLessons();
+    await app.advance(1500);
+    const lesson = (await pending).lessons.find((row) => row.status !== 'ACTIVE' && row.startsAt !== null);
+    expect(lesson).toBeDefined();
+    if (!lesson) return;
+    await app.open(`/teacher/lessons/${lesson.id}`);
+    const kicker = byTestId(app, 'lesson-board-kicker');
+    expect(kicker).toBeTruthy();
+    expect(textOf(kicker!)).toMatch(new RegExp(`^(.+ · )?\\d{2}\\.\\d{2}\\.\\d{4}, \\d{2}:\\d{2} · ${lesson.durationMinutes} мин · (Запланирован|Завершён)$`));
+    expect(visibleText(app)).toContain(textOf(kicker!));
+    expect(within(byTestId(app, 'lesson-board-app-bar')!, kicker!)).toBe(false);
   });
 });
 

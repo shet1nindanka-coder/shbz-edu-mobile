@@ -50,13 +50,14 @@ describe('group rename answered 404 (#104)', () => {
 });
 
 describe('a cool-down keeps its reason on screen for as long as the control is locked (#105)', () => {
-  it('lesson board: a refused result mark explains the locked traffic lights of every open card', async () => {
+  it('lesson board: a refused result mark explains the locked result buttons of every student', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/lessons/les_live' });
     const board = await call(app, () => app.mock.planner.getLessonBoard('les_live'));
     const [first, second] = board.participants.filter((participant) => participant.items.length > 0);
     expect(first && second).toBeTruthy();
+    // One student's numbers are open at a time (a sheet); the result buttons are those of the picked tile.
     await tap(app, `#lesson-participant-toggle-${first.id}`);
-    await tap(app, `#lesson-participant-toggle-${second.id}`);
+    await tap(app, `#lesson-tile-${first.items[0].id}`);
     expect(hasTestId(app, `lesson-result-wait-${first.id}`)).toBe(false);
 
     arm(app, 'planner.setItemResult', 'rateLimited');
@@ -65,15 +66,26 @@ describe('a cool-down keeps its reason on screen for as long as the control is l
     await app.rntl.fireEvent.press(option);
     await app.settle();
 
-    // Both open cards are locked, and both say until when — no notice is involved at all.
+    // The open student's buttons are locked and say until when — no notice is involved at all.
     expect(hasTestId(app, `lesson-result-wait-${first.id}`)).toBe(true);
+    expect(isDisabled(app.rntl.within(group).getAllByRole('radio')[0])).toBe(true);
+    expect(hasTestId(app, 'lesson-sheet-notice')).toBe(false);
+    expect(waitLines(app)).toBe(1);
+
+    // The lock is the board's: the next student's sheet has the same locked buttons and the same reason.
+    await tap(app, 'button:Закрыть');
+    await app.settle();
+    await tap(app, `#lesson-participant-toggle-${second.id}`);
+    await tap(app, `#lesson-tile-${second.items[0].id}`);
     expect(hasTestId(app, `lesson-result-wait-${second.id}`)).toBe(true);
     expect(isDisabled(app.rntl.within(app.screen.getByTestId(`lesson-item-result-${second.items[0].id}`)).getAllByRole('radio')[0])).toBe(true);
+    expect(waitLines(app)).toBe(1);
     // The header line is for the plan, set and lesson buckets: the result wait is not repeated there.
     expect(hasTestId(app, 'lesson-wait')).toBe(false);
+    expect(hasTestId(app, 'lesson-notice')).toBe(false);
 
     await wait(app, 61_000, 'lesson board: after the wait');
-    expect(hasTestId(app, `lesson-result-wait-${first.id}`)).toBe(false);
+    expect(hasTestId(app, `lesson-result-wait-${second.id}`)).toBe(false);
   });
 
   it('lesson board: dismissing the error notice keeps the countdown of the locked lesson actions', async () => {
@@ -165,18 +177,30 @@ describe('add-a-problem sheets on an empty topic (#110)', () => {
   });
 });
 
+/** A tablet window: the lessons list shows the tapped lesson, with its actions, in the panel next to it. */
+const asTablet = () => {
+  const { Dimensions } = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
+  const window = { width: 1024, height: 768, scale: 2, fontScale: 1 };
+  Dimensions.set({ window, screen: window });
+};
+
 describe('deleting a lesson from the list (#117)', () => {
+  // A phone list has no row actions any more (the delete lives on the board); a tablet keeps the delete
+  // next to the list, in the panel of the selected lesson.
   it('refreshes the group attendance table and statistics, like the board delete', async () => {
-    const app = await visit({ as: ANNA, url: '/teacher/lessons' });
+    const app = await visit({ as: ANNA, url: '/teacher/lessons', arrange: asTablet });
     const invalidate = jest.spyOn(app.queryClient, 'invalidateQueries');
-    const more = app.screen.queryAllByTestId(/^lesson-more-/)[0];
-    expect(more).toBeDefined();
-    await app.rntl.fireEvent.press(more);
+    const remove = jest.spyOn(app.runtime.api.planner, 'deleteLesson');
+    const row = app.screen.queryAllByTestId(/^lesson-open-/)[0];
+    expect(row).toBeDefined();
+    await app.rntl.fireEvent.press(row);
     await app.settle();
-    await tap(app, '#lesson-menu-delete');
+    await tap(app, '#lesson-detail-delete');
     await app.settle();
     await tap(app, 'button:Да, удалить');
     await app.settle();
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(app.path()).toBe('/teacher/lessons');
     const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify((filters as { queryKey?: unknown } | undefined)?.queryKey));
     expect(keys).toEqual(expect.arrayContaining([JSON.stringify(['groups', 'getGroupAttendance']), JSON.stringify(['groups', 'getGroupStatistics'])]));
   });
@@ -290,7 +314,7 @@ describe('new lesson: the back gesture on the form picked from the chooser (#135
     // Android has no swipe-back: the native stack keeps the gesture off on every screen there.
     if (Platform.OS === 'ios') expect(gestureOffCount()).toBe(atChooser + 1);
     // The app bar arrow goes back to the chooser, inside the same route.
-    await tap(app, 'button:Вернуться назад');
+    await tap(app, '#lesson-new-app-bar-back');
     expect(app.path()).toBe('/teacher/lessons/new');
     expect(hasTestId(app, 'lesson-targets-list')).toBe(true);
     expect(gestureOffCount()).toBe(atChooser);

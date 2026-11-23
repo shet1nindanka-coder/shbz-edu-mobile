@@ -4,7 +4,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 import { byTestId, fill, hasTestId, locate, tap, visibleText, visit } from './support/drive';
 import type { AppHandle } from './support/launch';
-import { all, flattenStyle, type HostNode } from './support/tree';
+import { all, pressables, textOf, type HostNode } from './support/tree';
 
 const ANNA = 'teacher@example.com';
 const DEV = 'dev@example.com';
@@ -39,8 +39,23 @@ function nestedInAccessible(app: AppHandle, testID: string): boolean {
   return nested;
 }
 
+/** The texts the eye reads inside a row, in order (an avatar's initials are decoration, hidden from readers). */
+function textsOf(row: HostNode): string[] {
+  return all(row, (node) => node.type === 'Text' && node.children.some((child) => typeof child === 'string') && !hiddenFromReaders(node, row))
+    .map((node) => textOf(node).trim())
+    .filter((text) => text !== '');
+}
+
+function hiddenFromReaders(node: HostNode, within: HostNode): boolean {
+  for (let current: HostNode | null = node; current && current !== within; current = current.parent) {
+    const important = current.props.importantForAccessibility;
+    if (important === 'no' || important === 'no-hide-descendants' || current.props.accessibilityElementsHidden === true) return true;
+  }
+  return false;
+}
+
 const withFontScale = (fontScale: number) => () => {
-  const { Dimensions } = require('react-native') as typeof import('react-native');
+  const { Dimensions } = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
   const window = { width: 390, height: 844, scale: 3, fontScale };
   Dimensions.set({ window, screen: window });
 };
@@ -96,6 +111,8 @@ describe('group reports (#215, #225, #244)', () => {
     await tap(app, 'tab:Посещаемость');
     await app.settle();
     fakeReport(app, 2500);
+    // The three periods are folded behind the «PDF» button: a sheet of rows.
+    await tap(app, '#group-attendance-pdf');
     await app.rntl.fireEvent.press(app.screen.getByTestId('group-attendance-pdf-7d'));
     await app.advance(200);
     await app.rntl.act(async () => {
@@ -120,6 +137,7 @@ describe('group reports (#215, #225, #244)', () => {
     await tap(app, 'tab:Attendance');
     await app.settle();
     fakeReport(app, 500);
+    await tap(app, '#group-attendance-pdf');
     await app.rntl.fireEvent.press(app.screen.getByTestId('group-attendance-pdf-30d'));
     await app.advance(600);
     await app.settle();
@@ -172,6 +190,8 @@ describe('lesson board: an optimistic result mark is not switched off by an olde
     const radios = (itemId: string) => app.rntl.within(app.screen.getByTestId(`lesson-item-result-${itemId}`)).getAllByRole('radio');
     const selected = (itemId: string) => radios(itemId).some((radio) => (radio.props.accessibilityState as { checked?: boolean } | undefined)?.checked === true);
     const [first, second] = participant.items;
+    // The student's sheet shows the result buttons of ONE number: the tile picks it.
+    await tap(app, `#lesson-tile-${first.id}`);
     await app.rntl.fireEvent.press(radios(first.id)[0]);
     await app.settle();
     // A board read that left before the second mark (the realtime refresh of the first one, the live poll)
@@ -180,6 +200,7 @@ describe('lesson board: an optimistic result mark is not switched off by an olde
       void app.queryClient.invalidateQueries({ queryKey: ['planner', 'getLessonBoard', 'les_live'] });
     });
     await app.advance(100);
+    await app.rntl.fireEvent.press(app.screen.getByTestId(`lesson-tile-${second.id}`));
     await app.rntl.fireEvent.press(radios(second.id)[0]);
     await app.advance(10);
     for (let step = 0; step < 60; step += 1) {
@@ -237,21 +258,35 @@ describe('group AI profile: a refused speed save followed by a saved one (#223)'
 });
 
 describe('screen readers reach the planner cards and hear their signals (#236)', () => {
-  it('lesson list: the «⋯» is its own control and the status chips are spoken', async () => {
+  it('lesson list: a row is one control and speaks what the eye reads on it, the attention label included', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/lessons' });
-    const mores = app.screen.queryAllByTestId(/^lesson-more-/);
-    expect(mores.length).toBeGreaterThan(0);
-    for (const more of mores) expect(nestedInAccessible(app, String(more.props.testID))).toBe(false);
-    const label = labelOf(app, 'lesson-open-les_ai_off');
-    expect(label).toContain('Запланирован');
-    expect(label).toMatch(/ошибок: \d/);
+    // The rows have no «⋯» any more: the whole row is pressed and nothing inside it is a control of its own.
+    const rows = app.screen.queryAllByTestId(/^lesson-open-/) as unknown as HostNode[];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.props.accessibilityRole).toBe('button');
+      expect(pressables(row).filter((node) => node !== row)).toEqual([]);
+      expect(nestedInAccessible(app, String(row.props.testID))).toBe(false);
+      const label = String(row.props.accessibilityLabel);
+      for (const text of textsOf(row)) expect(label).toContain(text);
+    }
+    // The label that asks for the teacher (plans that failed) is spoken.
+    expect(labelOf(app, 'lesson-open-les_ai_off')).toMatch(/ошибок: \d/);
   });
 
-  it('live board: the participant header speaks submitted, idle and presence', async () => {
+  it('live board: a participant row speaks its state — presence or idle time — and the solved count', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/lessons/les_live' });
+    const row = byTestId(app, 'lesson-participant-toggle-lp_les_live_kirill');
+    expect(row).toBeTruthy();
+    if (!row) return;
     const label = labelOf(app, 'lesson-participant-toggle-lp_les_live_kirill');
-    expect(label).toContain('сдано');
-    expect(label).toMatch(/ещё не открыл урок|в классе с/);
+    // One caption per row now: what the student is at; «2/7» on the right is spoken in words.
+    expect(label).toMatch(/ещё не открыл урок|в классе с|нет сдач/);
+    const [name, caption, count] = textsOf(row);
+    expect(label).toContain(name);
+    expect(label).toContain(caption);
+    expect(count).toMatch(/^\d+\/\d+$/);
+    expect(label).toContain(count.replace('/', ' из '));
   });
 
   it('drafts: the card and a failed participant speak their chips', async () => {
@@ -263,17 +298,27 @@ describe('screen readers reach the planner cards and hear their signals (#236)',
 });
 
 describe('parent-call rows at a large text size (#240)', () => {
-  it('the reminder chip moves under a long name instead of cutting it', async () => {
+  // A row is a `ListRow` now: the name and one caption on the left, the «пора позвонить» chip — only on the
+  // rows that need a call — on the right. The chip cannot move under the name any more; a long name next
+  // to it takes a second line at a large text size instead of being cut.
+  const names = (app: AppHandle) =>
+    (app.screen.queryAllByTestId(/^call-record-usr_/) as unknown as HostNode[]).map((row) => {
+      const title = all(row, (node) => node.type === 'Text' && node.children.some((child) => typeof child === 'string') && !hiddenFromReaders(node, row))[0];
+      expect(title).toBeDefined();
+      return title;
+    });
+
+  it('a long name wraps to a second line instead of being cut by the reminder chip', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/calls', arrange: withFontScale(1.3) });
-    const heads = all(app.screen.container as unknown as HostNode, (node) => typeof node.props.testID === 'string' && /^call-row-head-/.test(node.props.testID));
-    expect(heads.length).toBeGreaterThan(0);
-    for (const head of heads) expect(flattenStyle(head.props.style).flexWrap).toBe('wrap');
+    const titles = names(app);
+    expect(titles.length).toBeGreaterThan(0);
+    for (const title of titles) expect(title?.props.numberOfLines).toBe(2);
   });
 
-  it('keeps the one-line head at the default size', async () => {
+  it('keeps the one-line name at the default size', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/calls', arrange: withFontScale(1) });
-    const head = all(app.screen.container as unknown as HostNode, (node) => typeof node.props.testID === 'string' && /^call-row-head-/.test(node.props.testID))[0];
-    expect(head).toBeDefined();
-    expect(flattenStyle(head?.props.style).flexWrap).toBeUndefined();
+    const titles = names(app);
+    expect(titles.length).toBeGreaterThan(0);
+    for (const title of titles) expect(title?.props.numberOfLines).toBe(1);
   });
 });

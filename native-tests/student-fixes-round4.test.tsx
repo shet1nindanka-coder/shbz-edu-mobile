@@ -11,6 +11,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { byTestId, tap, visibleText, visit } from './support/drive';
 import { device } from './support/fakes';
 import type { AppHandle } from './support/launch';
+import { submittableLessonNumbers } from './support/student';
 import type { HostNode } from './support/tree';
 
 jest.mock('expo-image-manipulator', () => ({
@@ -49,7 +50,7 @@ function holdAnswers(app: Pick<AppHandle, 'runtime'>, method: string, holder: Ho
 }
 
 function spyAnnouncements(): () => string[] {
-  const RN = require('react-native') as typeof import('react-native');
+  const RN = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
   const plain = jest.spyOn(RN.AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
   const queued = jest.spyOn(RN.AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
   plain.mockClear();
@@ -59,6 +60,27 @@ function spyAnnouncements(): () => string[] {
 
 function textIn(node: HostNode | null): string {
   return node ? visibleText({ screen: { container: node } } as never).replace(/\s+/g, ' ') : '';
+}
+
+/** The live lesson shows one item card: the card of `number` is brought on screen by its tile in the strip. */
+async function showLessonNumber(app: AppHandle, number: string): Promise<void> {
+  const tile = byTestId(app, `lesson-tile-${number}`);
+  expect(tile).not.toBeNull();
+  await app.rntl.act(async () => {
+    app.rntl.fireEvent.press(tile as never);
+  });
+  await app.settle();
+  expect(byTestId(app, `lesson-item-${number}`)).not.toBeNull();
+}
+
+/**
+ * «Выбрать из галереи» for a lesson item, until the shot is on the preview sheet: on iOS the app waits about
+ * a second of app time for the source sheet and the system picker to leave, longer than `settle` watches.
+ */
+async function pickForLesson(app: AppHandle): Promise<void> {
+  await tap(app, '#photo-source-library');
+  for (let step = 0; step < 8 && byTestId(app, 'lesson-preview-send') === null; step += 1) await app.advance(250);
+  await app.settle();
 }
 
 async function server<T>(app: AppHandle, request: () => Promise<T>): Promise<T> {
@@ -109,7 +131,7 @@ describe('homework check (#305, #341)', () => {
     const onServer = await server(app, () => app.mock.studentWork.getHomework('hw_ilya_open'));
     expect(onServer.assignment.photos.length).toBe(1);
     expect(onServer.assignment.latestCheck?.status).toBe('DONE');
-    expect(textIn(byTestId(app, 'homework-photos'))).toContain('1 / 10');
+    expect(textIn(byTestId(app, 'homework-photos'))).toContain('1 из 10');
     expect(byTestId(app, 'homework-check-running')).toBeNull();
   });
 });
@@ -117,6 +139,7 @@ describe('homework check (#305, #341)', () => {
 describe('live lesson (#330, #342)', () => {
   it('the verdict of a submission the student is waiting for is spoken once', async () => {
     const app = await visit({ as: 'polina@example.com', url: '/student/lesson' });
+    await showLessonNumber(app, '010208');
     const spoken = spyAnnouncements();
     expect(textIn(byTestId(app, 'lesson-item-010208'))).toContain('Проверяется');
     for (let step = 0; step < 60 && /Проверяется/.test(textIn(byTestId(app, 'lesson-item-010208'))); step += 1) {
@@ -139,23 +162,21 @@ describe('live lesson (#330, #342)', () => {
       url: '/student/lesson',
       arrange: (handle) => holdAnswers(handle, 'getLiveLessonState', holder),
     });
-    const numbers = app.screen
-      .queryAllByRole('button')
-      .map((node) => String(node.props.testID))
-      .filter((id) => /^lesson-submit-(?!error|wait)/.test(id))
-      .map((id) => id.replace('lesson-submit-', ''));
-    const [first, second] = numbers;
+    const [first, second] = await submittableLessonNumbers(app);
     expect(second).toBeDefined();
 
     device().picker.nextAssets = [photo(1)];
+    await showLessonNumber(app, first);
     await tap(app, `#lesson-submit-${first}`);
-    await tap(app, '#photo-source-library');
+    await pickForLesson(app);
     await tap(app, '#lesson-preview-send');
     await app.advance(1500);
 
     device().picker.nextAssets = [photo(2)];
+    await showLessonNumber(app, second);
+    const remarkBefore = textIn(byTestId(app, `lesson-comment-${second}`));
     await tap(app, `#lesson-submit-${second}`);
-    await tap(app, '#photo-source-library');
+    await pickForLesson(app);
     expect(byTestId(app, 'lesson-preview-send')).not.toBeNull();
     // A poll leaves and is held 6 s; meanwhile the student sends the second item.
     holder.delayMs = 6000;
@@ -177,10 +198,18 @@ describe('live lesson (#330, #342)', () => {
     const latest = await server(app, () => app.mock.studentWork.getLiveLesson());
     const item = latest.active?.items.find((entry) => entry.number === second);
     expect(item?.submission?.status === 'DONE' || item?.submission?.status === 'FAILED').toBe(true);
-    const { formatClockTime } = require('../src/domain/dates') as typeof import('../src/domain/dates');
+    const { formatClockTime } = require('../src/domain/dates') as typeof import('../src/domain/dates'); // eslint-disable-line @typescript-eslint/no-require-imports
     const card = textIn(byTestId(app, `lesson-item-${second}`));
     expect(card).not.toContain('Проверяется');
-    expect(card).toContain(formatClockTime(item?.submission?.submittedAt ?? '', 'ru'));
+    // The card shows the NEW submission. Its one caption is the outcome when there is one — then the
+    // check's remark is under the statement — and the time the solution was sent otherwise.
+    const submission = item?.submission;
+    const outcome = Boolean(item?.result) || (submission?.status === 'DONE' && Boolean(submission.verdict));
+    if (!outcome) expect(card).toContain(formatClockTime(submission?.submittedAt ?? '', 'ru'));
+    if (submission?.status === 'DONE' && submission.comment) {
+      expect(card).toContain(submission.comment);
+      expect(submission.comment).not.toBe(remarkBefore);
+    }
   });
 });
 

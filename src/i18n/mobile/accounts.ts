@@ -36,7 +36,8 @@ const en: typeof ru = {
     changed: "changed"
   },
   create: {
-    short: "Add",
+    // Part of the accessible name «New account» (WCAG 2.5.3): voice control finds the button by what it shows.
+    short: "New",
     onceHint: "Once the account is created, its login and password are shown one time — copy them and pass them on."
   },
   search: {

@@ -30,7 +30,7 @@ const speedOf = (app: AppHandle) =>
 const noteOf = (app: AppHandle) => String(byTestId(app, 'member-note-usr_artem')?.props.value ?? '');
 const occurrences = (text: string, part: string) => text.split(part).length - 1;
 
-/** Opens grp_8a with Artem's editor open and a slow server. */
+/** Opens grp_8a with Artem's sheet (the AI-profile editor is in it) open and a slow server. */
 async function openEditor(): Promise<AppHandle> {
   const app = await visit({ as: ANNA, url: '/teacher/groups/grp_8a' });
   await tap(app, '#member-ai-toggle-usr_artem');
@@ -48,9 +48,23 @@ async function typeAndCommit(app: AppHandle, text: string): Promise<void> {
   await app.advance(100);
 }
 
-async function toggle(app: AppHandle): Promise<void> {
+/**
+ * Closes the member sheet with its «Закрыть» button and lets it slide away: the editor leaves the screen
+ * with the sheet (what folding the member card used to do), without waiting for a request in flight.
+ */
+async function closeEditor(app: AppHandle): Promise<void> {
+  const sheet = app.screen.getByTestId('member-sheet');
+  await app.rntl.fireEvent.press(app.rntl.within(sheet).getByRole('button', { name: 'Закрыть' }));
+  for (let waited = 0; waited < 300 && hasTestId(app, 'member-sheet'); waited += 50) await app.advance(50);
+  expect(hasTestId(app, 'member-sheet')).toBe(false);
+  expect(hasTestId(app, 'member-note-usr_artem')).toBe(false);
+}
+
+/** Opens the member sheet again from the member's row: a new editor of the same student. */
+async function reopenEditor(app: AppHandle): Promise<void> {
   await app.rntl.fireEvent.press(app.screen.getByTestId('member-ai-toggle-usr_artem'));
-  await app.advance(100);
+  await app.advance(50);
+  expect(hasTestId(app, 'member-note-usr_artem')).toBe(true);
 }
 
 async function pickSpeed(app: AppHandle, label: string): Promise<void> {
@@ -60,20 +74,23 @@ async function pickSpeed(app: AppHandle, label: string): Promise<void> {
   await app.advance(100);
 }
 
-describe('group AI profile: a save still running when the editor folds (#326)', () => {
-  it('a refused note is reported on the screen once, and the folded card shows what the server holds', async () => {
+describe('group AI profile: a save still running when the editor closes (#326)', () => {
+  it('a refused note is reported on the screen once, and the reopened editor shows what the server holds', async () => {
     const app = await openEditor();
     arm(app, 'groups.setStudentAiProfile', 'serviceUnavailable');
     await typeAndCommit(app, NEW_NOTE);
-    await toggle(app);
-    expect(hasTestId(app, 'member-note-usr_artem')).toBe(false);
+    await closeEditor(app);
     await app.settle(20_000);
 
     expect((await storedArtem(app))?.aiNote).toBe(OLD_NOTE);
+    // The editor is gone: the group screen itself says why the note was not saved.
+    expect(hasTestId(app, 'group-notice')).toBe(true);
     const text = visibleText(app);
     expect(occurrences(text, REFUSED)).toBe(1);
-    expect(text).toContain(OLD_NOTE);
     expect(text).not.toContain(NEW_NOTE);
+    await reopenEditor(app);
+    expect(noteOf(app)).toBe(OLD_NOTE);
+    expect(occurrences(visibleText(app), REFUSED)).toBe(1);
   });
 
   it('a refused speed pick is reported on the screen and the reopened select shows the stored speed', async () => {
@@ -81,23 +98,40 @@ describe('group AI profile: a save still running when the editor folds (#326)', 
     expect(speedOf(app)).toBe('8 из 10');
     arm(app, 'groups.setStudentAiProfile', 'serviceUnavailable');
     await pickSpeed(app, '5 из 10');
-    await toggle(app);
+    await closeEditor(app);
     await app.settle(20_000);
 
     expect((await storedArtem(app))?.speed).toBe(8);
+    expect(hasTestId(app, 'group-notice')).toBe(true);
     expect(occurrences(visibleText(app), REFUSED)).toBe(1);
-    await toggle(app);
+    await reopenEditor(app);
     expect(speedOf(app)).toBe('8 из 10');
   });
 
-  it('a saved note folds into the card without a message', async () => {
+  it('a saved note is in the reopened editor, without a message', async () => {
     const app = await openEditor();
     await typeAndCommit(app, NEW_NOTE);
-    await toggle(app);
+    await closeEditor(app);
     await app.settle(20_000);
     expect((await storedArtem(app))?.aiNote).toBe(NEW_NOTE);
-    expect(visibleText(app)).toContain(NEW_NOTE);
     expect(visibleText(app)).not.toContain(REFUSED);
+    expect(hasTestId(app, 'group-notice')).toBe(false);
+    await reopenEditor(app);
+    expect(noteOf(app)).toBe(NEW_NOTE);
+    expect(visibleText(app)).not.toContain(REFUSED);
+  });
+
+  it('a note still being typed when the sheet closes is sent without the editor', async () => {
+    const app = await openEditor();
+    const field = app.screen.getByTestId('member-note-usr_artem');
+    await app.rntl.fireEvent(field, 'focus', { nativeEvent: {} });
+    await app.rntl.fireEvent.changeText(field, NEW_NOTE);
+    // No blur and no «Done»: a removed input never reports them.
+    await closeEditor(app);
+    await app.settle(20_000);
+    expect((await storedArtem(app))?.aiNote).toBe(NEW_NOTE);
+    await reopenEditor(app);
+    expect(noteOf(app)).toBe(NEW_NOTE);
   });
 
   it('a refusal while the editor stays open is shown in the editor only', async () => {
@@ -106,6 +140,7 @@ describe('group AI profile: a save still running when the editor folds (#326)', 
     await typeAndCommit(app, NEW_NOTE);
     await app.settle(20_000);
     expect(hasTestId(app, 'member-ai-error-usr_artem')).toBe(true);
+    expect(hasTestId(app, 'group-notice')).toBe(false);
     expect(occurrences(visibleText(app), REFUSED)).toBe(1);
     // The typed note stays for another try.
     expect(noteOf(app)).toBe(NEW_NOTE);
@@ -116,8 +151,8 @@ describe('group AI profile: the editor reopened while a save runs (#327)', () =>
   it('starts from the note being sent, and a later speed pick keeps it', async () => {
     const app = await openEditor();
     await typeAndCommit(app, NEW_NOTE);
-    await toggle(app);
-    await toggle(app);
+    await closeEditor(app);
+    await reopenEditor(app);
     expect(noteOf(app)).toBe(NEW_NOTE);
     await app.settle(20_000);
     expect(noteOf(app)).toBe(NEW_NOTE);
@@ -135,8 +170,8 @@ describe('group AI profile: the editor reopened while a save runs (#327)', () =>
     const app = await openEditor();
     arm(app, 'groups.setStudentAiProfile', 'serviceUnavailable');
     await typeAndCommit(app, NEW_NOTE);
-    await toggle(app);
-    await toggle(app);
+    await closeEditor(app);
+    await reopenEditor(app);
     expect(noteOf(app)).toBe(NEW_NOTE);
     await app.settle(20_000);
 
@@ -155,8 +190,8 @@ describe('group AI profile: the editor reopened while a save runs (#327)', () =>
   it('a note typed in the reopened editor is not replaced when the earlier save lands', async () => {
     const app = await openEditor();
     await typeAndCommit(app, NEW_NOTE);
-    await toggle(app);
-    await toggle(app);
+    await closeEditor(app);
+    await reopenEditor(app);
     const field = app.screen.getByTestId('member-note-usr_artem');
     await app.rntl.fireEvent(field, 'focus', { nativeEvent: {} });
     await app.rntl.fireEvent.changeText(field, 'Третья заметка');
@@ -181,8 +216,8 @@ describe('group AI profile: a group read in flight when a save starts (#327, rev
     await pickSpeed(app, '5 из 10');
     // The older read would have landed by now; the save has not.
     await app.advance(2000);
-    await toggle(app);
-    await toggle(app);
+    await closeEditor(app);
+    await reopenEditor(app);
     expect(noteOf(app)).toBe(NEW_NOTE);
     expect(speedOf(app)).toBe('5 из 10');
     await pickSpeed(app, '6 из 10');
@@ -332,6 +367,8 @@ describe('lesson board: what a screen reader hears (#328, #332)', () => {
     await tap(app, `#lesson-participant-toggle-${participant.id}`);
     const item = participant.items.find((row) => (row.submission?.photoFileIds.length ?? 0) > 0);
     if (!item?.submission) return;
+    // The student's sheet shows ONE number — its card and its result buttons: the tile picks it.
+    await tap(app, `#lesson-tile-${item.id}`);
     const sign = `№ ${item.number}`;
     const group = app.screen.getByTestId(`lesson-item-result-${item.id}`);
     expect(group.props.accessibilityLabel).toBe(`Итог урока, ${sign}`);
@@ -409,17 +446,49 @@ describe('weekly lessons chart (#337)', () => {
   });
 });
 
-describe('calls: the history button (#339)', () => {
-  it('its accessible name starts with the visible label and its count', async () => {
+describe('calls: the row that opens the history (#339)', () => {
+  /** The texts the eye reads on a row (the avatar's initials are decoration, hidden from readers). */
+  const shownOn = (row: HostNode) =>
+    all(
+      row,
+      (node) => node.type === 'Text' && node.children.some((child) => typeof child === 'string') && node.props.accessibilityElementsHidden !== true,
+    ).map((node) => textOfNode(node).trim());
+
+  it('teacher: the row is one control — it says what a press opens and holds what the eye reads', async () => {
+    // The «История (N)» button is gone: the history is in the sheet the row opens, under the form.
     const app = await visit({ as: ANNA, url: '/teacher/calls' });
     await app.settle();
     const overview = await call(app, () => app.mock.groups.getParentCallsOverview());
     const student = overview.students.find((row) => row.totalCalls > 0);
     expect(student).toBeDefined();
     if (!student) return;
-    expect(byTestId(app, `call-history-${student.studentId}`)?.props.accessibilityLabel).toBe(
-      `История (${student.totalCalls}) — звонки родителям: ${student.studentName}`,
+    expect(hasTestId(app, `call-history-${student.studentId}`)).toBe(false);
+    const row = byTestId(app, `call-record-${student.studentId}`);
+    expect(row).toBeTruthy();
+    if (!row) return;
+    const label = String(row.props.accessibilityLabel);
+    expect(label.startsWith(`Записать звонок: ${student.studentName}`)).toBe(true);
+    const shown = shownOn(row);
+    expect(shown[0]).toBe(student.studentName);
+    expect(shown.length).toBeGreaterThan(1);
+    for (const text of shown) expect(label).toContain(text);
+
+    await tap(app, `#call-record-${student.studentId}`);
+    expect(hasTestId(app, 'call-record-sheet')).toBe(true);
+    expect(all(rootOf(app), (node) => typeof node.props.testID === 'string' && /^call-history-entry-/.test(node.props.testID))).toHaveLength(
+      Math.min(student.totalCalls, student.history.length),
     );
+  });
+
+  it('read-only viewer: the accessible name of the row starts with «История» and its count', async () => {
+    const app = await visit({ as: 'dev@example.com', url: '/developer/calls' });
+    await app.settle();
+    const overview = await call(app, () => app.mock.groups.getParentCallsOverview());
+    const student = overview.students.find((row) => row.totalCalls > 0);
+    expect(student).toBeDefined();
+    if (!student) return;
+    const label = String(byTestId(app, `call-history-${student.studentId}`)?.props.accessibilityLabel);
+    expect(label.startsWith(`История (${student.totalCalls}) — звонки родителям: ${student.studentName}`)).toBe(true);
   });
 });
 

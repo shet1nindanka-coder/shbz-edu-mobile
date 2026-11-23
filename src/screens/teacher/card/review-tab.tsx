@@ -212,6 +212,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
     waitSeconds: review.wait.seconds,
     error: review.assignmentErrors[assignment.id],
     accepting: review.acceptingId === assignment.id,
+    sheetNumberId: numbersFor?.assignmentId === assignment.id ? numbersFor.numberId : null,
     onDismissError: () => review.dismissAssignmentError(assignment.id),
     onStatus: review.setStatus,
     onAccept: () => review.acceptVerdicts(assignment),
@@ -256,8 +257,9 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
         keyExtractor={(row) => row.key}
         getItemType={(row) => row.kind}
         renderItem={renderRow}
-        // Everything a card shows besides its homework: expansion, lesson mode, the clock and the request states.
-        extraData={[expandedIds, lessonMode, now, flashId, review.savingIds, review.numberErrors, review.assignmentErrors, review.wait.seconds, review.acceptingId]}
+        // Everything a card shows besides its homework: expansion, lesson mode, the clock, the request states
+        // and the number whose sheet is open.
+        extraData={[expandedIds, lessonMode, now, flashId, review.savingIds, review.numberErrors, review.assignmentErrors, review.wait.seconds, review.acceptingId, numbersFor]}
         ListHeaderComponent={
           <View style={styles.header}>
             {notices}

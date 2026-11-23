@@ -399,14 +399,16 @@ describe('font scale and fixed rows (#239)', () => {
     Dimensions.set({ window, screen: window });
   };
 
-  it.each([
-    [1, 'Системная'],
-    [1.2, 'Авто'],
-    [1.3, 'Авто'],
-  ] as const)('the Theme control at font scale %s says «%s»', async (fontScale, expected) => {
+  // The Theme control sits on the right of its row now, next to the label «Тема»: there is no room for
+  // «Системная» at any text size, so the segment always carries the site's short name — the long one is
+  // never drawn in the fixed row (it was cut at 1.2). A screen reader still hears the full name.
+  it.each([1, 1.2, 1.3] as const)('the Theme control at font scale %s says «Авто», never a cut «Системная»', async (fontScale) => {
     const app = await visit({ as: 'ilya@example.com', url: '/settings', arrange: withFontScale(fontScale) });
     const theme = byTestId(app, 'settings-theme');
     expect(theme).toBeTruthy();
-    expect(textOf(theme!)).toContain(expected);
+    expect(textOf(theme!)).toContain('Авто');
+    expect(textOf(theme!)).not.toContain('Системная');
+    const system = all(theme!, (node) => node.props.accessibilityRole === 'radio' && textOf(node) === 'Авто')[0];
+    expect(system?.props.accessibilityLabel).toBe('Системная');
   });
 });

@@ -8,6 +8,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import type { ReactElement, ReactNode } from 'react';
 
 import { byTestId, fill, tap, visit } from './support/drive';
+import { showHomeworkNumber } from './support/student';
 import { all, type HostNode } from './support/tree';
 
 const INSETS = { top: 47, right: 0, bottom: 34, left: 0 };
@@ -51,6 +52,8 @@ describe('note save refused with a wait, device clock set back (#315 review)', (
     ['homework card', '/student/homeworks/hw_ilya_overdue', '#number-note-120', 'number-note-retry-120', 'number-note-wait-120'],
   ])('%s: «Повторить» appears when the wait is over and really sends', async (_name, url, input, retryId, waitId) => {
     const app = await visit({ as: 'ilya@example.com', url });
+    // The homework shows one number card: № 120 is chosen in the strip first.
+    if (input === '#number-note-120') await showHomeworkNumber(app, '120');
     const saves = jest.spyOn(app.runtime.api.studentStudy, 'saveNumberNote');
     app.mock.controls.set('forceNextError', { method: 'studentStudy.saveNumberNote', error: 'rateLimited', times: 1 });
     expect(await fill(app, input, 'заметка под лимитом')).toBe(true);

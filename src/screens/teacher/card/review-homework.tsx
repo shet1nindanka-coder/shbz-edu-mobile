@@ -28,6 +28,8 @@ export type ReviewHomeworkProps = {
   error?: string;
   /** The "accept AI verdicts" batch of this homework is in flight. */
   accepting: boolean;
+  /** The number of this homework whose sheet is open over the review, if any: its row leaves the talking to the sheet. */
+  sheetNumberId: string | null;
   /** «Отменить ДЗ» under the body (a phone card); a tablet panel shows it next to the title instead. */
   cancelBelow: boolean;
   onDismissError: () => void;
@@ -60,6 +62,7 @@ export function ReviewHomework({
   waitSeconds,
   error,
   accepting,
+  sheetNumberId,
   cancelBelow,
   onDismissError,
   onStatus,
@@ -131,6 +134,7 @@ export function ReviewHomework({
             blocked={blocked}
             error={numberErrors[number.homeworkNumberId]}
             divider={index < rows.length - 1}
+            sheetOpen={sheetNumberId === number.homeworkNumberId}
             onStatus={(status) => onStatus(number.homeworkNumberId, status)}
             onOpen={() => onOpenNumber(number.homeworkNumberId)}
           />

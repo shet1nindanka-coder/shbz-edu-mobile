@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import type { HomeworkNumberStatus, TeacherHomeworkCheckResult, TeacherHomeworkNumber } from '@/api/types';
@@ -21,6 +22,8 @@ export type ReviewNumberRowProps = {
   error?: string;
   /** Hairline under the row. */
   divider: boolean;
+  /** The number's sheet is open over the row: it has the same marks and speaks a refused one itself. */
+  sheetOpen: boolean;
   onStatus: (status: HomeworkNumberStatus | null) => void;
   /** Tap on the number: its details open in a sheet. */
   onOpen: () => void;
@@ -32,12 +35,17 @@ export type ReviewNumberRowProps = {
  * right. The texts open the number's sheet (verdict, diagnostics, statement, history); the marks are their
  * sibling, so each has its own touch target.
  */
-export function ReviewNumberRow({ number, result, saving, blocked, error, divider, onStatus, onOpen }: ReviewNumberRowProps) {
+export function ReviewNumberRow({ number, result, saving, blocked, error, divider, sheetOpen, onStatus, onOpen }: ReviewNumberRowProps) {
   const styles = useStyles();
   const theme = useTheme();
   const { dict, m } = useI18n();
-  // A refused mark appears under the row without moving the focus: screen readers have to be told.
-  useStatusAnnouncement(error);
+  // A refused mark appears under the row without moving the focus: screen readers have to be told. While
+  // the number's sheet is open over the row, the sheet tells them (`ReviewNumberCard`): the row must not say
+  // the same refusal a second time — neither then, nor when the sheet leaves and the text is still here.
+  const [saidBySheet, setSaidBySheet] = useState<string | undefined>(undefined);
+  const heard = sheetOpen ? error : error === undefined ? undefined : saidBySheet;
+  if (heard !== saidBySheet) setSaidBySheet(heard);
+  useStatusAnnouncement(error, !sheetOpen && error !== heard);
   const t = dict.students.review;
   const comment = result?.comment?.trim() ?? '';
   // What the AI said about the number. A verdict it could not reach leads the line — its comment alone

@@ -5,12 +5,12 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 import { byTestId, hasTestId, tap, visibleText, visit, wait } from './support/drive';
 import type { AppHandle } from './support/launch';
-import { all, flattenStyle, type HostNode } from './support/tree';
+import { all, flattenStyle, textOf, type HostNode } from './support/tree';
 
 const ANNA = 'teacher@example.com';
 const DEV = 'dev@example.com';
 
-const isIos = () => (require('react-native') as typeof import('react-native')).Platform.OS === 'ios';
+const isIos = () => (require('react-native') as typeof import('react-native')).Platform.OS === 'ios'; // eslint-disable-line @typescript-eslint/no-require-imports
 
 function labelOf(app: AppHandle, testID: string): string {
   const node = byTestId(app, testID);
@@ -20,21 +20,28 @@ function labelOf(app: AppHandle, testID: string): string {
 
 /** The OS text size the app starts with (390 pt phone); the next launch loads a fresh `Dimensions`. */
 const withFontScale = (fontScale: number) => () => {
-  const { Dimensions } = require('react-native') as typeof import('react-native');
+  const { Dimensions } = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
   const window = { width: 390, height: 844, scale: 3, fontScale };
   Dimensions.set({ window, screen: window });
 };
 
 describe('student card headers name what tells them apart (#235)', () => {
-  it('a homework header carries its overdue chip, topic and dates', async () => {
+  // The folded card reads «title — ONE caption — N из M»: the overdue chip became the caption «просрочено
+  // 2 дня», the dates became the deadline wording of the caption («до пятницы», «сегодня до 23:59»).
+  it('a homework header carries its overdue caption, topic and deadline', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
     const overdue = labelOf(app, 'review-assignment-toggle-hw_ilya_overdue');
-    expect(overdue).toContain('Просрочено');
+    expect(overdue).toMatch(/просрочено \d+ (день|дня|дней)/);
     expect(overdue).toContain('Линейные уравнения');
-    expect(overdue).toMatch(/дедлайн до \d\d\.\d\d\.\d{4}/);
-    const later = labelOf(app, 'review-assignment-toggle-hw_ilya_later');
-    expect(later).not.toBe(overdue);
-    expect(later).not.toContain('Просрочено');
+    // Everything the eye reads on the folded head is in the name.
+    const head = byTestId(app, 'review-assignment-toggle-hw_ilya_overdue')!;
+    for (const text of all(head, (node) => node.type === 'Text' && node.children.every((child) => typeof child === 'string')).map((node) => textOf(node).trim())) {
+      if (text !== '') expect(overdue).toContain(text);
+    }
+    const today = labelOf(app, 'review-assignment-toggle-hw_ilya_today');
+    expect(today).not.toBe(overdue);
+    expect(today).not.toContain('просрочено');
+    expect(today).toMatch(/сегодня до \d\d:\d\d/);
     expect(byTestId(app, 'review-assignment-toggle-hw_ilya_overdue')?.props.accessibilityState).toMatchObject({ expanded: false });
   });
 
@@ -48,14 +55,21 @@ describe('student card headers name what tells them apart (#235)', () => {
   });
 });
 
-describe('the journal card names everything it shows', () => {
-  it('category, time and who are part of the card button', async () => {
+describe('the journal row names everything it shows', () => {
+  // A row is «action — who · when»; the category moved to the detail sheet the row opens.
+  it('the action, who and the Moscow time are part of the row button; the category is in its detail', async () => {
     const app = await visit({ as: DEV, url: '/developer/panel/journal' });
     const open = all(app.screen.container as unknown as HostNode, (node) => typeof node.props.testID === 'string' && /^journal-entry-.+-open$/.test(node.props.testID)).at(0);
     expect(open).toBeTruthy();
     const label = String(open?.props.accessibilityLabel ?? '');
     expect(label).toMatch(/МСК/);
-    expect(label.split(', ').length).toBeGreaterThanOrEqual(3);
+    const shown = all(open!, (node) => node.type === 'Text' && node.children.every((child) => typeof child === 'string')).map((node) => textOf(node).trim()).filter((text) => text !== '');
+    expect(shown.length).toBeGreaterThanOrEqual(2);
+    for (const text of shown) expect(label).toContain(text);
+
+    expect(await tap(app, `#${String(open?.props.testID)}`)).toBe(true);
+    expect(hasTestId(app, 'journal-detail-action')).toBe(true);
+    expect(visibleText(app)).toContain('Категория');
   });
 });
 
@@ -67,15 +81,24 @@ describe('buttons stay readable at a large OS text size (#241, #242)', () => {
     expect(flattenStyle(button!.props.style).maxWidth).toBeUndefined();
   });
 
-  it.each([
-    [1, 145],
-    [1.3, 145 * 1.3],
-  ] as const)('developer topics: at font scale %s the actions take %s pt each, so they wrap when the text is large', async (fontScale, basis) => {
+  // The two actions moved into the header's aside row. They are sized by their labels (no fixed basis, no
+  // `flex: 1`, no cap) in a row that wraps: at a large text size the second one goes under the first
+  // instead of both being cut («Новая те…»).
+  it.each([1, 1.3] as const)('developer topics: at font scale %s the header actions keep their label width in a row that wraps', async (fontScale) => {
     const app = await visit({ as: DEV, url: '/developer/topics', arrange: withFontScale(fontScale) });
     for (const id of ['topics-create', 'topics-reorder']) {
       const button = byTestId(app, id);
       expect(button).toBeTruthy();
-      expect(flattenStyle(button!.props.style).flexBasis).toBeCloseTo(basis);
+      const style = flattenStyle(button!.props.style);
+      expect(style.flexGrow).toBe(1);
+      expect([undefined, 'auto']).toContain(style.flexBasis);
+      expect(style.flex).toBeUndefined();
+      expect(style.flexShrink).toBeUndefined();
+      expect(style.maxWidth).toBeUndefined();
+      expect(style.width).toBeUndefined();
+      let row = button!.parent;
+      while (row && flattenStyle(row.props.style).flexDirection !== 'row') row = row.parent;
+      expect(flattenStyle(row?.props.style).flexWrap).toBe('wrap');
     }
   });
 });
@@ -85,7 +108,7 @@ describe('import panel: an iOS paste refusal is not "the clipboard is empty" (#2
     const calls = { read: 0, has: 0 };
     // Inside the app's module registry (each launch has its own): the clipboard holds text, the read is "".
     const arrange = () => {
-      const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard');
+      const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard'); // eslint-disable-line @typescript-eslint/no-require-imports
       jest.spyOn(Clipboard, 'getStringAsync').mockImplementation(async () => {
         calls.read += 1;
         return '';

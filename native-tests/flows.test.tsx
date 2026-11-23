@@ -2,12 +2,16 @@
 // the request runs, after it succeeded, and after the deferred jobs (AI check, plan generation) finished.
 import { describe, expect, it } from '@jest/globals';
 
-import { fill, hasTestId, tap, visibleText, visit, wait } from './support/drive';
+import { byTestId, fill, hasTestId, tap, visibleText, visit, wait } from './support/drive';
 import { device } from './support/fakes';
+import { showHomeworkNumber } from './support/student';
+import { textOf } from './support/tree';
 
 const ANNA = 'teacher@example.com';
 const ILYA = 'ilya@example.com';
 const DEV = 'dev@example.com';
+/** The dashed «add» tile at the end of the row of a homework's photos. */
+const ADD_PHOTO = '#homework-photos-grid-add';
 const PHOTO = { uri: 'file:///data/user/0/cache/ImagePicker/solution.jpg', name: 'solution.jpg', mimeType: 'image/jpeg', size: 240_000 };
 
 describe('teacher forms', () => {
@@ -38,12 +42,18 @@ describe('teacher forms', () => {
   });
 
   it('opens the actions of a student: login, password reset, deletion', async () => {
+    // A row of the list is one pressable element: it opens the student card, whose «⋯» menu holds the
+    // login to copy, the password reset and the deletion.
     const app = await visit({ as: ANNA, url: '/teacher/students' });
-    await tap(app, '#student-actions-usr_timur');
-    await tap(app, '#student-actions-reset');
-    const again = await visit({ as: ANNA, url: '/teacher/students' });
-    await tap(again, '#student-actions-usr_timur');
-    await tap(again, '#student-actions-delete');
+    await tap(app, '#student-open-usr_timur');
+    expect(app.path()).toBe('/teacher/students/usr_timur');
+    await tap(app, '#student-card-menu');
+    expect(hasTestId(app, 'student-menu-login')).toBe(true);
+    await tap(app, '#student-menu-reset');
+    expect(hasTestId(app, 'reset-password-sheet')).toBe(true);
+    const again = await visit({ as: ANNA, url: '/teacher/students/usr_timur' });
+    await tap(again, '#student-card-menu');
+    await tap(again, '#student-menu-delete');
     expect(hasTestId(again, 'delete-student-dialog')).toBe(true);
   });
 
@@ -55,8 +65,10 @@ describe('teacher forms', () => {
     await tap(app, '#call-record-usr_artem');
     await tap(app, 'radio:Не дозвонились');
     await tap(app, '#call-record-save');
-    await tap(app, '#call-history-usr_kirill');
-    expect(hasTestId(app, 'call-history-sheet')).toBe(true);
+    // A teacher's row opens one sheet: the form, and the student's earlier calls under it.
+    await tap(app, '#call-record-usr_kirill');
+    expect(hasTestId(app, 'call-record-sheet')).toBe(true);
+    expect(hasTestId(app, 'call-history-list')).toBe(true);
   });
 
   it('creates a group, renames it and adds a member', async () => {
@@ -86,6 +98,7 @@ describe('teacher forms', () => {
     await tap(app, 'radio:По занятиям');
     await tap(app, '#attendance-mark-usr_artem-LATE');
     await tap(app, '#attendance-lesson-select');
+    await tap(app, '#group-attendance-pdf'); // the periods of the report are in a sheet
     await tap(app, '#group-attendance-pdf-30d');
     await tap(app, 'tab:Статистика');
     await tap(app, '#group-statistics-row-usr_artem');
@@ -118,13 +131,23 @@ describe('teacher forms', () => {
   it('reviews a homework: sets a number status, opens the history, cancels the homework', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
     await tap(app, '#review-assignment-toggle-hw_ilya_uncertain');
-    await tap(app, 'radio:Красный');
-    await tap(app, '#review-number-history-num_204');
+    // The unfolded card lists the numbers that wait for the teacher, each with the three marks.
+    await tap(app, '#review-number-status-num_211-RED');
+    // Everything else about a number is in the sheet its row (or its tile in «Все номера») opens.
+    await tap(app, '#review-all-numbers-hw_ilya_uncertain');
+    await tap(app, '#review-numbers-sheet-207');
     await tap(app, '#review-number-diagnostics-num_207');
-    await tap(app, '#review-cancel-hw_ilya_uncertain');
-    expect(hasTestId(app, 'cancel-homework-dialog')).toBe(true);
-    await tap(app, '#review-completed-toggle');
-    await tap(app, '#review-lesson-mode');
+    await tap(app, '#review-numbers-sheet-back');
+    await tap(app, '#review-numbers-sheet-204');
+    await tap(app, '#review-number-history-num_204');
+    expect(hasTestId(app, 'progress-history-sheet')).toBe(true);
+    const again = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
+    await tap(again, '#review-assignment-toggle-hw_ilya_uncertain');
+    await tap(again, '#review-cancel-hw_ilya_uncertain');
+    expect(hasTestId(again, 'cancel-homework-dialog')).toBe(true);
+    await tap(again, 'button:Отмена');
+    await tap(again, '#review-completed-toggle');
+    await tap(again, '#review-lesson-mode');
   });
 
   it('composes an individual lesson with an AI plan and marks the results', async () => {
@@ -219,6 +242,7 @@ describe('student forms', () => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_open' });
     const { setSimulatedOffline } = require('@/services/network') as typeof import('@/services/network'); // eslint-disable-line @typescript-eslint/no-require-imports
     await app.rntl.act(async () => setSimulatedOffline(true));
+    await showHomeworkNumber(app, '305'); // the homework shows the card of one number
     await fill(app, '#number-note-305', 'Заметка без сети.');
     await wait(app, 5_000, 'homework: note typed offline');
     await app.rntl.act(async () => setSimulatedOffline(false));
@@ -228,7 +252,7 @@ describe('student forms', () => {
   it.each(['#photo-source-library', '#photo-source-camera'])('attaches a photo from %s and starts the AI check', async (source) => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_soon' });
     device().picker.nextAssets = [PHOTO];
-    await tap(app, 'button:Добавить фото');
+    await tap(app, ADD_PHOTO);
     await tap(app, source);
     await wait(app, 3_000, 'homework: after the upload');
     await tap(app, '#homework-check-start');
@@ -239,11 +263,15 @@ describe('student forms', () => {
 
   it('cancels the photo picker, is refused the camera, deletes a photo', async () => {
     const app = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_today' });
-    await tap(app, 'button:Добавить фото');
+    await tap(app, ADD_PHOTO);
     await tap(app, '#photo-source-library'); // the user cancels: nextAssets is null
+    // The add tile is busy («Готовим фото…») until the system picker has left the screen.
+    await wait(app, 1_000, 'homework: the cancelled picker has left the screen');
     device().picker.cameraPermission = false;
-    await tap(app, 'button:Добавить фото');
+    await tap(app, ADD_PHOTO);
     await tap(app, '#photo-source-camera');
+    await wait(app, 1_000, 'homework: the camera was refused');
+    expect(hasTestId(app, 'homework-photos-pick-problem')).toBe(true);
     const again = await visit({ as: ILYA, url: '/student/homeworks/hw_ilya_today' });
     await tap(again, 'button:Удалить фото');
     await wait(again, 8_000, 'homework: after the undo window of a deleted photo');
@@ -280,9 +308,14 @@ describe('developer forms', () => {
     await fill(app, '#latex-condition-input', 'Решите уравнение $\\frac{2x-1}{3} = x + 5$ и запишите корень.');
     const save = ['#latex-condition-save', 'button:Сохранить'].find((selector) => (selector.startsWith('#') ? hasTestId(app, selector.slice(1)) : true));
     if (save) await tap(app, save);
+    // A phone shows one editor at a time; «Условие | Ответ» in the header switches (both keep their draft).
+    await tap(app, 'tab:Ответ');
     await fill(app, '#latex-answer-input', '$x = -16$');
+    await tap(app, 'tab:Условие');
     await fill(app, '#latex-condition-input', 'Сломанная формула $\\frac{1}{$');
+    await tap(app, 'tab:Ответ');
     await tap(app, '#latex-answer-delete');
+    await tap(app, 'tab:Условие');
     await tap(app, '#latex-condition-delete');
   });
 
@@ -325,29 +358,43 @@ describe('developer forms', () => {
 describe('settings', () => {
   it.each([ILYA, ANNA, DEV] as const)('%s changes the name, the theme, the hints and the language', async (as) => {
     const app = await visit({ as, url: '/settings' });
+    // The name form is folded behind «Имя и пароль»; the profile card shows the saved name.
+    await tap(app, '#settings-account');
     await fill(app, '#settings-name', 'Имя Изменено');
     await tap(app, '#settings-save-name');
-    await tap(app, 'radio:Светлая');
-    for (const node of app.screen.queryAllByRole('radio')) {
+    expect(hasTestId(app, 'settings-profile-notice')).toBe(true);
+    const profile = byTestId(app, 'settings-profile-row');
+    expect(profile ? textOf(profile) : '').toContain('Имя Изменено');
+    const prefs = await visit({ as, url: '/settings' });
+    await tap(prefs, 'radio:Светлая');
+    for (const node of prefs.screen.queryAllByRole('radio')) {
       if (!/^(Русский|English)$/.test(String(node.props.accessibilityLabel))) {
-        await app.rntl.fireEvent.press(node);
-        await app.settle();
+        await prefs.rntl.fireEvent.press(node);
+        await prefs.settle();
       }
     }
-    await wait(app, 500, 'settings: every theme and hints option pressed');
-    await tap(app, 'radio:English');
-    await wait(app, 2_000, 'settings: in English');
-    expect(visibleText(app)).toMatch(/Settings|Sign out|Interface/);
+    // The hints are a switch now: off, then on again.
+    await tap(prefs, '#settings-hints');
+    await tap(prefs, '#settings-hints');
+    await wait(prefs, 500, 'settings: every theme option and the hints switch pressed');
+    await tap(prefs, 'radio:English');
+    await wait(prefs, 2_000, 'settings: in English');
+    expect(visibleText(prefs)).toMatch(/Profile/);
+    expect(visibleText(prefs)).toMatch(/Log out/);
+    expect(visibleText(prefs)).toMatch(/Theme/);
   });
 
   it('changes the password, and shows the limiter of the pinned account', async () => {
+    // The password form is in the «Имя и пароль» sheet.
     const app = await visit({ as: ILYA, url: '/settings' });
+    await tap(app, '#settings-account');
     await tap(app, '#settings-update-password'); // empty: validation
     await fill(app, '#settings-current-password', 'student123');
     await fill(app, '#settings-new-password', 'new-secret-123');
     await fill(app, '#settings-repeat-password', 'new-secret-123');
     await tap(app, '#settings-update-password');
     const egor = await visit({ as: 'egor@example.com', url: '/settings' });
+    await tap(egor, '#settings-account');
     await fill(egor, '#settings-current-password', 'student123');
     await fill(egor, '#settings-new-password', 'new-secret-123');
     await fill(egor, '#settings-repeat-password', 'new-secret-123');

@@ -7,6 +7,7 @@ import type { ReactElement, ReactNode } from 'react';
 
 import { byTestId, fill, tap, visit } from './support/drive';
 import type { AppHandle } from './support/launch';
+import { showHomeworkNumber } from './support/student';
 import { all, textOf, type HostNode } from './support/tree';
 
 const INSETS = { top: 47, right: 0, bottom: 34, left: 0 };
@@ -126,6 +127,8 @@ describe('note save refused with a wait (#315, #331)', () => {
     ['homework card', '/student/homeworks/hw_ilya_overdue', '#number-note-120', 'number-note-error-120', 'number-note-wait-120'],
   ])('%s: the live region holds the message only; the countdown is a plain line under it', async (_name, url, input, errorId, waitId) => {
     const app = await visit({ as: 'ilya@example.com', url });
+    // The homework shows one number card: № 120 is chosen in the strip first.
+    if (input === '#number-note-120') await showHomeworkNumber(app, '120');
     app.mock.controls.set('forceNextError', { method: 'studentStudy.saveNumberNote', error: 'rateLimited', times: 1 });
     expect(await fill(app, input, 'заметка под лимитом')).toBe(true);
     await app.advance(1500);
@@ -200,21 +203,36 @@ describe('student homework photos (#333)', () => {
 
 describe('live math WebViews (#308)', () => {
   it.each([
-    ['lesson board', '/teacher/lessons/les_live', 'lesson-participant-toggle-', 13],
-    ['homework-plan board', '/teacher/homework-plans/hp_ready', 'draft-participant-toggle-', 1],
-  ])('%s with every participant expanded keeps at most 12 WebViews', async (_name, url, prefix, atLeastBlocks) => {
+    // The lesson board shows ONE student (a sheet) and ONE number card at a time: every statement of the
+    // class is walked through its tile instead, and each card that leaves must give its slot back.
+    ['lesson board', '/teacher/lessons/les_live', 'lesson-participant-toggle-', 'lesson-tile-', 13, 1],
+    ['homework-plan board', '/teacher/homework-plans/hp_ready', 'draft-participant-toggle-', null, 0, 1],
+  ] as const)('%s with every participant expanded keeps at most 12 WebViews', async (_name, url, prefix, tilePrefix, atLeastWalked, atLeastBlocks) => {
     const app = await visit({ as: 'teacher@example.com', url });
-    const ids = [...new Set(nodes(app, (node) => typeof node.props.testID === 'string' && (node.props.testID as string).startsWith(prefix)).map((node) => node.props.testID as string))];
-    expect(ids.length).toBeGreaterThan(1);
-    for (const id of ids) {
+    const { liveMathViews } = require('@/components/math/use-math-slot') as typeof import('@/components/math/use-math-slot'); // eslint-disable-line @typescript-eslint/no-require-imports
+    const idsOf = (start: string) => [...new Set(nodes(app, (node) => typeof node.props.testID === 'string' && (node.props.testID as string).startsWith(start)).map((node) => node.props.testID as string))];
+    const pressId = async (id: string) => {
       const node = nodes(app, (candidate) => candidate.props.testID === id)[0];
-      if (!node) continue;
+      if (!node) return false;
       await app.rntl.act(async () => {
         app.rntl.fireEvent.press(node as never);
       });
       await app.settle();
+      return true;
+    };
+    const ids = idsOf(prefix);
+    expect(ids.length).toBeGreaterThan(1);
+    const walked = new Set<string>();
+    for (const id of ids) {
+      if (!(await pressId(id)) || tilePrefix === null) continue;
+      for (const tile of idsOf(tilePrefix)) {
+        if (!(await pressId(tile))) continue;
+        walked.add(tile);
+        expect(webViews(app)).toBeLessThanOrEqual(12);
+        expect(liveMathViews()).toBe(webViews(app));
+      }
     }
-    const { liveMathViews } = require('@/components/math/use-math-slot') as typeof import('@/components/math/use-math-slot');
+    expect(walked.size).toBeGreaterThanOrEqual(atLeastWalked);
     expect(webViews(app)).toBeGreaterThan(0);
     expect(webViews(app)).toBeLessThanOrEqual(12);
     expect(liveMathViews()).toBe(webViews(app));

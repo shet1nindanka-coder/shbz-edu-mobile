@@ -7,6 +7,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { byTestId, tap, visibleText, visit } from './support/drive';
 import { device } from './support/fakes';
 import { passwordFor, type AppHandle, type PersonaLogin } from './support/launch';
+import { showHomeworkNumber } from './support/student';
 
 async function press(app: AppHandle, id: string, waitMs = 800): Promise<void> {
   const node = byTestId(app, id);
@@ -44,6 +45,8 @@ async function now<T>(app: AppHandle, call: () => Promise<T>): Promise<T> {
 describe('session isolation, round 4', () => {
   it("a note dasha sent before signing out does not land in ilya's account (#303)", async () => {
     const app = await visit({ as: 'dasha@example.com', url: '/student/homeworks/hw_dasha_first' });
+    // The homework shows one number card: № 113 is chosen in the strip first.
+    await showHomeworkNumber(app, '113');
     app.mock.controls.set('latency', { minMs: 8000, maxMs: 8000 });
     await type(app, 'number-note-113', 'Даша: личная заметка');
     await app.advance(1200); // the debounce sends it
@@ -192,7 +195,7 @@ describe('session isolation, round 4', () => {
     try {
       // A forced expiry whose token removal fails: both messages are on the login screen.
       app.mock.controls.set('forceNextError', { method: '*', error: 'sessionExpired', times: 1 });
-      await press(app, 'tab-homeworks');
+      await press(app, 'dock-homeworks');
       await app.settle();
       expect(app.path()).toMatch(/^\/login/);
       expect(byTestId(app, 'login-session-notice')).not.toBeNull();

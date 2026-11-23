@@ -5,6 +5,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { byTestId, fill, visibleText, visit } from './support/drive';
+import { showHomeworkNumber } from './support/student';
 
 const ILYA = 'ilya@example.com';
 
@@ -16,6 +17,8 @@ describe('note editors with a rate-limit countdown (#233)', () => {
     ['homework card', '/student/homeworks/hw_ilya_overdue', '#number-note-120', 'number-note-error-120'],
   ])('%s: speaks the error once, never the ticking countdown', async (_name, url, input, errorId) => {
     const app = await visit({ as: ILYA, url });
+    // The homework shows one number card: № 120 is chosen in the strip first.
+    if (input === '#number-note-120') await showHomeworkNumber(app, '120');
     const { AccessibilityInfo } = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
     const queued = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
     const plain = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);

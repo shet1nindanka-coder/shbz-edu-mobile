@@ -1,8 +1,8 @@
 // Every teacher screen, opened by deep link on a cold start: the teacher with data, the second owner
 // (isolation, no realtime) and the teacher with nothing.
-import { describe, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 
-import { visit } from './support/drive';
+import { hasTestId, tap, visit } from './support/drive';
 
 const ANNA = 'teacher@example.com';
 const STUDENTS = ['usr_ilya', 'usr_maria', 'usr_artem', 'usr_polina', 'usr_kirill', 'usr_dasha', 'usr_timur'];
@@ -14,7 +14,6 @@ const LISTS: [string, string][] = [
   ['planner.lessons', '/teacher/lessons'],
   ['planner.drafts', '/teacher/homework-plans'],
   ['calls.list', '/teacher/calls'],
-  ['(more list)', '/teacher/more'],
   ['content.topics', '/teacher/topics'],
   ['groups.list', '/teacher/groups'],
   ['planner.lessonNew (target chooser)', '/teacher/lessons/new'],
@@ -23,6 +22,13 @@ const LISTS: [string, string][] = [
 describe('teacher screens as teacher@example.com (7 students, 2 groups)', () => {
   it.each(LISTS)('%s  %s', async (_screen, url) => {
     await visit({ as: ANNA, url });
+  });
+
+  // The `/teacher/more` screen is gone: the rest of the sections are the dock's «ещё» sheet.
+  it('(more sheet)  the «ещё» sheet of the dock over /teacher', async () => {
+    const app = await visit({ as: ANNA, url: '/teacher' });
+    expect(await tap(app, '#dock-more')).toBe(true);
+    for (const id of ['dock-more-sheet', 'dock-more-topics', 'dock-more-calls', 'dock-more-settings']) expect(hasTestId(app, id)).toBe(true);
   });
 
   it('calls.list with a student to flash  /teacher/calls?studentId=usr_kirill', async () => {
