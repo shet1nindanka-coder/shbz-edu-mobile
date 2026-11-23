@@ -1,87 +1,79 @@
 import { View } from 'react-native';
 
 import { format, useI18n } from '@/i18n';
-import { makeStyles, useTheme } from '@/theme';
+import { makeStyles } from '@/theme';
 import { Chip, Text } from '@/ui';
 
-import { rankingColor } from '../charts/palette';
 import type { RankingItem } from '../logic';
+import { StatsCard } from './stats-card';
 
 export type RankingCardProps = {
   title: string;
+  /** What is ranked: «По ученикам», «По темам». */
+  subtitle?: string;
   emptyMessage: string;
   items: readonly RankingItem[];
   testID?: string;
 };
 
 /**
- * A ranking of up to five students or topics (`RankingCard` on the site): place, title, subtitle, the
- * value on the right and a bar in the tone of the list.
+ * A ranking of up to five students or topics (`RankingCard` on the site; mockup D-stats «Где чаще всего
+ * красное»): rows of a card — the place, the title, one caption and the value on the right. The value is a
+ * plain figure; only the "needs help" lists mark it red.
  */
-export function RankingCard({ title, emptyMessage, items, testID }: RankingCardProps) {
+export function RankingCard({ title, subtitle, emptyMessage, items, testID }: RankingCardProps) {
   const styles = useStyles();
-  const theme = useTheme();
   const { m } = useI18n();
 
   return (
-    <View style={styles.card} testID={testID}>
-      <Text variant="cardTitle" accessibilityRole="header">
-        {title}
-      </Text>
+    <StatsCard title={title} subtitle={subtitle} testID={testID}>
       {items.length === 0 ? (
-        <Text variant="small" color="textMuted" align="center" style={styles.empty}>
+        <Text variant="small" color="textMuted" style={styles.empty}>
           {emptyMessage}
         </Text>
       ) : (
-        items.map((item, index) => (
-          <View key={item.key} style={styles.item}>
-            <View style={styles.head}>
-              <Chip label={`#${index + 1}`} accessibilityLabel={format(m.stats.ranking.placeAria, { n: index + 1 })} />
-              <Text variant="bodyBold" numberOfLines={3} style={styles.title}>
-                {item.title}
-              </Text>
-              <Text variant="smallExtra" tabular>
-                {item.valueLabel}
-              </Text>
-            </View>
-            <Text variant="small" color="textMuted">
-              {item.subtitle}
-            </Text>
-            <View
-              style={styles.track}
-              accessible
-              accessibilityRole="progressbar"
-              accessibilityLabel={item.title}
-              accessibilityValue={{ min: 0, max: 100, now: Math.round(item.progress) }}
-            >
-              <View style={[styles.fill, { width: `${item.progress}%`, backgroundColor: rankingColor(item.tone, theme) }]} />
-            </View>
-          </View>
-        ))
+        <View>
+          {items.map((item, index) => {
+            const place = format(m.stats.ranking.placeAria, { n: index + 1 });
+            return (
+              <View
+                key={item.key}
+                accessible
+                accessibilityLabel={`${place}. ${item.title}. ${item.subtitle}. ${item.valueLabel}`}
+                style={[styles.row, index > 0 ? styles.divider : null]}
+              >
+                <Text variant="small" color="textMuted" tabular style={styles.place}>
+                  {index + 1}
+                </Text>
+                <View style={styles.texts}>
+                  <Text variant="bodyStrong" numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <Text variant="small" color="textMuted" numberOfLines={2}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+                {item.tone === 'rose' ? (
+                  <Chip label={item.valueLabel} tone="red" />
+                ) : (
+                  <Text variant="small" color="textMuted" tabular>
+                    {item.valueLabel}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
       )}
-    </View>
+    </StatsCard>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { gap: t.space.md },
-  empty: { paddingVertical: t.space.lg },
-  item: {
-    gap: t.space.sm,
-    paddingVertical: t.space.gutter,
-    paddingHorizontal: t.space.gutter,
-    borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
-  },
-  head: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  title: { flex: 1, minWidth: 0 },
-  track: {
-    height: t.sizes.progress.sm,
-    borderRadius: t.radii.full,
-    backgroundColor: t.colors.progressTrack,
-    overflow: 'hidden',
-  },
-  fill: { height: '100%', borderRadius: t.radii.full },
+  empty: { paddingVertical: t.space.sm },
+  row: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
+  divider: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
+  // Wide enough for the place of a five-row list.
+  place: { width: t.space.lg, textAlign: 'center' },
+  texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

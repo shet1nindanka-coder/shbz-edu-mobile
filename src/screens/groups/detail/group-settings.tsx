@@ -6,7 +6,7 @@ import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { GroupDetailResponse } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, Button, Dialog, Icon, ListRow, Notice, Text, TextField } from '@/ui';
 
 import { GROUP_NAME_MAX_LENGTH, normalizeGroupName } from '../logic';
@@ -35,6 +35,7 @@ type Step = 'rename' | 'delete';
  */
 export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDeleted, onDeleteFailed, onMissing }: GroupSettingsProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict, m } = useI18n();
@@ -141,26 +142,23 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
         }}
         closeLabel={m.common.actions.close}
         title={t.detail.settings}
-        padded={false}
         testID="group-menu-sheet"
       >
-        <View style={styles.menu}>
-          <ListRow
-            title={t.detail.rename}
-            left={<Icon name="edit" size={18} color="textStrong" />}
-            chevron={false}
-            onPress={() => choose('rename')}
-            testID="group-menu-rename"
-          />
-          <ListRow
-            title={t.detail.delete}
-            left={<Icon name="trash" size={18} color="dangerSolid" />}
-            chevron={false}
-            divider={false}
-            onPress={() => choose('delete')}
-            testID="group-menu-delete"
-          />
-        </View>
+        <ListRow
+          title={t.detail.rename}
+          left={<Icon name="edit" size={theme.sizes.icon.md} color="textStrong" />}
+          inset={0}
+          onPress={() => choose('rename')}
+          testID="group-menu-rename"
+        />
+        <ListRow
+          title={t.detail.delete}
+          left={<Icon name="trash" size={theme.sizes.icon.md} color="dangerSolid" />}
+          inset={0}
+          divider={false}
+          onPress={() => choose('delete')}
+          testID="group-menu-delete"
+        />
       </BottomSheet>
 
       <BottomSheet
@@ -226,6 +224,5 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
 }
 
 const useStyles = makeStyles((t) => ({
-  menu: { paddingBottom: t.space.sm },
   form: { gap: t.space.field, paddingTop: t.space.xs },
 }));

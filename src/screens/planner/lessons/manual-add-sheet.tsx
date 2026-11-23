@@ -16,6 +16,8 @@ export type ManualAddSheetProps = {
   /** Numbers already in the participant's set: they are not offered. */
   existingIds: readonly string[];
   onClose: () => void;
+  /** The sheet has left the screen: the place to bring back the sheet it was opened from. */
+  onClosed?: () => void;
   onAdd: (homeworkNumberId: string, toExtra: boolean) => void;
 };
 
@@ -26,7 +28,7 @@ const BANK_STALE_MS = 10 * 60 * 1000;
  * "Add a problem" (`LessonManualAdd`, docs/spec/05-teacher-lessons-plans.md §1.3 item 8): topic → number
  * (only numbers that are not in the set yet) → to the main or to the extra part.
  */
-export function ManualAddSheet({ visible, studentName, existingIds, onClose, onAdd }: ManualAddSheetProps) {
+export function ManualAddSheet({ visible, studentName, existingIds, onClose, onClosed, onAdd }: ManualAddSheetProps) {
   const styles = useStyles();
   const api = useApi();
   const { dict, m } = useI18n();
@@ -68,7 +70,10 @@ export function ManualAddSheet({ visible, studentName, existingIds, onClose, onA
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      onClosed={reset}
+      onClosed={() => {
+        reset();
+        onClosed?.();
+      }}
       closeLabel={m.common.actions.close}
       title={t.label}
       footer={

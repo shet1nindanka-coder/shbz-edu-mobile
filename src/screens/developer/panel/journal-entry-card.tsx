@@ -1,111 +1,47 @@
-import { useState } from 'react';
-import { View } from 'react-native';
-
 import type { JournalEntry } from '@/api/types';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
-import { makeStyles, useTheme } from '@/theme';
-import { Card, CardPressArea, Chip, Text, TextButton } from '@/ui';
+import { Chip, ListRow } from '@/ui';
 
-import { collapseError, costText, tokensText, whoText } from './journal-logic';
+import { whoText } from './journal-logic';
 
 export type JournalEntryCardProps = {
   entry: JournalEntry;
+  /** Hairline under the row; off on the last row of the list. */
+  divider: boolean;
+  /** Tablet: this entry is shown in the panel next to the list. */
+  selected?: boolean;
   onOpen: (entry: JournalEntry) => void;
 };
 
 /**
- * One journal row as a card (07 §1.10 phone mapping): category chip (red when the entry failed) and time
- * (Moscow time, marked «МСК» on every card — 07 §7 item 14 — so it reads right in any device zone),
- * the action's label with its system name, who, what, tokens and cost when present, then the error in
- * red — collapsed behind «полностью» when it is longer than 140 characters. A tap opens the detail sheet.
+ * One journal row (07 §1.10; layout: docs/design/glass-over-paper.md §7): what happened — the action's
+ * label, or its system name when it has none — and one caption «who · when» (Moscow time, marked «МСК» —
+ * 07 §7 item 14 — so it reads right in any device zone). A failed entry carries the one red mark of the
+ * list. The category, the object, tokens, cost and the whole error are in the detail the row opens.
  */
-export function JournalEntryCard({ entry, onOpen }: JournalEntryCardProps) {
-  const styles = useStyles();
-  const theme = useTheme();
+export function JournalEntryCard({ entry, divider, selected, onOpen }: JournalEntryCardProps) {
   const { dict, m, locale } = useI18n();
   const t = dict.planner.journal;
-  const [expanded, setExpanded] = useState(false);
-
   const failed = entry.outcome === 'failed';
   const action = entry.actionLabel ?? entry.action;
-  const tokens = tokensText(entry);
-  const cost = costText(entry.costRub);
-  const error = entry.error ? collapseError(entry.error) : null;
-  const when = `${formatDateTime(entry.createdAt, locale)} ${m.common.dateTime.msk}`;
-  const who = whoText(entry, t.roles);
-  const usage = [tokens ? `${t.colTokens}: ${tokens}` : null, cost ? `${t.colCost}: ${cost}` : null].filter(Boolean).join(' · ');
+  const caption = `${whoText(entry, t.roles)} · ${formatDateTime(entry.createdAt, locale)} ${m.common.dateTime.msk}`;
 
   return (
-    <Card padded={false} testID={`journal-entry-${entry.id}`}>
-      {/* One element for screen readers: everything the eye reads in it is spoken after the action. */}
-      <CardPressArea
-        accessibilityLabel={format(m.developer.journal.openEntry, { action })}
-        accessibilityParts={[t.categories[entry.category], when, entry.actionLabel ? entry.action : null, who, entry.progressTarget, entry.summary, usage]}
-        onPress={() => onOpen(entry)}
-        style={[styles.main, error ? styles.mainWithError : null]}
-        testID={`journal-entry-${entry.id}-open`}
-      >
-        <View style={styles.top}>
-          <Chip label={t.categories[entry.category]} tone={failed ? 'red' : 'muted'} />
-          <Text variant="caption" tabular style={styles.when}>
-            {when}
-          </Text>
-        </View>
-
-        <View style={styles.titles}>
-          <Text variant="bodyStrong">{action}</Text>
-          {/* The text filter works on the system name, so it stays visible next to its label. */}
-          {entry.actionLabel ? (
-            <Text variant="caption" style={{ fontFamily: theme.fonts.mono }}>
-              {entry.action}
-            </Text>
-          ) : null}
-        </View>
-
-        <Text variant="caption">{who}</Text>
-
-        {entry.progressTarget || entry.summary ? (
-          <View style={styles.what}>
-            {entry.progressTarget ? <Text variant="smallBold">{entry.progressTarget}</Text> : null}
-            {entry.summary ? <Text variant="small">{entry.summary}</Text> : null}
-          </View>
-        ) : null}
-
-        {usage ? (
-          <Text variant="caption" tabular>
-            {usage}
-          </Text>
-        ) : null}
-      </CardPressArea>
-
-      {entry.error && error ? (
-        <View style={styles.error}>
-          <Text variant="small" color="dangerText" testID={`journal-entry-${entry.id}-error`}>
-            {expanded ? entry.error : error.text}
-          </Text>
-          {error.collapsed ? (
-            <TextButton
-              label={expanded ? m.developer.journal.collapse : t.fully}
-              tone="danger"
-              onPress={() => setExpanded((value) => !value)}
-              style={styles.fully}
-              testID={`journal-entry-${entry.id}-fully`}
-            />
-          ) : null}
-        </View>
-      ) : null}
-    </Card>
+    <ListRow
+      title={action}
+      titleLines={2}
+      subtitle={caption}
+      subtitleLines={2}
+      right={failed ? <Chip label={dict.planner.common.error} tone="red" /> : undefined}
+      divider={divider}
+      selected={selected}
+      onPress={() => onOpen(entry)}
+      // One element for screen readers: everything the eye reads in it is spoken after the action.
+      accessibilityLabel={[format(m.developer.journal.openEntry, { action }), failed ? dict.planner.common.error : null, caption]
+        .filter(Boolean)
+        .join('. ')}
+      testID={`journal-entry-${entry.id}-open`}
+    />
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  main: { padding: t.space.card, gap: t.space.xs, borderRadius: t.radii.lg },
-  mainWithError: { paddingBottom: t.space.sm },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  when: { flexShrink: 1, textAlign: 'right' },
-  titles: { gap: 2, marginTop: t.space.xxs },
-  what: { gap: 2, marginTop: t.space.xxs },
-  error: { paddingHorizontal: t.space.card, paddingBottom: t.space.card, gap: t.space.xxs },
-  fully: { alignSelf: 'flex-start' },
-}));

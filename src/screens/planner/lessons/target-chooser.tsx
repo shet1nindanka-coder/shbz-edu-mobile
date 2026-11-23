@@ -1,34 +1,30 @@
-import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Avatar, Icon, ListRow, LoadingState, Notice, Text, TextField } from '@/ui';
+import { Avatar, Icon, IconTile, ListCard, ListRow, LoadingState, Notice, Panel, Panels, Screen, SectionCaption, Text, TextField } from '@/ui';
 
 import { filterByName } from './new-lesson-logic';
 
 export type LessonTarget = { groupId: string } | { studentId: string };
 
 export type TargetChooserProps = {
+  /** Header of the screen. */
+  header: ReactNode;
   onPick: (target: LessonTarget) => void;
 };
 
-type ChooserRow =
-  | { type: 'title'; key: string; title: string }
-  | { type: 'note'; key: string; text: string }
-  | { type: 'group'; key: string; id: string; name: string; membersCount: number; last: boolean }
-  | { type: 'student'; key: string; id: string; name: string; last: boolean };
-
 /**
  * Whom the lesson is for (docs/spec/05-teacher-lessons-plans.md §1.2.a): the teacher's groups and
- * students as two searchable lists.
+ * students as two lists of rows under one search field. A phone stacks the lists; a tablet puts them side
+ * by side.
  */
-export function TargetChooser({ onPick }: TargetChooserProps) {
+export function TargetChooser({ header, onPick }: TargetChooserProps) {
   const styles = useStyles();
   const theme = useTheme();
   const api = useApi();
@@ -38,149 +34,126 @@ export function TargetChooser({ onPick }: TargetChooserProps) {
 
   const targets = useQuery({ queryKey: qk('planner', 'getLessonTargets'), queryFn: () => api.planner.getLessonTargets() });
   const data = targets.data;
-
-  const rows = useMemo<ChooserRow[]>(() => {
-    if (!data) return [];
-    const groups = filterByName(data.groups, query);
-    const students = filterByName(data.students, query);
-    const searching = query.trim() !== '';
-    return [
-      { type: 'title', key: 'groups-title', title: t.forGroup },
-      ...(groups.length > 0
-        ? groups.map<ChooserRow>((group, index) => ({
-            type: 'group',
-            key: `group-${group.id}`,
-            id: group.id,
-            name: group.name,
-            membersCount: group.membersCount,
-            last: index === groups.length - 1,
-          }))
-        : [{ type: 'note', key: 'groups-empty', text: searching && data.groups.length > 0 ? dict.planner.common.nothingFound : t.noGroups } satisfies ChooserRow]),
-      { type: 'title', key: 'students-title', title: t.forStudent },
-      ...(students.length > 0
-        ? students.map<ChooserRow>((student, index) => ({
-            type: 'student',
-            key: `student-${student.id}`,
-            id: student.id,
-            name: student.name,
-            last: index === students.length - 1,
-          }))
-        : [{ type: 'note', key: 'students-empty', text: searching && data.students.length > 0 ? dict.planner.common.nobodyFound : t.noStudents } satisfies ChooserRow]),
-    ];
-  }, [data, query, t, dict]);
-
   const { refreshing, refresh } = usePullRefresh([targets]);
 
   if (!data) {
-    return targets.isError || isWaitingForNetwork(targets) ? (
-      <View style={styles.state}>
-        <LoadFailure query={targets} testID="lesson-targets-error" />
-      </View>
-    ) : (
-      <View style={styles.state}>
-        <LoadingState variant="list" count={6} accessibilityLabel={m.common.a11y.loading} testID="lesson-targets-loading" />
-      </View>
+    return (
+      <Screen testID="planner-lesson-new-screen" header={header}>
+        {targets.isError || isWaitingForNetwork(targets) ? (
+          <LoadFailure query={targets} testID="lesson-targets-error" />
+        ) : (
+          <LoadingState variant="list" count={6} accessibilityLabel={m.common.a11y.loading} testID="lesson-targets-loading" />
+        )}
+      </Screen>
     );
   }
 
-  const renderRow = ({ item }: { item: ChooserRow }) => {
-    switch (item.type) {
-      case 'title':
-        return (
-          <Text variant="sectionTitle" accessibilityRole="header" style={styles.title}>
-            {item.title}
-          </Text>
-        );
-      case 'note':
-        return (
-          <Text variant="small" color="textMuted" style={styles.note}>
-            {item.text}
-          </Text>
-        );
-      case 'group':
-        return (
+  const groups = filterByName(data.groups, query);
+  const students = filterByName(data.students, query);
+  const searching = query.trim() !== '';
+
+  const note = (text: string) => (
+    <Text variant="small" color="textMuted" style={styles.note}>
+      {text}
+    </Text>
+  );
+
+  const groupRows =
+    groups.length > 0
+      ? groups.map((group, index) => (
           <ListRow
-            title={item.name}
-            meta={String(item.membersCount)}
-            accessibilityLabel={`${item.name} · ${item.membersCount}`}
-            left={
-              <View style={styles.groupIcon}>
-                <Icon name="usersGroup" size={18} color="kicker" />
-              </View>
+            key={group.id}
+            title={group.name}
+            meta={String(group.membersCount)}
+            accessibilityLabel={`${group.name} · ${group.membersCount}`}
+            left={<IconTile icon="bookUser" tone="quiet" />}
+            divider={index < groups.length - 1}
+            onPress={() => onPick({ groupId: group.id })}
+            testID={`lesson-target-group-${group.id}`}
+          />
+        ))
+      : note(searching && data.groups.length > 0 ? dict.planner.common.nothingFound : t.noGroups);
+
+  const studentRows =
+    students.length > 0
+      ? students.map((student, index) => (
+          <ListRow
+            key={student.id}
+            title={student.name}
+            left={<Avatar name={student.name} tone="neutral" />}
+            divider={index < students.length - 1}
+            onPress={() => onPick({ studentId: student.id })}
+            testID={`lesson-target-student-${student.id}`}
+          />
+        ))
+      : note(searching && data.students.length > 0 ? dict.planner.common.nobodyFound : t.noStudents);
+
+  const top = (
+    <>
+      {targets.isError ? <Notice tone="error" text={errorText(targets.error, m.common.errors.generic)} testID="lesson-targets-refresh-error" /> : null}
+      <TextField
+        value={query}
+        onChangeText={setQuery}
+        placeholder={m.planner.lessonNew.searchPlaceholder}
+        accessibilityLabel={m.planner.lessonNew.searchAria}
+        autoCorrect={false}
+        returnKeyType="search"
+        left={<Icon name="search" size={theme.sizes.icon.md} color="textMuted" />}
+        testID="lesson-targets-search"
+      />
+    </>
+  );
+
+  if (theme.tablet) {
+    return (
+      <Screen testID="planner-lesson-new-screen" header={header} scroll={false} maxWidth="full">
+        {top}
+        <Panels testID="lesson-targets-list">
+          <Panel
+            padded={false}
+            contentStyle={styles.panelRows}
+            header={
+              <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelHead}>
+                {t.forGroup}
+              </Text>
             }
-            chevron
-            inset={0}
-            divider={!item.last}
-            onPress={() => onPick({ groupId: item.id })}
-            testID={`lesson-target-group-${item.id}`}
-          />
-        );
-      case 'student':
-        return (
-          <ListRow
-            title={item.name}
-            left={<Avatar name={item.name} size={36} />}
-            inset={0}
-            divider={!item.last}
-            onPress={() => onPick({ studentId: item.id })}
-            testID={`lesson-target-student-${item.id}`}
-          />
-        );
-    }
-  };
+          >
+            {groupRows}
+          </Panel>
+          <Panel
+            padded={false}
+            contentStyle={styles.panelRows}
+            header={
+              <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelHead}>
+                {t.forStudent}
+              </Text>
+            }
+          >
+            {studentRows}
+          </Panel>
+        </Panels>
+      </Screen>
+    );
+  }
 
   return (
-    <FlashList
-      data={rows}
-      keyExtractor={(row) => row.key}
-      getItemType={(row) => row.type}
-      renderItem={renderRow}
-      ListHeaderComponent={
-        <View style={styles.header}>
-          {targets.isError ? <Notice tone="error" text={errorText(targets.error, m.common.errors.generic)} testID="lesson-targets-refresh-error" /> : null}
-          <TextField
-            value={query}
-            onChangeText={setQuery}
-            placeholder={m.planner.lessonNew.searchPlaceholder}
-            accessibilityLabel={m.planner.lessonNew.searchAria}
-            autoCorrect={false}
-            returnKeyType="search"
-            left={<Icon name="search" size={18} color="kicker" />}
-            testID="lesson-targets-search"
-          />
-        </View>
-      }
-      contentContainerStyle={styles.listContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={refresh}
-          tintColor={theme.colors.accentSolid}
-          colors={[theme.colors.accentSolid]}
-          progressBackgroundColor={theme.colors.cardBg}
-        />
-      }
-      testID="lesson-targets-list"
-    />
+    <Screen testID="planner-lesson-new-screen" header={header} onRefresh={refresh} refreshing={refreshing}>
+      {top}
+      <View style={styles.section} testID="lesson-targets-list">
+        <SectionCaption>{t.forGroup}</SectionCaption>
+        <ListCard>{groupRows}</ListCard>
+      </View>
+      <View style={styles.section}>
+        <SectionCaption>{t.forStudent}</SectionCaption>
+        <ListCard>{studentRows}</ListCard>
+      </View>
+    </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  state: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg },
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.md },
-  title: { paddingTop: t.space.xl, paddingBottom: t.space.xs },
-  note: { paddingVertical: t.space.sm },
-  groupIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: t.radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.colors.softBg,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-  },
+  section: { gap: t.space.xs },
+  note: { paddingHorizontal: t.space.card, paddingVertical: t.space.md },
+  panelHead: { paddingHorizontal: t.space.card, paddingTop: t.space.card },
+  panelRows: { gap: 0, paddingTop: t.space.xs, paddingBottom: t.space.sm },
 }));

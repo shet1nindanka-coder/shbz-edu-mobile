@@ -1,10 +1,9 @@
-import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, type ScrollViewInstance } from 'react-native';
 
 import { HIGHLIGHT_FLASH_MS, errorText, qk, useApi } from '@/api';
-import type { ParentCallStudentOverview } from '@/api/types';
+import type { ParentCallStudentOverview, RecordCallResponse } from '@/api/types';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useScreenFocused, type AppLink, type ScreenParams } from '@/navigation';
@@ -12,11 +11,13 @@ import { useCurrentUser } from '@/providers';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen } from '@/ui';
+import { Button, EmptyState, ListCard, LoadingState, Notice, Panels, Screen, Text } from '@/ui';
 
 import { CallRow } from './list/call-row';
-import { SummaryBar } from './list/summary-bar';
-import { buildCallRows, rowIndexOfStudent, type CallListRow } from './logic';
+import { ScrollPanel } from './list/scroll-panel';
+import { summaryLine } from './logic';
+import { CallJournalPanel } from './panels/call-journal-panel';
+import { RecordCallPanel } from './panels/record-call-panel';
 import { HistorySheet } from './sheets/history-sheet';
 import { RecordCallSheet, type RecordCallTarget } from './sheets/record-call-sheet';
 
@@ -28,18 +29,21 @@ type ListNotice = { tone: 'success' | 'error'; text: string };
 /** The one sheet that is open — the site's "only one panel in the whole list". */
 type Overlay = { kind: 'record'; target: RecordCallTarget } | { kind: 'history'; studentId: string };
 
-/** The three counters stay pinned while the rows scroll. */
-const STICKY_SUMMARY = [0];
-
 /**
- * `calls.list` (docs/spec/06-teacher-groups-calls-stats.md §1.4): who needs a parent call. A TEACHER sees
- * the own students and records calls; a DEVELOPER sees every student with the teacher's name and only
- * reads. The server sorts the rows (overdue → due → ok) and counts the days in Moscow time.
+ * `calls.list` (docs/spec/06-teacher-groups-calls-stats.md §1.4; layout: docs/design/glass-over-paper.md
+ * §7): who needs a parent call. A TEACHER sees the own students and records calls; a DEVELOPER sees every
+ * student with the teacher's name and only reads. The server sorts the rows (overdue → due → ok) and
+ * counts the days in Moscow time.
+ *
+ * Phone: one card of rows; a row opens a sheet — the record form with the earlier calls under it for a
+ * teacher, the history alone for a developer. Tablet: the list is the left panel; the right one is the
+ * form of the selected student (teacher) or the journal of the latest calls (developer).
  *
  * `studentId` comes from a `parent_call_due` notification: that row is scrolled to and flashed for
  * `HIGHLIGHT_FLASH_MS`; nothing is opened, and an id that is not in the list changes nothing.
  *
- * Call comments are personal data: they are shown in the history sheet only and never leave memory.
+ * Call comments are personal data: they are shown in the history and in the developer's journal only —
+ * never in a row — and never leave memory.
  */
 export function CallsListScreen({ studentId }: CallsListScreenProps) {
   const styles = useStyles();
@@ -52,10 +56,12 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   const { dict, m } = useI18n();
   const t = dict.planner.calls;
   const isDeveloper = user.role === 'DEVELOPER';
-  const listRef = useRef<FlashListRef<CallListRow>>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const [notice, setNotice] = useState<ListNotice | null>(null);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  // Tablet: the student whose form the right panel shows; the first row until one is picked.
+  const [pickedId, setPickedId] = useState<string | null>(null);
   // From a saved call until the list has reloaded: the row is about to change its state and place.
   const [settling, setSettling] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -67,8 +73,18 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   const data = overview.data;
   useRefetchOnFocus([overview]);
 
-  const rows = useMemo(() => buildCallRows(data?.students ?? []), [data]);
+  const students = data?.students;
   const canRecord = data?.canRecord === true;
+  // Two panels need something to show in both: an empty list keeps the one-column empty state.
+  const panels = theme.tablet && students !== undefined && students.length > 0;
+
+  // ── where the rows are, for scrolling to one of them ───────────────────────────────────────────
+  // Offsets inside the scrolled content: what stands above the card (the header and the notices on a
+  // phone, the panel's head on a tablet), then the row inside the card.
+  const layout = useRef({ header: 0, list: 0, rows: new Map<string, number>() });
+  const noteRow = (id: string, y: number) => {
+    layout.current.rows.set(id, y);
+  };
 
   // ── highlight from a notification ──────────────────────────────────────────────────────────────
   // Which `studentId` has been dealt with; reset when the parameter goes away, so the same
@@ -77,9 +93,9 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   // dealt with and the highlight runs again when the tab is in front again (a later tap on the same
   // notification lands here with unchanged params) — and then drops the parameter.
   const handledId = useRef<string | null>(null);
-  const latest = useRef({ rows, focused, navigation });
+  const latest = useRef({ students, focused, navigation, rowHeight: theme.sizes.row });
   useEffect(() => {
-    latest.current = { rows, focused, navigation };
+    latest.current = { students, focused, navigation, rowHeight: theme.sizes.row };
   });
 
   const listed = data !== undefined;
@@ -92,10 +108,14 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
     // One frame later: the list has to lay its rows out before it can scroll to one of them.
     const timer = setTimeout(() => {
       handledId.current = studentId;
-      const index = rowIndexOfStudent(latest.current.rows, studentId);
-      if (index === -1) return;
+      if (!latest.current.students?.some((student) => student.studentId === studentId)) return;
       setFlashId(studentId);
-      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      const { header, list, rows } = layout.current;
+      const row = rows.get(studentId);
+      // A row or two stay above the highlighted one, so it reads as a place in the list.
+      if (row !== undefined) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, header + list + row - latest.current.rowHeight * 2), animated: true });
+      }
     }, 50);
     return () => clearTimeout(timer);
   }, [studentId, listed, focused]);
@@ -118,7 +138,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   /** A banner is useless below the fold: bring the list back to its top with it. */
   const announce = (next: ListNotice) => {
     setNotice(next);
-    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   const reloadAfterChange = () => {
@@ -134,8 +154,10 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
       .finally(() => setSettling(false));
   };
 
-  const onSaved = () => {
+  const onSaved = (_response: RecordCallResponse, target: RecordCallTarget) => {
     setOverlay(null);
+    // Tablet: the reloaded list moves the student down; the panel stays with the call just recorded.
+    if (panels) setPickedId(target.studentId);
     // SPEC-GAP: the site closes the inline form and reloads without a message; a sheet that just
     // disappears gives no confirmation on a phone, so the list says «Звонок записан».
     announce({ tone: 'success', text: m.calls.log.saved });
@@ -151,21 +173,24 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   const openRecord = (student: ParentCallStudentOverview) => {
     // The banner of the previous call would read as the result of this one.
     setNotice(null);
-    setOverlay({ kind: 'record', target: { studentId: student.studentId, studentName: student.studentName } });
+    if (panels) setPickedId(student.studentId);
+    else setOverlay({ kind: 'record', target: { studentId: student.studentId, studentName: student.studentName } });
   };
   const openHistory = (student: ParentCallStudentOverview) => setOverlay({ kind: 'history', studentId: student.studentId });
 
-  // The history sheet follows the live row; a student that left the list closes it.
-  const historyStudent =
-    overlay?.kind === 'history' ? (data?.students.find((student) => student.studentId === overlay.studentId) ?? null) : null;
+  // The sheets follow the live row; a student that left the list closes the history.
+  const liveRow = (id: string | null | undefined) => (id ? (students?.find((student) => student.studentId === id) ?? null) : null);
+  const historyStudent = overlay?.kind === 'history' ? liveRow(overlay.studentId) : null;
+  const recordTarget = overlay?.kind === 'record' ? overlay.target : null;
+  // Tablet: a picked student that left the list gives the panel back to the first row.
+  const selected = panels && canRecord ? (liveRow(pickedId) ?? students[0] ?? null) : null;
 
   // ── pieces ─────────────────────────────────────────────────────────────────────────────────────
   // The sentence of the empty state links to the students section; a developer has accounts instead.
   const studentsLink: AppLink = isDeveloper ? { screen: 'developer.accounts' } : { screen: 'teacher.students' };
 
-  const header = (
-    <View style={styles.header}>
-      <PageHeader title={t.title} gap={0} />
+  const notices = (
+    <>
       {notice ? (
         <Notice
           tone={notice.tone}
@@ -179,113 +204,138 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
       {overview.isError && data ? (
         <Notice tone="error" text={errorText(overview.error, m.common.errors.generic)} testID="calls-refresh-error" />
       ) : null}
-    </View>
+    </>
   );
 
-  const renderRow = ({ item, target }: ListRenderItemInfo<CallListRow>) =>
-    item.type === 'summary' ? (
-      data ? (
-        target === 'StickyHeader' ? (
-          // FlashList keeps the in-list cell and draws this pinned copy beside it: only the cell is read.
-          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-            <SummaryBar counts={data.counts} />
-          </View>
-        ) : (
-          <SummaryBar counts={data.counts} />
-        )
-      ) : null
-    ) : (
-      <View style={styles.item}>
-        <CallRow
-          student={item.student}
-          canRecord={canRecord}
-          showTeacher={isDeveloper}
-          highlighted={flashId === item.student.studentId}
-          recordDisabled={settling}
-          onRecord={openRecord}
-          onHistory={openHistory}
-        />
-      </View>
-    );
+  // The site's summary line, as plain muted text: the chips of the rows carry the colour.
+  const summary = data ? (
+    <Text variant="small" color="textMuted" tabular accessibilityRole="summary" style={panels ? null : styles.summary} testID="calls-summary">
+      {summaryLine(data.counts, t)}
+    </Text>
+  ) : null;
 
-  return (
-    <Screen
-      testID="calls-list-screen"
-      header={<ShellAppBar title={screenTitle('calls.list', m.shell.tabs)} />}
-      bottomInset={false}
-      scroll={!data}
-      padded={!data}
-      onRefresh={data ? undefined : isLoadFailed(overview) ? refresh : undefined}
-      refreshing={refreshing}
-    >
-      {data ? (
-        <FlashList
-          ref={listRef}
-          data={rows}
-          keyExtractor={(row) => (row.type === 'summary' ? 'summary' : row.student.studentId)}
-          getItemType={(row) => row.type}
-          renderItem={renderRow}
-          // `flashId` and `settling` change what a row draws without changing the data.
-          extraData={`${flashId ?? ''}|${settling}|${canRecord}`}
-          stickyHeaderIndices={rows.length > 0 ? STICKY_SUMMARY : undefined}
-          ListHeaderComponent={header}
-          ListEmptyComponent={
-            <View style={styles.item}>
-              <EmptyState
-                title={t.emptyTitle}
-                hint={`${t.emptyBefore}${t.emptyLink}${t.emptyAfter}`}
-                action={
-                  navigation.canOpen(studentsLink) ? (
-                    <Button
-                      label={format(m.calls.empty.openSection, { section: screenTitle(studentsLink.screen, m.shell.tabs) })}
-                      variant="outline"
-                      rightIcon="forward"
-                      onPress={() => navigation.open(studentsLink)}
-                      testID="calls-empty-open"
-                    />
-                  ) : undefined
-                }
-                testID="calls-empty"
-              />
-            </View>
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.colors.accentSolid}
-              colors={[theme.colors.accentSolid]}
-              progressBackgroundColor={theme.colors.cardBg}
-            />
-          }
-          testID="calls-list"
-        />
-      ) : isLoadFailed(overview) ? (
-        <LoadFailure query={overview} testID="calls-error" />
-      ) : (
-        <LoadingState variant="cards" count={5} cardHeight={132} accessibilityLabel={m.common.a11y.loading} testID="calls-loading" />
-      )}
+  const rows = students?.map((student, index) => (
+    <CallRow
+      key={student.studentId}
+      student={student}
+      canRecord={canRecord}
+      showTeacher={isDeveloper}
+      highlighted={flashId === student.studentId}
+      selected={selected?.studentId === student.studentId}
+      divider={index < students.length - 1}
+      // A read-only viewer opens the history; there is nothing to open before the first call.
+      onPress={canRecord ? openRecord : student.totalCalls > 0 ? openHistory : undefined}
+      onLayout={noteRow}
+    />
+  ));
 
-      {canRecord ? (
+  const sheets = (
+    <>
+      {canRecord && !panels ? (
         <RecordCallSheet
-          target={overlay?.kind === 'record' ? overlay.target : null}
+          target={recordTarget}
+          student={liveRow(recordTarget?.studentId)}
+          settling={settling}
           onClose={() => setOverlay(null)}
           onSaved={onSaved}
           onMissing={onMissing}
         />
       ) : null}
       <HistorySheet student={historyStudent} showTeacher={isDeveloper} onClose={() => setOverlay(null)} />
+    </>
+  );
+
+  const header = <ShellAppBar title={screenTitle('calls.list', m.shell.tabs)} />;
+
+  if (panels) {
+    return (
+      <Screen testID="calls-list-screen" header={header} scroll={false} maxWidth="full">
+        <Panels>
+          <ScrollPanel weight={3} padded={false} scrollRef={scrollRef} refreshing={refreshing} onRefresh={refresh} testID="calls-list">
+            <View style={styles.panelHead}>
+              {notices}
+              {summary}
+            </View>
+            <View
+              onLayout={(event) => {
+                layout.current.header = 0;
+                layout.current.list = event.nativeEvent.layout.y;
+              }}
+            >
+              {rows}
+            </View>
+          </ScrollPanel>
+          {selected ? (
+            <RecordCallPanel weight={2} student={selected} settling={settling} onSaved={onSaved} onMissing={onMissing} />
+          ) : (
+            <CallJournalPanel weight={2} students={students} showTeacher={isDeveloper} />
+          )}
+        </Panels>
+        {sheets}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen
+      testID="calls-list-screen"
+      header={
+        <View
+          onLayout={(event) => {
+            layout.current.header = event.nativeEvent.layout.height;
+          }}
+        >
+          {header}
+        </View>
+      }
+      scrollRef={scrollRef}
+      // A failed first load is retried by its own button; a pull has nothing to refresh before the data.
+      onRefresh={data || isLoadFailed(overview) ? refresh : undefined}
+      refreshing={refreshing}
+    >
+      {notices}
+      {students ? (
+        students.length === 0 ? (
+          <EmptyState
+            title={t.emptyTitle}
+            hint={`${t.emptyBefore}${t.emptyLink}${t.emptyAfter}`}
+            action={
+              navigation.canOpen(studentsLink) ? (
+                <Button
+                  label={format(m.calls.empty.openSection, { section: screenTitle(studentsLink.screen, m.shell.tabs) })}
+                  variant="outline"
+                  rightIcon="forward"
+                  onPress={() => navigation.open(studentsLink)}
+                  testID="calls-empty-open"
+                />
+              ) : undefined
+            }
+            testID="calls-empty"
+          />
+        ) : (
+          <>
+            {summary}
+            <View
+              onLayout={(event) => {
+                layout.current.list = event.nativeEvent.layout.y;
+              }}
+            >
+              <ListCard testID="calls-list">{rows}</ListCard>
+            </View>
+          </>
+        )
+      ) : isLoadFailed(overview) ? (
+        <LoadFailure query={overview} testID="calls-error" />
+      ) : (
+        <LoadingState variant="list" count={5} accessibilityLabel={m.common.a11y.loading} testID="calls-loading" />
+      )}
+      {sheets}
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  // The gutters live inside the cells, not on the list: a pinned cell is laid out against the list's
-  // own edges, so the counters would otherwise touch the screen sides while they are stuck.
-  listContent: { paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.md, paddingHorizontal: t.space.gutter, paddingBottom: t.space.xs },
-  // Gaps live inside the items too: FlashList measures each cell, separators would not follow the header.
-  item: { paddingHorizontal: t.space.gutter, paddingTop: t.space.xs, paddingBottom: t.space.xs },
+  // Stands where a section caption would: one muted line above the card.
+  summary: { paddingHorizontal: t.space.xxs },
+  panelHead: { gap: t.space.md, paddingHorizontal: t.space.card, paddingTop: t.space.sm, paddingBottom: t.space.xs },
 }));

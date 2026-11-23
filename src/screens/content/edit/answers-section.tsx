@@ -1,27 +1,24 @@
+import { useRef } from 'react';
 import { View } from 'react-native';
 
 import type { TopicNumber } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Badge, Card, EmptyState, Icon, IconButton, Select, Text, type BadgeTone } from '@/ui';
+import { EmptyState, IconButton, ListRow, Select, Text } from '@/ui';
 
-import { hasLatex, numberFillStatus, type NumberFillStatus } from '../shared/number-fill-status';
+import { hasLatex, numberFillStatus } from '../shared/number-fill-status';
 
 import { ANSWERS_PAGE_SIZE, clampPage, countFilled, pageCountOf, pageRange, pageSlice } from './topic-edit';
-
-// SPEC-GAP: the site paints «Частично заполнено» with the accent badge; the kit has no accent badge, so
-// the neutral outline stands in (same choice as the single-number screen).
-const FILL_TONE: Record<NumberFillStatus, BadgeTone> = { full: 'GREEN', partial: 'neutral', empty: 'none' };
 
 export type AnswersSectionProps = {
   numbers: readonly TopicNumber[];
   /** 1-based page of the list; the screen keeps it while other sections are shown. */
   page: number;
   onPageChange: (page: number) => void;
-  /** The number the screen was opened for (the site's `?number=N`): its row is ringed. */
+  /** The number the screen was opened for (the site's `?number=N`): its row is filled. */
   highlightedId?: string;
-  /** Vertical offset of the ringed row inside this section, once it is laid out (the screen scrolls to it). */
+  /** Vertical offset of the highlighted row inside this section, once it is laid out (the screen scrolls to it). */
   onHighlightLayout?: (y: number) => void;
   /** Opens the single-number editor. */
   onOpenNumber: (number: TopicNumber) => void;
@@ -29,8 +26,9 @@ export type AnswersSectionProps = {
 
 /**
  * «Условия и ответы к заданиям» (site: `TopicAnswerManager`, docs/spec/07-developer-content.md §1.3.2 and
- * its phone mapping): the topic's numbers ten per page with their fill badges. A row opens the
- * single-number editor (`content.number`) instead of editing ten LaTeX cards inline.
+ * its phone mapping): the topic's numbers ten per page, each a row with one caption — what is filled. A row
+ * opens the single-number editor (`content.number`) instead of editing ten LaTeX cards inline. Rendered
+ * inside a card: the rows bring no padding of their own.
  */
 export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout, onPageChange, onOpenNumber }: AnswersSectionProps) {
   const styles = useStyles();
@@ -43,6 +41,14 @@ export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout
   const range = pageRange(total, current);
   const filled = countFilled(numbers);
   const visible = pageSlice(numbers, current);
+  // The highlighted row sits inside the list, the list inside the section: its offset in the section is
+  // known once both have been laid out, in whichever order that happens.
+  const offsets = useRef<{ list: number | null; row: number | null }>({ list: null, row: null });
+  const reportHighlight = (part: 'list' | 'row', y: number) => {
+    offsets.current[part] = y;
+    const { list, row } = offsets.current;
+    if (list !== null && row !== null) onHighlightLayout?.(list + row);
+  };
 
   const pager = (placement: 'top' | 'bottom') => (
     <View style={styles.pager}>
@@ -67,7 +73,7 @@ export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout
           testID="answers-page-select"
         />
       ) : (
-        <Text variant="smallStrong" align="center" tabular style={styles.grow} testID="answers-page-of">
+        <Text variant="small" color="textMuted" align="center" tabular style={styles.grow} testID="answers-page-of">
           {format(a.pageOf, { page: current, total: pageCount })}
         </Text>
       )}
@@ -83,14 +89,10 @@ export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout
 
   return (
     <View style={styles.root} testID="edit-answers">
-      <View style={styles.head}>
-        <Text variant="sectionTitle" accessibilityRole="header">
-          {t.answersTitle}
-        </Text>
-        <Hint>
-          <Text variant="hint">{t.answersDescription}</Text>
-        </Hint>
-      </View>
+      {/* No title of its own: the section switch above already names it. */}
+      <Hint>
+        <Text variant="hint">{t.answersDescription}</Text>
+      </Hint>
 
       {total === 0 ? (
         // SPEC-GAP: the site's manager has no empty state (a saved topic always has numbers); a topic
@@ -98,59 +100,48 @@ export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout
         <EmptyState title={dict.topics.viewNumbers.emptyTitle} testID="answers-empty" />
       ) : (
         <>
-          <Card variant="soft" padded={14} style={styles.toolbar} accessibilityLabel={a.navTitle}>
-            <Text variant="smallStrong" tabular testID="answers-range">
+          <View style={styles.toolbar} accessibilityLabel={a.navTitle}>
+            <Text variant="small" color="textMuted" tabular testID="answers-range">
               {format(a.shownRange, { start: range.start, end: range.end, total })}
             </Text>
             <Hint>
-              <Text variant="caption" color="textMuted" testID="answers-summary">
+              <Text variant="hint" testID="answers-summary">
                 {format(a.savedSummary, { conditions: filled.conditions, answers: filled.answers, total, pageSize: ANSWERS_PAGE_SIZE })}
               </Text>
             </Hint>
             {pageCount > 1 ? pager('top') : null}
-          </Card>
+          </View>
 
-          {visible.map((entry) => {
-            const hasCondition = hasLatex(entry.conditionLatex);
-            const hasAnswer = hasLatex(entry.answerLatex);
-            const fill = numberFillStatus(entry.conditionLatex, entry.answerLatex);
-            const card = (
-              <Card
-                key={entry.id}
-                variant="outline"
-                padded={14}
-                selected={entry.id === highlightedId}
-                onPress={() => onOpenNumber(entry)}
-                accessibilityLabel={`${a.cardKicker}: ${format(m.content.edit.openNumber, { number: entry.number })}. ${a.status[fill]}`}
-                // The two badges under the head are part of what the row shows.
-                accessibilityParts={[hasCondition ? a.hasCondition : a.noCondition, hasAnswer ? a.hasAnswer : a.noAnswer]}
-                style={styles.row}
-                testID={`answers-number-${entry.number}`}
-              >
-                <View style={styles.rowHead}>
-                  {/* The site's card kicker («Материалы к номеру») stays in the accessible name only: on a
-                      phone row it pushed the status badge onto a second line. */}
-                  <Text variant="numberTitle" style={styles.grow}>
-                    {format(dict.topics.widgets.numberLabel, { number: entry.number })}
-                  </Text>
-                  <Badge tone={FILL_TONE[fill]} label={a.status[fill]} />
-                  <Icon name="chevronRight" size={18} color="textMuted" />
+          <View onLayout={highlightedId ? (event) => reportHighlight('list', event.nativeEvent.layout.y) : undefined}>
+            {visible.map((entry, index) => {
+              const hasCondition = hasLatex(entry.conditionLatex);
+              const fill = numberFillStatus(entry.conditionLatex, entry.answerLatex);
+              // One caption: what the number has; a half-filled one names what is missing.
+              const caption = fill === 'partial' ? (hasCondition ? a.noAnswer : a.noCondition) : a.status[fill];
+              const row = (
+                <ListRow
+                  key={entry.id}
+                  inset={0}
+                  title={format(dict.topics.widgets.numberLabel, { number: entry.number })}
+                  subtitle={caption}
+                  selected={entry.id === highlightedId}
+                  divider={index < visible.length - 1}
+                  style={entry.id === highlightedId ? styles.highlighted : undefined}
+                  onPress={() => onOpenNumber(entry)}
+                  accessibilityLabel={`${a.cardKicker}: ${format(m.content.edit.openNumber, { number: entry.number })}. ${caption}`}
+                  testID={`answers-number-${entry.number}`}
+                />
+              );
+              // Only the highlighted row reports where it is.
+              return entry.id === highlightedId && onHighlightLayout ? (
+                <View key={entry.id} onLayout={(event) => reportHighlight('row', event.nativeEvent.layout.y)}>
+                  {row}
                 </View>
-                <View style={styles.badges}>
-                  <Badge tone={hasCondition ? 'GREEN' : 'none'} label={hasCondition ? a.hasCondition : a.noCondition} />
-                  <Badge tone={hasAnswer ? 'GREEN' : 'none'} label={hasAnswer ? a.hasAnswer : a.noAnswer} />
-                </View>
-              </Card>
-            );
-            // Only the ringed row reports where it is; the wrapper keeps the column's spacing.
-            return entry.id === highlightedId && onHighlightLayout ? (
-              <View key={entry.id} onLayout={(event) => onHighlightLayout(event.nativeEvent.layout.y)}>
-                {card}
-              </View>
-            ) : (
-              card
-            );
-          })}
+              ) : (
+                row
+              );
+            })}
+          </View>
 
           {pageCount > 1 ? pager('bottom') : null}
         </>
@@ -161,11 +152,9 @@ export function AnswersSection({ numbers, page, highlightedId, onHighlightLayout
 
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.md },
-  head: { gap: t.space.xxs, marginBottom: t.space.xxs },
   toolbar: { gap: t.space.sm },
   pager: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   grow: { flex: 1, minWidth: 0 },
-  row: { gap: t.space.sm },
-  rowHead: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
+  // The rows have no side padding inside the card: the fill of the highlighted one gets its own.
+  highlighted: { marginHorizontal: -t.space.sm, paddingHorizontal: t.space.sm, borderRadius: t.radii.md },
 }));

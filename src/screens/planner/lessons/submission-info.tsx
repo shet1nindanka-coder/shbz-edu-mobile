@@ -4,8 +4,8 @@ import type { LessonBoardSubmission } from '@/api/types';
 import { PhotoThumb } from '@/components/files';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Chip, Spinner, Text } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Spinner, Text } from '@/ui';
 
 import { minutesAgo } from './board-logic';
 
@@ -19,21 +19,21 @@ export type SubmissionInfoProps = {
   live: boolean;
   /** Opens the photos of the submission full screen at `index`. */
   onOpenPhoto: (index: number) => void;
-  /** «№ 215»: every row has photos, so their names carry the number. */
+  /** «№ 215»: every number has photos, so their names carry the number. */
   numberLabel?: string;
   testID?: string;
 };
 
-const PHOTO_SIZE = 56;
-
 /**
  * The latest submission of a lesson item (docs/spec/05-teacher-lessons-plans.md §1.3 "Submission info
- * line"): when it was sent and how long the problem took, the check state, the teacher-only flags and
- * the photos. Correct / incorrect verdicts set the result automatically, so only "not recognised" and
- * the instruction-text flag are spelled out.
+ * line"; layout: mockup `T-board`): the photos, and next to them when it was sent and how long the problem
+ * took, the check state and the teacher-only remarks. Correct / incorrect verdicts set the result
+ * automatically, so only "not recognised" and the instruction-text flag are spelled out — in red, because
+ * the number then waits for the teacher.
  */
 export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhoto, numberLabel, testID }: SubmissionInfoProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, locale } = useI18n();
   const t = dict.planner.lessonBoard;
   const checking = submission.status === 'PENDING' || submission.status === 'CHECKING';
@@ -50,32 +50,6 @@ export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhot
 
   return (
     <View style={styles.block} testID={testID}>
-      {checking ? (
-        <View accessibilityRole="progressbar" accessibilityLabel={t.checking} style={styles.checking}>
-          <Spinner size={14} color="accentSolid" />
-          <Text variant="captionStrong" color="textMuted">
-            {t.checking}
-          </Text>
-        </View>
-      ) : (
-        <Text variant="caption" color="textSoft" tabular>
-          {typeof spentMinutes === 'number' ? `${submitted} · ${format(t.minutesOnNumber, { n: spentMinutes })}` : submitted}
-        </Text>
-      )}
-      {submission.status === 'FAILED' ? (
-        <Text variant="captionStrong" color="dangerText">
-          {t.checkFailed}
-        </Text>
-      ) : null}
-      {submission.status === 'DONE' && submission.verdict === 'UNCERTAIN' ? <Chip tone="muted" label={t.uncertain} /> : null}
-      {injection ? (
-        // Teacher-only: the model found an instruction to the checker on the photo. The verdict is untouched.
-        <View accessible accessibilityLabel={injection} style={styles.injection}>
-          <Text variant="captionStrong" color="dangerText">
-            {injection}
-          </Text>
-        </View>
-      ) : null}
       {submission.photoFileIds.length > 0 ? (
         <View style={styles.photos}>
           {submission.photoFileIds.map((fileId, index) => (
@@ -85,25 +59,49 @@ export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhot
               fileId={fileId}
               name={numberLabel}
               position={{ index, total: submission.photoFileIds.length }}
-              size={PHOTO_SIZE}
+              size={theme.sizes.control.lg}
               onPress={() => onOpenPhoto(index)}
             />
           ))}
         </View>
       ) : null}
+      <View style={styles.texts}>
+        {checking ? (
+          <View accessibilityRole="progressbar" accessibilityLabel={t.checking} style={styles.checking}>
+            <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
+            <Text variant="small" color="textMuted">
+              {t.checking}
+            </Text>
+          </View>
+        ) : (
+          <Text variant="small" color="textMuted" tabular>
+            {typeof spentMinutes === 'number' ? `${submitted} · ${format(t.minutesOnNumber, { n: spentMinutes })}` : submitted}
+          </Text>
+        )}
+        {submission.status === 'FAILED' ? (
+          <Text variant="small" color="redText">
+            {t.checkFailed}
+          </Text>
+        ) : null}
+        {submission.status === 'DONE' && submission.verdict === 'UNCERTAIN' ? (
+          <Text variant="small" color="redText">
+            {t.uncertain}
+          </Text>
+        ) : null}
+        {injection ? (
+          // Teacher-only: the model found an instruction to the checker on the photo. The verdict is untouched.
+          <Text variant="small" color="redText">
+            {injection}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  block: { gap: t.space.xs, alignItems: 'flex-start' },
+  block: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  photos: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs, flexShrink: 0, maxWidth: '60%' },
+  texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
   checking: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-  injection: {
-    alignSelf: 'stretch',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: t.radii.sm,
-    backgroundColor: t.colors.tabHover,
-  },
-  photos: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs, paddingTop: 2 },
 }));

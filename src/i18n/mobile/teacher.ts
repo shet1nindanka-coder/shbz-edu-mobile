@@ -1,10 +1,35 @@
 // Mobile-only strings of the teacher area (overview, students, homework review, assigning, reports).
 // Site texts stay in `dict.students.*` and `dict.teacherHome`.
 const ru = {
+  // Overview (`teacher.home`): the nearest lesson, who needs attention, everybody's progress.
+  home: {
+    // The lesson card: when the nearest lesson is («Сегодня в 17:00 · 11А») over its title.
+    lessonNow: "Идёт сейчас",
+    lessonToday: "Сегодня в {time}",
+    lessonTomorrow: "Завтра в {time}",
+    lessonOn: "{date} в {time}",
+    // «Сегодня в 17:00 · 11А»: the when-line with the group or the only student of the lesson.
+    lessonWith: "{when} · {who}",
+    openBoard: "Открыть доску",
+    openBoardOf: "Открыть доску: {title}, {when}",
+    attention: "Требуют внимания",
+    attentionEmpty: "Сейчас никто не требует внимания",
+    // One caption per student: how many numbers are marked «нужна помощь».
+    needHelpForms: ["{n} номер «нужна помощь»", "{n} номера «нужна помощь»", "{n} номеров «нужна помощь»"],
+    callsLine: "{label}: {n}",
+    upcoming: "Ближайшие занятия",
+    progress: "Прогресс",
+    allStudents: "Все ученики",
+    // Screen-reader name of a progress row: «Илья Смирнов. 31 решил сам · 6 исправил».
+    progressA11y: "{name}. {breakdown}",
+    progressEmptyA11y: "{name}. Пока нет отмеченных номеров"
+  },
   // Students list (`teacher.students`): wording the site does not have, and touch wording for its "click" hints.
   students: {
     // The site shows three buttons per row; a phone row has one "⋯" that opens them in a sheet.
     actionsFor: "Действия: {name}",
+    // The one fact on the right of a student row: how many numbers the student has closed.
+    solved: "решено {n}",
     copyHint: "Нажмите, чтобы скопировать",
     suggestPickHint: "Нажмите, чтобы подставить"
   },
@@ -22,6 +47,11 @@ const ru = {
     open: "Открыть отчёт"
   },
   review: {
+    // Heading of the rows of a homework that wait for the teacher: «Нужно проверить · 5».
+    toCheck: "Нужно проверить",
+    nothingToCheck: "Проверять пока нечего",
+    // Part of a homework's caption: «до завтра, 23:59 · 5 номеров ждут проверки».
+    toCheckForms: ["{n} номер ждёт проверки", "{n} номера ждут проверки", "{n} номеров ждут проверки"],
     // A status group has no visible caption on a phone; this is its accessible name.
     statusAria: "Статус номера {n}",
     // The site's review tab hides the statement; on a phone it opens on demand under the number.
@@ -67,8 +97,27 @@ const ru = {
 };
 
 const en: typeof ru = {
+  home: {
+    lessonNow: "On now",
+    lessonToday: "Today at {time}",
+    lessonTomorrow: "Tomorrow at {time}",
+    lessonOn: "{date} at {time}",
+    lessonWith: "{when} · {who}",
+    openBoard: "Open the board",
+    openBoardOf: "Open the board: {title}, {when}",
+    attention: "Needs attention",
+    attentionEmpty: "Nobody needs attention right now",
+    needHelpForms: ["{n} problem marked “needs help”", "{n} problems marked “needs help”"],
+    callsLine: "{label}: {n}",
+    upcoming: "Upcoming lessons",
+    progress: "Progress",
+    allStudents: "All students",
+    progressA11y: "{name}. {breakdown}",
+    progressEmptyA11y: "{name}. No marked problems yet"
+  },
   students: {
     actionsFor: "Actions: {name}",
+    solved: "{n} solved",
     copyHint: "Tap to copy",
     suggestPickHint: "Tap to use it"
   },
@@ -81,6 +130,9 @@ const en: typeof ru = {
     open: "Open the report"
   },
   review: {
+    toCheck: "To check",
+    nothingToCheck: "Nothing to check yet",
+    toCheckForms: ["{n} problem to check", "{n} problems to check"],
     statusAria: "Status of problem {n}",
     hideCondition: "Hide the statement and answer",
     noCondition: "No statement has been added for this problem.",

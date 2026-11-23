@@ -24,8 +24,9 @@ export type DonutChartProps = {
 };
 
 /**
- * The donut of «Как решаются выданные ДЗ» (the site's conic gradient): one arc per non-empty segment,
- * clockwise from the top, with the solved share in the middle. Nothing issued → one neutral ring.
+ * The donut of «Как решаются выданные ДЗ» (the site's conic gradient): one arc per non-empty segment in
+ * its status colour, clockwise from the top, with the solved share in the middle. Nothing issued → one
+ * neutral ring.
  */
 export function DonutChart({ segments, total, centerValue, centerLabel, accessibilityLabel }: DonutChartProps) {
   const styles = useStyles();
@@ -35,7 +36,7 @@ export function DonutChart({ segments, total, centerValue, centerLabel, accessib
   return (
     <View style={styles.root} accessible accessibilityRole="image" accessibilityLabel={accessibilityLabel} testID="stats-donut">
       <Svg width={SIZE} height={SIZE}>
-        <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke={theme.colors.progressTrack} strokeWidth={STROKE} />
+        <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" stroke={theme.colors.soft2} strokeWidth={STROKE} />
         {arcs.map((arc) => (
           <Circle
             key={arc.key}

@@ -66,6 +66,14 @@ export function groupCardSubline(
   return group.grade ? `${format(t.grade, { n: group.grade })} · ${created}` : created;
 }
 
+/**
+ * The one caption of a group row: «8 класс · 4 ученика» — the grade part only when it is set. `students`
+ * is the counted word form («4 ученика»), which the caller declines for its locale.
+ */
+export function groupRowCaption(group: Pick<GroupListItem, "grade">, students: string, t: GroupsDict["list"]): string {
+  return group.grade ? `${format(t.grade, { n: group.grade })} · ${students}` : students;
+}
+
 /** First three names and «и ещё N»; «Учеников пока нет.» for an empty group. */
 export function memberNamesLine(members: readonly { name: string }[], t: GroupsDict["list"]): string {
   if (members.length === 0) return t.noStudents;
@@ -185,6 +193,11 @@ export function summaryTiles(stats: GroupStatisticsResponse, t: GroupsDict["stat
 // ───────────────────────────── attendance ─────────────────────────────
 
 export type AttendanceCell = { participantId: string; attendance: AttendanceStatus };
+
+/** «5 / 6» — the row total of the table, without the percent (the tiles of the row already show it). */
+export function attendanceRatioText(summary: AttendanceSummary): string {
+  return summary.counted === 0 ? "—" : `${summary.attended} / ${summary.counted}`;
+}
 
 /** The cell of every student that took part in the lesson, by student id. */
 export function lessonCells(lesson: Pick<GroupAttendanceLesson, "participants">): Map<string, AttendanceCell> {

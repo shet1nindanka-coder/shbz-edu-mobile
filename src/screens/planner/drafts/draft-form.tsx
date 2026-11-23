@@ -10,8 +10,8 @@ import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation, useStillHere } from '@/navigation';
 import { useHintsEnabled } from '@/providers';
-import { makeStyles } from '@/theme';
-import { Button, CheckRow, DateTimeField, Notice, Screen, Select, Text, TextArea, useStatusAnnouncement } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, Card, CheckRow, DateTimeField, Notice, Panel, Panels, Screen, SectionCaption, Select, Text, TextArea, useStatusAnnouncement } from '@/ui';
 
 import { DurationStepper } from '../lessons/duration-stepper';
 import { checkedMemberIds, toggleId } from '../lessons/new-lesson-logic';
@@ -21,8 +21,8 @@ import { buildDraftInput, draftBudget, initialTopicId, validateDraftForm, type D
 
 export type DraftFormProps = {
   form: HomeworkPlanNewModel;
-  /** App bar of the screen. */
-  header: ReactNode;
+  /** Builds the header of the screen; on a tablet the form hands it its main button. */
+  header: (aside?: ReactNode) => ReactNode;
   /** Notice shown above the fields (a failed refresh of the form data). */
   top?: ReactNode;
 };
@@ -30,11 +30,14 @@ export type DraftFormProps = {
 /**
  * The homework-draft create form (`TeacherHomeworkPlanCreateForm`, docs/spec/05-teacher-lessons-plans.md
  * §1.6): exactly one topic, the date of the next lesson (it becomes the deadline), minutes per day, a note
- * for AI and the students. There is no title field. Submitting creates the draft and opens its board for
- * EVERY `plan` outcome — the draft exists even when AI selection was refused.
+ * for AI in one card, the students in another. There is no title field. Submitting — the one main button:
+ * under the form on a phone, in the header on a tablet, where the two cards stand side by side — creates
+ * the draft and opens its board for EVERY `plan` outcome: the draft exists even when AI selection was
+ * refused.
  */
 export function DraftForm({ form, header, top }: DraftFormProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
@@ -96,121 +99,161 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
     create.mutate(buildDraftInput({ topicId, deadlineAt, dailyMinutes, teacherNote, studentIds: checkedIds }, form));
   };
 
+  const submitButton = (
+    <Button
+      label={create.isPending ? t.creating : t.submit}
+      size={theme.tablet ? 'md' : 'lg'}
+      fullWidth={!theme.tablet}
+      loading={create.isPending}
+      disabled={nobodyChecked || wait.waiting}
+      onPress={submit}
+      testID="draft-new-submit"
+    />
+  );
+
+  const notices = (
+    <>
+      {top}
+      {error ? <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="draft-new-error" /> : null}
+    </>
+  );
+
+  const fields = (
+    <>
+      <Select
+        label={t.topicLabel}
+        options={form.topics.map((topic) => ({ value: topic.id, label: topic.title }))}
+        value={topicId}
+        onChange={(next) => {
+          setPickedTopicId(next);
+          if (problem === 'pickTopic') setProblem(null);
+        }}
+        placeholder={dict.topics.widgets.selectPlaceholder}
+        closeLabel={m.common.actions.close}
+        error={problem === 'pickTopic' ? t.pickTopic : null}
+        helper={hints ? t.topicHint : undefined}
+        testID="draft-new-topic"
+      />
+
+      <DateTimeField
+        label={t.nextLessonLabel}
+        value={deadlineAt}
+        onChange={(next) => {
+          setDeadlineAt(next);
+          if (problem === 'pickDeadline' && next) setProblem(null);
+        }}
+        today={mskToday()}
+        placeholder={t.dateTimePlaceholder}
+        labels={dateTimeLabels}
+        locale={locale}
+        error={problem === 'pickDeadline' ? t.pickDeadline : null}
+        helper={hints ? `${t.nextLessonHint} · ${m.common.dateTime.moscowTime}` : m.common.dateTime.moscowTime}
+        disabled={create.isPending}
+        testID="draft-new-deadline"
+      />
+
+      <View style={styles.field}>
+        <Text variant="label">{t.dailyMinutesLabel}</Text>
+        {/* Same range and step as a lesson's duration: 15…240 minutes in steps of 5. */}
+        <DurationStepper value={dailyMinutes} onChange={setDailyMinutes} accessibilityLabel={t.dailyMinutesLabel} testID="draft-new-daily-minutes" />
+        {budget ? (
+          <Text variant="small" color="textMuted" tabular testID="draft-new-budget">
+            {format(plural(locale, budget.days, m.planner.draftNew.budgetForms), { minutes: budget.minutes, total: budget.total })}
+          </Text>
+        ) : hints ? (
+          <Text variant="small" color="textMuted">
+            {t.dailyMinutesHint}
+          </Text>
+        ) : null}
+      </View>
+
+      <TextArea
+        label={t.noteLabel}
+        labelAside={
+          <Text variant="small" color="textMuted" tabular>
+            {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
+          </Text>
+        }
+        value={teacherNote}
+        onChangeText={setTeacherNote}
+        placeholder={t.notePlaceholder}
+        maxLength={META_LIMITS.maxTeacherNoteLength}
+        testID="draft-new-note"
+      />
+    </>
+  );
+
+  const students = (
+    <>
+      {form.members.map((member) => (
+        <CheckRow
+          key={member.id}
+          label={member.name}
+          checked={checkedIds.includes(member.id)}
+          onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
+          testID={`draft-new-student-${member.id}`}
+        />
+      ))}
+      {nobodyChecked ? (
+        <Text variant="small" color="redText" accessibilityRole="alert">
+          {dict.apiPlanner.lessons.selectAtLeastOneStudent}
+        </Text>
+      ) : null}
+    </>
+  );
+
+  if (theme.tablet) {
+    return (
+      <Screen testID="draft-new-form" header={header(submitButton)} scroll={false} maxWidth="full">
+        {notices}
+        {/* Next to nothing it could be dismissed with: the reason stays as long as the button is locked. */}
+        <RetryWaitLine seconds={wait.seconds} testID="draft-new-wait" />
+        <Panels>
+          <Panel weight={3} contentStyle={styles.fields}>
+            {fields}
+          </Panel>
+          <Panel
+            weight={2}
+            contentStyle={styles.students}
+            header={
+              <Text variant="sectionTitle" accessibilityRole="header">
+                {t.studentsLabel}
+              </Text>
+            }
+          >
+            {students}
+          </Panel>
+        </Panels>
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       testID="draft-new-form"
-      header={header}
+      header={header()}
       scrollRef={scrollRef}
-      contentContainerStyle={styles.content}
       footer={
         <View style={styles.footer}>
-          <Button
-            label={create.isPending ? t.creating : t.submit}
-            size="lg"
-            fullWidth
-            loading={create.isPending}
-            disabled={nobodyChecked || wait.waiting}
-            onPress={submit}
-            testID="draft-new-submit"
-          />
+          {submitButton}
           <RetryWaitLine seconds={wait.seconds} testID="draft-new-wait" />
         </View>
       }
     >
-      <View style={styles.form}>
-        {top}
-        {error ? <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="draft-new-error" /> : null}
-
-        <Select
-          label={t.topicLabel}
-          options={form.topics.map((topic) => ({ value: topic.id, label: topic.title }))}
-          value={topicId}
-          onChange={(next) => {
-            setPickedTopicId(next);
-            if (problem === 'pickTopic') setProblem(null);
-          }}
-          placeholder={dict.topics.widgets.selectPlaceholder}
-          closeLabel={m.common.actions.close}
-          error={problem === 'pickTopic' ? t.pickTopic : null}
-          helper={hints ? t.topicHint : undefined}
-          testID="draft-new-topic"
-        />
-
-        <DateTimeField
-          label={t.nextLessonLabel}
-          value={deadlineAt}
-          onChange={(next) => {
-            setDeadlineAt(next);
-            if (problem === 'pickDeadline' && next) setProblem(null);
-          }}
-          today={mskToday()}
-          placeholder={t.dateTimePlaceholder}
-          labels={dateTimeLabels}
-          locale={locale}
-          error={problem === 'pickDeadline' ? t.pickDeadline : null}
-          helper={hints ? `${t.nextLessonHint} · ${m.common.dateTime.moscowTime}` : m.common.dateTime.moscowTime}
-          disabled={create.isPending}
-          testID="draft-new-deadline"
-        />
-
-        <View style={styles.field}>
-          <Text variant="label">{t.dailyMinutesLabel}</Text>
-          {/* Same range and step as a lesson's duration: 15…240 minutes in steps of 5. */}
-          <DurationStepper value={dailyMinutes} onChange={setDailyMinutes} accessibilityLabel={t.dailyMinutesLabel} testID="draft-new-daily-minutes" />
-          {budget ? (
-            <Text variant="caption" color="textMuted" tabular testID="draft-new-budget">
-              {format(plural(locale, budget.days, m.planner.draftNew.budgetForms), { minutes: budget.minutes, total: budget.total })}
-            </Text>
-          ) : hints ? (
-            <Text variant="caption" color="textMuted">
-              {t.dailyMinutesHint}
-            </Text>
-          ) : null}
-        </View>
-
-        <TextArea
-          label={t.noteLabel}
-          labelAside={
-            <Text variant="caption" color="textMuted" tabular>
-              {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
-            </Text>
-          }
-          value={teacherNote}
-          onChangeText={setTeacherNote}
-          placeholder={t.notePlaceholder}
-          maxLength={META_LIMITS.maxTeacherNoteLength}
-          testID="draft-new-note"
-        />
-
-        <View style={styles.field}>
-          <Text variant="label">{t.studentsLabel}</Text>
-          <View style={styles.students}>
-            {form.members.map((member) => (
-              <CheckRow
-                key={member.id}
-                label={member.name}
-                checked={checkedIds.includes(member.id)}
-                onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
-                testID={`draft-new-student-${member.id}`}
-              />
-            ))}
-          </View>
-          {nobodyChecked ? (
-            <Text variant="captionMedium" color="redText" accessibilityRole="alert">
-              {dict.apiPlanner.lessons.selectAtLeastOneStudent}
-            </Text>
-          ) : null}
-        </View>
+      {notices}
+      <Card style={styles.fields}>{fields}</Card>
+      <View style={styles.section}>
+        <SectionCaption>{t.studentsLabel}</SectionCaption>
+        <Card style={styles.students}>{students}</Card>
       </View>
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  // A form starts right under the app bar; the page's 32 pt top padding is for screens with a page header.
-  content: { paddingTop: t.space.lg, paddingBottom: t.space.lg },
-  form: { gap: t.space.lg },
-  field: { gap: t.space.sm },
-  students: { gap: t.space.sm },
+  fields: { gap: t.space.lg },
+  field: { gap: t.space.xs },
+  section: { gap: t.space.xs },
+  students: { gap: t.space.xs },
   footer: { gap: t.space.xs },
 }));

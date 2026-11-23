@@ -28,8 +28,8 @@ export function ScheduleBanner({ pending, disabled, onSchedule }: ScheduleBanner
   const instant = value ? parseMskDateTimeInput(value) : null;
 
   return (
-    <Card variant="soft" style={styles.card} testID="lesson-schedule-banner">
-      <Text variant="smallStrong">{t.noTime}</Text>
+    <Card style={styles.card} testID="lesson-schedule-banner">
+      <Text variant="bodyStrong">{t.noTime}</Text>
       <DateTimeField
         value={value}
         onChange={setValue}

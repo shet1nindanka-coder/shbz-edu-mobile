@@ -3,7 +3,6 @@ import { useState } from 'react';
 
 import { errorText, useApi } from '@/api';
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
 import { Dialog, Notice, Text } from '@/ui';
 
 import { isStudentGone } from './error-text';
@@ -28,7 +27,6 @@ export type DeleteStudentDialogProps = {
  * it can be restored.
  */
 export function DeleteStudentDialog({ student, onClose, onDeleted, onMissing }: DeleteStudentDialogProps) {
-  const styles = useStyles();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict } = useI18n();
@@ -66,7 +64,6 @@ export function DeleteStudentDialog({ student, onClose, onDeleted, onMissing }: 
   return (
     <Dialog
       visible={student !== null}
-      kicker={confirm.kicker}
       title={t.deleteTitle}
       confirmLabel={confirm.confirm}
       pendingLabel={confirm.pending}
@@ -80,9 +77,9 @@ export function DeleteStudentDialog({ student, onClose, onDeleted, onMissing }: 
       onCancel={cancel}
       testID="delete-student-dialog"
     >
-      <Text variant="small" color="label" style={styles.paragraph}>
+      <Text variant="body" color="label">
         {t.deleteBefore}
-        <Text variant="smallStrong" color="textStrong">
+        <Text variant="bodyStrong" color="textStrong">
           {`«${shown?.name ?? ''}»`}
         </Text>
         {t.deleteAfter}
@@ -91,7 +88,3 @@ export function DeleteStudentDialog({ student, onClose, onDeleted, onMissing }: 
     </Dialog>
   );
 }
-
-const useStyles = makeStyles(() => ({
-  paragraph: { lineHeight: 24 },
-}));

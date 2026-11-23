@@ -4,11 +4,11 @@ import { ScrollView, View, type ScrollViewInstance } from 'react-native';
 import type { GroupAttendanceLesson, GroupAttendanceResponse } from '@/api/types';
 import { formatDateTime, formatMsk } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Card, PressableScale, Text } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Card, PressableScale, Text, useInsideSurface } from '@/ui';
 
-import { attendanceTotalText, lessonCells, memberAttendanceSummary, type AttendanceCell } from '../logic';
-import { AttendancePill } from './attendance-pill';
+import { attendanceRatioText, attendanceTotalText, lessonCells, memberAttendanceSummary, type AttendanceCell } from '../logic';
+import { AttendanceTile, useAttendanceTileLabel } from './attendance-tile';
 
 type Member = GroupAttendanceResponse['members'][number];
 
@@ -28,24 +28,27 @@ export type AttendanceTableProps = {
   onOpenLesson?: (lesson: GroupAttendanceLesson) => void;
 };
 
-// 108 + 2.5 × 62 + 96 ≈ a 390pt screen: the half-visible third lesson shows that the lessons scroll.
-const NAME_WIDTH = 108;
-const CELL_WIDTH = 62;
-const TOTAL_WIDTH = 96;
-const HEADER_HEIGHT = 44;
-const ROW_HEIGHT = 52;
+// The name column: a phone keeps room for the tiles (the lessons scroll sideways), a tablet panel has
+// the width for a whole name.
+const NAME_WIDTH = { phone: 112, tablet: 200 } as const;
+const TOTAL_WIDTH = 64;
 
 /**
- * The attendance matrix (06 §1.2 item 6, Q4): students down, lessons across, the name column pinned
- * while the lessons scroll sideways. It opens scrolled to the newest lessons and the row totals.
+ * The attendance matrix (06 §1.2 item 6, Q4; mockup `T-groups`): students down, lessons across, every
+ * mark a 44 pt tile. The name column is pinned while the lessons scroll sideways; the table opens
+ * scrolled to the newest lessons and the row totals.
  */
 export function AttendanceTable({ members, lessons, busy, disabled, onToggle, onChoose, onOpenLesson }: AttendanceTableProps) {
   const styles = useStyles();
+  const theme = useTheme();
+  const inside = useInsideSurface();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.groups.attendance;
   const labels = dict.planner.attendance.labels;
+  const tileLabel = useAttendanceTileLabel();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const scrolledToEnd = useRef(false);
+  const nameWidth = theme.tablet ? NAME_WIDTH.tablet : NAME_WIDTH.phone;
 
   const columns = useMemo(
     () =>
@@ -57,78 +60,80 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
     [lessons, locale],
   );
 
-  return (
-    <Card padded={false} testID="attendance-table">
-      {/* The clip lives on an inner box: on iOS `overflow: hidden` on the card itself would clip its own
-          layer shadow (clipsToBounds), and this card would be the only one without one. */}
-      <View style={styles.clip}>
-        <View style={styles.names}>
-          <View style={[styles.headerRow, styles.headerCell, styles.nameCell]}>
-            <Text variant="kickerSm" numberOfLines={1}>
-              {t.student}
+  const table = (
+    // The clip lives on an inner box: on iOS `overflow: hidden` on the card itself would clip its own
+    // layer shadow (clipsToBounds), and this card would be the only one without one.
+    <View style={[styles.clip, inside ? null : styles.clipCard]}>
+      <View style={{ width: nameWidth }}>
+        <View style={[styles.headerRow, styles.cell, inside ? null : styles.nameCell]}>
+          <Text variant="smallStrong" color="textMuted" numberOfLines={1}>
+            {t.student}
+          </Text>
+        </View>
+        {members.map((member) => (
+          <View key={member.id} style={[styles.bodyRow, styles.cell, inside ? null : styles.nameCell]}>
+            <Text variant="bodyStrong" numberOfLines={2}>
+              {member.name}
             </Text>
           </View>
-          {members.map((member) => (
-            <View key={member.id} style={[styles.bodyRow, styles.rowCell, styles.nameCell]}>
-              <Text variant="captionStrong" color="textStrong" numberOfLines={2}>
-                {member.name}
+        ))}
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        // The newest lessons and the totals are what a teacher marks: start at the right edge, once.
+        onContentSizeChange={() => {
+          if (scrolledToEnd.current) return;
+          scrolledToEnd.current = true;
+          scrollRef.current?.scrollToEnd({ animated: false });
+        }}
+        testID="attendance-table-scroll"
+      >
+        <View>
+          <View style={[styles.row, styles.headerRow]}>
+            {columns.map(({ lesson, date }) => {
+              const label = (
+                <Text variant="smallStrong" color={lesson.status === 'ACTIVE' ? 'accentSolid' : 'textMuted'} tabular>
+                  {date}
+                </Text>
+              );
+              const title = `${lesson.title} · ${formatDateTime(lesson.startsAt, locale)}`;
+              return onOpenLesson ? (
+                <PressableScale
+                  key={lesson.id}
+                  accessibilityRole="link"
+                  accessibilityLabel={format(m.groups.attendance.openLessonAria, {
+                    title: lesson.title,
+                    date: formatDateTime(lesson.startsAt, locale),
+                  })}
+                  onPress={() => onOpenLesson(lesson)}
+                  scaleTo={1}
+                  style={[styles.cell, styles.lessonCell]}
+                  pressedStyle={styles.pressed}
+                  testID={`attendance-lesson-${lesson.id}`}
+                >
+                  {label}
+                </PressableScale>
+              ) : (
+                <View key={lesson.id} accessible accessibilityLabel={title} style={[styles.cell, styles.lessonCell]}>
+                  {label}
+                </View>
+              );
+            })}
+            <View style={[styles.cell, styles.totalCell, inside ? null : styles.totalCellCard]}>
+              <Text variant="smallStrong" color="textMuted" numberOfLines={1}>
+                {t.total}
               </Text>
             </View>
-          ))}
-        </View>
+          </View>
 
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.scroll}
-          // The newest lessons and the totals are what a teacher marks: start at the right edge, once.
-          onContentSizeChange={() => {
-            if (scrolledToEnd.current) return;
-            scrolledToEnd.current = true;
-            scrollRef.current?.scrollToEnd({ animated: false });
-          }}
-          testID="attendance-table-scroll"
-        >
-          <View>
-            <View style={[styles.row, styles.headerRow]}>
-              {columns.map(({ lesson, date }) => {
-                const label = (
-                  <Text variant="captionBold" color={lesson.status === 'ACTIVE' ? 'accentSolid' : 'kicker'} tabular>
-                    {date}
-                  </Text>
-                );
-                const title = `${lesson.title} · ${formatDateTime(lesson.startsAt, locale)}`;
-                return onOpenLesson ? (
-                  <PressableScale
-                    key={lesson.id}
-                    accessibilityRole="link"
-                    accessibilityLabel={format(m.groups.attendance.openLessonAria, {
-                      title: lesson.title,
-                      date: formatDateTime(lesson.startsAt, locale),
-                    })}
-                    onPress={() => onOpenLesson(lesson)}
-                    scaleTo={1}
-                    style={[styles.headerCell, styles.lessonCell]}
-                    pressedStyle={styles.pressed}
-                    testID={`attendance-lesson-${lesson.id}`}
-                  >
-                    {label}
-                  </PressableScale>
-                ) : (
-                  <View key={lesson.id} accessible accessibilityLabel={title} style={[styles.headerCell, styles.lessonCell]}>
-                    {label}
-                  </View>
-                );
-              })}
-              <View style={[styles.headerCell, styles.totalCell]}>
-                <Text variant="kickerSm" numberOfLines={1}>
-                  {t.total}
-                </Text>
-              </View>
-            </View>
-
-            {members.map((member) => (
+          {members.map((member) => {
+            const total = memberAttendanceSummary(member.id, lessons);
+            return (
               <View key={member.id} style={[styles.row, styles.bodyRow]}>
                 {columns.map(({ lesson, cells, date }) => {
                   const cell = cells.get(member.id);
@@ -138,7 +143,7 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
                         key={lesson.id}
                         accessible
                         accessibilityLabel={`${member.name}, ${date}: ${t.notParticipated}`}
-                        style={[styles.rowCell, styles.lessonCell]}
+                        style={[styles.cell, styles.lessonCell]}
                       >
                         <Text variant="bodyBold" color="textSoft">
                           ·
@@ -160,40 +165,57 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
                       disabled={disabled || saving}
                       onPress={() => onToggle(lesson, member, cell)}
                       onLongPress={() => onChoose(lesson, member, cell)}
-                      style={[styles.rowCell, styles.lessonCell]}
+                      style={[styles.cell, styles.lessonCell]}
                       testID={`attendance-cell-${lesson.id}-${member.id}`}
                     >
-                      <AttendancePill value={cell.attendance} label={labels[cell.attendance].short} busy={saving || disabled} />
+                      <AttendanceTile value={cell.attendance} label={tileLabel(cell.attendance)} dimmed={saving || disabled} />
                     </PressableScale>
                   );
                 })}
-                <View style={[styles.rowCell, styles.totalCell]} testID={`attendance-total-${member.id}`}>
-                  <Text variant="caption" color="textMuted" tabular numberOfLines={1}>
-                    {attendanceTotalText(memberAttendanceSummary(member.id, lessons))}
+                <View
+                  accessible
+                  // The percent stays for the ear; the eye has the row of tiles.
+                  accessibilityLabel={`${t.total}: ${attendanceTotalText(total)}`}
+                  style={[styles.cell, styles.totalCell, inside ? null : styles.totalCellCard]}
+                  testID={`attendance-total-${member.id}`}
+                >
+                  <Text variant="bodyBold" tabular numberOfLines={1}>
+                    {attendanceRatioText(total)}
                   </Text>
                 </View>
               </View>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  // On the page the table is a card; inside a tablet panel — already a card — it lies flat.
+  return inside ? (
+    <View testID="attendance-table">{table}</View>
+  ) : (
+    <Card padded={false} testID="attendance-table">
+      {table}
     </Card>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  // The card's radius less its hairline border, so the pinned column's corners stay round inside it.
-  clip: { flexDirection: 'row', overflow: 'hidden', borderRadius: t.radii.lg - t.borders.hairline },
-  names: { width: NAME_WIDTH, borderRightWidth: t.borders.hairline, borderRightColor: t.colors.rowBorder },
+  clip: { flexDirection: 'row' },
+  clipCard: { overflow: 'hidden', borderRadius: t.radii.xl },
   scroll: { flex: 1 },
-  // Both columns build their rows from the same two boxes, so the pinned names stay level with the cells.
+  // The totals sit at the right edge of the card also when a few lessons leave room.
+  scrollContent: { flexGrow: 1, justifyContent: 'flex-end' },
+  // Both columns build their rows from the same two boxes, so the pinned names stay level with the tiles.
   row: { flexDirection: 'row', alignItems: 'stretch' },
-  headerRow: { height: HEADER_HEIGHT },
-  bodyRow: { height: ROW_HEIGHT, borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
-  headerCell: { justifyContent: 'center' },
-  rowCell: { justifyContent: 'center' },
-  nameCell: { paddingLeft: t.space.md, paddingRight: t.space.xs },
-  lessonCell: { width: CELL_WIDTH, alignItems: 'center' },
-  totalCell: { width: TOTAL_WIDTH, alignItems: 'flex-end', paddingRight: t.space.md, paddingLeft: t.space.xxs },
+  headerRow: { height: t.sizes.control.md },
+  bodyRow: { height: t.sizes.row, borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
+  cell: { justifyContent: 'center' },
+  nameCell: { paddingLeft: t.space.card, paddingRight: t.space.xs },
+  // A 44 tile and the gap to the next one.
+  lessonCell: { width: t.sizes.tile + t.space.xs, alignItems: 'center' },
+  totalCell: { width: TOTAL_WIDTH, alignItems: 'flex-end', paddingLeft: t.space.xs },
+  totalCellCard: { width: TOTAL_WIDTH + t.space.card, paddingRight: t.space.card },
   pressed: { opacity: 0.6 },
 }));

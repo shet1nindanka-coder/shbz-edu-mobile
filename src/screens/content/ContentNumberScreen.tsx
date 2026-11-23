@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
 
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { NumberDetail } from '@/api/types';
@@ -11,38 +10,41 @@ import { useAppNavigation, useRefetchOnFocus, type ScreenParams } from '@/naviga
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
-import { makeStyles } from '@/theme';
-import { Badge, Card, LoadingState, Notice, Screen, Text, TextButton, type BadgeTone } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { LoadingState, Notice, Panel, Panels, Screen, Segmented, Text, TextButton } from '@/ui';
 
 import { LatexEditorBlock } from './browse/latex-editor-block';
 import { clearOpenedFromEditor, peekOpenedFromEditor, requestEditorFocus } from './shared/editor-links';
-import { hasLatex, numberFillStatus, type NumberFillStatus } from './shared/number-fill-status';
+import { hasLatex, numberFillStatus } from './shared/number-fill-status';
 import { isTopicLeaving } from './shared/topics-flash';
 
 /** Route params of `content.number` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type ContentNumberScreenProps = ScreenParams['content.number'];
 
-// SPEC-GAP: the site paints «Частично заполнено» with the accent badge; the kit has no accent badge, so
-// the neutral outline stands in (the status tones stay reserved for the traffic light).
-const FILL_TONE: Record<NumberFillStatus, BadgeTone> = { full: 'GREEN', partial: 'neutral', empty: 'none' };
+/** The two values of a number; a developer's phone shows one editor at a time. */
+type NumberPart = 'condition' | 'answer';
 
 /**
- * `content.number` (docs/spec/07-developer-content.md §1.4b): one number of a topic, the destination of
- * the staff number search. A TEACHER reads the statement and the answer (shown at once); a DEVELOPER
- * edits both as LaTeX with a live preview and can save or delete each.
+ * `content.number` (docs/spec/07-developer-content.md §1.4b; layout: docs/design/glass-over-paper.md §7):
+ * one number of a topic — opened from the topic's tiles and from the staff number search. The number is
+ * the title; a TEACHER reads the statement and the answer (shown at once); a DEVELOPER edits both as
+ * LaTeX with a live preview and can save or delete each. A tablet puts the two side by side.
  */
 export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict, m } = useI18n();
   const t = dict.topics.singleNumber;
+  const v = dict.topics.viewNumbers;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
   const isDeveloper = user.role === 'DEVELOPER';
   // Pushed from the editor's statements-and-answers list: that editor is the screen right below this one.
   const [fromEditor] = useState(() => peekOpenedFromEditor(topicId, number));
   useEffect(() => clearOpenedFromEditor(), []);
+  const [part, setPart] = useState<NumberPart>('condition');
 
   const key = qk('content', 'getNumber', topicId, number);
   const detail = useQuery({ queryKey: key, queryFn: () => api.content.getNumber(topicId, number) });
@@ -65,7 +67,6 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
 
   // The recorded spelling («010203») comes from the server; the route may carry another spelling of it.
   const recorded = data?.number.number ?? number;
-  const fill = data ? numberFillStatus(data.number.conditionLatex, data.number.answerLatex) : 'empty';
   // The site's back link (07 §1.4b): a teacher returns to the topic, a developer to the statements-and-answers
   // section of its editor, on the page of this number. Opened from that very list, the editor is one step
   // back with its section and page intact — pushing another editor on top would lose both.
@@ -80,84 +81,113 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
     }
   };
 
+  // Under the title: the topic, and for a developer how much of the number is filled (a neutral fact).
+  const subtitle = data
+    ? isDeveloper
+      ? `${data.topic.title} · ${dict.topics.answerManager.status[numberFillStatus(data.number.conditionLatex, data.number.answerLatex)]}`
+      : data.topic.title
+    : undefined;
+  const toTopic = <TextButton label={t.back} onPress={openTopic} style={styles.toTopic} testID="number-open-topic" />;
+  // A phone has room for one editor: the switch sits in the header; a tablet shows both panels.
+  const parts =
+    isDeveloper && data && !theme.tablet ? (
+      <Segmented<NumberPart>
+        options={[
+          { value: 'condition', label: v.condition },
+          { value: 'answer', label: v.answer },
+        ]}
+        value={part}
+        onChange={setPart}
+        accessibilityLabel={t.sectionTitle}
+        role="tab"
+        fill
+        testID="number-parts"
+      />
+    ) : undefined;
+
   return (
     <Screen
       testID="content-number-screen"
-      header={<DetailAppBar title={format(t.title, { number: recorded })} subtitle={data?.topic.title} />}
+      header={
+        <DetailAppBar
+          title={format(t.title, { number: recorded })}
+          subtitle={subtitle}
+          backTitle={m.shell.tabs.topics}
+          aside={theme.tablet ? (data ? toTopic : undefined) : parts}
+        />
+      }
+      // A tablet page does not scroll: each panel scrolls its own content down to the dock.
+      scroll={!theme.tablet}
+      maxWidth="full"
       onRefresh={refresh}
       refreshing={refreshing}
     >
       {data ? (
-        <View style={styles.root}>
+        <>
           {detail.isError ? <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="number-refresh-error" /> : null}
-
-          <TextButton label={t.back} tone="muted" onPress={openTopic} style={styles.back} testID="number-open-topic" />
-
-          <View style={styles.head}>
-            <Text variant="sectionTitle" accessibilityRole="header">
-              {t.sectionTitle}
-            </Text>
-            {isDeveloper ? (
-              <Hint>
-                <Text variant="hint">{t.sectionDescription}</Text>
-              </Hint>
-            ) : null}
-          </View>
 
           {isDeveloper ? (
             <>
-              <View style={styles.numberRow}>
-                <Text variant="numberTitle" style={styles.grow} testID="number-label">
-                  {format(dict.topics.widgets.numberLabel, { number: recorded })}
-                </Text>
-                <Badge tone={FILL_TONE[fill]} label={dict.topics.answerManager.status[fill]} />
-              </View>
-              <LatexEditorBlock
-                // A new number (another route) must not inherit the previous draft.
-                key={`condition-${data.number.id}`}
-                kind="condition"
-                homeworkNumberId={data.number.id}
-                number={recorded}
-                saved={data.number.conditionLatex}
-                onChanged={(value) => applyChange({ conditionLatex: value })}
-              />
-              <LatexEditorBlock
-                key={`answer-${data.number.id}`}
-                kind="answer"
-                homeworkNumberId={data.number.id}
-                number={recorded}
-                saved={data.number.answerLatex}
-                onChanged={(value) => applyChange({ answerLatex: value })}
-              />
+              <Hint>
+                <Text variant="hint">{t.sectionDescription}</Text>
+              </Hint>
+              <Panels>
+                {/* Both editors stay mounted: a draft typed in one survives a look at the other. */}
+                <Panel style={!theme.tablet && part !== 'condition' ? styles.hidden : undefined} testID="latex-condition">
+                  <LatexEditorBlock
+                    // A new number (another route) must not inherit the previous draft.
+                    key={`condition-${data.number.id}`}
+                    kind="condition"
+                    homeworkNumberId={data.number.id}
+                    number={recorded}
+                    saved={data.number.conditionLatex}
+                    onChanged={(value) => applyChange({ conditionLatex: value })}
+                  />
+                </Panel>
+                <Panel style={!theme.tablet && part !== 'answer' ? styles.hidden : undefined} testID="latex-answer">
+                  <LatexEditorBlock
+                    key={`answer-${data.number.id}`}
+                    kind="answer"
+                    homeworkNumberId={data.number.id}
+                    number={recorded}
+                    saved={data.number.answerLatex}
+                    onChanged={(value) => applyChange({ answerLatex: value })}
+                    secondary={theme.tablet}
+                  />
+                </Panel>
+              </Panels>
             </>
           ) : (
-            <Card style={styles.readCard} testID="number-read">
-              <Text variant="numberTitle" testID="number-label">
-                {format(dict.topics.widgets.numberLabel, { number: recorded })}
-              </Text>
-              <View style={styles.block}>
-                <Text variant="kickerSm">{dict.topics.viewNumbers.condition}</Text>
+            <Panels testID="number-read">
+              <Panel>
+                <Text variant="sectionTitle" accessibilityRole="header">
+                  {v.condition}
+                </Text>
                 {hasLatex(data.number.conditionLatex) ? (
                   <MathContent value={data.number.conditionLatex ?? ''} testID="number-condition" />
                 ) : (
                   <Text variant="small" color="textMuted">
-                    {dict.topics.viewNumbers.noCondition}
+                    {v.noCondition}
                   </Text>
                 )}
-              </View>
-              <View style={styles.block}>
-                <Text variant="kickerSm">{dict.topics.viewNumbers.answer}</Text>
+              </Panel>
+              <Panel>
+                <Text variant="sectionTitle" accessibilityRole="header">
+                  {v.answer}
+                </Text>
                 {hasLatex(data.number.answerLatex) ? (
                   <MathContent value={data.number.answerLatex ?? ''} testID="number-answer" />
                 ) : (
                   <Text variant="small" color="textMuted">
-                    {dict.topics.viewNumbers.noAnswer}
+                    {v.noAnswer}
                   </Text>
                 )}
-              </View>
-            </Card>
+              </Panel>
+            </Panels>
           )}
-        </View>
+
+          {theme.tablet ? null : toTopic}
+        </>
       ) : failure ? (
         <LoadFailure query={detail} testID="number-error" />
       ) : (
@@ -168,11 +198,6 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
 }
 
 const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.lg },
-  back: { alignSelf: 'flex-start', minHeight: t.sizes.minTouch, justifyContent: 'center' },
-  head: { gap: t.space.xxs },
-  numberRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  grow: { flex: 1 },
-  readCard: { gap: t.space.lg },
-  block: { gap: t.space.xs },
+  hidden: { display: 'none' },
+  toTopic: { alignSelf: 'flex-start', minHeight: t.sizes.minTouch, justifyContent: 'center' },
 }));

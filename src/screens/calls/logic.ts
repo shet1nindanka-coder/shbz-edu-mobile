@@ -70,6 +70,24 @@ export function reminderChip(state: ParentCallReminderState, t: CallsDict): Remi
   return { tone: "muted", label: t.ok };
 }
 
+/** The chip of a list row: only a state that needs attention gets one; «созвонились недавно» is no news. */
+export function attentionChip(state: ParentCallReminderState, t: CallsDict): ReminderChip | null {
+  const chip = reminderChip(state, t);
+  return chip.tone === "muted" ? null : chip;
+}
+
+/**
+ * The one caption of a list row: the latest fact of the meta line — the unanswered attempt when there was
+ * one after the last successful call, that call otherwise — led by the owning teacher's name for a
+ * developer. The whole line is in the row's spoken name and in the history behind the row. Call comments
+ * never go into it: a row can be read over a shoulder, a comment only in the opened history.
+ */
+export function callRowCaption(student: ParentCallStudentOverview, t: CallsDict, locale: Locale, showTeacher: boolean): string {
+  const parts = callMetaParts(student, t, locale);
+  const latest = parts[parts.length - 1] ?? "";
+  return showTeacher ? `${student.teacherName ?? "—"} · ${latest}` : latest;
+}
+
 /** «История (23)»; «История (—)» when there is nothing to open (the button is then disabled). */
 export function historyButtonLabel(totalCalls: number, t: CallsDict): string {
   return format(t.history, { n: totalCalls === 0 ? "—" : totalCalls });
@@ -118,6 +136,26 @@ export function mergeHistory(shown: readonly ParentCallEntry[], earlierPages: re
     merged.push(entry);
   }
   return merged;
+}
+
+/** A call of the journal with the student it was about. */
+export type JournalEntry = { entry: ParentCallEntry; studentId: string; studentName: string };
+
+/**
+ * The journal of the read-only view: the calls of every student, newest first, assembled from the
+ * histories the overview already carries. A student's history is cut at its newest 20, so the journal
+ * stops at the newest cut — below it calls of that student would be missing between the others.
+ */
+export function buildCallJournal(students: readonly ParentCallStudentOverview[]): JournalEntry[] {
+  let cutoff = "";
+  const entries: JournalEntry[] = [];
+  for (const student of students) {
+    const oldest = student.history[student.history.length - 1];
+    if (oldest && student.totalCalls > student.history.length && oldest.calledAt > cutoff) cutoff = oldest.calledAt;
+    for (const entry of student.history) entries.push({ entry, studentId: student.studentId, studentName: student.studentName });
+  }
+  // ISO instants in UTC compare as strings.
+  return entries.filter((row) => row.entry.calledAt >= cutoff).sort((left, right) => (left.entry.calledAt < right.entry.calledAt ? 1 : -1));
 }
 
 /** «5 ноября в 18:30» — Moscow time, whatever the device zone is. */

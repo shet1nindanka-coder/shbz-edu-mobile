@@ -18,14 +18,15 @@ const ru = {
     searchPrompt: "Поиск идёт по имени среди ваших учеников. Ученик из другой группы будет переведён сюда.",
     // The site says "find a student in the field below": on a phone the search is a sheet behind a button.
     empty: "В группе пока никого нет — добавьте первого ученика.",
+    // Caption of a member row until the student has marked a single number.
+    speed: "Скорость: {speed}",
     aiProfile: "Профиль для ИИ",
-    aiProfileSummary: "Скорость: {speed}",
-    aiProfileExpandAria: "Профиль для ИИ: {name}. Развернуть",
-    aiProfileCollapseAria: "Профиль для ИИ: {name}. Свернуть",
     aiProfileHint: "Скорость и заметка попадают в ИИ-подбор уроков и ДЗ. Скорость сохраняется сразу, заметка — когда вы выходите из поля.",
-    progressAria: "{status}: {n}"
+    // The button of the member sheet; the site's remove control is an icon with an aria-label.
+    remove: "Убрать из группы"
   },
   statistics: {
+    openStudent: "Карточка ученика",
     openStudentAria: "Открыть карточку ученика {name}",
     reportAria: "Отчёт ученика {name}: {period}"
   },
@@ -44,6 +45,12 @@ const ru = {
     markAria: "{name}: {mark}",
     markSheetHint: "{date} · {title}",
     notParticipatedLegend: "«·» — {text}",
+    // A mark is a 44 pt square: the site's «опозд.» and «уваж.» do not fit it.
+    tileLate: "оп.",
+    tileExcused: "ув.",
+    // The button that opens the three periods of the report, and the title of their sheet.
+    pdf: "PDF",
+    pdfTitle: "Отчёт о посещаемости (PDF)",
     reportAria: "Отчёт о посещаемости (PDF): {period}",
     // Title of the file viewer: the server's file name is Russian and long; the title stands alone.
     reportTitle7d: "Посещаемость: 7 дней",
@@ -76,14 +83,13 @@ const en: typeof ru = {
     searchPlaceholder: "Start typing a name…",
     searchPrompt: "The search is by name among your students. A student from another group will be moved here.",
     empty: "The group is empty — add the first student.",
+    speed: "Speed: {speed}",
     aiProfile: "AI profile",
-    aiProfileSummary: "Speed: {speed}",
-    aiProfileExpandAria: "AI profile: {name}. Expand",
-    aiProfileCollapseAria: "AI profile: {name}. Collapse",
     aiProfileHint: "Speed and the note go into AI selection of lessons and homework. Speed is saved at once, the note when you leave the field.",
-    progressAria: "{status}: {n}"
+    remove: "Remove from the group"
   },
   statistics: {
+    openStudent: "Student card",
     openStudentAria: "Open the student card of {name}",
     reportAria: "Report for {name}: {period}"
   },
@@ -101,6 +107,10 @@ const en: typeof ru = {
     markAria: "{name}: {mark}",
     markSheetHint: "{date} · {title}",
     notParticipatedLegend: "“·” — {text}",
+    tileLate: "late",
+    tileExcused: "exc.",
+    pdf: "PDF",
+    pdfTitle: "Attendance report (PDF)",
     reportAria: "Attendance report (PDF): {period}",
     reportTitle7d: "Attendance: 7 days",
     reportTitle30d: "Attendance: 30 days",

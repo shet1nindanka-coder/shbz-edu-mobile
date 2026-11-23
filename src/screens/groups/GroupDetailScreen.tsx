@@ -1,251 +1,105 @@
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { POLLING, errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
-import { useRetryWait } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus, useScreenFocused, useScreenLive, useStillHere, type ScreenParams } from '@/navigation';
-import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
-import { usePullRefresh } from '@/services/query';
-import { makeStyles } from '@/theme';
-import { Button, IconButton, LoadingState, Notice, Screen, Segmented } from '@/ui';
+import type { ScreenParams } from '@/navigation';
+import { DetailAppBar, NotFoundScreen, screenTitle } from '@/screens/shell';
+import { makeStyles, useTheme } from '@/theme';
+import { LoadingState, Panels, Screen } from '@/ui';
 
-import { ATTENDANCE_PERIOD, AttendanceTab } from './detail/attendance-tab';
-import { GroupSettings } from './detail/group-settings';
-import { LessonsTab } from './detail/lessons-tab';
-import { MembersTab } from './detail/members-tab';
-import { StatisticsTab } from './detail/statistics-tab';
-import { useReportExport } from './detail/use-report-export';
-import { hasActiveLesson } from './logic';
-import { GROUPS_LIST_NOTICE, groupNoticeChannel, postGroupNotice, useGroupNotice } from './shared/notice-store';
+import {
+  GroupActions,
+  GroupMenuButton,
+  GroupNotices,
+  GroupSettingsHost,
+  GroupTabBody,
+  GroupTabsBar,
+  hasGroupNotices,
+} from './detail/group-detail-parts';
+import { GROUP_SIDE_TABS, GROUP_TABS, useGroupDetail } from './detail/use-group-detail';
+import { ScrollPanel } from './shared/scroll-panel';
 
 /** Route params of `groups.detail` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type GroupDetailScreenProps = ScreenParams['groups.detail'];
 
-type Tab = 'members' | 'statistics' | 'attendance' | 'lessons';
-const TABS: readonly Tab[] = ['members', 'statistics', 'attendance', 'lessons'];
-
-type Banner = { tone: 'success'; key: 'saved' } | { tone: 'error'; text: string };
-
 /**
- * `groups.detail` (docs/spec/06-teacher-groups-calls-stats.md §1.2, §1.3): one group of the teacher.
- * The site's four long sections become four tabs — members (with the AI profile), statistics,
- * attendance, lessons; rename and delete sit behind the app bar's "⋯". Statistics and attendance are
- * loaded when their tab is first opened.
+ * `groups.detail` (docs/spec/06-teacher-groups-calls-stats.md §1.2, §1.3; layout: docs/design/
+ * glass-over-paper.md §7): one group of the teacher. Its parts — members (with the AI profile),
+ * statistics, attendance, lessons — are never all open at once; rename and delete sit behind «⋯».
+ *
+ * Phone: the parts are a switch in the header, «Составить урок» is the screen's main button. Tablet: the
+ * members have the left panel, the switch and the other three parts the right one, and the two actions
+ * move into the header. (On a tablet the groups screen shows a group next to the list; this screen is
+ * where a link from elsewhere lands.)
  */
 export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
   const styles = useStyles();
-  const api = useApi();
-  const navigation = useAppNavigation();
+  const theme = useTheme();
   const { dict, m } = useI18n();
-  const t = dict.planner.groups.detail;
-  const report = useReportExport();
-  // Here, not in the tab: the attendance tab unmounts on a tab switch, the cool-down of its marks must not.
-  const attendanceWait = useRetryWait();
-  const [tab, setTab] = useState<Tab>('members');
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(new Set<Tab>(['members']));
-  const [createdNotice, dismissCreated] = useGroupNotice(groupNoticeChannel(groupId));
-  const [banner, setBanner] = useState<Banner | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  // The group has just been deleted here: nothing may refetch (and answer 404) while the screen leaves.
-  const [leaving, setLeaving] = useState(false);
-  // The group is gone but the teacher had moved on when the answer came: the screen leaves when it is back.
-  const leaveOnReturn = useRef(false);
-  const stillHere = useStillHere();
-  const focused = useScreenFocused();
-  useEffect(() => {
-    if (!leaveOnReturn.current || !focused) return;
-    leaveOnReturn.current = false;
-    navigation.back();
-  }, [focused, navigation]);
-  // `back` from a screen that is not on top would close whatever the teacher went to.
-  const leave = () => {
-    if (stillHere()) navigation.back();
-    else leaveOnReturn.current = true;
-  };
-  // The attendance poll runs only while this screen is on top and the app is in the foreground.
-  const screenLive = useScreenLive();
-
-  const group = useQuery({
-    queryKey: qk('groups', 'getGroup', groupId),
-    queryFn: () => api.groups.getGroup(groupId),
-    enabled: !leaving,
-  });
-  const statistics = useQuery({
-    queryKey: qk('groups', 'getGroupStatistics', groupId),
-    queryFn: () => api.groups.getGroupStatistics(groupId),
-    enabled: visited.has('statistics') && !leaving,
-  });
-  const attendance = useQuery({
-    queryKey: qk('groups', 'getGroupAttendance', groupId, ATTENDANCE_PERIOD),
-    queryFn: () => api.groups.getGroupAttendance(groupId, ATTENDANCE_PERIOD),
-    enabled: visited.has('attendance') && !leaving,
-    // Students join and submit while a lesson runs: realtime refreshes the table, this is the fallback.
-    refetchInterval: (query) =>
-      tab === 'attendance' && !leaving && screenLive && hasActiveLesson(query.state.data) ? POLLING.lessonLiveMs : false,
-  });
-
-  // Membership has no realtime event (06 §5) and this screen stays mounted under the student card and the
-  // lesson board: what went stale meanwhile is reloaded when it comes back (00 §2.3 "refetch on focus").
-  useRefetchOnFocus(
-    leaving
-      ? []
-      : [group, ...(visited.has('statistics') ? [statistics] : []), ...(visited.has('attendance') ? [attendance] : [])],
-  );
-
-  const { refreshing, refresh } = usePullRefresh([
-    group,
-    visited.has('statistics') && statistics,
-    visited.has('attendance') && attendance,
-  ]);
+  const split = theme.tablet;
+  const state = useGroupDetail(groupId, { split });
+  const { data, group } = state;
 
   // A foreign or deleted group is indistinguishable from a missing one.
-  if (isNotFoundError(group.error) && !leaving) return <NotFoundScreen />;
+  if (state.missing) return <NotFoundScreen />;
 
-  const data = group.data;
+  const header = (
+    <DetailAppBar
+      title={data ? data.group.name : dict.planner.groups.detail.kicker}
+      backTitle={screenTitle('groups.list', m.shell.tabs)}
+      right={data ? <GroupMenuButton state={state} variant="glass" /> : undefined}
+      aside={data ? split ? <GroupActions groupId={groupId} /> : <GroupTabsBar state={state} tabs={GROUP_TABS} /> : undefined}
+    />
+  );
+  const pending = isLoadFailed(group) ? (
+    <LoadFailure query={group} testID="group-error" />
+  ) : (
+    <LoadingState variant="list" count={4} accessibilityLabel={m.common.a11y.loading} testID="group-loading" />
+  );
 
-  const selectTab = (next: Tab) => {
-    setTab(next);
-    setVisited((current) => (current.has(next) ? current : new Set(current).add(next)));
-  };
-
-  const tabLabels: Record<Tab, string> = {
-    members: t.participants,
-    statistics: m.groups.detail.statisticsTab,
-    attendance: t.attendance,
-    lessons: dict.students.detail.tabLessons,
-  };
-
-  const composeLink = { screen: 'planner.lessonNew', groupId } as const;
-  const homeworkLink = { screen: 'planner.draftNew', groupId } as const;
+  if (split && data) {
+    return (
+      <Screen testID="group-detail-screen" header={header} scroll={false} maxWidth="full">
+        {hasGroupNotices(state) ? (
+          <View style={styles.notices}>
+            <GroupNotices state={state} />
+          </View>
+        ) : null}
+        <Panels>
+          <ScrollPanel weight={2} refreshing={state.refreshing} onRefresh={state.refresh} testID="group-members-panel">
+            <GroupTabBody state={state} tab="members" />
+          </ScrollPanel>
+          <ScrollPanel
+            weight={3}
+            header={<GroupTabsBar state={state} tabs={GROUP_SIDE_TABS} />}
+            refreshing={state.refreshing}
+            onRefresh={state.refresh}
+            testID="group-parts-panel"
+          >
+            <GroupTabBody state={state} tab={state.tab} />
+          </ScrollPanel>
+        </Panels>
+        <GroupSettingsHost state={state} />
+      </Screen>
+    );
+  }
 
   return (
-    <Screen
-      testID="group-detail-screen"
-      header={
-        <DetailAppBar
-          title={data ? data.group.name : t.kicker}
-          subtitle={data ? t.kicker : undefined}
-          right={
-            data ? (
-              <IconButton
-                icon="more"
-                accessibilityLabel={m.groups.detail.menuAria}
-                onPress={() => setMenuOpen(true)}
-                testID="group-menu"
-              />
-            ) : undefined
-          }
-        />
-      }
-      // The screen lives in the stack of the «ещё» tab: the tab bar owns the bottom inset.
-      bottomInset={false}
-      onRefresh={refresh}
-      refreshing={refreshing}
-    >
+    <Screen testID="group-detail-screen" header={header} onRefresh={state.refresh} refreshing={state.refreshing}>
       {data ? (
-        <View style={styles.page}>
-          {createdNotice === 'created' ? (
-            <Notice
-              tone="success"
-              text={t.notices.created}
-              onDismiss={dismissCreated}
-              dismissLabel={m.common.actions.close}
-              testID="group-notice-created"
-            />
-          ) : null}
-          {banner ? (
-            <Notice
-              tone={banner.tone}
-              text={banner.tone === 'success' ? t.notices.saved : banner.text}
-              onDismiss={() => setBanner(null)}
-              dismissLabel={m.common.actions.close}
-              testID="group-notice"
-            />
-          ) : null}
-          {/* Cached data stays on screen when a refresh fails (offline): say so instead of replacing it. */}
-          {group.isError ? (
-            <Notice tone="error" text={errorText(group.error, m.common.errors.generic)} testID="group-refresh-error" />
-          ) : null}
-
-          <View style={styles.actions}>
-            {navigation.canOpen(composeLink) ? (
-              <Button
-                label={t.composeLesson}
-                onPress={() => navigation.open(composeLink)}
-                style={styles.action}
-                testID="group-compose-lesson"
-              />
-            ) : null}
-            {navigation.canOpen(homeworkLink) ? (
-              <Button
-                label={t.issueHomework}
-                variant="outline"
-                onPress={() => navigation.open(homeworkLink)}
-                style={styles.action}
-                testID="group-issue-homework"
-              />
-            ) : null}
-          </View>
-
-          {/* The kit's in-page tabs: all four fill the row while they fit; on a narrow phone the bar
-              scrolls with the selected tab kept in view and no label is cut. */}
-          <Segmented
-            options={TABS.map((value) => ({ value, label: tabLabels[value] }))}
-            value={tab}
-            onChange={selectTab}
-            accessibilityLabel={m.groups.detail.tabsAria}
-            plain
-            scrollable
-            role="tab"
-            style={styles.tabs}
-            testID="group-tabs"
-          />
-
-          {tab === 'members' ? (
-            <MembersTab group={data.group} onProfileError={(text) => setBanner({ tone: 'error', text })} />
-          ) : null}
-          {tab === 'statistics' ? <StatisticsTab stats={statistics} report={report} /> : null}
-          {tab === 'attendance' ? <AttendanceTab groupId={groupId} attendance={attendance} report={report} wait={attendanceWait} /> : null}
-          {tab === 'lessons' ? <LessonsTab lessons={data.lessons} /> : null}
-
-          <GroupSettings
-            group={data.group}
-            menuOpen={menuOpen}
-            onCloseMenu={() => setMenuOpen(false)}
-            onRenamed={() => setBanner({ tone: 'success', key: 'saved' })}
-            onDeleted={() => {
-              setLeaving(true);
-              dismissCreated();
-              // The site redirects to the list with «Группа удалена. Ученики остались на платформе.»
-              postGroupNotice(GROUPS_LIST_NOTICE, 'deleted');
-              leave();
-            }}
-            onDeleteFailed={(text) => setBanner({ tone: 'error', text })}
-            onMissing={() => {
-              setLeaving(true);
-              dismissCreated();
-              postGroupNotice(GROUPS_LIST_NOTICE, 'missing');
-              leave();
-            }}
-          />
-        </View>
-      ) : isLoadFailed(group) ? (
-        <LoadFailure query={group} testID="group-error" />
+        <>
+          <GroupNotices state={state} />
+          <GroupActions groupId={groupId} stretch />
+          <GroupTabBody state={state} tab={state.tab} />
+          <GroupSettingsHost state={state} />
+        </>
       ) : (
-        <LoadingState variant="cards" tabs count={3} accessibilityLabel={m.common.a11y.loading} testID="group-loading" />
+        pending
       )}
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  page: { gap: t.space.lg },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
-  // Each button is as wide as its label; when the two do not fit one line (English) they stack.
-  action: { flexGrow: 1 },
-  // When the bar scrolls, its viewport keeps the track's rounded corners instead of a square cut.
-  tabs: { borderRadius: t.radii.md },
+  notices: { gap: t.space.sm },
 }));

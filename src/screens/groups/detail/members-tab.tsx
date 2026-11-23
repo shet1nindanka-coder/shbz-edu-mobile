@@ -1,18 +1,21 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import type { GroupCandidate, GroupDetail, GroupDetailResponse, GroupMember } from '@/api/types';
+import { statusBreakdown } from '@/components/numbers';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Dialog, EmptyState, Notice, Text } from '@/ui';
+import { Avatar, Button, Dialog, EmptyState, ListRow, Notice, SectionCaption } from '@/ui';
 
+import { speedLabel } from '../logic';
 import { invalidateGroupMembership } from '../shared/invalidate';
+import { Rows, useRowInset } from '../shared/rows';
 import { useFlash } from '../shared/use-flash';
 import { AddMemberSheet } from './add-member-sheet';
 import { FlashText } from './flash-text';
-import { MemberCard } from './member-card';
+import { MemberSheet } from './member-sheet';
 
 /** The site flashes «Сохранено» / «Ошибка» in the members header for 2000 ms. */
 const MEMBERS_FLASH_MS = 2000;
@@ -24,8 +27,10 @@ export type MembersTabProps = {
 };
 
 /**
- * «Участники» (06 §1.2 item 4, §3.4, §3.5): the member cards, the add-student search and removal with a
- * confirmation. Adding needs no confirmation, even when it moves the student out of another group.
+ * «Участники» (06 §1.2 item 4, §3.4, §3.5): the members as rows — the name and how the student stands in
+ * the bank — with the add-student search behind the button of the caption row. A row opens the member
+ * sheet: the AI profile and «Убрать из группы», which asks for a confirmation. Adding needs none, even
+ * when it moves the student out of another group.
  */
 export function MembersTab({ group, onProfileError }: MembersTabProps) {
   const styles = useStyles();
@@ -34,8 +39,21 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
   const { dict, m } = useI18n();
   const t = dict.planner.groups;
   const confirm = dict.topics.widgets.confirm;
+  const inset = useRowInset();
   const flash = useFlash(MEMBERS_FLASH_MS);
   const [addOpen, setAddOpen] = useState(false);
+  // The member sheet: the id stays set while the sheet slides away, so its content does not collapse.
+  const [openedId, setOpenedId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // The sheet must be gone before the confirmation appears: two modals at once fight for the backdrop.
+  const confirmAfterClose = useRef<GroupMember | null>(null);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    },
+    [],
+  );
   // The member stays set while the dialog slides away, so its text does not collapse mid-animation.
   const [removing, setRemoving] = useState<GroupMember | null>(null);
   const [removeOpen, setRemoveOpen] = useState(false);
@@ -100,13 +118,32 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
 
   const busy = add.isPending || remove.isPending;
 
+  const opened = group.members.find((member) => member.id === openedId) ?? null;
+
+  /** The one caption of a member row: the progress over the bank; the AI speed until there is any. */
+  const captionOf = (member: GroupMember): string => {
+    const progress = statusBreakdown(
+      { green: member.progress.greenCount, yellow: member.progress.yellowCount, red: member.progress.redCount, none: 0 },
+      m.common.statuses,
+    );
+    return progress !== '' ? progress : format(m.groups.members.speed, { speed: speedLabel(member.speed, t.memberEditor) });
+  };
+
   return (
     <View style={styles.tab} testID="group-members-tab">
       <View style={styles.headRow}>
-        <Text variant="sectionTitle" accessibilityRole="header" style={styles.title}>
-          {format(t.membersManager.participants, { n: group.members.length })}
-        </Text>
+        <SectionCaption style={styles.title}>{format(t.membersManager.participants, { n: group.members.length })}</SectionCaption>
         <FlashText state={flash.state} testID="group-members-flash" />
+        <Button
+          label={dict.students.list.addStudent}
+          accessibilityLabel={t.membersManager.addAria}
+          variant="outline"
+          size="sm"
+          leftIcon="userPlus"
+          disabled={busy}
+          onPress={() => setAddOpen(true)}
+          testID="group-member-add"
+        />
       </View>
 
       {error ? (
@@ -119,33 +156,54 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
         />
       ) : null}
 
-      <Button
-        label={dict.students.list.addStudent}
-        accessibilityLabel={t.membersManager.addAria}
-        variant="outline"
-        leftIcon="userPlus"
-        disabled={busy}
-        onPress={() => setAddOpen(true)}
-        testID="group-member-add"
-      />
-
       {group.members.length === 0 ? (
         <EmptyState variant="plain" title={m.groups.members.empty} testID="group-members-empty" />
       ) : (
-        group.members.map((member) => (
-          <MemberCard
-            key={member.id}
-            groupId={group.id}
-            member={member}
-            busy={busy}
-            onProfileError={onProfileError}
-            onRemove={(target) => {
-              setRemoving(target);
-              setRemoveOpen(true);
-            }}
-          />
-        ))
+        <Rows testID="group-members-list">
+          {group.members.map((member, index) => (
+            <ListRow
+              key={member.id}
+              title={member.name}
+              subtitle={captionOf(member)}
+              subtitleLines={2}
+              left={<Avatar name={member.name} tone="neutral" />}
+              inset={inset}
+              divider={index < group.members.length - 1}
+              onPress={() => {
+                setOpenedId(member.id);
+                setSheetOpen(true);
+              }}
+              // The id the folded AI-profile row had: the row is what opens the profile now.
+              testID={`member-ai-toggle-${member.id}`}
+            />
+          ))}
+        </Rows>
       )}
+
+      <MemberSheet
+        groupId={group.id}
+        member={opened}
+        visible={sheetOpen && opened !== null}
+        busy={busy}
+        onClose={() => setSheetOpen(false)}
+        onClosed={() => {
+          const target = confirmAfterClose.current;
+          confirmAfterClose.current = null;
+          if (target === null) return;
+          // One tick later: the commit that removes the sheet's modal is finished before the dialog asks
+          // to appear (iOS refuses a modal while another one is still presented).
+          confirmTimer.current = setTimeout(() => {
+            confirmTimer.current = null;
+            setRemoving(target);
+            setRemoveOpen(true);
+          }, 0);
+        }}
+        onRemove={(target) => {
+          confirmAfterClose.current = target;
+          setSheetOpen(false);
+        }}
+        onProfileError={onProfileError}
+      />
 
       <AddMemberSheet
         visible={addOpen}
@@ -181,6 +239,7 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
 
 const useStyles = makeStyles((t) => ({
   tab: { gap: t.space.md },
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  title: { flexShrink: 1 },
+  // The caption and the button share a row; the button keeps the width of its label.
+  headRow: { minHeight: t.sizes.control.sm, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  title: { flex: 1, minWidth: 0, paddingTop: 0 },
 }));

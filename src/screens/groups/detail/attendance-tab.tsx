@@ -12,7 +12,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, EmptyState, LoadingState, Notice, Segmented, Text } from '@/ui';
+import { BottomSheet, Button, EmptyState, ListRow, LoadingState, Notice, Segmented, Text } from '@/ui';
 
 import { applyAttendanceMark, applyPendingMarks, type AttendanceCell } from '../logic';
 import { AttendanceLessonList } from './attendance-lesson-list';
@@ -55,6 +55,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
   const [markOpen, setMarkOpen] = useState(false);
   // Marks in flight (participant id → mark): shown over every read of the table until they settle.
   const [pending, setPending] = useState<Readonly<Record<string, AttendanceStatus>>>({});
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   const key = qk('groups', 'getGroupAttendance', groupId, ATTENDANCE_PERIOD);
   const patch = (participantId: string, value: AttendanceStatus) =>
@@ -121,7 +122,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
     return isLoadFailed(attendance) ? (
       <LoadFailure query={attendance} testID="group-attendance-error" />
     ) : (
-      <LoadingState variant="cards" count={2} cardHeight={180} accessibilityLabel={m.common.a11y.loading} testID="group-attendance-loading" />
+      <LoadingState variant="list" count={4} accessibilityLabel={m.common.a11y.loading} testID="group-attendance-loading" />
     );
   }
 
@@ -130,29 +131,44 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
     { period: '30d', label: common.forThirtyDays },
     { period: 'year', label: common.academicYear },
   ];
-  const reports = (
-    <View style={styles.reports}>
-      <ReportExportNotice report={report} testID="group-attendance-report-error" />
-      <View style={styles.reportRow}>
-        <Text variant="captionStrong" color="textMuted">
-          {t.pdf}
-        </Text>
-        {periods.map(({ period, label }) => (
-          <Button
-            key={period}
-            label={label}
-            accessibilityLabel={format(m.groups.attendance.reportAria, { period: label })}
-            variant="outline"
-            size="sm"
-            loading={report.pendingKey === attendanceReportKey(period)}
-            disabled={report.blocked}
-            onPress={() => report.exportGroupAttendance(groupId, period)}
-            testID={`group-attendance-pdf-${period}`}
-          />
-        ))}
-      </View>
-    </View>
+  // The three PDF periods are folded behind one button; it spins while any of them is being built.
+  const reportButton = (
+    <Button
+      label={m.groups.attendance.pdf}
+      accessibilityLabel={m.groups.attendance.pdfTitle}
+      variant="outline"
+      leftIcon="download"
+      loading={periods.some(({ period }) => report.pendingKey === attendanceReportKey(period))}
+      disabled={report.blocked}
+      onPress={() => setReportsOpen(true)}
+      testID="group-attendance-pdf"
+    />
   );
+  const reportSheet = (
+    <BottomSheet
+      visible={reportsOpen}
+      onClose={() => setReportsOpen(false)}
+      closeLabel={m.common.actions.close}
+      title={m.groups.attendance.pdfTitle}
+      testID="group-attendance-pdf-sheet"
+    >
+      {periods.map(({ period, label }, index) => (
+        <ListRow
+          key={period}
+          title={label}
+          inset={0}
+          divider={index < periods.length - 1}
+          accessibilityLabel={format(m.groups.attendance.reportAria, { period: label })}
+          onPress={() => {
+            setReportsOpen(false);
+            report.exportGroupAttendance(groupId, period);
+          }}
+          testID={`group-attendance-pdf-${period}`}
+        />
+      ))}
+    </BottomSheet>
+  );
+  const reportNotice = <ReportExportNotice report={report} testID="group-attendance-report-error" />;
 
   if (data.members.length === 0 || data.lessons.length === 0) {
     return (
@@ -163,7 +179,13 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
           testID="group-attendance-empty"
         />
         {/* The group had lessons but has no members now: the reports still have something to show. */}
-        {data.lessons.length > 0 ? reports : null}
+        {data.lessons.length > 0 ? (
+          <>
+            {reportNotice}
+            <View style={styles.emptyReport}>{reportButton}</View>
+            {reportSheet}
+          </>
+        ) : null}
       </View>
     );
   }
@@ -181,22 +203,26 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
         <Notice tone="error" text={errorText(attendance.error, m.common.errors.generic)} testID="group-attendance-refresh-error" />
       ) : null}
 
-      {reports}
+      {reportNotice}
 
-      <Segmented
-        options={[
-          { value: 'table', label: m.groups.attendance.modeTable },
-          { value: 'lessons', label: m.groups.attendance.modeLessons },
-        ]}
-        value={mode}
-        onChange={setMode}
-        accessibilityLabel={m.groups.attendance.modeAria}
-        fill
-        testID="group-attendance-mode"
-      />
+      <View style={styles.head}>
+        <Segmented
+          options={[
+            { value: 'table', label: m.groups.attendance.modeTable },
+            { value: 'lessons', label: m.groups.attendance.modeLessons },
+          ]}
+          value={mode}
+          onChange={setMode}
+          accessibilityLabel={m.groups.attendance.modeAria}
+          fill
+          style={styles.mode}
+          testID="group-attendance-mode"
+        />
+        {reportButton}
+      </View>
 
       <Hint>
-        <Text variant="hint" color="kicker">
+        <Text variant="hint" color="textMuted">
           {mode === 'table' ? m.groups.attendance.tapHint : m.groups.attendance.listHint}
         </Text>
       </Hint>
@@ -254,6 +280,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
         />
       )}
 
+      {reportSheet}
       <AttendanceMarkSheet
         visible={markOpen}
         target={markTarget}
@@ -268,7 +295,9 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
 
 const useStyles = makeStyles((t) => ({
   tab: { gap: t.space.md },
-  reports: { gap: t.space.sm },
-  reportRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
+  // The view switch takes the row; the PDF button keeps the width of its label.
+  head: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  mode: { flex: 1, minWidth: 0 },
+  emptyReport: { alignItems: 'flex-start' },
   errorBox: { gap: t.space.xs },
 }));

@@ -1,26 +1,30 @@
 // Mobile-only strings of the parent-calls area. Site texts stay in `dict.planner.calls`.
 // Call comments are personal data: never put them into a notification, a log line or a share sheet.
 const ru = {
-  summary: {
-    // The site prints one line («Просрочено: 2 · Пора позвонить: 1 · Всего учеников: 7»); the phone
-    // shows three counters, and the third one needs a label of its own.
-    total: "Всего учеников"
-  },
+  // A row of the list is one pressable element: this is the start of its spoken name — what a press opens.
   row: {
     recordAria: "Записать звонок: {name}",
-    // starts with the visible «История (23)» (label in name), so the count is heard too
     historyAria: "История ({n}) — звонки родителям: {name}",
     historyEmptyAria: "Звонков ещё не было: {name}"
+  },
+  form: {
+    // The site's label is «Комментарий»; the app says who reads it, next to a lock.
+    commentLabel: "Комментарий, виден только вам"
   },
   log: {
     saved: "Звонок записан"
   },
   history: {
-    sheetTitle: "История звонков",
+    title: "История звонков",
     shownOf: "Показано {shown} из {total}",
     showEarlier: "Показать более ранние",
     loadFailed: "Не удалось загрузить более ранние звонки. Попробуйте ещё раз.",
     by: "— {name}"
+  },
+  // The developer's tablet panel: the latest calls of every student.
+  journal: {
+    title: "Журнал звонков",
+    empty: "Звонков пока нет"
   },
   empty: {
     // Button under the empty state: opens the section the site's sentence links to.
@@ -29,23 +33,27 @@ const ru = {
 };
 
 const en: typeof ru = {
-  summary: {
-    total: "Total students"
-  },
   row: {
     recordAria: "Log a call: {name}",
     historyAria: "History ({n}) — parent calls: {name}",
     historyEmptyAria: "No calls yet: {name}"
   },
+  form: {
+    commentLabel: "Comment, visible only to you"
+  },
   log: {
     saved: "Call logged"
   },
   history: {
-    sheetTitle: "Call history",
+    title: "Call history",
     shownOf: "Showing {shown} of {total}",
     showEarlier: "Show earlier calls",
     loadFailed: "Could not load earlier calls. Try again.",
     by: "— {name}"
+  },
+  journal: {
+    title: "Call journal",
+    empty: "No calls yet"
   },
   empty: {
     openSection: "Open the “{section}” section"

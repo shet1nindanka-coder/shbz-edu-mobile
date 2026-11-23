@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import type { HomeworkNumberStatus, SolutionVerdict, TeacherHomeworkCheckResult, TeacherHomeworkNumber } from '@/api/types';
+import type { HomeworkNumberStatus, TeacherHomeworkCheckResult, TeacherHomeworkNumber } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { HOMEWORK_STATUS_ORDER } from '@/domain/statuses';
+import { statusLabel } from '@/components/numbers';
+import { homeworkStatusLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
-import { makeStyles, useTheme } from '@/theme';
-import { Chip, PressableScale, StatusBadge, StatusOptionGroup, Text, TextButton, useStatusAnnouncement, type ChipTone } from '@/ui';
+import { makeStyles } from '@/theme';
+import { Card, Chip, PressableScale, StatusBadge, Text, TextButton, useStatusAnnouncement } from '@/ui';
 
 import { DisclosureRow } from './disclosure-row';
 import { hasResultDiagnostics, shortenRecognizedAnswer } from './review-logic';
+import { StatusMarks } from './status-marks';
 
 export type ReviewNumberCardProps = {
   /** The number with its current colour (an in-flight mark already applied). */
@@ -28,19 +30,16 @@ export type ReviewNumberCardProps = {
   onHistory: () => void;
 };
 
-const VERDICT_CHIP: Record<SolutionVerdict, ChipTone> = { CORRECT: 'green', INCORRECT: 'red', UNCERTAIN: 'muted' };
-
 /**
- * One number of a homework in the review (docs/spec/04-teacher-students.md S4 "number card"): the AI
- * verdict of the latest finished check, the current colour, what the model recognised and said, the
- * staff-only diagnostics, the student's note and the three traffic-light buttons. A 3 px stripe on the
- * left repeats the verdict so the column can be scanned.
+ * Everything about one number of a homework in the review (docs/spec/04-teacher-students.md S4 "number
+ * card"), shown in the sheet a number row opens: the current status and the AI verdict of the latest
+ * finished check, what the model recognised and said, the staff-only diagnostics, the student's note, the
+ * statement with the reference answer on demand, the three status marks and the way to the status history.
  */
 export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, error, onStatus, onHistory }: ReviewNumberCardProps) {
   const styles = useStyles();
-  const theme = useTheme();
   const { dict, m } = useI18n();
-  // A refused mark appears under the toggle without moving the focus: VoiceOver and TalkBack have to be told
+  // A refused mark appears under the marks without moving the focus: VoiceOver and TalkBack have to be told
   // (on Android role="alert" alone says nothing).
   useStatusAnnouncement(error);
   const t = dict.students.review;
@@ -48,31 +47,24 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
   const [conditionOpen, setConditionOpen] = useState(false);
   const [fullAnswer, setFullAnswer] = useState(false);
 
-  const stripe =
-    result?.verdict === 'CORRECT'
-      ? theme.colors.accentSolid
-      : result?.verdict === 'INCORRECT'
-        ? theme.colors.dangerText
-        : result?.verdict === 'UNCERTAIN'
-          ? theme.colors.kicker
-          : theme.colors.softBorder;
-
   const recognized = result && result.verdict !== 'UNCERTAIN' ? (result.recognizedAnswer ?? '').trim() : '';
   const shortRecognized = recognized ? shortenRecognizedAnswer(recognized) : '';
   const showDiagnostics = !lessonMode && result !== undefined && hasResultDiagnostics(result);
-  const label = format(t.number, { n: number.number });
 
   return (
-    <View style={[styles.card, { borderLeftColor: stripe }]} testID={`review-number-${number.homeworkNumberId}`}>
+    <View style={styles.card} testID={`review-number-${number.homeworkNumberId}`}>
       <View style={styles.head}>
-        <Text variant="bodyBold" tabular accessibilityRole="header">
-          {label}
-        </Text>
-        {result ? <Chip tone={VERDICT_CHIP[result.verdict]} label={t.verdict[result.verdict].chip} /> : null}
-        <StatusBadge
-          status={number.status}
-          label={number.status ? dict.status[number.status].shortLabel : dict.student.statusBadge.unmarked}
-        />
+        <StatusBadge status={number.status} label={statusLabel(number.status, m.common.statuses)} accessibilityLabel={homeworkStatusLabel(number.status, dict)} />
+        {/* A colour only where the verdict asks for attention; «Верно» is a plain fact. */}
+        {result ? (
+          result.verdict === 'INCORRECT' ? (
+            <Chip tone="red" label={t.verdict.INCORRECT.chip} />
+          ) : (
+            <Text variant="small" color="textMuted">
+              {t.verdict[result.verdict].chip}
+            </Text>
+          )
+        ) : null}
       </View>
 
       {shortRecognized ? (
@@ -97,14 +89,38 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
         )
       ) : null}
 
-      {result?.comment ? <Text variant="small">{result.comment}</Text> : null}
+      {result?.comment ? <Text variant="body">{result.comment}</Text> : null}
+
+      {number.note ? (
+        <Card style={styles.note}>
+          <Text variant="kicker" color="textMuted">
+            {dict.student.numberCard.note}
+          </Text>
+          <Text variant="small" selectable>
+            {number.note}
+          </Text>
+        </Card>
+      ) : null}
+
+      <StatusMarks
+        accessibilityLabel={format(m.teacher.review.statusAria, { n: number.number })}
+        value={number.status}
+        onChange={onStatus}
+        disabled={saving || blocked}
+        testID={`review-number-sheet-status-${number.homeworkNumberId}`}
+      />
+
+      {error ? (
+        <Text variant="captionStrong" color="dangerText" accessibilityRole="alert" testID={`review-number-error-${number.homeworkNumberId}`}>
+          {error}
+        </Text>
+      ) : null}
 
       {showDiagnostics && result ? (
         <View>
           <DisclosureRow
             label={t.diagnosticsSummary}
-            variant="captionStrong"
-            color="textMuted"
+            icon="lock"
             expanded={diagnosticsOpen}
             onToggle={() => setDiagnosticsOpen((open) => !open)}
             testID={`review-number-diagnostics-${number.homeworkNumberId}`}
@@ -112,13 +128,13 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
           {diagnosticsOpen ? (
             <View style={styles.diagnostics}>
               {result.copySuspected ? (
-                <Text variant="caption" color="label">
+                <Text variant="small" color="label">
                   {t.copySuspected}
                   {result.copyReason ? `: ${result.copyReason}` : '.'}
                 </Text>
               ) : null}
               {result.injectionSuspected ? (
-                <Text variant="caption" color="label">
+                <Text variant="small" color="label">
                   {t.injectionNote}
                   {result.injectionNote ? `: ${result.injectionNote}` : '.'}
                 </Text>
@@ -128,69 +144,44 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
         </View>
       ) : null}
 
-      {number.note ? (
-        <View style={styles.note}>
-          <Text variant="small" selectable>
-            {number.note}
-          </Text>
-        </View>
-      ) : null}
-
       {/* PROPOSAL of the spec (04 S4, §7 item 15): the statement and the reference answer on demand. */}
       <View>
         <DisclosureRow
           label={conditionOpen ? m.teacher.review.hideCondition : dict.topics.singleNumber.sectionTitle}
           accessibilityLabel={format(conditionOpen ? m.teacher.review.hideConditionOf : m.teacher.review.showConditionOf, { n: number.number })}
-          variant="captionStrong"
-          color="textMuted"
           expanded={conditionOpen}
           onToggle={() => setConditionOpen((open) => !open)}
           testID={`review-number-condition-${number.homeworkNumberId}`}
         />
         {conditionOpen ? (
-          <View style={styles.condition}>
-            <Text variant="kickerSm">{dict.topics.viewNumbers.condition}</Text>
+          <Card style={styles.condition}>
+            <Text variant="kicker" color="textMuted">
+              {dict.topics.viewNumbers.condition}
+            </Text>
             {number.conditionLatex ? (
               <MathContent value={number.conditionLatex} variant="bare" />
             ) : (
-              <Text variant="caption" color="textMuted">
+              <Text variant="small" color="textMuted">
                 {m.teacher.review.noCondition}
               </Text>
             )}
-            <Text variant="kickerSm">{dict.topics.viewNumbers.answer}</Text>
+            <Text variant="kicker" color="textMuted">
+              {dict.topics.viewNumbers.answer}
+            </Text>
             {number.answerLatex ? (
               <MathContent value={number.answerLatex} variant="bare" />
             ) : (
-              <Text variant="caption" color="textMuted">
+              <Text variant="small" color="textMuted">
                 {m.teacher.review.noAnswer}
               </Text>
             )}
-          </View>
+          </Card>
         ) : null}
       </View>
-
-      <StatusOptionGroup
-        accessibilityLabel={format(m.teacher.review.statusAria, { n: number.number })}
-        options={HOMEWORK_STATUS_ORDER.map((value) => ({ value, label: dict.status[value].shortLabel, tone: value }))}
-        value={number.status}
-        onChange={onStatus}
-        columns={3}
-        disabled={saving || blocked}
-        testID={`review-number-status-${number.homeworkNumberId}`}
-      />
-
-      {error ? (
-        <View style={styles.error}>
-          <Text variant="captionStrong" color="dangerText" accessibilityRole="alert" testID={`review-number-error-${number.homeworkNumberId}`}>
-            {error}
-          </Text>
-        </View>
-      ) : null}
 
       <TextButton
         label={dict.topics.history.show}
         accessibilityLabel={format(m.teacher.review.historyOf, { n: number.number })}
-        tone="muted"
         onPress={onHistory}
         testID={`review-number-history-${number.homeworkNumberId}`}
         style={styles.history}
@@ -200,21 +191,10 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
 }
 
 const useStyles = makeStyles((t) => ({
-  card: {
-    gap: t.space.sm,
-    paddingVertical: 12,
-    paddingLeft: 12,
-    paddingRight: 14,
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderLeftWidth: 3,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
-  },
-  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: t.space.sm, rowGap: t.space.xs },
-  diagnostics: { gap: t.space.xxs, paddingLeft: 16 + t.space.sm, paddingBottom: t.space.xs },
-  note: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: t.radii.md, backgroundColor: t.colors.tabHover },
-  condition: { gap: t.space.xs, paddingBottom: t.space.xs },
-  error: { gap: t.space.xxs },
+  card: { gap: t.space.md, paddingBottom: t.space.sm },
+  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: t.space.md, rowGap: t.space.xs },
+  diagnostics: { gap: t.space.xxs, paddingLeft: t.sizes.icon.sm + t.space.sm, paddingBottom: t.space.xs },
+  note: { gap: t.space.xxs },
+  condition: { gap: t.space.xs },
   history: { alignSelf: 'flex-start' },
 }));

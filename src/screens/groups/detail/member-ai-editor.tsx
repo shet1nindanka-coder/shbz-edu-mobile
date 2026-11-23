@@ -329,7 +329,6 @@ export function MemberAiEditor({ groupId, member, onDetachedError }: MemberAiEdi
         onChange={changeSpeed}
         placeholder={t.speedNotSet}
         closeLabel={m.common.actions.close}
-        size="sm"
         disabled={save.isPending}
         testID={`member-speed-${member.id}`}
       />

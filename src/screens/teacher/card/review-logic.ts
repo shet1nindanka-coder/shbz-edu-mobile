@@ -115,6 +115,27 @@ export function acceptVerdictChanges(
   return changes;
 }
 
+/**
+ * The numbers of a homework that wait for the teacher — the rows under «Нужно проверить» (docs/design/
+ * glass-over-paper.md §1 rule 5: many numbers never grow the screen, the rest is in «Все номера»):
+ * - a number marked «нужна помощь»;
+ * - a number the latest finished check could not judge («на проверке») and nobody has marked yet;
+ * - a number whose definite AI verdict is not applied yet — what "Accept AI verdicts" would change.
+ * In the homework's own order.
+ */
+export function numbersToCheck(assignment: Pick<TeacherHomeworkAssignment, 'numbers' | 'checks'>): string[] {
+  const verdicts = verdictsByNumber(latestDoneCheck(assignment.checks));
+  const pending = new Set(acceptVerdictChanges(assignment).map((change) => change.homeworkNumberId));
+  return assignment.numbers
+    .filter(
+      (number) =>
+        number.status === 'RED' ||
+        pending.has(number.homeworkNumberId) ||
+        (number.status === null && verdicts.get(number.number)?.verdict === 'UNCERTAIN'),
+    )
+    .map((number) => number.homeworkNumberId);
+}
+
 export function chunkChanges<T>(changes: readonly T[], size = STATUS_BATCH_MAX): T[][] {
   const chunks: T[][] = [];
   for (let start = 0; start < changes.length; start += size) chunks.push(changes.slice(start, start + size));

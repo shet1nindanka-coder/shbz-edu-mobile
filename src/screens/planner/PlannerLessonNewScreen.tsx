@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { BackHandler, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { BackHandler } from 'react-native';
 
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
@@ -18,8 +18,8 @@ import { TargetChooser, type LessonTarget } from './lessons/target-chooser';
 export type PlannerLessonNewScreenProps = ScreenParams['planner.lessonNew'] & {
   /**
    * Told whether a target picked on the chooser is open — a step inside this screen that "back" closes.
-   * The route turns the iOS back gesture off meanwhile, so it cannot leave the screen while the app bar
-   * arrow and Android's back return to the chooser.
+   * The route turns the iOS back gesture off meanwhile, so it cannot leave the screen while the header's
+   * back link and Android's back return to the chooser.
    */
   onInnerStepChange?: (active: boolean) => void;
 };
@@ -32,7 +32,7 @@ type ComposeMode = 'ai' | 'manual';
  * individual lesson with the "AI selection / pick manually" switch.
  */
 export function PlannerLessonNewScreen({ groupId, studentId, onInnerStepChange }: PlannerLessonNewScreenProps) {
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.planner.lessonNew;
   const routeTarget: LessonTarget | null = groupId ? { groupId } : studentId ? { studentId } : null;
   // A target picked on the chooser lives in the screen: "back" returns to the chooser, not to the list.
@@ -54,11 +54,7 @@ export function PlannerLessonNewScreen({ groupId, studentId, onInnerStepChange }
   }, [pickedHere]);
 
   if (!target) {
-    return (
-      <Screen testID="planner-lesson-new-screen" header={<DetailAppBar title={t.title} subtitle={t.kicker} />} scroll={false} padded={false}>
-        <TargetChooser onPick={setPicked} />
-      </Screen>
-    );
+    return <TargetChooser header={<DetailAppBar title={t.title} backTitle={m.shell.tabs.lessons} />} onPick={setPicked} />;
   }
 
   return (
@@ -89,11 +85,16 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
   // `null` until the teacher touches the switch: the initial mode follows AI availability.
   const [chosenMode, setChosenMode] = useState<ComposeMode | null>(null);
 
-  const appBar = (
+  // The header of every state of the form: whom the lesson is for under the title; the forms add their
+  // main button to it on a tablet.
+  const header = (aside?: ReactNode) => (
     <DetailAppBar
       title={t.title}
-      subtitle={data?.kicker ?? t.kicker}
+      subtitle={data?.kicker}
+      // Back from a form opened on the chooser returns to the chooser, which has no shorter name.
+      backTitle={onBack ? undefined : m.shell.tabs.lessons}
       onBack={onBack}
+      aside={aside}
       testID="lesson-new-app-bar"
     />
   );
@@ -103,10 +104,10 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
     if (form.isError && isNotFoundError(form.error)) {
       const description = errorText(form.error, dict.shells.notFoundDescription);
       // Opened from the route: the shell's 404 page. Picked on the chooser: the route has turned the iOS back
-      // gesture off, so the 404 keeps the app bar whose arrow returns to the chooser (as Android's back does).
+      // gesture off, so the 404 keeps the header whose back link returns to the chooser (as Android's back does).
       if (!onBack) return <NotFoundScreen description={description} />;
       return (
-        <Screen testID="planner-lesson-new-screen" header={appBar} scroll={false} contentContainerStyle={styles.center}>
+        <Screen testID="planner-lesson-new-screen" header={header()} scroll={false} contentContainerStyle={styles.center}>
           <ErrorState
             numeral="404"
             title={dict.shells.notFoundTitle}
@@ -119,11 +120,11 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
       );
     }
     return (
-      <Screen testID="planner-lesson-new-screen" header={appBar}>
+      <Screen testID="planner-lesson-new-screen" header={header()}>
         {form.isError || isWaitingForNetwork(form) ? (
           <LoadFailure query={form} testID="lesson-new-error-state" />
         ) : (
-          <LoadingState variant="cards" count={3} cardHeight={96} accessibilityLabel={m.common.a11y.loading} testID="lesson-new-loading" />
+          <LoadingState variant="cards" count={2} accessibilityLabel={m.common.a11y.loading} testID="lesson-new-loading" />
         )}
       </Screen>
     );
@@ -134,7 +135,7 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
 
   // Nothing to show above the fields of a group form while AI selection is available.
   const top = !form.isError && data.aiAvailable && !studentMode ? null : (
-    <View style={styles.top}>
+    <>
       {form.isError ? <Notice tone="error" text={errorText(form.error, m.common.errors.generic)} testID="lesson-new-refresh-error" /> : null}
       {!data.aiAvailable ? <Notice tone="warning" text={t.aiUnavailable} testID="lesson-new-ai-unavailable" /> : null}
       {studentMode ? (
@@ -150,17 +151,16 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
           testID="lesson-new-mode"
         />
       ) : null}
-    </View>
+    </>
   );
 
   const student = data.members[0];
   if (mode === 'manual' && studentMode && student && data.composeTopics) {
-    return <ManualCompose studentId={student.id} topics={data.composeTopics} header={appBar} top={top} />;
+    return <ManualCompose studentId={student.id} topics={data.composeTopics} header={header} top={top} />;
   }
-  return <AiLessonForm form={data} header={appBar} top={top} />;
+  return <AiLessonForm form={data} header={header} top={top} />;
 }
 
-const useStyles = makeStyles((t) => ({
-  top: { gap: t.space.md },
+const useStyles = makeStyles(() => ({
   center: { justifyContent: 'center' },
 }));

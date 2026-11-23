@@ -2,46 +2,73 @@ import { AccessibilityInfo, Platform, View } from 'react-native';
 
 import type { ReasoningEffort } from '@/api/types';
 import { REASONING_EFFORTS } from '@/api/types';
-import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Button, Card, IconButton, Select, Switch, Text, TextButton, TextField } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Card, IconButton, Panel, Panels, Select, Switch, Text, TextField, useAnnounce } from '@/ui';
 
-import { ResultLine } from './result-line';
 import {
   SETTINGS_GROUPS,
   canStep,
   stepNumberInput,
   type NumberFieldSpec,
   type SettingFieldSpec,
+  type SettingsGroup,
   type SwitchFieldSpec,
   type TextFieldSpec,
 } from './settings-form';
 import type { SettingsFormState } from './use-settings-form';
 
+/** How the five groups of the form share the two tablet panels: the long AI group stands alone. */
+const TABLET_COLUMNS: readonly (readonly SettingsGroup['key'][])[] = [['aiCheck', 'files'], ['lessonPlan', 'classwork', 'homeworkPlan']];
+
 /**
- * Settings tab (07 §1.9, §4.5): the site's one form as five grouped cards — switches, numeric fields with
- * steppers and their range, texts and the reasoning-effort picker. Field sub-labels are part of the form
- * on the site (not hideable hints) and stay visible here too. The save bar is `SettingsSaveBar`.
+ * Settings tab (07 §1.9, §4.5; layout: docs/design/glass-over-paper.md §7, mockup D-panel): the site's one
+ * form as cards titled inside. A setting is a row with its control on the right — a number field with its
+ * steppers, a switch — or, for a text and the effort picker, a field under its label. Field sub-labels are
+ * part of the form on the site (not hideable hints) and stay visible as the row's caption, together with
+ * the allowed range. The save controls are in `settings-save.tsx`.
  */
 export function SettingsTab({ form }: { form: SettingsFormState }) {
   const styles = useStyles();
-  const { dict } = useI18n();
-  const t = dict.planner.devPanel.settings;
+  const theme = useTheme();
+
+  if (theme.tablet) {
+    return (
+      <Panels testID="panel-settings">
+        {TABLET_COLUMNS.map((keys) => (
+          <Panel key={keys.join('|')} contentStyle={styles.column}>
+            {SETTINGS_GROUPS.filter((group) => keys.includes(group.key)).map((group) => (
+              <SettingsGroupBlock key={group.key} group={group} form={form} />
+            ))}
+          </Panel>
+        ))}
+      </Panels>
+    );
+  }
 
   return (
     <View style={styles.root} testID="panel-settings">
       {SETTINGS_GROUPS.map((group) => (
-        <Card key={group.key} testID={`settings-group-${group.key}`}>
-          <View style={styles.group}>
-            <Text variant="kicker" accessibilityRole="header">
-              {t[group.key]}
-            </Text>
-            {group.fields.map((field) => (
-              <SettingField key={field.key} field={field} form={form} />
-            ))}
-          </View>
+        <Card key={group.key}>
+          <SettingsGroupBlock group={group} form={form} />
         </Card>
+      ))}
+    </View>
+  );
+}
+
+function SettingsGroupBlock({ group, form }: { group: SettingsGroup; form: SettingsFormState }) {
+  const styles = useStyles();
+  const { dict } = useI18n();
+  return (
+    <View testID={`settings-group-${group.key}`}>
+      <Text variant="sectionTitle" accessibilityRole="header" style={styles.groupTitle}>
+        {dict.planner.devPanel.settings[group.key]}
+      </Text>
+      {group.fields.map((field, index) => (
+        <View key={field.key} style={[styles.field, index > 0 ? styles.divider : null]}>
+          <SettingField field={field} form={form} />
+        </View>
       ))}
     </View>
   );
@@ -133,6 +160,10 @@ function NumberSetting({ field, form }: { field: NumberFieldSpec; form: Settings
   const text = form.draft[field.key];
   const label = t[field.label];
   const range = { min: field.min, max: field.max };
+  const caption = `${t[field.hint]} · ${format(m.developer.settings.range, range)}`;
+  const error = form.invalid.has(field.key) ? format(m.developer.settings.rangeError, range) : null;
+  // The error replaces the caption without moving the focus: iOS has no live regions, so it is spoken.
+  useAnnounce(error);
   const step = (direction: 1 | -1) => {
     const next = stepNumberInput(text, field, direction);
     form.set(field.key, next);
@@ -140,106 +171,73 @@ function NumberSetting({ field, form }: { field: NumberFieldSpec; form: Settings
   };
 
   return (
-    <TextField
-      label={label}
-      labelAside={
-        // One line, never squeezed: a long label wraps instead of the range.
-        <Text variant="caption" tabular numberOfLines={1} style={styles.range}>
-          {format(m.developer.settings.range, range)}
-        </Text>
-      }
-      helper={t[field.hint]}
-      error={form.invalid.has(field.key) ? format(m.developer.settings.rangeError, range) : null}
-      value={text}
-      onChangeText={(next) => form.set(field.key, next)}
-      keyboardType={field.kind === 'int' ? 'number-pad' : 'decimal-pad'}
-      inputMode={field.kind === 'int' ? 'numeric' : 'decimal'}
-      maxLength={8}
-      disabled={form.pending}
-      selectTextOnFocus
-      right={
-        <View style={styles.stepper}>
-          <IconButton
-            icon="minus"
-            variant="ghost"
-            accessibilityLabel={format(m.developer.settings.decrease, { label })}
-            onPress={() => step(-1)}
-            disabled={form.pending || !canStep(text, field, -1)}
-            testID={`setting-${field.key}-minus`}
-          />
-          <IconButton
-            icon="plus"
-            variant="ghost"
-            accessibilityLabel={format(m.developer.settings.increase, { label })}
-            onPress={() => step(1)}
-            disabled={form.pending || !canStep(text, field, 1)}
-            testID={`setting-${field.key}-plus`}
-          />
-        </View>
-      }
-      testID={`setting-${field.key}`}
-    />
-  );
-}
-
-/**
- * Sticky bar of the Settings tab: the status line of the site's form («Значения перекрывают .env…» →
- * «Сохраняем настройки…» → the save message) and the save button. A range error blocks the save: the site
- * would silently clamp the value or reset a blank field to the env default (07 §7 item 11).
- */
-export function SettingsSaveBar({ form }: { form: SettingsFormState }) {
-  const styles = useStyles();
-  const { dict, m } = useI18n();
-  const t = dict.planner.devPanel.settings;
-  const blocked = form.invalid.size > 0;
-
-  return (
-    <View style={styles.bar} testID="settings-save-bar">
-      <View style={styles.status}>
-        <View style={styles.statusText}>
-          {form.pending ? (
-            <ResultLine pendingText={t.savingSettings} result={null} testID="settings-status" />
-          ) : blocked ? (
-            <ResultLine result={{ ok: false, message: m.developer.settings.fixErrors }} testID="settings-status" />
-          ) : form.result ? (
-            <ResultLine result={form.result} testID="settings-status" />
-          ) : form.dirty ? (
-            <Text variant="captionMedium" color="yellowText" testID="settings-status">
-              {m.developer.settings.unsaved}
-            </Text>
-          ) : (
-            // Always shown on the site (not a hideable hint): it says when a saved value takes effect.
-            <Text variant="caption" testID="settings-status">
-              {t.applyHint}
-            </Text>
-          )}
-        </View>
-        {form.dirty && !form.pending ? (
-          <TextButton label={m.developer.settings.reset} tone="muted" onPress={form.reset} testID="settings-reset" />
-        ) : null}
+    <View style={styles.row}>
+      <View style={styles.rowTexts}>
+        <Text variant="bodyStrong">{label}</Text>
+        {error ? (
+          <Text variant="small" color="redText" accessibilityRole="alert" accessibilityLiveRegion="polite" testID={`setting-${field.key}-error`}>
+            {error}
+          </Text>
+        ) : (
+          <Text variant="small" color="textMuted">
+            {caption}
+          </Text>
+        )}
       </View>
-      <Button
-        label={form.pending ? t.saving : t.save}
-        size="lg"
-        loading={form.pending}
-        disabled={blocked || form.waitSeconds > 0}
-        onPress={form.save}
-        fullWidth
-        testID="settings-save"
+      <TextField
+        accessibilityLabel={label}
+        // The row's caption belongs to the field: focusing it reads the hint and the range, or the error.
+        accessibilityHint={error ?? caption}
+        value={text}
+        onChangeText={(next) => form.set(field.key, next)}
+        keyboardType={field.kind === 'int' ? 'number-pad' : 'decimal-pad'}
+        inputMode={field.kind === 'int' ? 'numeric' : 'decimal'}
+        maxLength={8}
+        disabled={form.pending}
+        selectTextOnFocus
+        containerStyle={styles.number}
+        inputStyle={styles.numberInput}
+        right={
+          <View style={styles.stepper}>
+            <IconButton
+              icon="minus"
+              variant="ghost"
+              accessibilityLabel={format(m.developer.settings.decrease, { label })}
+              onPress={() => step(-1)}
+              disabled={form.pending || !canStep(text, field, -1)}
+              style={styles.step}
+              testID={`setting-${field.key}-minus`}
+            />
+            <IconButton
+              icon="plus"
+              variant="ghost"
+              accessibilityLabel={format(m.developer.settings.increase, { label })}
+              onPress={() => step(1)}
+              disabled={form.pending || !canStep(text, field, 1)}
+              style={styles.step}
+              testID={`setting-${field.key}-plus`}
+            />
+          </View>
+        }
+        testID={`setting-${field.key}`}
       />
-      {/* Under the button, not in the status: editing a field clears the status, the lock stays. */}
-      <RetryWaitLine seconds={form.waitSeconds} testID="settings-wait" />
     </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.lg },
-  group: { gap: t.space.field },
-  range: { flexShrink: 0 },
+  root: { gap: t.space.block },
+  // A tablet panel holds several groups: more air between them than between the rows of one.
+  column: { gap: t.space.xl },
+  groupTitle: { paddingBottom: t.space.xxs },
+  field: { paddingVertical: t.space.md },
+  divider: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
+  row: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  rowTexts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  // The value and its two 36 steppers; a value is at most six digits («100000», «0.65»).
+  number: { width: t.sizes.control.sm * 2 + t.sizes.control.lg + t.space.xl },
+  numberInput: { textAlign: 'center', fontVariant: ['tabular-nums'], paddingHorizontal: t.space.xxs },
   // Inside the field's frame: anything wider than the frame would be scrolled into view on focus (web).
-  stepper: { flexDirection: 'row', alignItems: 'center', marginRight: t.space.xxs },
-  bar: { gap: t.space.sm },
-  status: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  statusText: { flex: 1 },
+  stepper: { flexDirection: 'row', alignItems: 'center', marginRight: t.space.xxxs },
+  step: { width: t.sizes.control.sm, height: t.sizes.control.sm },
 }));

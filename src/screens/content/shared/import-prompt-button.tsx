@@ -106,7 +106,7 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
         )}
       </View>
       {error ? (
-        <Text variant="caption" color="dangerText" accessibilityRole="alert" testID="import-prompt-error">
+        <Text variant="small" color="redText" accessibilityRole="alert" testID="import-prompt-error">
           {error}
         </Text>
       ) : null}

@@ -26,7 +26,7 @@ export function PasswordSuggestion({ suggestion, onPick, onAnother, onCustom }: 
 
   return (
     <View style={styles.panel} accessibilityLabel={t.aria} testID="password-suggestion">
-      <Text variant="kickerSm" style={styles.title}>
+      <Text variant="kicker" color="textMuted" style={styles.title}>
         {t.title}
       </Text>
       <PressableScale
@@ -43,7 +43,7 @@ export function PasswordSuggestion({ suggestion, onPick, onAnother, onCustom }: 
           {suggestion}
         </Text>
         {/* Part of the suggestion on the site, not a `.ui-hint`: shown whatever the hints preference is. */}
-        <Text variant="caption" color="kicker">
+        <Text variant="small" color="textMuted">
           {m.teacher.students.suggestPickHint}
         </Text>
       </PressableScale>
@@ -57,21 +57,20 @@ export function PasswordSuggestion({ suggestion, onPick, onAnother, onCustom }: 
 
 const useStyles = makeStyles((t) => ({
   panel: {
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
+    // A soft panel inside the sheet.
+    borderRadius: t.radii.lg,
     backgroundColor: t.colors.softBg,
     paddingHorizontal: t.space.xs,
     paddingTop: t.space.md,
     paddingBottom: t.space.md,
   },
-  title: { paddingHorizontal: 10 },
+  title: { paddingHorizontal: t.space.sm },
   pick: {
     minHeight: t.sizes.minTouch,
     justifyContent: 'center',
-    gap: 2,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    gap: t.space.xxxs,
+    paddingVertical: t.space.xs,
+    paddingHorizontal: t.space.sm,
     borderRadius: t.radii.md,
   },
   pressed: { backgroundColor: t.colors.cardBg },
@@ -80,6 +79,6 @@ const useStyles = makeStyles((t) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: t.space.md,
-    paddingHorizontal: 10,
+    paddingHorizontal: t.space.sm,
   },
 }));

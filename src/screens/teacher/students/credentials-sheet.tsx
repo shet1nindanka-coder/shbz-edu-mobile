@@ -128,17 +128,18 @@ export function CredentialsSheet({ credentials, title, onDone }: CredentialsShee
       {shown ? (
         <View style={styles.content}>
           <View style={styles.intro}>
-            <Text variant="kicker">{t.kicker}</Text>
             <Text variant="dialogTitle" accessibilityRole="header">
               {title}
             </Text>
-            <Text variant="small" color="textMuted" style={styles.paragraph}>
+            <Text variant="small" color="textMuted">
               {format(t.intro, { name: shown.name })}
             </Text>
           </View>
 
           <View style={styles.block}>
-            <Text variant="kickerSm">{t.messageTitle}</Text>
+            <Text variant="kicker" color="textMuted">
+              {t.messageTitle}
+            </Text>
             <View style={styles.message}>
               {lines.map((line) => (
                 <CredentialRow
@@ -190,18 +191,18 @@ function CredentialRow({ line, copied, showPill, copiedLabel, hint, onCopy }: Cr
         style={styles.row}
         testID={`credentials-line-${line.id}`}
       >
-        <Text variant="mono" color="kicker" selectable={false} style={styles.rowText}>
+        <Text variant="mono" color="textMuted" selectable={false} style={styles.rowText}>
           {`${line.label}: `}
           <Text variant="mono" color="textStrong" selectable={false}>
             {line.value}
           </Text>
         </Text>
         <View style={copied ? null : styles.icon}>
-          <Icon name={copied ? 'check' : 'copy'} size={16} color={copied ? 'greenText' : 'textStrong'} />
+          <Icon name={copied ? 'check' : 'copy'} size={theme.sizes.icon.sm} color={copied ? 'greenText' : 'textStrong'} />
         </View>
       </PressableScale>
       {showPill ? (
-        <Enter duration={theme.motion.duration.copyPillIn} offset={4} style={[styles.pill, theme.shadows.pill]}>
+        <Enter duration={theme.motion.duration.copyPillIn} offset={theme.space.xxs} style={[styles.pill, theme.shadows.pill]}>
           <Text variant="captionBold" color="tabActiveText" numberOfLines={1}>
             {copiedLabel}
           </Text>
@@ -213,13 +214,11 @@ function CredentialRow({ line, copied, showPill, copiedLabel, hint, onCopy }: Cr
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.lg, paddingTop: t.space.xxs },
-  intro: { gap: 10 },
-  paragraph: { lineHeight: 24 },
+  intro: { gap: t.space.xs },
   block: { gap: t.space.sm },
   message: {
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
+    // A soft panel inside the sheet.
+    borderRadius: t.radii.lg,
     backgroundColor: t.colors.softBg,
     paddingVertical: t.space.xs,
     paddingHorizontal: t.space.sm,
@@ -231,23 +230,23 @@ const useStyles = makeStyles((t) => ({
     gap: t.space.md,
     paddingVertical: t.space.xs,
     paddingHorizontal: t.space.sm,
-    borderRadius: t.radii.selectXs,
+    borderRadius: t.radii.md,
   },
   rowPressed: { backgroundColor: t.colors.accentSoftStrong },
   rowText: { flex: 1, minWidth: 0 },
   icon: { opacity: 0.55 },
   pill: {
     position: 'absolute',
-    right: 8,
-    top: -14,
-    paddingVertical: 5,
-    paddingHorizontal: 11,
+    right: t.space.sm,
+    top: -t.space.md,
+    paddingVertical: t.space.xxs,
+    paddingHorizontal: t.space.md,
     borderRadius: t.radii.full,
     backgroundColor: t.colors.tabActiveBg,
     pointerEvents: 'none',
   },
-  feedback: { minHeight: 16 },
+  feedback: { minHeight: t.typography.small.lineHeight },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
-  action: { flexGrow: 1, flexBasis: 120 },
+  action: { flexGrow: 1, flexBasis: '30%' },
   actionWide: { flexBasis: '100%' },
 }));

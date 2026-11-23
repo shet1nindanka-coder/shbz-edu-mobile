@@ -52,7 +52,7 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
       contentStyle={styles.shrink}
       footer={
         <View style={styles.footer}>
-          <Text variant="smallMedium" color="textMuted" style={styles.counter} testID="recipients-sheet-count">
+          <Text variant="small" color="textMuted" style={styles.counter} testID="recipients-sheet-count">
             {pickedIds.length > 0 ? format(t.picked, { n: pickedIds.length }) : t.nonePicked}
           </Text>
           <Button label={m.common.actions.done} onPress={onClose} testID="recipients-sheet-done" />

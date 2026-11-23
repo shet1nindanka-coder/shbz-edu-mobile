@@ -38,6 +38,27 @@ export function panelChips(stats: DeveloperPanelStats, settings: SiteSettings, t
   ];
 }
 
+export type PanelFigure = {
+  key: PanelChip['key'];
+  caption: string;
+  value: string;
+  /** The value signals a problem (the yellow chip of the site): it is the only figure drawn in colour. */
+  attention: boolean;
+};
+
+/**
+ * The same three counters as plain figures — a caption and a value (docs/design/glass-over-paper.md §1
+ * rule 3: a neutral fact is not a coloured label). The warning rule stays the one of `panelChips`.
+ */
+export function panelFigures(stats: DeveloperPanelStats, settings: SiteSettings, t: DevPanelDict): PanelFigure[] {
+  const values: Record<PanelChip['key'], { caption: string; value: string }> = {
+    queue: { caption: t.status.queue, value: String(stats.queueLength) },
+    ai: { caption: t.status.runs24h, value: `${stats.checksLastDay} / ${settings.aiDailyLimit}` },
+    storage: { caption: t.status.files, value: stats.filesSizeLabel },
+  };
+  return panelChips(stats, settings, t).map((chip) => ({ key: chip.key, ...values[chip.key], attention: chip.tone === 'yellow' }));
+}
+
 // ───────────────────────────── status tiles ─────────────────────────────
 
 export type StatTileKey = 'queue' | 'runs24h' | 'lessonQueue' | 'files' | 'students' | 'topics' | 'lastRetention';
@@ -53,6 +74,8 @@ export type StatTile = {
   percent?: number;
   /** Takes the whole row and uses the smaller value size: its value is a date-time, not a counter. */
   wide: boolean;
+  /** The value signals a problem: 80 % and more of the daily AI limit is spent. */
+  attention?: boolean;
 };
 
 /**
@@ -70,6 +93,7 @@ export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t:
       hint: t.runsHint,
       percent: budgetPercent(stats.checksLastDay, settings.aiDailyLimit),
       wide: false,
+      attention: stats.checksLastDay >= settings.aiDailyLimit * BUDGET_WARN_SHARE,
     },
     { key: 'lessonQueue', label: t.lessonQueue, value: String(stats.lessonQueueLength), hint: t.lessonQueueHint, wide: false },
     { key: 'files', label: t.files, value: String(stats.filesCount), hint: stats.filesSizeLabel, wide: false },

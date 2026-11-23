@@ -1,7 +1,5 @@
-import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { useMemo, useState } from 'react';
 
 import { errorText, qk, useApi } from '@/api';
 import type { HomeworkPlanListItem } from '@/api/types';
@@ -11,15 +9,17 @@ import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { PlannerSegments, ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { EmptyState, LoadingState, Notice, Screen } from '@/ui';
+import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
 
-import { DraftCard } from './drafts/draft-card';
+import { DraftRow } from './drafts/draft-row';
+import { DraftSummary } from './drafts/draft-summary';
 import { sortDrafts } from './drafts/drafts-logic';
 
 /**
  * `planner.drafts` (docs/spec/05-teacher-lessons-plans.md §1.5): the second segment of the teacher's
- * «занятия» tab — every AI homework draft, newest first. There is deliberately no "create" entry here:
- * a draft is started from a lesson board, a group or a student (90-addendum-2 N1).
+ * «занятия» section — every AI homework draft as a row, newest first. There is deliberately no "create"
+ * entry here: a draft is started from a lesson board, a group or a student (90-addendum-2 N1). A phone
+ * opens the draft's board on a tap; a tablet shows the tapped draft in the panel next to the list.
  */
 export function PlannerDraftsScreen() {
   const styles = useStyles();
@@ -29,6 +29,7 @@ export function PlannerDraftsScreen() {
   const { dict, m } = useI18n();
   const t = dict.planner.homeworkPlans.list;
 
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // The "assigned" counters move while a board is open elsewhere, so the list is re-read on every visit.
   const drafts = useQuery({ queryKey: qk('planner', 'listHomeworkPlans'), queryFn: () => api.planner.listHomeworkPlans(), refetchOnMount: 'always' });
@@ -41,72 +42,54 @@ export function PlannerDraftsScreen() {
   const { refreshing, refresh } = usePullRefresh([drafts]);
 
   const open = (plan: HomeworkPlanListItem) => navigation.open({ screen: 'planner.draftBoard', planId: plan.id });
+  // The tablet panel shows the tapped draft, or the newest one.
+  const selected = theme.tablet ? (plans.find((plan) => plan.id === selectedId) ?? plans[0] ?? null) : null;
+  const pressRow = theme.tablet ? (plan: HomeworkPlanListItem) => setSelectedId(plan.id) : open;
 
-  const header = (
-    <View style={styles.header}>
-      <PlannerSegments active="drafts" />
-      {/* Cached drafts stay on screen when a refresh fails (offline): say so instead of replacing them. */}
-      {drafts.isError && data ? <Notice tone="error" text={errorText(drafts.error, m.common.errors.generic)} testID="drafts-refresh-error" /> : null}
-    </View>
-  );
+  const rows = plans.map((plan, index) => (
+    <DraftRow key={plan.id} plan={plan} selected={selected?.id === plan.id} divider={index < plans.length - 1} onPress={pressRow} />
+  ));
 
   return (
     <Screen
       testID="planner-drafts-screen"
-      header={<ShellAppBar title={screenTitle('planner.drafts', m.shell.tabs)} />}
+      header={<ShellAppBar title={screenTitle('planner.drafts', m.shell.tabs)} aside={<PlannerSegments active="drafts" />} />}
       bottomInset={false}
-      scroll={!data}
-      padded={!data}
-      onRefresh={data ? undefined : refresh}
+      scroll={!theme.tablet}
+      maxWidth="full"
+      onRefresh={refresh}
       refreshing={refreshing}
     >
-      {data ? (
-        <FlashList
-          data={plans}
-          keyExtractor={(plan) => plan.id}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <DraftCard plan={item} onOpen={open} />
-            </View>
-          )}
-          ListHeaderComponent={header}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="drafts-empty" />
-            </View>
-          }
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.colors.accentSolid}
-              colors={[theme.colors.accentSolid]}
-              progressBackgroundColor={theme.colors.cardBg}
-            />
-          }
-          testID="drafts-list"
-        />
-      ) : drafts.isError || isWaitingForNetwork(drafts) ? (
-        <View style={styles.state}>
-          <PlannerSegments active="drafts" />
+      {/* Cached drafts stay on screen when a refresh fails (offline): say so instead of replacing them. */}
+      {drafts.isError && data ? <Notice tone="error" text={errorText(drafts.error, m.common.errors.generic)} testID="drafts-refresh-error" /> : null}
+
+      {!data ? (
+        drafts.isError || isWaitingForNetwork(drafts) ? (
           <LoadFailure query={drafts} testID="drafts-error" />
-        </View>
+        ) : (
+          <LoadingState variant="list" count={5} accessibilityLabel={m.common.a11y.loading} testID="drafts-loading" />
+        )
+      ) : plans.length === 0 ? (
+        <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="drafts-empty" />
+      ) : theme.tablet ? (
+        <Panels testID="drafts-list">
+          <Panel weight={3} padded={false} contentStyle={styles.listPanel}>
+            {rows}
+          </Panel>
+          <Panel
+            weight={2}
+            footer={selected ? <Button label={dict.planner.common.open} rightIcon="forward" fullWidth onPress={() => open(selected)} testID="draft-summary-open" /> : undefined}
+          >
+            {selected ? <DraftSummary plan={selected} /> : null}
+          </Panel>
+        </Panels>
       ) : (
-        <View style={styles.state}>
-          <PlannerSegments active="drafts" />
-          <LoadingState variant="cards" count={4} cardHeight={112} accessibilityLabel={m.common.a11y.loading} testID="drafts-loading" />
-        </View>
+        <ListCard testID="drafts-list">{rows}</ListCard>
       )}
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.lg, paddingBottom: t.space.lg, paddingHorizontal: t.space.gutter },
-  item: { paddingBottom: t.space.md, paddingHorizontal: t.space.gutter },
-  empty: { paddingHorizontal: t.space.gutter },
-  state: { gap: t.space.lg },
+  listPanel: { gap: 0, paddingVertical: t.space.sm },
 }));

@@ -1,13 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { View } from 'react-native';
+import type { ReactNode } from 'react';
 
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import type { ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
-import { makeStyles } from '@/theme';
-import { EmptyState, LoadingState, Notice, Screen, Text } from '@/ui';
+import { EmptyState, LoadingState, Notice, Screen } from '@/ui';
 
 import { DraftForm } from './drafts/draft-form';
 import { draftSourceKey, draftSourceOf, type DraftSource } from './drafts/drafts-logic';
@@ -28,7 +27,6 @@ export function PlannerDraftNewScreen({ lessonId, groupId, studentId }: PlannerD
 }
 
 function DraftNew({ source }: { source: DraftSource }) {
-  const styles = useStyles();
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.planner.homeworkPlans.new;
@@ -41,20 +39,21 @@ function DraftNew({ source }: { source: DraftSource }) {
   });
   const data = form.data;
 
-  // The bar has one line: a group or a student name fits there, «По итогам занятия «…»» does not — a
-  // draft made from a lesson shows that line in full above the form.
-  const fromLesson = Boolean(data?.sourceLessonId);
-  const appBar = <DetailAppBar title={t.title} subtitle={data && !fromLesson ? data.kicker : t.kicker} testID="draft-new-app-bar" />;
+  // Whom or what the homework is for — a group, a student, «По итогам занятия «…»» — is the line under the
+  // title; the form adds its main button to the header on a tablet.
+  const header = (aside?: ReactNode) => (
+    <DetailAppBar title={t.title} subtitle={data?.kicker} backTitle={m.shell.tabs.lessons} aside={aside} testID="draft-new-app-bar" />
+  );
 
   if (!data) {
     // `404 lessonNotFound` / `groupNotFound` / `studentNotFound`: the source is gone or belongs to someone else.
     if (form.isError && isNotFoundError(form.error)) return <NotFoundScreen description={errorText(form.error, dict.shells.notFoundDescription)} />;
     return (
-      <Screen testID="planner-draft-new-screen" header={appBar}>
+      <Screen testID="planner-draft-new-screen" header={header()}>
         {form.isError || isWaitingForNetwork(form) ? (
           <LoadFailure query={form} testID="draft-new-error-state" />
         ) : (
-          <LoadingState variant="cards" count={3} cardHeight={96} accessibilityLabel={m.common.a11y.loading} testID="draft-new-loading" />
+          <LoadingState variant="cards" count={2} accessibilityLabel={m.common.a11y.loading} testID="draft-new-loading" />
         )}
       </Screen>
     );
@@ -63,7 +62,7 @@ function DraftNew({ source }: { source: DraftSource }) {
   if (data.members.length === 0) {
     // A group without students: nobody to assign to, so no form.
     return (
-      <Screen testID="planner-draft-new-screen" header={appBar}>
+      <Screen testID="planner-draft-new-screen" header={header()}>
         <EmptyState title={t.nobody} testID="draft-new-nobody" />
       </Screen>
     );
@@ -72,23 +71,8 @@ function DraftNew({ source }: { source: DraftSource }) {
   return (
     <DraftForm
       form={data}
-      header={appBar}
-      top={
-        fromLesson || form.isError ? (
-          <View style={styles.top}>
-            {fromLesson ? (
-              <Text variant="smallStrong" color="textMuted" testID="draft-new-source">
-                {data.kicker}
-              </Text>
-            ) : null}
-            {form.isError ? <Notice tone="error" text={errorText(form.error, m.common.errors.generic)} testID="draft-new-refresh-error" /> : null}
-          </View>
-        ) : undefined
-      }
+      header={header}
+      top={form.isError ? <Notice tone="error" text={errorText(form.error, m.common.errors.generic)} testID="draft-new-refresh-error" /> : undefined}
     />
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  top: { gap: t.space.md },
-}));

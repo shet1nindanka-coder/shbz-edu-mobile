@@ -22,6 +22,11 @@ export type LatexEditorBlockProps = {
   saved: string | null;
   /** The server accepted a save (the stored string) or a delete (`null`). */
   onChanged: (value: string | null) => void;
+  /**
+   * The block shares the screen with the other value's editor (tablet panels): its save is an ordinary
+   * button then — a screen has one gradient action.
+   */
+  secondary?: boolean;
 };
 
 /**
@@ -29,8 +34,9 @@ export type LatexEditorBlockProps = {
  * docs/spec/07-developer-content.md §1.4b, §4.9): a saved value and a draft. «Сохранить» is offered when
  * the draft is non-blank and differs from the saved value; «Удалить» only when a saved value exists.
  * Unlike the site's card the preview follows the DRAFT — the spec's phone mapping asks for it.
+ * Rendered inside a card (a `Panel` of the number screen): the block brings no surface of its own.
  */
-export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChanged }: LatexEditorBlockProps) {
+export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChanged, secondary = false }: LatexEditorBlockProps) {
   const styles = useStyles();
   const api = useApi();
   const queryClient = useQueryClient();
@@ -128,7 +134,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
   const canSave = canSaveLatexDraft(draft, saved) && !busy && !wait.waiting;
 
   return (
-    <Card style={styles.card} testID={`latex-${kind}`}>
+    <View style={styles.root}>
       <TextArea
         label={texts.label}
         value={draft}
@@ -151,13 +157,15 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
 
       {hasLatex(draft) ? (
         <View style={styles.preview}>
-          <Text variant="kickerSm">{single.preview}</Text>
+          <Text variant="small" color="textMuted">
+            {single.preview}
+          </Text>
           <MathPreview value={draft} testID={`latex-${kind}-preview`} />
         </View>
       ) : (
         // A hint on the site (`ui-hint`): with hints off a blank draft simply has no preview.
         <Hint>
-          <Card variant="soft" dashed padded={14} testID={`latex-${kind}-empty`}>
+          <Card dashed testID={`latex-${kind}-empty`}>
             <Text variant="small" color="textMuted">
               {texts.empty}
             </Text>
@@ -167,7 +175,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
 
       {dirty && !busy ? (
         <View style={styles.dirty}>
-          <Text variant="caption" color="textMuted" style={styles.grow}>
+          <Text variant="small" color="textMuted" style={styles.grow}>
             {m.content.number.unsaved}
           </Text>
           <TextButton
@@ -195,6 +203,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
       <View style={styles.actions}>
         <Button
           label={save.isPending ? manager.saving : texts.save}
+          variant={secondary ? 'outline' : 'primary'}
           loading={save.isPending}
           disabled={!canSave}
           onPress={() => {
@@ -207,6 +216,7 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
           <Button
             label={texts.remove}
             variant="danger"
+            leftIcon="trash"
             disabled={busy || wait.waiting}
             onPress={() => setConfirmOpen(true)}
             testID={`latex-${kind}-delete`}
@@ -230,12 +240,12 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
         onCancel={() => setConfirmOpen(false)}
         testID={`latex-${kind}-confirm`}
       />
-    </Card>
+    </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { gap: t.space.md },
+  root: { gap: t.space.md },
   mono: { ...t.typography.mono },
   preview: { gap: t.space.xs },
   dirty: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },

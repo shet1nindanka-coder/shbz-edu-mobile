@@ -68,13 +68,13 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
       testID="numbers-confirm-dialog"
     >
       <View style={styles.content} accessibilityRole="alert">
-        <Text variant="kicker" color="dangerSolid">
+        <Text variant="kicker" color="dangerText">
           {dict.topics.widgets.confirm.kicker}
         </Text>
         <Text variant="dialogTitle" accessibilityRole="header">
           {t.dialogTitle}
         </Text>
-        <Text variant="small" color="label" style={styles.intro}>
+        <Text variant="small" color="label">
           {t.dialogIntro}
         </Text>
 
@@ -82,7 +82,7 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
           <View style={styles.body}>
             <View style={styles.list} testID="numbers-confirm-removed">
               {dangerousNumbers(shown).map((entry) => (
-                <Text key={entry.number} variant="small" color="label" style={styles.line}>
+                <Text key={entry.number} variant="small" color="label">
                   <Text variant="smallBold" color="textStrong">
                     {numberLabel(entry.number)}
                   </Text>
@@ -92,11 +92,11 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
             </View>
 
             {shown.added.length > 0 ? (
-              <Text variant="small" color="label" style={styles.line} testID="numbers-confirm-added">
+              <Text variant="small" color="label" testID="numbers-confirm-added">
                 {format(t.added, { numbers: shown.added.join(', ') })}
               </Text>
             ) : null}
-            <Text variant="small" color="label" style={styles.line} testID="numbers-confirm-kept">
+            <Text variant="small" color="label" testID="numbers-confirm-kept">
               {format(t.kept, { count: shown.keptCount })}
             </Text>
 
@@ -124,9 +124,7 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.sm, paddingTop: t.space.xxs, paddingBottom: t.space.md },
-  intro: { lineHeight: 24 },
   actions: { gap: t.space.md },
   body: { gap: t.space.md },
   list: { gap: t.space.xs },
-  line: { lineHeight: 22 },
 }));

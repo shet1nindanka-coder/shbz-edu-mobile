@@ -4,7 +4,7 @@ import type { ReportPeriod } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, CopyRow, Text } from '@/ui';
+import { BottomSheet, Button, CopyRow, ListRow, Text } from '@/ui';
 
 export type StudentMenuAction = { kind: 'report'; period: ReportPeriod } | { kind: 'resetPassword' } | { kind: 'delete' };
 
@@ -21,7 +21,8 @@ export type StudentMenuSheetProps = {
 
 /**
  * The "⋯" menu of the student card (docs/spec/04-teacher-students.md S3, mobile note): the login to copy,
- * the three PDF reports, "reset password" and "delete student" — the site's row of header buttons.
+ * the three PDF reports and "reset password" as menu rows, "delete student" as the one red button — the
+ * site's row of header buttons.
  */
 export function StudentMenuSheet({ visible, student, reportsBlocked, onClose, onSelect, onClosed }: StudentMenuSheetProps) {
   const styles = useStyles();
@@ -49,38 +50,37 @@ export function StudentMenuSheet({ visible, student, reportsBlocked, onClose, on
             testID="student-menu-login"
           />
 
-          <View style={styles.group}>
-            <Text variant="kickerSm">{m.teacher.card.reports}</Text>
+          <View>
+            <Text variant="kicker" color="textMuted" accessibilityRole="header">
+              {m.teacher.card.reports}
+            </Text>
             {reports.map((report) => (
-              <Button
+              <ListRow
                 key={report.period}
-                label={report.label}
-                variant="outline"
-                size="lg"
-                leftIcon="file"
+                title={report.label}
+                chevron
+                inset={0}
                 disabled={reportsBlocked}
                 onPress={() => onSelect({ kind: 'report', period: report.period })}
                 testID={`student-menu-report-${report.period}`}
               />
             ))}
-            <Hint>
-              <Text variant="caption" color="textMuted">
-                {m.teacher.card.reportsHint}
-              </Text>
-            </Hint>
-          </View>
-
-          <View style={styles.group}>
-            <Button
-              label={dict.students.passwordReset.button}
-              variant="outline"
-              size="lg"
-              leftIcon="key"
+            <ListRow
+              title={dict.students.passwordReset.button}
+              chevron
+              inset={0}
+              divider={false}
               onPress={() => onSelect({ kind: 'resetPassword' })}
               testID="student-menu-reset"
             />
-            <Button label={t.deleteStudent} variant="danger" size="lg" leftIcon="trash" onPress={() => onSelect({ kind: 'delete' })} testID="student-menu-delete" />
           </View>
+          <Hint>
+            <Text variant="hint" color="textMuted">
+              {m.teacher.card.reportsHint}
+            </Text>
+          </Hint>
+
+          <Button label={t.deleteStudent} variant="danger" leftIcon="trash" onPress={() => onSelect({ kind: 'delete' })} testID="student-menu-delete" />
         </View>
       ) : null}
     </BottomSheet>
@@ -89,6 +89,5 @@ export function StudentMenuSheet({ visible, student, reportsBlocked, onClose, on
 
 const useStyles = makeStyles((t) => ({
   // Room above the copy row for its «Скопировано» pill.
-  content: { gap: t.space.lg, paddingTop: t.space.sm },
-  group: { gap: t.space.md },
+  content: { gap: t.space.md, paddingTop: t.space.sm, paddingBottom: t.space.sm },
 }));

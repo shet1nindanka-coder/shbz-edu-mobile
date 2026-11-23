@@ -5,7 +5,6 @@ import { errorText, hasErrorCode, useApi } from '@/api';
 import type { TeacherHomeworkAssignment } from '@/api/types';
 import { RetryWaitLine, type RetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
 import { Dialog, Notice, Text } from '@/ui';
 
 import { useLatched } from '../students/use-latched';
@@ -31,7 +30,6 @@ export type CancelHomeworkDialogProps = {
  * check results, which cannot be downloaded afterwards. Statuses already set are kept.
  */
 export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissing, wait }: CancelHomeworkDialogProps) {
-  const styles = useStyles();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict } = useI18n();
@@ -72,7 +70,6 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
   return (
     <Dialog
       visible={assignment !== null}
-      kicker={dict.topics.widgets.confirm.kicker}
       title={t.cancelTitle}
       confirmLabel={t.cancelConfirm}
       pendingLabel={t.cancelPending}
@@ -88,13 +85,13 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
       onCancel={close}
       testID="cancel-homework-dialog"
     >
-      <Text variant="small" color="label" style={styles.paragraph}>
+      <Text variant="body" color="label">
         {t.cancelLine1}
       </Text>
       {photos > 0 || checks > 0 ? (
-        <Text variant="small" color="label" style={styles.paragraph} testID="cancel-homework-files">
+        <Text variant="body" color="label" testID="cancel-homework-files">
           {t.cancelFilesBefore}
-          <Text variant="smallStrong" color="textStrong">
+          <Text variant="bodyStrong" color="textStrong">
             {t.cancelFilesStrong}
           </Text>
           {':'}
@@ -104,7 +101,7 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
           {t.cancelFilesAfter}
         </Text>
       ) : null}
-      <Text variant="small" color="label" style={styles.paragraph}>
+      <Text variant="body" color="label">
         {t.cancelLine3}
       </Text>
       {error ? <Notice tone="error" text={error} testID="cancel-homework-error" /> : null}
@@ -112,7 +109,3 @@ export function CancelHomeworkDialog({ assignment, onClose, onCancelled, onMissi
     </Dialog>
   );
 }
-
-const useStyles = makeStyles(() => ({
-  paragraph: { lineHeight: 24 },
-}));

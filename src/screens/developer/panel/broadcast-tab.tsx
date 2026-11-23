@@ -6,7 +6,7 @@ import { errorText, qk, useApi } from '@/api';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Card, Dialog, IconButton, Segmented, Text, TextArea, TextField } from '@/ui';
+import { Button, Dialog, IconButton, Panel, Panels, Segmented, Text, TextArea, TextField } from '@/ui';
 
 import {
   BROADCAST_BODY_MAX,
@@ -23,8 +23,10 @@ import { ResultLine, type PanelResult } from './result-line';
 import { useRetryLock } from './use-retry-lock';
 
 /**
- * Broadcast tab (07 §1.9): a notification for all students or for the chosen ones — students only, shown
- * to them as typed. On success the form and the picked list are reset (the mode returns to "all").
+ * Broadcast tab (07 §1.9; layout: docs/design/glass-over-paper.md §7): a notification for all students or
+ * for the chosen ones — students only, shown to them as typed. Two cards: the message, and «Получатели»
+ * with the send button — stacked on a phone, side by side on a tablet. On success the form and the picked
+ * list are reset (the mode returns to "all").
  */
 export function BroadcastTab({ students }: { students: readonly BroadcastStudent[] }) {
   const styles = useStyles();
@@ -71,39 +73,45 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
   };
 
   return (
-    <Card testID="panel-broadcast">
-      <View style={styles.form}>
-        <TextField
-          label={t.titleLabel}
-          value={title}
-          onChangeText={setTitle}
-          maxLength={BROADCAST_TITLE_MAX}
-          placeholder={t.titlePlaceholder}
-          disabled={send.isPending}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => bodyRef.current?.focus()}
-          labelAside={<Counter length={title.length} max={BROADCAST_TITLE_MAX} />}
-          testID="broadcast-title"
-        />
-        <TextArea
-          ref={bodyRef}
-          label={t.bodyLabel}
-          value={body}
-          onChangeText={setBody}
-          maxLength={BROADCAST_BODY_MAX}
-          placeholder={t.bodyPlaceholder}
-          disabled={send.isPending}
-          helper={t.bodyHint}
-          labelAside={<Counter length={body.length} max={BROADCAST_BODY_MAX} />}
-          testID="broadcast-body"
-        />
+    <>
+      <Panels testID="panel-broadcast">
+        <Panel weight={3}>
+          <TextField
+            label={t.titleLabel}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={BROADCAST_TITLE_MAX}
+            placeholder={t.titlePlaceholder}
+            disabled={send.isPending}
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => bodyRef.current?.focus()}
+            labelAside={<Counter length={title.length} max={BROADCAST_TITLE_MAX} />}
+            testID="broadcast-title"
+          />
+          <TextArea
+            ref={bodyRef}
+            label={t.bodyLabel}
+            value={body}
+            onChangeText={setBody}
+            maxLength={BROADCAST_BODY_MAX}
+            placeholder={t.bodyPlaceholder}
+            disabled={send.isPending}
+            helper={t.bodyHint}
+            labelAside={<Counter length={body.length} max={BROADCAST_BODY_MAX} />}
+            testID="broadcast-body"
+          />
+        </Panel>
 
-        <View style={styles.recipients}>
+        <Panel weight={2}>
           <View style={styles.recipientsLabel}>
-            <Text variant="label">{t.recipientsLabel}</Text>
+            <Text variant="sectionTitle" accessibilityRole="header">
+              {t.recipientsLabel}
+            </Text>
             {/* Field sub-labels of the panel are always shown on the site (not hideable hints). */}
-            <Text variant="caption">{t.recipientsHint}</Text>
+            <Text variant="small" color="textMuted">
+              {t.recipientsHint}
+            </Text>
           </View>
           <Segmented<BroadcastMode>
             options={[
@@ -156,24 +164,24 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
               />
             </View>
           )}
-        </View>
 
-        <View style={styles.submit}>
-          <Button
-            label={send.isPending ? t.sending : t.send}
-            size="lg"
-            loading={send.isPending}
-            disabled={!canSubmitBroadcast(title) || lock.seconds > 0}
-            // SPEC-GAP: the site sends without asking. A notification to every student cannot be recalled,
-            // so the "all" mode asks first (07 §7 item 12); a hand-picked list is its own confirmation.
-            onPress={mode === 'all' ? () => setConfirming(true) : submit}
-            fullWidth
-            testID="broadcast-send"
-          />
-          {send.isPending ? null : <ResultLine result={result} testID="broadcast-result" />}
-          <RetryWaitLine seconds={lock.seconds} testID="broadcast-wait" />
-        </View>
-      </View>
+          <View style={styles.submit}>
+            <Button
+              label={send.isPending ? t.sending : t.send}
+              size="lg"
+              loading={send.isPending}
+              disabled={!canSubmitBroadcast(title) || lock.seconds > 0}
+              // SPEC-GAP: the site sends without asking. A notification to every student cannot be recalled,
+              // so the "all" mode asks first (07 §7 item 12); a hand-picked list is its own confirmation.
+              onPress={mode === 'all' ? () => setConfirming(true) : submit}
+              fullWidth
+              testID="broadcast-send"
+            />
+            {send.isPending ? null : <ResultLine result={result} testID="broadcast-result" />}
+            <RetryWaitLine seconds={lock.seconds} testID="broadcast-wait" />
+          </View>
+        </Panel>
+      </Panels>
 
       <RecipientsSheet
         visible={pickerOpen}
@@ -185,7 +193,6 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
       <Dialog
         visible={confirming}
         tone="default"
-        kicker={dict.topics.widgets.confirm.kicker}
         title={m.developer.broadcast.confirmTitle}
         description={format(m.developer.broadcast.confirmBody, { n: students.length })}
         // The site's «Отправить уведомление» does not fit half a dialog on a phone.
@@ -195,7 +202,7 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
         onCancel={() => setConfirming(false)}
         testID="broadcast-confirm"
       />
-    </Card>
+    </>
   );
 }
 
@@ -203,30 +210,27 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
 function Counter({ length, max }: { length: number; max: number }) {
   const { m } = useI18n();
   return (
-    <Text variant="caption" tabular color={length >= max ? 'yellowText' : 'textMuted'}>
+    <Text variant="small" tabular color={length >= max ? 'redText' : 'textMuted'}>
       {format(m.developer.broadcast.counter, { n: length, max })}
     </Text>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  form: { gap: t.space.field },
-  recipients: { gap: t.space.md },
-  recipientsLabel: { gap: 2 },
+  recipientsLabel: { gap: t.space.xxxs },
   selected: { gap: t.space.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
+  // A picked student: a neutral 36-high mark with its remove cross.
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.xs,
     maxWidth: '100%',
-    minHeight: 36,
+    minHeight: t.sizes.control.sm,
     paddingLeft: t.space.md,
     paddingRight: t.space.xxs,
     borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
+    backgroundColor: t.colors.soft2,
   },
   chipName: { flexShrink: 1 },
   submit: { gap: t.space.sm },

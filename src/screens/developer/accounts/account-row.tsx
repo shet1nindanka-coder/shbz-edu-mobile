@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
 
-import { makeStyles, useTheme } from '@/theme';
-import { Avatar, Icon, PressableScale, Text } from '@/ui';
+import { Avatar, ListRow } from '@/ui';
 
 export type AccountRowProps = {
   name: string;
-  /** The login. */
-  email: string;
-  /** Lines under the login: student count, owner, warnings. */
-  children?: ReactNode;
-  /** Read by a screen reader after the name: everything the row shows as text. */
+  /** The one caption of the row: «login · 9 учеников», «login · teacher». */
+  caption: string;
+  /** The caption is a warning (a student nobody owns). */
+  attention?: boolean;
+  /** The one element on the right: a mark that needs attention (an unsaved change). */
+  right?: ReactNode;
+  /** Hairline under the row; off on the last row of a card. */
+  divider: boolean;
+  /** Read by a screen reader: everything the row shows as text. */
   accessibilityLabel: string;
   /** What the tap opens. */
   accessibilityHint: string;
@@ -19,53 +21,25 @@ export type AccountRowProps = {
 };
 
 /**
- * One account of the directory (docs/spec/04-teacher-students.md S9b, mobile note): the site's table row
- * with its buttons becomes a card that is one touch target — the tap opens the row's sheet, the trailing
- * "⋯" only shows that there is more behind it.
+ * One account of the directory (docs/spec/04-teacher-students.md S9b; layout: docs/design/
+ * glass-over-paper.md §7): a neutral avatar, the name and one caption. The site's row buttons live in the
+ * sheet the row opens — the whole row is one touch target.
  */
-export function AccountRow({ name, email, children, accessibilityLabel, accessibilityHint, onPress, testID }: AccountRowProps) {
-  const styles = useStyles();
-  const theme = useTheme();
-
+export function AccountRow({ name, caption, attention = false, right, divider, accessibilityLabel, accessibilityHint, onPress, testID }: AccountRowProps) {
   return (
-    <PressableScale
-      accessibilityRole="button"
+    <ListRow
+      left={<Avatar name={name} tone="neutral" />}
+      title={name}
+      subtitle={caption}
+      subtitleTone={attention ? 'attention' : 'muted'}
+      // A warning is a sentence: it may take a second line, a login never does.
+      subtitleLines={attention ? 2 : 1}
+      right={right}
+      divider={divider}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       onPress={onPress}
-      scaleTo={1}
-      pressedStyle={styles.pressed}
-      style={[styles.card, theme.shadows.card]}
       testID={testID}
-    >
-      <Avatar name={name} />
-      <View style={styles.texts}>
-        <Text variant="bodyBold" numberOfLines={1}>
-          {name}
-        </Text>
-        <Text variant="small" color="textMuted" numberOfLines={1}>
-          {email}
-        </Text>
-        {children}
-      </View>
-      <Icon name="more" size={18} color="kicker" />
-    </PressableScale>
+    />
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  card: {
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: t.space.md,
-    paddingVertical: t.space.md,
-    paddingHorizontal: t.space.gutter,
-    borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.cardBorder,
-    backgroundColor: t.colors.cardBg,
-  },
-  pressed: { backgroundColor: t.colors.softBg },
-  texts: { flex: 1, minWidth: 0, gap: 2 },
-}));

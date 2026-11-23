@@ -6,7 +6,8 @@ import type { ManagedStudent, ManagedTeacher, OwnerChange } from '@/api/types';
 import { matchesAccountSearch } from '@/domain/text';
 import { canSubmitStudentForm } from '@/screens/teacher/students/account-form';
 
-export type DirectoryTab = 'teachers' | 'students';
+/** What the directory shows: both lists under their captions, or one of them. */
+export type DirectoryTab = 'all' | 'teachers' | 'students';
 
 type Account = { name: string; email: string };
 type TeacherRef = { id: string; name: string; email: string };
@@ -20,7 +21,7 @@ export function teacherOptions(teachers: readonly TeacherRef[]): { value: string
   return teachers.map((teacher) => ({ value: teacher.id, label: teacherOptionLabel(teacher) }));
 }
 
-/** One search field for both tabs: every word of the query must occur in "name login". */
+/** One search field for every tab: every word of the query must occur in "name login". */
 export function filterAccounts<T extends Account>(accounts: readonly T[], query: string): T[] {
   return accounts.filter((account) => matchesAccountSearch(query, account.name, account.email));
 }

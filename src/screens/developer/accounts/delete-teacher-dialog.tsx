@@ -94,11 +94,10 @@ export function DeleteTeacherDialog({ teacher, teachers, onClose, onDeleted, onM
       testID="delete-teacher-dialog"
       footer={
         <View style={styles.actions}>
-          <Button label={t.cancel} variant="outline" size="lg" disabled={remove.isPending} onPress={cancel} testID="delete-teacher-cancel" />
+          <Button label={t.cancel} variant="outline" disabled={remove.isPending} onPress={cancel} testID="delete-teacher-cancel" />
           <Button
             label={remove.isPending ? t.deleting : t.confirm}
             variant="dangerSolid"
-            size="lg"
             loading={remove.isPending}
             disabled={!canConfirm}
             onPress={confirm}
@@ -111,24 +110,23 @@ export function DeleteTeacherDialog({ teacher, teachers, onClose, onDeleted, onM
       {shown && plan ? (
         <View style={styles.content} accessibilityRole="alert">
           <View style={styles.intro}>
-            <Text variant="kicker">{t.kicker}</Text>
-            <Text variant="dialogTitle" accessibilityRole="header">
+            <Text variant="sectionTitle" accessibilityRole="header">
               {format(t.heading, { name: shown.name })}
             </Text>
-            <Text variant="small" color="label" style={styles.description}>
+            <Text variant="body" color="label">
               {t.description}
             </Text>
           </View>
 
           {plan.transferredLessons > 0 ? (
-            <Text variant="small" color="textMuted" style={styles.paragraph} testID="delete-teacher-lessons-transfer">
+            <Text variant="small" color="textMuted" testID="delete-teacher-lessons-transfer">
               {format(t.lessonsTransfer, { lessons: plural(locale, plan.transferredLessons, t.lessonForms) })}
             </Text>
           ) : null}
 
           {plan.showCascade ? (
             <View style={styles.cascade} testID="delete-teacher-cascade">
-              <Text variant="small" color="dangerSolid" style={styles.paragraph}>
+              <Text variant="small" color="redText">
                 {t.cascadeBefore}
                 {plan.deletedLessons > 0 ? plural(locale, plan.deletedLessons, t.lessonForms) : null}
                 {plan.deletedLessons > 0 && plan.deletedTests > 0 ? t.cascadeAnd : null}
@@ -144,7 +142,7 @@ export function DeleteTeacherDialog({ teacher, teachers, onClose, onDeleted, onM
                 <Text variant="label" color="label">
                   {format(t.transferLabel, { n: shown.studentCount })}
                 </Text>
-                <Text variant="smallMedium" color="dangerSolid" style={styles.paragraph} testID="delete-teacher-only">
+                <Text variant="small" color="redText" testID="delete-teacher-only">
                   {t.onlyTeacher}
                 </Text>
               </View>
@@ -174,12 +172,11 @@ export function DeleteTeacherDialog({ teacher, teachers, onClose, onDeleted, onM
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: t.space.lg, paddingTop: t.space.xxs, paddingBottom: t.space.md },
-  intro: { gap: 10 },
-  description: { lineHeight: 24 },
-  paragraph: { lineHeight: 22 },
+  content: { gap: t.space.md, paddingTop: t.space.xxs, paddingBottom: t.space.md },
+  intro: { gap: t.space.sm },
+  // A soft panel in the status red: what is deleted for good.
   cascade: {
-    borderRadius: t.radii.md,
+    borderRadius: t.radii.lg,
     backgroundColor: t.colors.redSoft,
     paddingVertical: t.space.md,
     paddingHorizontal: t.space.lg,

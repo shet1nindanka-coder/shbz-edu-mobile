@@ -1,4 +1,5 @@
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { errorText } from '@/api';
@@ -6,10 +7,26 @@ import type { GroupMemberRow, GroupStatisticsResponse, ReportPeriod } from '@/ap
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
-import { makeStyles, useTheme } from '@/theme';
-import { AccentGradient, Button, Card, Chip, EmptyState, LoadingState, Notice, PressableScale, Text } from '@/ui';
+import { makeStyles } from '@/theme';
+import {
+  Avatar,
+  BottomSheet,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  ListRow,
+  LoadingState,
+  Notice,
+  SectionCaption,
+  Text,
+  TextButton,
+  accessibilityLabelOf,
+  useInsideSurface,
+} from '@/ui';
 
 import { RED_ALERT_THRESHOLD, activityLabel, attentionLabels, summaryTiles, type SummaryTile } from '../logic';
+import { Rows, useRowInset } from '../shared/rows';
 import { CountUp } from './count-up';
 import { ReportExportNotice, studentReportKey, type ReportExport } from './use-report-export';
 
@@ -19,20 +36,27 @@ export type StatisticsTabProps = {
 };
 
 /**
- * «Статистика группы» (06 §1.2 item 5, §4.2): four summary tiles and the members ranked by activity, in
- * the stacked layout the site uses below its `lg` breakpoint. The numbers come ready from the server.
+ * «Статистика группы» (06 §1.2 item 5, §4.2): four summary boxes and the members ranked by activity. A
+ * member is one row — the name, what needs attention (or the last activity) and the week's count; the
+ * numbers, the way to the student card and the PDF reports are in the sheet the row opens. The numbers
+ * come ready from the server.
  */
 export function StatisticsTab({ stats, report }: StatisticsTabProps) {
   const styles = useStyles();
-  const { dict, m } = useI18n();
+  const inside = useInsideSurface();
+  const inset = useRowInset();
+  const { locale, dict, m } = useI18n();
   const t = dict.planner.groups.statistics;
   const data = stats.data;
+  // The member stays set while the sheet slides away, so its content does not collapse mid-animation.
+  const [opened, setOpened] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   if (!data) {
     return isLoadFailed(stats) ? (
       <LoadFailure query={stats} testID="group-statistics-error" />
     ) : (
-      <LoadingState variant="cards" count={3} cardHeight={104} accessibilityLabel={m.common.a11y.loading} testID="group-statistics-loading" />
+      <LoadingState variant="list" count={4} accessibilityLabel={m.common.a11y.loading} testID="group-statistics-loading" />
     );
   }
 
@@ -41,6 +65,19 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
   }
 
   const tiles = summaryTiles(data, t);
+  const grid = (
+    <View style={styles.tiles}>
+      <View style={styles.tileRow}>
+        <Tile tile={tiles[0]} />
+        <Tile tile={tiles[1]} />
+      </View>
+      <View style={styles.tileRow}>
+        <Tile tile={tiles[2]} />
+        <Tile tile={tiles[3]} />
+      </View>
+    </View>
+  );
+  const openedRow = data.members.find((row) => row.id === opened) ?? null;
 
   return (
     <View style={styles.tab} testID="group-statistics-tab">
@@ -48,33 +85,40 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
         <Notice tone="error" text={errorText(stats.error, m.common.errors.generic)} testID="group-statistics-refresh-error" />
       ) : null}
 
-      <View style={styles.tiles}>
-        <View style={styles.tileRow}>
-          <Tile tile={tiles[0]} />
-          <Tile tile={tiles[1]} />
-        </View>
-        <View style={styles.tileRow}>
-          <Tile tile={tiles[2]} />
-          <Tile tile={tiles[3]} />
-        </View>
-      </View>
+      {/* On the page the four boxes share one card; inside a tablet panel they already stand on one. */}
+      {inside ? grid : <Card>{grid}</Card>}
 
-      <ReportExportNotice report={report} testID="group-statistics-report-error" />
+      {/* While the member sheet is open it shows the outcome of a report itself. */}
+      {sheetOpen ? null : <ReportExportNotice report={report} testID="group-statistics-report-error" />}
 
-      <Card variant="soft" padded={false}>
-        {/* Paddings sit on an inner view: on web a card's own `padding: 0` wins over longhand paddings. */}
-        <View style={styles.rows}>
-          {data.members.map((row, index) => (
-            <MemberRow
+      <Rows>
+        {data.members.map((row, index) => {
+          const flags = attentionLabels(row.attention, dict.planner.groupStatistics);
+          const caption = flags.length > 0 ? flags.join(' · ') : activityLabel(row, t, locale);
+          const week = format(t.closedFor7, { n: row.closed7 });
+          return (
+            <ListRow
               key={row.id}
-              row={row}
-              leader={row.rank === 1 && data.mostActiveId !== null}
+              title={row.name}
+              subtitle={caption}
+              subtitleTone={flags.length > 0 ? 'attention' : 'muted'}
+              subtitleLines={2}
+              meta={week}
+              left={<Avatar name={row.name} tone="neutral" />}
+              inset={inset}
               divider={index < data.members.length - 1}
-              report={report}
+              onPress={() => {
+                setOpened(row.id);
+                setSheetOpen(true);
+              }}
+              accessibilityLabel={accessibilityLabelOf([format(m.stats.ranking.placeAria, { n: row.rank }), row.name, caption, week])}
+              testID={`group-statistics-row-${row.id}`}
             />
-          ))}
-        </View>
-      </Card>
+          );
+        })}
+      </Rows>
+
+      <MemberStatsSheet row={openedRow} visible={sheetOpen && openedRow !== null} report={report} onClose={() => setSheetOpen(false)} />
     </View>
   );
 }
@@ -83,148 +127,140 @@ function Tile({ tile }: { tile: SummaryTile | undefined }) {
   const styles = useStyles();
   if (!tile) return null;
   return (
-    <Card variant="soft" padded={false} style={styles.tile} testID={`group-statistics-tile-${tile.key}`}>
-      <View style={styles.tileBody}>
-        <Text variant="kickerSm">{tile.label}</Text>
-        {/* Two lines: a full name does not fit half a phone screen in one. */}
-        <Text variant="miniStat" numberOfLines={2} style={styles.tileValue}>
-          {tile.value}
+    <Card style={styles.tile} testID={`group-statistics-tile-${tile.key}`}>
+      <Text variant="small" color="textMuted">
+        {tile.label}
+      </Text>
+      {/* Two lines: a full name does not fit half a phone screen in one. */}
+      <Text variant="cardTitle" numberOfLines={2}>
+        {tile.value}
+      </Text>
+      {tile.hint ? (
+        <Text variant="small" color="textMuted">
+          {tile.hint}
         </Text>
-        {tile.hint ? (
-          <Text variant="hint" color="textMuted">
-            {tile.hint}
-          </Text>
-        ) : null}
-      </View>
+      ) : null}
     </Card>
   );
 }
 
-function MemberRow({ row, leader, divider, report }: { row: GroupMemberRow; leader: boolean; divider: boolean; report: ReportExport }) {
+type MemberStatsSheetProps = {
+  row: GroupMemberRow | null;
+  visible: boolean;
+  report: ReportExport;
+  onClose: () => void;
+};
+
+/** One member of the ranking in full: the place, the four numbers, what needs attention, the card and the reports. */
+function MemberStatsSheet({ row, visible, report, onClose }: MemberStatsSheetProps) {
   const styles = useStyles();
-  const theme = useTheme();
   const navigation = useAppNavigation();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.groups.statistics;
   const common = dict.planner.common;
-  const studentLink = { screen: 'teacher.student.review', studentId: row.id } as const;
-  const flags = attentionLabels(row.attention, dict.planner.groupStatistics);
-
-  const name = (
-    <Text variant="smallBold" numberOfLines={1}>
-      {row.name}
-    </Text>
-  );
-  const rank = (
-    <Text variant="captionBold" tabular style={{ color: leader ? theme.colors.onAccent : theme.colors.segText }}>
-      {row.rank}
-    </Text>
-  );
   const periods: readonly { period: ReportPeriod; label: string }[] = [
     { period: '7d', label: common.forSevenDays },
     { period: '30d', label: common.forThirtyDays },
   ];
 
-  return (
-    <View style={[styles.row, divider ? styles.rowDivider : null]} testID={`group-statistics-row-${row.id}`}>
-      <View style={styles.nameRow}>
-        <View accessible accessibilityLabel={format(m.stats.ranking.placeAria, { n: row.rank })}>
-          {leader ? (
-            <AccentGradient style={styles.rank}>{rank}</AccentGradient>
-          ) : (
-            <View style={[styles.rank, styles.rankPlain]}>{rank}</View>
-          )}
-        </View>
-        {/* A role that has no student card gets plain text, never a link that bounces home. */}
-        {navigation.canOpen(studentLink) ? (
-          <PressableScale
-            accessibilityRole="link"
-            accessibilityLabel={format(m.groups.statistics.openStudentAria, { name: row.name })}
-            onPress={() => navigation.open(studentLink)}
-            scaleTo={1}
-            hitSlop={{ top: 12, bottom: 12 }}
-            style={styles.nameLink}
-            pressedStyle={styles.pressed}
-            testID={`group-statistics-student-${row.id}`}
-          >
-            {name}
-          </PressableScale>
-        ) : (
-          <View style={styles.nameLink}>{name}</View>
-        )}
-      </View>
-
-      {flags.length > 0 ? (
-        <View style={styles.flags}>
-          {flags.map((flag) => (
-            <Chip key={flag} tone="yellow" label={flag} />
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.numbers}>
-        <Stat value={row.closed7} label={t.for7} />
-        <Stat value={row.closed30} label={t.for30} />
-        <Stat value={row.red30} label={t.red} alert={row.red30 >= RED_ALERT_THRESHOLD} />
-        <Stat value={row.streak} label={t.streak} />
-      </View>
-
-      <Text variant="meta" color="textMuted">
-        {activityLabel(row, t, locale)}
-      </Text>
-
-      <View style={styles.reports}>
-        <Text variant="captionStrong" color="textMuted">
-          {t.colReport}
+  let body = null;
+  if (row) {
+    const studentLink = { screen: 'teacher.student.review', studentId: row.id } as const;
+    const flags = attentionLabels(row.attention, dict.planner.groupStatistics);
+    body = (
+      <View style={styles.sheet}>
+        <Text variant="small" color="textMuted">
+          {`${format(m.stats.ranking.placeAria, { n: row.rank })} · ${activityLabel(row, t, locale)}`}
         </Text>
-        {periods.map(({ period, label }) => (
-          <Button
-            key={period}
-            label={label}
-            accessibilityLabel={format(m.groups.statistics.reportAria, { name: row.name, period: label })}
-            variant="outline"
-            size="sm"
-            loading={report.pendingKey === studentReportKey(row.id, period)}
-            disabled={report.blocked}
-            onPress={() => report.exportStudentReport(row.id, period)}
-            testID={`group-statistics-report-${row.id}-${period}`}
+
+        {flags.length > 0 ? (
+          <View style={styles.flags}>
+            {flags.map((flag) => (
+              <Chip key={flag} tone="yellow" label={flag} />
+            ))}
+          </View>
+        ) : null}
+
+        <View style={styles.numbers}>
+          <Stat value={row.closed7} label={t.for7} />
+          <Stat value={row.closed30} label={t.for30} />
+          <Stat value={row.red30} label={t.red} alert={row.red30 >= RED_ALERT_THRESHOLD} />
+          <Stat value={row.streak} label={t.streak} />
+        </View>
+
+        <ReportExportNotice report={report} testID="group-statistics-sheet-report-error" />
+
+        <View>
+          <SectionCaption>{t.colReport}</SectionCaption>
+          <View style={styles.reports}>
+            {periods.map(({ period, label }) => (
+              <Button
+                key={period}
+                label={label}
+                accessibilityLabel={format(m.groups.statistics.reportAria, { name: row.name, period: label })}
+                variant="outline"
+                leftIcon="download"
+                loading={report.pendingKey === studentReportKey(row.id, period)}
+                disabled={report.blocked}
+                onPress={() => report.exportStudentReport(row.id, period)}
+                style={styles.report}
+                testID={`group-statistics-report-${row.id}-${period}`}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* A role that has no student card gets no link, never one that bounces home. */}
+        {navigation.canOpen(studentLink) ? (
+          <TextButton
+            label={m.groups.statistics.openStudent}
+            accessibilityLabel={format(m.groups.statistics.openStudentAria, { name: row.name })}
+            onPress={() => {
+              onClose();
+              navigation.open(studentLink);
+            }}
+            style={styles.link}
+            testID={`group-statistics-student-${row.id}`}
           />
-        ))}
+        ) : null}
       </View>
-    </View>
+    );
+  }
+
+  return (
+    <BottomSheet visible={visible} onClose={onClose} closeLabel={m.common.actions.close} title={row?.name} testID="group-statistics-sheet">
+      {body}
+    </BottomSheet>
   );
 }
 
 function Stat({ value, label, alert = false }: { value: number; label: string; alert?: boolean }) {
   const styles = useStyles();
   return (
-    <View style={styles.stat} accessible accessibilityLabel={`${value} ${label}`}>
-      <CountUp value={value} color={alert ? 'redText' : 'textStrong'} />
-      <Text variant="caption" color="textMuted" numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
+    <Card padded={false} style={styles.stat}>
+      <View accessible accessibilityLabel={`${value} ${label}`} style={styles.statBody}>
+        <CountUp value={value} color={alert ? 'redText' : 'textStrong'} />
+        <Text variant="small" color="textMuted" numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    </Card>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  tab: { gap: t.space.lg },
-  tiles: { gap: t.space.md },
-  tileRow: { flexDirection: 'row', alignItems: 'stretch', gap: t.space.md },
-  tile: { flex: 1, minWidth: 0 },
-  tileBody: { paddingVertical: t.space.field, paddingHorizontal: t.space.gutter, gap: t.space.xxs },
-  tileValue: { marginTop: t.space.xxs },
-  rows: { paddingHorizontal: t.space.gutter, paddingVertical: t.space.xxs },
-  row: { gap: t.space.sm, paddingVertical: t.space.gutter },
-  rowDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rank: { width: 24, height: 24, borderRadius: t.radii.full, alignItems: 'center', justifyContent: 'center' },
-  rankPlain: { backgroundColor: t.colors.segBg },
-  nameLink: { flex: 1, minWidth: 0 },
-  pressed: { opacity: 0.75 },
+  tab: { gap: t.space.block },
+  tiles: { gap: t.space.sm },
+  tileRow: { flexDirection: 'row', alignItems: 'stretch', gap: t.space.sm },
+  tile: { flex: 1, minWidth: 0, gap: t.space.xxs },
+  sheet: { gap: t.space.md },
   flags: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
-  // Four equal columns, the number over its label: side by side they do not fit a phone in one line.
-  numbers: { flexDirection: 'row', gap: t.space.sm },
+  // Four equal boxes, the number over its label: side by side they do not fit a phone in one line.
+  numbers: { flexDirection: 'row', gap: t.space.xs },
   stat: { flex: 1, minWidth: 0 },
-  reports: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm, marginTop: t.space.xxs },
+  // Paddings sit on an inner view: on web a card's own `padding: 0` wins over longhand paddings.
+  statBody: { paddingVertical: t.space.md, paddingHorizontal: t.space.xs, alignItems: 'center', gap: t.space.xxxs },
+  reports: { flexDirection: 'row', gap: t.space.sm, paddingTop: t.space.xs },
+  report: { flex: 1 },
+  link: { alignSelf: 'flex-start' },
 }));

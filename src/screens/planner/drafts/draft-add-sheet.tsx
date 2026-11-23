@@ -18,10 +18,12 @@ export type DraftAddSheetProps = {
   /** Numbers already in the participant's set: they are not offered. */
   existingIds: readonly string[];
   onClose: () => void;
+  /** The sheet has left the screen: the place to bring back the sheet it was opened from. */
+  onClosed?: () => void;
   onAdd: (homeworkNumberId: string) => void;
 };
 
-/** Narrowest tile: «№ 051001» in the tabular bold face with its padding. */
+/** Narrowest tile: «051001» in the tabular bold face with its padding. */
 const TILE_MIN_WIDTH = 84;
 /** Share of the window the grid may take; the title, the student and the footer need the rest. */
 const GRID_MAX_SHARE = 0.5;
@@ -31,13 +33,13 @@ type FreeNumber = { id: string; number: string };
 /**
  * "Add a problem" of a draft (docs/spec/05-teacher-lessons-plans.md §1.7 "Manual add"): only numbers of the
  * draft's single topic that are not in the set yet. The site's select + «Добавить» become a grid of number
- * tiles in one sheet: pick a tile, then add. The student's status is not checked here — a solved number
+ * tiles in one sheet: pick a tile (it turns ink, like the current number everywhere else), then add. The student's status is not checked here — a solved number
  * surfaces as a conflict when the homework is assigned.
  *
  * A topic may hold up to 2000 numbers (the `parseNumbersInput` limit), so the grid is virtualised
  * (FlashList in a box of bounded height): mounting every tile at once froze the sheet for seconds.
  */
-export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, existingIds, onClose, onAdd }: DraftAddSheetProps) {
+export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, existingIds, onClose, onClosed, onAdd }: DraftAddSheetProps) {
   const styles = useStyles();
   const theme = useTheme();
   const window = useWindowDimensions();
@@ -54,7 +56,7 @@ export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, 
   const gap = theme.space.sm;
   const width = gridWidth > 0 ? gridWidth - gap : window.width - 2 * theme.space.gutter;
   const columns = numberGridColumns(width, TILE_MIN_WIDTH, gap);
-  const rowStride = theme.sizes.minTouch + gap;
+  const rowStride = theme.sizes.tile + gap;
   const rows = Math.ceil(free.length / columns);
   // A short topic is as tall as its rows; a long one scrolls inside the cap.
   const gridHeight = Math.min(rows * rowStride, Math.round(window.height * GRID_MAX_SHARE));
@@ -81,8 +83,8 @@ export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, 
           testID={`draft-add-number-${number.id}`}
           style={[styles.tile, selected ? styles.tileSelected : null]}
         >
-          <Text variant="smallBold" tabular color={selected ? 'greenText' : 'textStrong'}>
-            {format(common.numberSign, { n: number.number })}
+          <Text variant="tile" tabular color={selected ? 'tabActiveText' : 'label'}>
+            {number.number}
           </Text>
         </PressableScale>
       </View>
@@ -93,7 +95,10 @@ export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, 
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      onClosed={() => setNumberId(null)}
+      onClosed={() => {
+        setNumberId(null);
+        onClosed?.();
+      }}
       closeLabel={m.common.actions.close}
       title={format(dict.planner.homeworkPlans.board.addNumber, { topic: topicTitle })}
       footer={<Button label={common.add} fullWidth disabled={!picked} onPress={add} testID="draft-add-submit" />}
@@ -145,15 +150,14 @@ const useStyles = makeStyles((t) => ({
   content: { flexShrink: 1, minHeight: 0, gap: t.space.md, paddingBottom: t.space.sm },
   shrink: { flexShrink: 1, minHeight: 0 },
   cell: { flex: 1 },
+  // The kit's number tile without a status; the picked one is the ink "current" tile.
   tile: {
-    minHeight: t.sizes.minTouch,
+    height: t.sizes.tile,
     paddingHorizontal: t.space.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
+    backgroundColor: t.colors.soft2,
   },
-  tileSelected: { borderColor: t.colors.accentSolid, backgroundColor: t.colors.accentSoft },
+  tileSelected: { backgroundColor: t.colors.tabActiveBg },
 }));

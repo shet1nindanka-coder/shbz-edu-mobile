@@ -8,8 +8,6 @@ import { BottomSheet, EmptyState, Icon, PressableScale, Select, Text, TextField 
 
 import { PICKER_SEARCH_FROM, filterPickerOptions } from '../logic';
 
-const ROW_GAP = 2;
-
 export type PickerOption = { value: string; label: string };
 
 export type PickerFieldProps = {
@@ -59,7 +57,7 @@ export function PickerField({ label, options, value, onChange, disabled = false,
   const selected = options.find((option) => option.value === value) ?? null;
   const filtered = filterPickerOptions(options, query);
   // A short result is as tall as its rows; a long one scrolls inside the cap.
-  const rowStride = theme.sizes.minTouch + ROW_GAP;
+  const rowStride = theme.sizes.minTouch + theme.space.xxxs;
   const listHeight = Math.min(contentHeight ?? filtered.length * rowStride, Math.round(window.height * LIST_MAX_SHARE));
 
   return (
@@ -75,10 +73,10 @@ export function PickerField({ label, options, value, onChange, disabled = false,
         style={[styles.trigger, open ? styles.triggerOpen : null, disabled ? styles.disabled : null]}
         testID={testID}
       >
-        <Text variant="smallStrong" numberOfLines={1} color={selected ? 'textStrong' : 'placeholder'} style={styles.value}>
+        <Text variant="bodyMedium" numberOfLines={1} color={selected ? 'textStrong' : 'placeholder'} style={styles.value}>
           {selected?.label ?? dict.topics.widgets.selectPlaceholder}
         </Text>
-        <Icon name="chevronDown" size={16} color="kicker" />
+        <Icon name="chevronDown" size={theme.sizes.icon.sm} color="textMuted" />
       </PressableScale>
 
       <BottomSheet
@@ -109,7 +107,7 @@ export function PickerField({ label, options, value, onChange, disabled = false,
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
-            left={<Icon name="search" size={16} color="kicker" />}
+            left={<Icon name="search" size={theme.sizes.icon.md} color="textMuted" />}
             testID={testID ? `${testID}-search` : undefined}
           />
           {filtered.length === 0 ? (
@@ -140,10 +138,10 @@ export function PickerField({ label, options, value, onChange, disabled = false,
                         pressedStyle={active ? null : styles.optionPressed}
                         testID={testID ? `${testID}-option-${option.value}` : undefined}
                       >
-                        <Text variant="bodyStrong" color={active ? 'greenText' : 'textStrong'} style={styles.value}>
+                        <Text variant="bodyStrong" style={styles.value}>
                           {option.label}
                         </Text>
-                        {active ? <Icon name="check" size={16} color="greenText" /> : null}
+                        {active ? <Icon name="check" size={theme.sizes.icon.sm} color="textStrong" /> : null}
                       </PressableScale>
                     </View>
                   );
@@ -164,15 +162,15 @@ export function PickerField({ label, options, value, onChange, disabled = false,
 }
 
 const useStyles = makeStyles((t) => ({
-  field: { gap: t.space.sm },
-  // The kit's `Select` trigger, size `sm`.
+  field: { gap: t.space.xxs },
+  // The kit's `Select` trigger.
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.sm,
     alignSelf: 'stretch',
     height: t.sizes.select.sm,
-    paddingHorizontal: 14,
+    paddingHorizontal: t.space.md,
     borderRadius: t.radii.md,
     borderWidth: t.borders.interactive,
     borderColor: t.colors.inputBorder,
@@ -183,17 +181,18 @@ const useStyles = makeStyles((t) => ({
   sheet: { flexShrink: 1, minHeight: 0, gap: t.space.sm, paddingTop: t.space.xs },
   shrink: { flexShrink: 1, minHeight: 0 },
   // The gap between rows lives inside the cells: FlashList measures each one.
-  item: { paddingBottom: ROW_GAP },
+  item: { paddingBottom: t.space.xxxs },
   option: {
     minHeight: t.sizes.minTouch,
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.md,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: t.space.sm,
+    paddingHorizontal: t.space.md,
     borderRadius: t.radii.md,
   },
-  optionActive: { backgroundColor: t.colors.accentSoft },
+  // The selected option, as in the kit's `Select`: a soft fill and a tick, no colour.
+  optionActive: { backgroundColor: t.colors.softBg },
   optionPressed: { backgroundColor: t.colors.tabHover },
   disabled: { opacity: 0.55 },
 }));

@@ -5,7 +5,7 @@ import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, Card, Notice, Text, TextArea, TextField } from '@/ui';
+import { Button, Notice, Text, TextArea, TextField } from '@/ui';
 
 import { NumbersField } from '../shared/numbers-field';
 
@@ -63,11 +63,9 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
 
       {/* A hint on the site (`ui-hint`): hidden with the hints preference; the button's state says the same. */}
       <Hint>
-        <Card variant="soft" padded={14}>
-          <Text variant="small" color={state.hint === 'ready' ? 'greenText' : 'textMuted'} testID="create-hint">
-            {hint}
-          </Text>
-        </Card>
+        <Text variant="hint" testID="create-hint">
+          {hint}
+        </Text>
       </Hint>
 
       {state.error ? <Notice tone="error" text={state.error} testID="create-error" /> : null}
@@ -85,5 +83,5 @@ export function ManualCreateForm({ state }: { state: ManualCreateState }) {
 }
 
 const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.field },
+  root: { gap: t.space.lg },
 }));

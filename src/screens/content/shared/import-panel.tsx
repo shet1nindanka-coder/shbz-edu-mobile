@@ -5,8 +5,8 @@ import { MathContent } from '@/components/math';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { makeStyles } from '@/theme';
-import { Button, Card, Checkbox, Icon, Notice, PressableScale, Text, TextArea, TextButton } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, Card, Icon, Notice, PressableScale, Switch, Text, TextArea, TextButton } from '@/ui';
 
 import { ImportPromptButton } from './import-prompt-button';
 import { useImportPanel, type ImportPanelOptions, type ImportPanelState } from './use-import-panel';
@@ -18,21 +18,28 @@ export type ImportPanelViewProps = {
   state: ImportPanelState;
   /** The topics list shows the prompt button next to the AI / manual switch. */
   hidePromptButton?: boolean;
+  /**
+   * The panel shares the screen with another main action (the editor's «Сохранить» on a tablet): its own
+   * steps are then ordinary buttons — a screen has one gradient action.
+   */
+  secondary?: boolean;
   testID?: string;
 };
 
 /**
  * Import panel (site: `TopicImportPanel`, docs/spec/07-developer-content.md §1.5): load the AI's JSON
- * reply (file, clipboard or typed), check it, read the preview, apply. The app never calls a model here.
- * Drag & drop becomes a tap on the tile (08 §5.15).
+ * reply (file, clipboard or typed), check it, read the preview of what will change, apply. The app never
+ * calls a model here. Drag & drop becomes a tap on the slot. Rendered inside a card or a sheet.
  */
-export function ImportPanelView({ state, hidePromptButton = false, testID = 'import-panel' }: ImportPanelViewProps) {
+export function ImportPanelView({ state, hidePromptButton = false, secondary = false, testID = 'import-panel' }: ImportPanelViewProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, m } = useI18n();
   const t = dict.topics.importPanel;
   const busy = state.checking || state.applying;
   const hasText = state.text.trim().length > 0;
   const loaded = hasText && !state.textOpen;
+  const done = state.justLoaded || loaded;
 
   const tileTitle = state.justLoaded ? t.successTitle : (state.fileName ?? m.content.importPanel.loadTitle);
   const tileSubtitle = state.fileName ? t.fileRead : loaded ? m.content.importPanel.textLoaded : m.content.importPanel.chooseJsonFile;
@@ -48,20 +55,16 @@ export function ImportPanelView({ state, hidePromptButton = false, testID = 'imp
         disabled={busy || state.picking}
         onPress={state.pickFile}
         scaleTo={0.99}
-        style={[styles.tile, state.justLoaded || loaded ? styles.tileLoaded : null]}
+        style={[styles.drop, done ? styles.dropLoaded : null]}
         testID="import-pick-file"
       >
-        <View style={styles.tileIcon}>
-          <Icon name={state.justLoaded || loaded ? 'check' : 'upload'} size={20} color="greenText" />
-        </View>
-        <View style={styles.tileTexts}>
-          <Text variant="smallBold" color={state.justLoaded ? 'greenText' : 'textStrong'} numberOfLines={2}>
-            {tileTitle}
-          </Text>
-          <Text variant="caption" color="textMuted" numberOfLines={2}>
-            {tileSubtitle}
-          </Text>
-        </View>
+        <Icon name={done ? 'check' : 'upload'} size={theme.sizes.icon.lg} color={done ? 'greenText' : 'textMuted'} />
+        <Text variant="bodyBold" color={done ? 'greenText' : 'textStrong'} align="center" numberOfLines={2}>
+          {tileTitle}
+        </Text>
+        <Text variant="small" color={done ? 'greenText' : 'textMuted'} align="center" numberOfLines={2}>
+          {tileSubtitle}
+        </Text>
       </PressableScale>
 
       <View style={styles.sources}>
@@ -105,6 +108,7 @@ export function ImportPanelView({ state, hidePromptButton = false, testID = 'imp
       {state.preview === null ? (
         <Button
           label={state.checking ? t.checking : t.check}
+          variant={secondary ? 'outline' : 'primary'}
           loading={state.checking}
           disabled={!hasText || state.wait.waiting}
           onPress={state.check}
@@ -127,12 +131,12 @@ export function ImportPanelView({ state, hidePromptButton = false, testID = 'imp
         />
       ) : null}
 
-      {state.preview ? <ImportPreviewBlock state={state} preview={state.preview} /> : null}
+      {state.preview ? <ImportPreviewBlock state={state} preview={state.preview} secondary={secondary} /> : null}
     </View>
   );
 }
 
-function ImportPreviewBlock({ state, preview }: { state: ImportPanelState; preview: ImportPreview }) {
+function ImportPreviewBlock({ state, preview, secondary }: { state: ImportPanelState; preview: ImportPreview; secondary: boolean }) {
   const styles = useStyles();
   const { dict } = useI18n();
   const t = dict.topics.importPanel;
@@ -145,49 +149,53 @@ function ImportPreviewBlock({ state, preview }: { state: ImportPanelState; previ
 
   return (
     <View style={styles.preview} testID="import-preview">
-      <Text variant="smallStrong">{format(t.fileSummary, { title: preview.fileTitle, count: preview.totalInFile })}</Text>
+      <Text variant="bodyStrong">{format(t.fileSummary, { title: preview.fileTitle, count: preview.totalInFile })}</Text>
 
       {preview.willCreateTopic ? (
-        <Card variant="soft" padded={14} testID="import-will-create">
-          <Text variant="cardKicker">{t.willCreate}</Text>
-          <Text variant="cardTitle" style={styles.createTitle}>
-            {preview.fileTitle}
+        <Card style={styles.create} testID="import-will-create">
+          <Text variant="small" color="textMuted">
+            {t.willCreate}
           </Text>
+          <Text variant="cardTitle">{preview.fileTitle}</Text>
           {preview.fileDescription ? (
             <Text variant="small" color="textMuted">
               {preview.fileDescription}
             </Text>
           ) : null}
           {preview.duplicateTitle ? (
-            <Text variant="small" color="dangerText" style={styles.duplicate} testID="import-duplicate-title">
+            <Text variant="small" color="redText" testID="import-duplicate-title">
               {t.duplicateTitle}
             </Text>
           ) : null}
         </Card>
       ) : null}
 
+      {/* What the import will change: the number first, its caption under it. */}
       <View style={styles.tiles}>
         {tiles.map((tile) => (
-          <Card key={tile.key} variant="soft" padded={12} style={styles.tileCell} testID={`import-tile-${tile.key}`}>
-            <Text variant="statLabel">{tile.label}</Text>
-            <Text variant="metric" tabular color={tile.danger ? 'dangerText' : 'textStrong'}>
+          <Card key={tile.key} style={styles.tileCell} accessibilityLabel={`${tile.label}: ${tile.value}`} testID={`import-tile-${tile.key}`}>
+            <Text variant="metric" tabular color={tile.danger ? 'redText' : 'textStrong'}>
               {String(tile.value)}
+            </Text>
+            <Text variant="small" color="textMuted">
+              {tile.label}
             </Text>
           </Card>
         ))}
       </View>
 
       {!state.createMode && preview.willOverwrite > 0 ? (
-        // A plain checkbox, not a `CheckRow`: the row cuts both lines to one, and this warning must be read whole.
         <View style={styles.overwrite}>
-          <Checkbox
+          <Switch
+            trailing
             label={t.overwriteLabel}
-            checked={state.overwriteFilled}
-            onChange={state.setOverwriteFilled}
+            value={state.overwriteFilled}
+            onValueChange={state.setOverwriteFilled}
             disabled={state.applying}
             testID="import-overwrite"
           />
-          <Text variant="caption" color="dangerText" style={styles.overwriteWarning} testID="import-overwrite-warning">
+          {/* Not the switch's own sub-line: this warning is about lost work and must stand out. */}
+          <Text variant="small" color="redText" testID="import-overwrite-warning">
             {format(t.overwriteWarning, { count: preview.willOverwrite })}
           </Text>
         </View>
@@ -200,7 +208,9 @@ function ImportPreviewBlock({ state, preview }: { state: ImportPanelState; previ
 
       {preview.sample.length > 0 ? (
         <View style={styles.sample}>
-          <Text variant="kickerSm">{t.sample}</Text>
+          <Text variant="smallStrong" color="textMuted" accessibilityRole="header">
+            {t.sample}
+          </Text>
           {preview.sample.map((entry) => (
             <SampleCard key={entry.number} entry={entry} />
           ))}
@@ -210,6 +220,8 @@ function ImportPreviewBlock({ state, preview }: { state: ImportPanelState; previ
       <View style={styles.actions}>
         <Button
           label={state.applying ? t.applying : state.createMode ? t.applyCreate : t.apply}
+          variant={secondary ? 'dark' : 'primary'}
+          leftIcon="upload"
           loading={state.applying}
           disabled={state.wait.waiting}
           onPress={state.apply}
@@ -225,12 +237,12 @@ function MessageList({ label, lines, danger = false, testID }: { label: string; 
   const styles = useStyles();
   return (
     <View style={styles.messages} testID={testID}>
-      <Text variant="kickerSm" color={danger ? 'dangerText' : 'kicker'}>
+      <Text variant="smallStrong" color={danger ? 'redText' : 'textMuted'}>
         {label}
       </Text>
       {lines.map((line, index) => (
         // The same sentence can repeat (two entries rejected for the same reason).
-        <Text key={`${index}-${line}`} variant="small" color={danger ? 'dangerText' : 'label'}>
+        <Text key={`${index}-${line}`} variant="small" color={danger ? 'redText' : 'label'}>
           {`— ${line}`}
         </Text>
       ))}
@@ -243,13 +255,17 @@ function SampleCard({ entry }: { entry: ImportNumber }) {
   const { dict } = useI18n();
   const t = dict.topics.importPanel;
   return (
-    <Card variant="outline" padded={14} style={styles.sampleCard}>
-      <Text variant="smallBold">{format(t.sampleNumber, { number: entry.number })}</Text>
-      <MathContent value={entry.conditionLatex} />
+    <Card style={styles.sampleCard}>
+      <Text variant="bodyBold" tabular>
+        {format(t.sampleNumber, { number: entry.number })}
+      </Text>
+      <MathContent value={entry.conditionLatex} variant="bare" />
       {entry.answerLatex ? (
         <>
-          <Text variant="kickerSm">{t.answer}</Text>
-          <MathContent value={entry.answerLatex} />
+          <Text variant="small" color="textMuted">
+            {t.answer}
+          </Text>
+          <MathContent value={entry.answerLatex} variant="bare" />
         </>
       ) : (
         <Hint>
@@ -268,39 +284,28 @@ export function ImportPanel({ hidePromptButton, testID, ...options }: ImportPane
 
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.md },
-  tile: {
-    flexDirection: 'row',
+  // The slot for the AI's reply (`.drop`): dashed while empty, solid green once something is loaded.
+  drop: {
     alignItems: 'center',
-    gap: t.space.md,
-    minHeight: 72,
-    padding: t.space.md,
+    justifyContent: 'center',
+    gap: t.space.xxs,
+    paddingVertical: t.space.xl,
+    paddingHorizontal: t.space.lg,
     borderRadius: t.radii.lg,
     borderWidth: t.borders.interactive,
     borderStyle: 'dashed',
-    borderColor: t.colors.inputBorder,
-    backgroundColor: t.colors.dropzoneBg,
+    borderColor: t.colors.line2,
+    backgroundColor: t.colors.softBg,
   },
-  tileLoaded: { borderStyle: 'solid', borderColor: t.colors.greenBorder, backgroundColor: t.colors.greenSoft },
-  tileIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: t.radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.colors.greenSoft,
-  },
-  tileTexts: { flex: 1, gap: 2 },
+  dropLoaded: { borderStyle: 'solid', borderColor: t.colors.greenSolid, backgroundColor: t.colors.greenSoft },
   sources: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
   toggle: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
   mono: { ...t.typography.mono },
   preview: { gap: t.space.md },
-  createTitle: { marginTop: t.space.xxs },
-  duplicate: { marginTop: t.space.sm },
+  create: { gap: t.space.xxs },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  tileCell: { flexGrow: 1, flexBasis: '45%', gap: 2 },
+  tileCell: { flexGrow: 1, flexBasis: '45%', gap: t.space.xxxs },
   overwrite: { gap: t.space.xxs },
-  // Aligned with the label: checkbox box + its gap.
-  overwriteWarning: { marginLeft: t.sizes.checkbox + 10 },
   messages: { gap: t.space.xxs },
   sample: { gap: t.space.sm },
   sampleCard: { gap: t.space.sm },

@@ -10,8 +10,8 @@ import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { makeStyles } from '@/theme';
-import { Button, Chip, DateTimeField, EmptyState, Notice, Screen, Select, Spinner, Text, TextButton } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, Card, DateTimeField, EmptyState, Notice, Screen, Select, Spinner, Text, TextButton } from '@/ui';
 
 import { useDateTimeLabels } from '@/components/date-time';
 import { DurationStepper } from './duration-stepper';
@@ -22,8 +22,8 @@ import { useCreateLesson } from './use-create-lesson';
 export type ManualComposeProps = {
   studentId: string;
   topics: readonly ComposeBoardTopic[];
-  /** App bar of the screen. */
-  header: ReactNode;
+  /** Builds the header of the screen. */
+  header: (aside?: ReactNode) => ReactNode;
   /** Banner and mode switch shown above the grid. */
   top?: ReactNode;
 };
@@ -31,10 +31,12 @@ export type ManualComposeProps = {
 /**
  * Manual composition of an individual lesson (`TeacherLessonComposeBoard`,
  * docs/spec/05-teacher-lessons-plans.md §1.2.e): numbers of one topic are ticked in the order they will
- * have in the lesson; duration, start and the primary button stay in the bottom bar.
+ * have in the lesson; duration, start, «Выбрано: n» and the one main button stay in the bottom bar. A tablet
+ * lays the numbers out in two columns.
  */
 export function ManualCompose({ studentId, topics, header, top }: ManualComposeProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const { dict, m, locale } = useI18n();
   const t = dict.planner.lessonCompose;
@@ -84,33 +86,35 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
   const listHeader = (
     <View style={styles.header}>
       {top}
-      <Select
-        label={dict.planner.common.topic}
-        options={topicOptions}
-        value={topicId}
-        onChange={(next) => {
-          setTopicId(next);
-          // A manually composed lesson starts with the numbers of one topic; more are added on the board.
-          setSelectedIds([]);
-          setError(null);
-        }}
-        placeholder={dict.topics.widgets.selectPlaceholder}
-        closeLabel={m.common.actions.close}
-        testID="lesson-compose-topic"
-      />
-      <Hint>
-        <Text variant="caption" color="textMuted">
-          {m.planner.lessonNew.composeSteps}
-        </Text>
-      </Hint>
-      {needsStatements && statements.isFetching ? (
-        <View accessibilityRole="progressbar" accessibilityLabel={m.planner.lessonNew.statementsLoading} style={styles.loading}>
-          <Spinner size={14} color="accentSolid" />
-          <Text variant="caption" color="textMuted">
-            {m.planner.lessonNew.statementsLoading}
+      <Card style={styles.topicCard}>
+        <Select
+          label={dict.planner.common.topic}
+          options={topicOptions}
+          value={topicId}
+          onChange={(next) => {
+            setTopicId(next);
+            // A manually composed lesson starts with the numbers of one topic; more are added on the board.
+            setSelectedIds([]);
+            setError(null);
+          }}
+          placeholder={dict.topics.widgets.selectPlaceholder}
+          closeLabel={m.common.actions.close}
+          testID="lesson-compose-topic"
+        />
+        <Hint>
+          <Text variant="small" color="textMuted">
+            {m.planner.lessonNew.composeSteps}
           </Text>
-        </View>
-      ) : null}
+        </Hint>
+        {needsStatements && statements.isFetching ? (
+          <View accessibilityRole="progressbar" accessibilityLabel={m.planner.lessonNew.statementsLoading} style={styles.loading}>
+            <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
+            <Text variant="small" color="textMuted">
+              {m.planner.lessonNew.statementsLoading}
+            </Text>
+          </View>
+        ) : null}
+      </Card>
     </View>
   );
 
@@ -131,56 +135,67 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
     </View>
   );
 
+  const columns = theme.tablet ? 2 : 1;
+
   return (
     <Screen
       testID="lesson-new-manual"
-      header={header}
+      header={header()}
       scroll={false}
       padded={false}
+      maxWidth="full"
       footer={
         <View style={styles.footer}>
           {error ? <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="lesson-compose-error" /> : null}
           <RetryWaitLine seconds={wait.seconds} />
-          <View style={styles.footerRow}>
-            <DurationStepper value={durationMinutes} onChange={setDurationMinutes} accessibilityLabel={t.durationAria} testID="lesson-compose-duration" />
-            <DateTimeField
-              variant="compact"
-              value={startsAt}
-              onChange={setStartsAt}
-              today={mskToday()}
-              // The compact trigger shares its row with the stepper: «Lesson date and time» does not fit
-              // there at 390 pt, so the trigger shows the short site label and is announced by the full one.
-              placeholder={dict.planner.homeworkPlans.createForm.dateTimePlaceholder}
-              accessibilityLabel={t.dateTimePlaceholder}
-              labels={dateTimeLabels}
-              locale={locale}
-              testID="lesson-compose-starts-at"
-              style={styles.footerDate}
-            />
+          <View style={styles.footerRows}>
+            <View style={styles.footerRow}>
+              <DurationStepper value={durationMinutes} onChange={setDurationMinutes} accessibilityLabel={t.durationAria} testID="lesson-compose-duration" />
+              <DateTimeField
+                variant="compact"
+                value={startsAt}
+                onChange={setStartsAt}
+                today={mskToday()}
+                // The compact trigger shares its row with the stepper: «Lesson date and time» does not fit
+                // there at 390 pt, so the trigger shows the short site label and is announced by the full one.
+                placeholder={dict.planner.homeworkPlans.createForm.dateTimePlaceholder}
+                accessibilityLabel={t.dateTimePlaceholder}
+                labels={dateTimeLabels}
+                locale={locale}
+                testID="lesson-compose-starts-at"
+                style={styles.footerDate}
+              />
+            </View>
+            <View style={styles.footerRow}>
+              {/* A plain fact, not a label: how many numbers the lesson will have. */}
+              <Text variant="bodyStrong" color="textMuted" tabular style={styles.selected} testID="lesson-compose-selected">
+                {format(t.selected, { n: selectedIds.length })}
+              </Text>
+              <Button
+                label={create.isPending ? t.composing : t.compose}
+                loading={create.isPending}
+                disabled={selectedIds.length === 0 || wait.waiting}
+                onPress={submit}
+                testID="lesson-compose-submit"
+                style={styles.footerSubmit}
+              />
+            </View>
           </View>
-          {/* The compact trigger has no helper line of its own; the other start pickers name the zone too. */}
-          <Text variant="caption" color="textMuted" align="right" testID="lesson-compose-time-zone">
-            {m.common.dateTime.moscowTime}
-          </Text>
-          <View style={styles.footerRow}>
-            <Chip size="row" tone={selectedIds.length > 0 ? 'green' : 'muted'} label={format(t.selected, { n: selectedIds.length })} />
-            <Button
-              label={create.isPending ? t.composing : t.compose}
-              loading={create.isPending}
-              disabled={selectedIds.length === 0 || wait.waiting}
-              onPress={submit}
-              testID="lesson-compose-submit"
-              style={styles.footerSubmit}
-            />
+          <View style={styles.footerNotes}>
+            {/* The compact trigger has no helper line of its own; the other start pickers name the zone too. */}
+            <Text variant="small" color="textMuted" testID="lesson-compose-time-zone">
+              {m.common.dateTime.moscowTime}
+            </Text>
+            {selectedIds.length > 0 ? <TextButton label={t.clearSelection} tone="muted" onPress={() => setSelectedIds([])} testID="lesson-compose-clear" /> : null}
           </View>
-          {selectedIds.length > 0 ? (
-            <TextButton label={t.clearSelection} tone="muted" onPress={() => setSelectedIds([])} testID="lesson-compose-clear" style={styles.clear} />
-          ) : null}
         </View>
       }
     >
       <FlashList
+        // A new column count is a new layout: remount instead of reflowing the recycled cells.
+        key={columns}
         data={topic?.numbers ?? []}
+        numColumns={columns}
         keyExtractor={(number) => number.id}
         renderItem={renderNumber}
         // Selection and lazily loaded statements live outside the rows.
@@ -197,13 +212,18 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.lg },
-  header: { gap: t.space.md, paddingBottom: t.space.md },
-  loading: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  item: { paddingBottom: t.space.md },
-  footer: { gap: t.space.sm },
-  footerRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  // Half of the gap between two columns sits on each side of a cell, so the list is inset by the rest.
+  listContent: { paddingHorizontal: t.space.gutter - t.space.xxs, paddingBottom: t.space.lg },
+  header: { gap: t.space.block, paddingBottom: t.space.block, paddingHorizontal: t.space.xxs },
+  topicCard: { gap: t.space.md },
+  loading: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+  item: { flex: 1, paddingBottom: t.space.block, paddingHorizontal: t.space.xxs },
+  footer: { gap: t.space.xs },
+  // Phone: the controls in two rows; tablet: all four in one.
+  footerRows: t.tablet ? { flexDirection: 'row', alignItems: 'center', gap: t.space.lg } : { gap: t.space.xs },
+  footerRow: { flex: t.tablet ? 1 : undefined, flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   footerDate: { flex: 1, minWidth: 0 },
+  selected: { flex: 1, minWidth: 0 },
   footerSubmit: { flex: 1 },
-  clear: { alignSelf: 'center' },
+  footerNotes: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, minHeight: t.sizes.icon.lg },
 }));

@@ -6,42 +6,57 @@ import { errorText, qk, useApi } from '@/api';
 import type { PanelAction } from '@/api/types';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Button, Card, Dialog, Text } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Chip, Dialog, Icon, ListCard, ListRow, Panel, Panels, Spinner, useStatusAnnouncement } from '@/ui';
 
-import { PANEL_ACTION_ROWS, type ActionConfirm, type PanelActionRow } from './logic';
-import { ResultLine, type PanelResult } from './result-line';
+import { BudgetsBlock } from './budgets-block';
+import { PANEL_ACTION_ROWS, type ActionConfirm, type BudgetRow, type PanelActionRow } from './logic';
+import type { PanelResult } from './result-line';
 import { useRetryLock } from './use-retry-lock';
 
 /**
- * Actions tab (07 §1.9): the five service buttons. Under each one a line shows the hint, then «Действие
- * выполняется…», then the action's message in green (`ok`) or red. The panel data is refreshed after
- * every action, as the site refreshes its page.
+ * Actions tab (07 §1.9; layout: docs/design/glass-over-paper.md §7): the five service actions as rows of
+ * one card — the name, and one caption that is the hint, then «Действие выполняется…», then the action's
+ * message (red when it failed). The whole row runs the action. The panel data is refreshed after every
+ * action, as the site refreshes its page. A tablet shows the AI budgets next to the list: two of the
+ * actions change them.
  */
-export function ActionsTab() {
+export function ActionsTab({ budgets }: { budgets: readonly BudgetRow[] }) {
   const styles = useStyles();
+  const theme = useTheme();
   const queryClient = useQueryClient();
 
   const afterAction = (action: PanelAction) => {
     // «Сбросить кэши платформы» forces fresh data on every page: here that is every cached query.
     if (action === 'flush-caches') void queryClient.invalidateQueries();
-    // Stats, chips and budgets; every action also writes a journal row.
+    // Stats, figures and budgets; every action also writes a journal row.
     else void queryClient.invalidateQueries({ queryKey: qk('developer') });
   };
 
-  return (
-    <Card testID="panel-actions">
-      <View style={styles.list}>
-        {PANEL_ACTION_ROWS.map((row) => (
-          <ActionRow key={row.action} row={row} onSettled={afterAction} />
-        ))}
-      </View>
-    </Card>
-  );
+  const rows = PANEL_ACTION_ROWS.map((row, index) => (
+    <ActionRow key={row.action} row={row} divider={index < PANEL_ACTION_ROWS.length - 1} onSettled={afterAction} />
+  ));
+
+  if (theme.tablet) {
+    return (
+      <Panels testID="panel-actions">
+        <Panel weight={3} padded={false} contentStyle={styles.rows}>
+          {rows}
+        </Panel>
+        {budgets.length > 0 ? (
+          <Panel weight={2}>
+            <BudgetsBlock budgets={budgets} />
+          </Panel>
+        ) : null}
+      </Panels>
+    );
+  }
+  return <ListCard testID="panel-actions">{rows}</ListCard>;
 }
 
-function ActionRow({ row, onSettled }: { row: PanelActionRow; onSettled: (action: PanelAction) => void }) {
+function ActionRow({ row, divider, onSettled }: { row: PanelActionRow; divider: boolean; onSettled: (action: PanelAction) => void }) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.planner.devPanel;
@@ -62,46 +77,53 @@ function ActionRow({ row, onSettled }: { row: PanelActionRow; onSettled: (action
     },
     onSettled: () => onSettled(row.action),
   });
+  // The outcome replaces the caption without moving the focus: it is spoken on both platforms.
+  useStatusAnnouncement(run.isPending ? null : result?.message);
 
   const start = () => {
     setConfirming(false);
     run.mutate();
   };
   const confirm = row.confirm ? confirmTexts(row.confirm, m.developer.actions) : null;
+  const title = t.actions[row.label];
+  // Not a hideable hint: the site shows this line whatever the "hints" preference is — it is the only
+  // description of what the action does.
+  const caption = run.isPending ? t.actionRunning : (result?.message ?? t.actions[row.hint]);
+  const failed = !run.isPending && result !== null && !result.ok;
 
   return (
-    <View style={styles.row}>
-      <Button
-        label={run.isPending ? t.running : t.actions[row.label]}
-        variant="outline"
-        loading={run.isPending}
-        disabled={lock.seconds > 0}
+    <View style={[styles.block, divider ? styles.divider : null]}>
+      <ListRow
+        // The block brings the card's side padding, so its hairline and the wait line share it.
+        inset={0}
+        title={title}
+        // The names are sentences («Разморозить зависшие проверки»): they wrap instead of ending in «…».
+        titleLines={2}
+        subtitle={caption}
+        subtitleLines={4}
+        subtitleTone={failed ? 'attention' : 'muted'}
+        right={
+          run.isPending ? (
+            <Spinner />
+          ) : failed ? (
+            <Chip label={dict.planner.common.error} tone="red" />
+          ) : result ? (
+            <Icon name="check" size={theme.sizes.icon.md} color="textMuted" />
+          ) : undefined
+        }
+        divider={false}
+        disabled={run.isPending || lock.seconds > 0}
+        accessibilityLabel={`${title}. ${caption}`}
         // SPEC-GAP: the site runs all five without asking. On a phone a stray tap is likelier, so the two
         // actions the spec names — reset budget and unfreeze — ask first (07 §1.9 phone mapping, §7 item 12).
         // The other three start on tap, as on the site.
         onPress={confirm ? () => setConfirming(true) : start}
-        fullWidth
-        // The names are sentences («Разморозить зависшие проверки»): on a narrow phone or with a large OS
-        // font they take a second line instead of ending in «…».
-        wrapLabel
         testID={`panel-action-${row.action}`}
       />
-      <RetryWaitLine seconds={lock.seconds} testID={`panel-action-${row.action}-wait`} />
-      {run.isPending || result ? (
-        <ResultLine
-          pendingText={run.isPending ? t.actionRunning : null}
-          result={result}
-          testID={`panel-action-${row.action}-result`}
-        />
-      ) : (
-        // Not a hideable hint: the site shows this line whatever the "hints" preference is — it is the
-        // only description of what the button does.
-        <Text variant="caption">{t.actions[row.hint]}</Text>
-      )}
+      <RetryWaitLine seconds={lock.seconds} style={styles.wait} testID={`panel-action-${row.action}-wait`} />
       {confirm ? (
         <Dialog
           visible={confirming}
-          kicker={dict.topics.widgets.confirm.kicker}
           title={confirm.title}
           description={confirm.body}
           confirmLabel={m.developer.actions.run}
@@ -127,6 +149,10 @@ function confirmTexts(kind: ActionConfirm, t: ActionTexts): { title: string; bod
 }
 
 const useStyles = makeStyles((t) => ({
-  list: { gap: t.space.lg },
-  row: { gap: t.space.xs },
+  block: { marginHorizontal: t.space.card },
+  // The hairline sits under the whole block, the wait line included.
+  divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
+  wait: { paddingBottom: t.space.sm },
+  // The tablet panel: rows follow each other without the panel's gap, with the padding of a list card.
+  rows: { gap: 0, paddingVertical: t.space.sm },
 }));

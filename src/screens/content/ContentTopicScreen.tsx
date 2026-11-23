@@ -1,47 +1,43 @@
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useRef, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { useState } from 'react';
 
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
-import type { StoredFileRef, TopicNumber } from '@/api/types';
-import { FileCard, type ViewerFile } from '@/components/files';
+import type { TopicNumber } from '@/api/types';
+import type { ViewerFile } from '@/components/files';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
-import { format, useI18n } from '@/i18n';
+import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useStillHere, type ScreenParams } from '@/navigation';
-import { Hint, useCurrentUser } from '@/providers';
+import { useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
-import { makeStyles, useTheme } from '@/theme';
-import { EmptyState, IconButton, LoadingState, Notice, Screen, Segmented, Text } from '@/ui';
+import { useTheme } from '@/theme';
+import { IconButton, LoadingState, Notice, Panel, Panels, Screen, Text } from '@/ui';
 
-import { TopicNumberCard } from './browse/topic-number-card';
-import { useListScrollMemory } from './browse/use-list-scroll-memory';
+import { TopicActionsSheet } from './browse/topic-actions-sheet';
+import { TopicFiles } from './browse/topic-files';
+import { TopicNumbers } from './browse/topic-numbers';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
 import { isTopicLeaving, postTopicDeleted } from './shared/topics-flash';
 
 /** Route params of `content.topic` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type ContentTopicScreenProps = ScreenParams['content.topic'];
 
-type TopicMode = 'view' | 'edit';
-
 /**
- * `content.topic` (docs/spec/07-developer-content.md §1.2): the topic as a student gets it — theory and
- * homework files — and every number with its statement and answer. Read-only for both roles; a DEVELOPER
- * additionally gets the «Просмотр | Редактирование» switch and «Удалить тему».
+ * `content.topic` (docs/spec/07-developer-content.md §1.2; layout: docs/design/glass-over-paper.md §7): the
+ * topic as a student gets it — the theory and tasks files — and its numbers as a grid of tiles; a tile
+ * opens the number with its statement and answer. Read-only for both roles; a DEVELOPER additionally gets
+ * the «⋯» with the way to the editor and «Удалить тему».
  */
 export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
-  const styles = useStyles();
   const theme = useTheme();
   const api = useApi();
   const { dict, m } = useI18n();
-  const t = dict.topics.view;
   const user = useCurrentUser();
   const navigation = useAppNavigation();
   const stillHere = useStillHere();
   const isDeveloper = user.role === 'DEVELOPER';
 
-  const [shownAnswers, setShownAnswers] = useState<ReadonlySet<string>>(() => new Set());
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   // Deleted from this screen: it is on its way out, so the 404 of the last refetch is not news.
   const [deleted, setDeleted] = useState(false);
@@ -52,19 +48,6 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   // The screen stays mounted under the editor and the number screen: realtime first, and a stale topic is
   // asked again when the screen is returned to (00 §2.3).
   useRefetchOnFocus([detail]);
-
-  // Web only (see the hook): the list keeps its place while the screen is covered by another one.
-  const listRef = useRef<FlashListRef<TopicNumber>>(null);
-  const scrollMemory = useListScrollMemory((offset) => listRef.current?.scrollToOffset({ offset, animated: false }));
-
-  const toggleAnswer = useCallback((homeworkNumberId: string) => {
-    setShownAnswers((current) => {
-      const next = new Set(current);
-      if (!next.delete(homeworkNumberId)) next.add(homeworkNumberId);
-      return next;
-    });
-  }, []);
-
   const { refreshing, refresh } = usePullRefresh([detail]);
 
   // The topic is gone (deleted by another developer, or from the editor above this screen): a 404 is the
@@ -73,168 +56,80 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
   // ago, it is already on its way out.
   if (!deleted && !isTopicLeaving(topicId) && isNotFoundError(detail.error)) return <NotFoundScreen />;
 
-  const openFile = (title: string) => (file: ViewerFile) => navigation.openFiles([file], { title });
-  const fileOf = (file: StoredFileRef | null): ViewerFile | null => file;
+  const openFile = (file: ViewerFile, title: string) => navigation.openFiles([file], { title });
+  const openNumber = (entry: TopicNumber) => navigation.push({ screen: 'content.number', topicId, number: entry.number });
 
   const topic = data?.topic;
-  const header = topic ? (
-    <View style={styles.header}>
-      {detail.isError && !deleted && !isTopicLeaving(topicId) ? (
-        <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="topic-refresh-error" />
-      ) : null}
-
-      {isDeveloper ? (
-        <Segmented<TopicMode>
-          options={[
-            { value: 'view', label: dict.topics.tabs.view },
-            { value: 'edit', label: dict.topics.tabs.edit, accessibilityLabel: m.content.topic.openEdit },
-          ]}
-          value="view"
-          onChange={(mode) => {
-            if (mode === 'edit') navigation.open({ screen: 'content.topicEdit', topicId });
-          }}
-          accessibilityLabel={dict.topics.tabs.aria}
-          role="tab"
-          fill
-          plain
-          testID="topic-mode"
-        />
-      ) : null}
-
-      <View style={styles.titleBlock}>
-        <Text variant="pageTitle" accessibilityRole="header" testID="topic-title">
-          {topic.title}
-        </Text>
-        {topic.description ? (
-          <Text variant="small" color="textMuted">
-            {topic.description}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHead}>
-          <Text variant="sectionTitle" accessibilityRole="header">
-            {t.materialsTitle}
-          </Text>
-          <Hint>
-            <Text variant="hint">{t.materialsDescription}</Text>
-          </Hint>
-        </View>
-        <FileCard title={t.theory} file={fileOf(topic.theoryFile)} onOpen={openFile(t.theory)} testID="topic-theory-file" />
-        <FileCard title={t.homework} file={fileOf(topic.homeworkFile)} onOpen={openFile(t.homework)} testID="topic-homework-file" />
-      </View>
-
-      <View style={styles.sectionHead}>
-        <View style={styles.numbersTitle}>
-          <Text variant="sectionTitle" accessibilityRole="header" style={styles.grow}>
-            {t.numbersTitle}
-          </Text>
-          {topic.homeworkNumbers.length > 0 ? (
-            <Text variant="meta" tabular testID="topic-numbers-count">
-              {format(m.content.topic.numbersCount, { count: topic.homeworkNumbers.length })}
-            </Text>
-          ) : null}
-        </View>
-        <Hint>
-          <Text variant="hint">{t.numbersDescription}</Text>
-        </Hint>
-      </View>
-    </View>
-  ) : null;
 
   return (
     <Screen
       testID="content-topic-screen"
       header={
         <DetailAppBar
-          // The bar carries the eyebrow («Тема»); the full title wraps below, where it is never cut.
-          title={t.eyebrow}
+          // The eyebrow («Тема») stands in until the topic is read.
+          title={topic?.title ?? dict.topics.view.eyebrow}
+          backTitle={m.shell.tabs.topics}
           right={
             isDeveloper && topic ? (
-              <IconButton
-                icon="trash"
-                accessibilityLabel={dict.topics.deleteTopic.label}
-                onPress={() => setDeleteOpen(true)}
-                testID="topic-delete"
-              />
+              <IconButton icon="more" accessibilityLabel={m.content.topic.actions} onPress={() => setActionsOpen(true)} testID="topic-actions" />
             ) : undefined
           }
         />
       }
-      // The topic lives in the stack of a tab: the tab bar owns the bottom inset.
-      bottomInset={false}
-      scroll={!topic}
-      padded={!topic}
+      // A tablet page does not scroll: each panel scrolls its own content down to the dock.
+      scroll={!theme.tablet}
+      maxWidth="full"
+      onRefresh={refresh}
+      refreshing={refreshing}
     >
       {topic ? (
-        <View style={styles.list} onLayout={scrollMemory.onLayout}>
-          <FlashList<TopicNumber>
-            ref={listRef}
-            {...scrollMemory.listProps}
-            data={topic.homeworkNumbers}
-            keyExtractor={(number) => number.id}
-            extraData={shownAnswers}
-            renderItem={({ item }) => (
-              <View style={styles.item}>
-                <TopicNumberCard number={item} answerShown={shownAnswers.has(item.id)} onToggleAnswer={toggleAnswer} />
-              </View>
-            )}
-            ListHeaderComponent={header}
-            ListEmptyComponent={
-              <EmptyState
-                title={dict.topics.viewNumbers.emptyTitle}
-                // The hint points at the «Редактирование» tab, which only a developer has.
-                hint={isDeveloper ? dict.topics.viewNumbers.emptyHint : undefined}
-                testID="topic-numbers-empty"
-              />
-            }
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={refresh}
-                tintColor={theme.colors.accentSolid}
-                colors={[theme.colors.accentSolid]}
-                progressBackgroundColor={theme.colors.cardBg}
-              />
-            }
-            testID="topic-numbers-list"
-          />
-        </View>
+        <>
+          {detail.isError && !deleted && !isTopicLeaving(topicId) ? (
+            <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="topic-refresh-error" />
+          ) : null}
+          <Panels>
+            <Panel weight={2} testID="topic-materials">
+              {topic.description ? (
+                <Text variant="body" color="label" testID="topic-description">
+                  {topic.description}
+                </Text>
+              ) : null}
+              <TopicFiles theoryFile={topic.theoryFile} homeworkFile={topic.homeworkFile} onOpen={openFile} />
+            </Panel>
+            <Panel weight={3} testID="topic-numbers">
+              <TopicNumbers numbers={topic.homeworkNumbers} isDeveloper={isDeveloper} onOpenNumber={openNumber} />
+            </Panel>
+          </Panels>
+        </>
       ) : failure ? (
         <LoadFailure query={detail} testID="topic-error" />
       ) : (
-        <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="topic-loading" />
+        <LoadingState variant="cards" count={2} accessibilityLabel={m.common.a11y.loading} testID="topic-loading" />
       )}
 
       {isDeveloper ? (
-        <DeleteTopicDialog
-          topic={deleteOpen && topic ? { id: topic.id, title: topic.title } : null}
-          onClose={() => setDeleteOpen(false)}
-          onDeleted={() => {
-            setDeleteOpen(false);
-            setDeleted(true);
-            // Back to the list, as the site's redirect does; the list shows «Тема успешно удалена».
-            postTopicDeleted(topicId);
-            // Answered after the user went elsewhere: the screen shows the gone state on return instead.
-            if (stillHere()) navigation.open({ screen: 'content.topics' });
-          }}
-        />
+        <>
+          <TopicActionsSheet
+            visible={actionsOpen}
+            title={topic?.title ?? dict.topics.view.eyebrow}
+            onClose={() => setActionsOpen(false)}
+            onEdit={() => navigation.open({ screen: 'content.topicEdit', topicId })}
+            onDelete={() => setDeleteOpen(true)}
+          />
+          <DeleteTopicDialog
+            topic={deleteOpen && topic ? { id: topic.id, title: topic.title } : null}
+            onClose={() => setDeleteOpen(false)}
+            onDeleted={() => {
+              setDeleteOpen(false);
+              setDeleted(true);
+              // Back to the list, as the site's redirect does; the list shows «Тема успешно удалена».
+              postTopicDeleted(topicId);
+              // Answered after the user went elsewhere: the screen shows the gone state on return instead.
+              if (stillHere()) navigation.open({ screen: 'content.topics' });
+            }}
+          />
+        </>
       ) : null}
     </Screen>
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  list: { flex: 1 },
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.lg, paddingBottom: t.space.md },
-  titleBlock: { gap: t.space.xs },
-  section: { gap: t.space.md },
-  sectionHead: { gap: t.space.xxs },
-  numbersTitle: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.md },
-  grow: { flex: 1 },
-  item: { paddingBottom: t.space.md },
-}));

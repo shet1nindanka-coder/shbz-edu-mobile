@@ -11,7 +11,7 @@ import { useRefetchOnFocus, type ScreenParams } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { LoadingState, Notice, PageHeader, Screen, Segmented } from '@/ui';
+import { LoadingState, Notice, Screen, Segmented } from '@/ui';
 
 import { STATS_VIEWS, initialStatsState, type StatsView } from './logic';
 import { TeacherCard } from './parts/teacher-card';
@@ -20,11 +20,13 @@ import { ProgressView } from './views/progress-view';
 import { TeachersView } from './views/teachers-view';
 
 /**
- * `stats.main` (docs/spec/06-teacher-groups-calls-stats.md §1.6): the developer's statistics tab. Three
- * views behind one segmented control — «Прогресс учеников», «По учителям», «Метрики платформы» — each a
- * vertical scroll of cards. A view's data is requested when the view is first opened and then kept, so
- * switching back is instant. The screen is one list: the cards of «По учителям» (one per teacher, no
- * upper bound) are its rows, the other two views are a single row, and the header stays mounted.
+ * `stats.main` (docs/spec/06-teacher-groups-calls-stats.md §1.6; layout: docs/design/glass-over-paper.md
+ * §7, mockup D-stats): the developer's statistics tab. Three views behind the segmented control of the
+ * header — «Прогресс учеников», «По учителям», «Метрики платформы» — each a scroll of cards: plain summary
+ * figures first, then charts and rankings; a tablet puts the cards side by side. A view's data is
+ * requested when the view is first opened and then kept, so switching back is instant. The screen is one
+ * list: the cards of «По учителям» (one per teacher, no upper bound) are its rows — two columns of them on
+ * a tablet — the other two views are a single row, and the head of the list stays mounted.
  *
  * Only a DEVELOPER has this screen (the registry and the server agree: `403 developerRightsRequired`
  * for anyone else). Statistics has no realtime event of its own: it refreshes on focus, on
@@ -146,23 +148,8 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
     [teacherCards],
   );
 
-  const header = (
-    <View style={styles.header}>
-      <PageHeader title={t.title} gap={0} />
-
-      {/* The kit's in-page tabs: no label is cut; on a narrow phone the bar scrolls, selected tab in view. */}
-      <Segmented
-        options={STATS_VIEWS.map((value) => ({ value, label: t.views[value] }))}
-        value={view}
-        onChange={selectView}
-        accessibilityLabel={t.viewsAria}
-        plain
-        scrollable
-        role="tab"
-        style={styles.tabs}
-        testID="stats-views"
-      />
-
+  const failures = (
+    <>
       {/* Cached numbers stay on screen when a refresh fails (offline): say so instead of replacing them. */}
       {current.isError && current.data ? (
         <Notice tone="error" text={errorText(current.error, m.common.errors.generic)} testID="stats-refresh-error" />
@@ -180,24 +167,51 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
       {current.isPlaceholderData && current.fetchStatus === 'paused' ? (
         <Notice tone="error" text={m.common.errors.network} testID="stats-filter-offline" />
       ) : null}
-    </View>
+    </>
   );
+  const hasFailure =
+    (current.isError && current.data !== undefined) ||
+    (view === 'teacher' && filterError !== null) ||
+    (current.isPlaceholderData && current.fetchStatus === 'paused');
+
+  // A tablet lays the teacher cards out in two columns; a view that is one row keeps the whole width.
+  const columns = theme.tablet && teacherCards ? 2 : 1;
 
   return (
     <Screen
       testID="stats-main-screen"
-      header={<ShellAppBar title={screenTitle('stats.main', m.shell.tabs)} />}
+      header={
+        <ShellAppBar
+          title={screenTitle('stats.main', m.shell.tabs)}
+          aside={
+            <Segmented
+              options={STATS_VIEWS.map((value) => ({ value, label: t.views[value] }))}
+              value={view}
+              onChange={selectView}
+              accessibilityLabel={t.viewsAria}
+              // No label is cut: on a narrow phone the bar scrolls, the selected view kept in sight.
+              scrollable
+              role="tab"
+              testID="stats-views"
+            />
+          }
+        />
+      }
       bottomInset={false}
       scroll={false}
       padded={false}
+      maxWidth="full"
     >
       <FlashList
+        // The number of columns cannot change on a mounted list.
+        key={columns}
+        numColumns={columns}
         data={rows}
         keyExtractor={(row) => (row.kind === 'teacher' ? row.entry.teacherId : 'body')}
         getItemType={(row) => row.kind}
-        renderItem={({ item }) =>
+        renderItem={({ item, index }) =>
           item.kind === 'teacher' && teacherCards ? (
-            <View style={styles.item}>
+            <View style={[styles.item, columns > 1 ? (index % columns === 0 ? styles.itemLeft : styles.itemRight) : null]}>
               <TeacherCard entry={item.entry} weekStarts={teacherCards.weekStarts} />
             </View>
           ) : (
@@ -206,7 +220,7 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
         }
         // The single "body" row shows whatever the current view and its query hold.
         extraData={[view, current.data, current.status, current.fetchStatus, current.isPlaceholderData, locale]}
-        ListHeaderComponent={header}
+        ListHeaderComponent={hasFailure ? <View style={styles.header}>{failures}</View> : null}
         ListFooterComponent={teacherCards ? <TeachersView data={teacherCards} /> : null}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
@@ -227,10 +241,11 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.pageTop, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.lg, paddingBottom: t.space.lg },
-  // When the bar scrolls, its viewport keeps the track's rounded corners instead of a square cut.
-  tabs: { borderRadius: t.radii.md },
+  listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
+  header: { gap: t.space.block, paddingBottom: t.space.block },
   // The gap between cards lives inside the cells: FlashList measures each one.
-  item: { paddingBottom: t.space.lg },
+  item: { flex: 1, paddingBottom: t.space.block },
+  // Two columns: each cell gives half of the gap between them.
+  itemLeft: { paddingRight: t.space.block / 2 },
+  itemRight: { paddingLeft: t.space.block / 2 },
 }));

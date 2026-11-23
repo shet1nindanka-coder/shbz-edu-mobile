@@ -76,5 +76,5 @@ export function CreateTopicSheet({ visible, onClose, onCreated, onImported }: Cr
 }
 
 const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.field, paddingTop: t.space.xs },
+  root: { gap: t.space.lg, paddingTop: t.space.xs },
 }));

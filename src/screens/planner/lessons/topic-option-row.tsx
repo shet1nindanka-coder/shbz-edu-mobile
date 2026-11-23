@@ -21,9 +21,9 @@ export function TopicOptionRow({ title, checked, onChange, testID }: TopicOption
       accessibilityState={{ checked }}
       onPress={() => onChange(!checked)}
       testID={testID}
-      style={[styles.row, checked ? styles.selected : styles.unselected]}
+      style={[styles.row, checked ? styles.selected : null]}
     >
-      <Text variant="smallStrong" style={styles.title}>
+      <Text variant="bodyStrong" style={styles.title}>
         {title}
       </Text>
       <CheckMark checked={checked} />
@@ -33,19 +33,16 @@ export function TopicOptionRow({ title, checked, onChange, testID }: TopicOption
 
 const useStyles = makeStyles((t) => ({
   row: {
-    minHeight: t.sizes.minTouch,
+    minHeight: t.sizes.control.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.md,
-    paddingVertical: 10,
-    paddingRight: 12,
-    paddingLeft: 14,
+    paddingVertical: t.space.xs,
+    paddingHorizontal: t.space.md,
     borderRadius: t.radii.md,
-    borderWidth: t.borders.interactive,
-    borderColor: 'transparent',
     backgroundColor: t.colors.softBg,
   },
-  selected: { borderColor: t.colors.accentSolid, backgroundColor: t.colors.greenSoft },
-  unselected: { opacity: 0.72 },
+  // The check mark says "picked"; the fill only lifts the row a little. Green is for number statuses.
+  selected: { backgroundColor: t.colors.soft2 },
   title: { flex: 1, minWidth: 0 },
 }));

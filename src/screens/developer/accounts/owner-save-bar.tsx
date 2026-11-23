@@ -16,8 +16,9 @@ export type OwnerSaveBarProps = {
 
 /**
  * The save bar of the students tab (docs/spec/04-teacher-students.md S9b): owner changes are edited in
- * several rows and sent with one button, so it is clear what changes and nothing is saved by halves. On a
- * phone it is pinned above the tab bar and exists only while there is something to save.
+ * several rows and sent with one button, so it is clear what changes and nothing is saved by halves. It is
+ * pinned above the dock and exists only while there is something to save. The button is the ink one: the
+ * save moves students between teachers, and the gradient stays with «Новый аккаунт».
  */
 export function OwnerSaveBar({ count, saving, error, onDiscard, onSave }: OwnerSaveBarProps) {
   const styles = useStyles();
@@ -33,15 +34,15 @@ export function OwnerSaveBar({ count, saving, error, onDiscard, onSave }: OwnerS
         <Text variant="smallStrong" accessibilityLiveRegion="polite" style={styles.text} testID="owner-save-text">
           {format(t.changedFor, { students: plural(locale, count, t.changedStudentForms) })}
         </Text>
-        {/* «Сохранить изменения» needs the full width on a phone; discarding is the quiet action beside the text. */}
+        {/* «Сохранить изменения» takes the full width; discarding is the quiet action beside the text. */}
         <TextButton label={t.reset} tone="muted" disabled={saving} onPress={onDiscard} testID="owner-save-discard" />
       </View>
       {error ? (
-        <Text variant="captionMedium" color="dangerSolid" accessibilityRole="alert" testID="owner-save-error">
+        <Text variant="small" color="redText" accessibilityRole="alert" testID="owner-save-error">
           {error}
         </Text>
       ) : null}
-      <Button label={saving ? t.saving : t.save} size="lg" fullWidth loading={saving} onPress={onSave} testID="owner-save-submit" />
+      <Button label={saving ? t.saving : t.save} variant="dark" fullWidth loading={saving} onPress={onSave} testID="owner-save-submit" />
     </View>
   );
 }

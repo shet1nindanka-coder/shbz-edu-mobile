@@ -6,7 +6,7 @@ import type { ViewerFile } from '@/components/files';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Card, Text, TextArea, TextField } from '@/ui';
+import { Text, TextArea, TextField } from '@/ui';
 
 import { NumbersField } from '../shared/numbers-field';
 
@@ -21,8 +21,9 @@ export type TopicFormSectionProps = {
 };
 
 /**
- * The topic's form (docs/spec/07-developer-content.md §1.3 item 4): basic information, the numbers field
- * that replaces the whole set on save, and the two files. The save button is the screen's sticky footer.
+ * The topic's form (docs/spec/07-developer-content.md §1.3 item 4; layout: the `D-topic-edit` mockup):
+ * the title, the description, the numbers field that replaces the whole set on save, and the two files as
+ * boxes that open their own sheet. Rendered inside one card; the save button belongs to the screen.
  */
 export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFormSectionProps) {
   const styles = useStyles();
@@ -34,73 +35,67 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
 
   return (
     <View style={styles.root} testID="edit-form">
-      <Card style={styles.block}>
-        <Text variant="cardTitle" accessibilityRole="header">
-          {t.basicInfo}
-        </Text>
-        <TextField
-          label={t.titleLabel}
-          value={form.values.title}
-          onChangeText={form.setTitle}
-          error={form.missing === 'title' ? m.content.edit.titleRequired : null}
-          disabled={locked}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => descriptionRef.current?.focus()}
-          testID="edit-title"
-        />
-        <TextArea
-          ref={descriptionRef}
-          label={t.descriptionLabel}
-          value={form.values.description}
-          onChangeText={form.setDescription}
-          numberOfLines={3}
-          disabled={locked}
-          testID="edit-description"
-        />
-      </Card>
+      <Text variant="sectionTitle" accessibilityRole="header">
+        {m.content.edit.sections.topic}
+      </Text>
+      <TextField
+        label={t.titleLabel}
+        value={form.values.title}
+        onChangeText={form.setTitle}
+        error={form.missing === 'title' ? m.content.edit.titleRequired : null}
+        disabled={locked}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => descriptionRef.current?.focus()}
+        testID="edit-title"
+      />
+      <TextArea
+        ref={descriptionRef}
+        label={t.descriptionLabel}
+        value={form.values.description}
+        onChangeText={form.setDescription}
+        numberOfLines={3}
+        disabled={locked}
+        testID="edit-description"
+      />
+      <NumbersField
+        value={form.values.numbers}
+        onChangeText={form.setNumbers}
+        description={t.numbersDescription}
+        rows={5}
+        disabled={locked}
+        error={form.missing === 'numbers' ? m.content.edit.numbersRequired : null}
+        testID="edit-numbers"
+      />
 
-      <Card style={styles.block}>
-        <Text variant="cardTitle" accessibilityRole="header">
-          {t.numbers}
-        </Text>
-        <NumbersField
-          value={form.values.numbers}
-          onChangeText={form.setNumbers}
-          description={t.numbersDescription}
-          rows={5}
-          disabled={locked}
-          error={form.missing === 'numbers' ? m.content.edit.numbersRequired : null}
-          testID="edit-numbers"
-        />
-      </Card>
-
-      <View style={styles.block}>
-        <Text variant="cardTitle" accessibilityRole="header">
+      <View style={styles.files}>
+        <Text variant="label" accessibilityRole="header">
           {t.files}
         </Text>
-        {/* One bucket for both cells, so the wait is shown once, above them. */}
+        {/* One bucket for both boxes, so the wait is shown once, above them. */}
         <RetryWaitLine seconds={form.uploadWait.seconds} testID="edit-upload-wait" />
-        <TopicFileField
-          kind="theory"
-          topicId={topic.id}
-          file={topic.theoryFile}
-          slot={form.theory}
-          disabled={locked}
-          uploadsLimited={form.uploadWait.waiting}
-          onOpen={onOpenFile}
-          onNotice={onNotice}
-        />
-        <TopicFileField
-          kind="homework"
-          topicId={topic.id}
-          file={topic.homeworkFile}
-          slot={form.homework}
-          disabled={locked}
-          uploadsLimited={form.uploadWait.waiting}
-          onOpen={onOpenFile}
-          onNotice={onNotice}
-        />
+        <View style={styles.boxes}>
+          <TopicFileField
+            kind="theory"
+            topicId={topic.id}
+            file={topic.theoryFile}
+            slot={form.theory}
+            disabled={locked}
+            uploadsLimited={form.uploadWait.waiting}
+            onOpen={onOpenFile}
+            onNotice={onNotice}
+          />
+          <TopicFileField
+            kind="homework"
+            topicId={topic.id}
+            file={topic.homeworkFile}
+            slot={form.homework}
+            disabled={locked}
+            uploadsLimited={form.uploadWait.waiting}
+            onOpen={onOpenFile}
+            onNotice={onNotice}
+          />
+        </View>
       </View>
     </View>
   );
@@ -108,5 +103,6 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
 
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.lg },
-  block: { gap: t.space.field },
+  files: { gap: t.space.xs },
+  boxes: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
 }));

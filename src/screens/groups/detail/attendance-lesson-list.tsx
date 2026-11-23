@@ -4,11 +4,12 @@ import { View } from 'react-native';
 import type { AttendanceStatus, GroupAttendanceLesson, GroupAttendanceResponse } from '@/api/types';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
-import { makeStyles, useTheme } from '@/theme';
-import { Card, PressableScale, Select, Text, TextButton } from '@/ui';
+import { makeStyles } from '@/theme';
+import { PressableScale, Select, Text, TextButton } from '@/ui';
 
 import { defaultAttendanceLessonId, lessonCells, type AttendanceCell } from '../logic';
-import { selectedMarkColors } from './attendance-pill';
+import { Rows, useRowInset } from '../shared/rows';
+import { AttendanceTile, useAttendanceTileLabel } from './attendance-tile';
 
 type Member = GroupAttendanceResponse['members'][number];
 
@@ -27,14 +28,15 @@ export type AttendanceLessonListProps = {
 
 /**
  * Attendance of one lesson (06 §1.2 "Mobile translation", Q4 b): pick a lesson, then set each
- * participant's mark with an explicit four-option control — no cycling, no sideways scrolling.
+ * participant's mark with an explicit control of four tiles — no cycling, no sideways scrolling.
  */
 export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, onOpenLesson }: AttendanceLessonListProps) {
   const styles = useStyles();
-  const theme = useTheme();
+  const inset = useRowInset();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.groups.attendance;
   const labels = dict.planner.attendance.labels;
+  const tileLabel = useAttendanceTileLabel();
   const [picked, setPicked] = useState<string | null>(null);
 
   // A picked lesson can leave the period; then the default one takes over.
@@ -60,7 +62,6 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
         onChange={setPicked}
         placeholder={m.groups.attendance.lessonLabel}
         closeLabel={m.common.actions.close}
-        size="sm"
         testID="attendance-lesson-select"
       />
       {onOpenLesson ? (
@@ -76,67 +77,55 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
         />
       ) : null}
 
-      <Card padded={false}>
-        {/* Paddings sit on an inner view: on web a card's own `padding: 0` wins over longhand paddings. */}
-        <View style={styles.card}>
-          {members.map((member, index) => {
-            const cell = cells.get(member.id);
-            const saving = cell ? busy.has(cell.participantId) : false;
-            return (
-              <View key={member.id} style={[styles.row, index > 0 ? styles.rowBorder : null]}>
-                <Text variant="smallBold" numberOfLines={1}>
-                  {member.name}
+      <Rows>
+        {members.map((member, index) => {
+          const cell = cells.get(member.id);
+          const saving = cell ? busy.has(cell.participantId) : false;
+          return (
+            <View
+              key={member.id}
+              style={[styles.row, inset === undefined ? styles.rowInset : null, index > 0 ? styles.rowBorder : null]}
+            >
+              <Text variant="bodyStrong" numberOfLines={2} style={styles.name}>
+                {member.name}
+              </Text>
+              {cell ? (
+                <View
+                  accessibilityRole="radiogroup"
+                  accessibilityLabel={format(m.groups.attendance.markAria, {
+                    name: member.name,
+                    mark: labels[cell.attendance].label,
+                  })}
+                  style={styles.marks}
+                >
+                  {MANUAL_MARKS.map((value) => {
+                    const selected = cell.attendance === value;
+                    return (
+                      <PressableScale
+                        key={value}
+                        accessibilityRole="radio"
+                        accessibilityLabel={format(m.groups.attendance.markAria, { name: member.name, mark: labels[value].label })}
+                        accessibilityState={{ selected, disabled: disabled || saving, busy: saving }}
+                        disabled={disabled || saving}
+                        onPress={() => {
+                          if (!selected) onSet(lesson, cell, value);
+                        }}
+                        testID={`attendance-mark-${member.id}-${value}`}
+                      >
+                        <AttendanceTile value={value} label={tileLabel(value)} idle={!selected} dimmed={disabled || saving} />
+                      </PressableScale>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text variant="small" color="textMuted" numberOfLines={2} style={styles.absent}>
+                  {t.notParticipated}
                 </Text>
-                {cell ? (
-                  <View
-                    accessibilityRole="radiogroup"
-                    accessibilityLabel={format(m.groups.attendance.markAria, {
-                      name: member.name,
-                      mark: labels[cell.attendance].label,
-                    })}
-                    style={styles.marks}
-                  >
-                    {MANUAL_MARKS.map((value) => {
-                      const selected = cell.attendance === value;
-                      const colors = selected ? selectedMarkColors(value, theme) : null;
-                      return (
-                        <PressableScale
-                          key={value}
-                          accessibilityRole="radio"
-                          accessibilityLabel={format(m.groups.attendance.markAria, { name: member.name, mark: labels[value].label })}
-                          accessibilityState={{ selected, disabled: disabled || saving, busy: saving }}
-                          disabled={disabled || saving}
-                          onPress={() => {
-                            if (!selected) onSet(lesson, cell, value);
-                          }}
-                          style={[
-                            styles.mark,
-                            colors ? { backgroundColor: colors.bg, borderColor: colors.border } : null,
-                            disabled || saving ? styles.markDisabled : null,
-                          ]}
-                          testID={`attendance-mark-${member.id}-${value}`}
-                        >
-                          <Text
-                            variant="captionBold"
-                            numberOfLines={1}
-                            style={{ color: colors ? colors.text : theme.status.idle.text }}
-                          >
-                            {labels[value].short}
-                          </Text>
-                        </PressableScale>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text variant="small" color="textSoft">
-                    {t.notParticipated}
-                  </Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      </Card>
+              )}
+            </View>
+          );
+        })}
+      </Rows>
     </View>
   );
 }
@@ -144,21 +133,10 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
 const useStyles = makeStyles((t) => ({
   list: { gap: t.space.md },
   openLesson: { alignSelf: 'flex-start' },
-  card: { paddingHorizontal: t.space.gutter },
-  row: { gap: t.space.sm, paddingVertical: t.space.gutter },
+  row: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
+  rowInset: { marginHorizontal: t.space.card },
   rowBorder: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
+  name: { flex: 1, minWidth: 0 },
   marks: { flexDirection: 'row', gap: t.space.xs },
-  mark: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: t.sizes.minTouch,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: t.space.xxs,
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.status.idle.border,
-    backgroundColor: t.status.idle.bg,
-  },
-  markDisabled: { opacity: 0.6 },
+  absent: { flexShrink: 1, textAlign: 'right' },
 }));

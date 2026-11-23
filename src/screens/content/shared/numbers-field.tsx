@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { format, plural, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Badge, Card, Text, TextArea } from '@/ui';
+import { Text, TextArea } from '@/ui';
 
 import { summarizeNumbersInput } from './numbers-summary';
 
@@ -62,32 +62,27 @@ export function NumbersField({
         testID={testID}
       />
 
-      <View style={styles.badges}>
-        <Badge
-          tone="count"
-          label={summary.state === 'ok' ? plural(locale, summary.count, dict.topics.widgets.numberForms) : t.empty}
-        />
-        {summary.state === 'ok' && summary.first !== null && summary.last !== null ? (
-          <Badge tone="count" label={format(t.range, { from: summary.first, to: summary.last })} />
-        ) : null}
-      </View>
+      {/* Neutral facts of the parsed list: plain text, not labels. */}
+      <Text variant="small" color="textMuted" tabular>
+        {summary.state === 'ok'
+          ? summary.first !== null && summary.last !== null
+            ? `${plural(locale, summary.count, dict.topics.widgets.numberForms)} · ${format(t.range, { from: summary.first, to: summary.last })}`
+            : plural(locale, summary.count, dict.topics.widgets.numberForms)
+          : t.empty}
+      </Text>
 
       {computing ? (
-        <Card variant="soft" padded={14}>
-          <Text variant="small" color="textMuted">
-            {t.computing}
-          </Text>
-        </Card>
+        <Text variant="small" color="textMuted">
+          {t.computing}
+        </Text>
       ) : summary.state === 'ok' ? (
         <Hint>
-          <Card variant="soft" padded={14} testID={`${testID}-summary`}>
-            <Text variant="small" color="textMuted">
-              {description ?? t.description}
-            </Text>
-            <Text variant="small" color="label" style={styles.finalList}>
+          <View style={styles.summary} testID={`${testID}-summary`}>
+            <Text variant="hint">{description ?? t.description}</Text>
+            <Text variant="small" color="label">
               {format(t.finalList, { list: summary.preview })}
             </Text>
-          </Card>
+          </View>
         </Hint>
       ) : null}
     </View>
@@ -95,7 +90,6 @@ export function NumbersField({
 }
 
 const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.md },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
-  finalList: { marginTop: t.space.xxs },
+  root: { gap: t.space.xs },
+  summary: { gap: t.space.xxs },
 }));

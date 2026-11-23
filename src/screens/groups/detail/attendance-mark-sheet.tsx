@@ -3,10 +3,10 @@ import { View } from 'react-native';
 import type { AttendanceStatus } from '@/api/types';
 import { ATTENDANCE_STATUSES } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, Icon, PressableScale, Text } from '@/ui';
 
-import { AttendancePill } from './attendance-pill';
+import { AttendanceTile, useAttendanceTileLabel } from './attendance-tile';
 
 export type AttendanceMarkTarget = {
   lessonId: string;
@@ -34,29 +34,25 @@ const ORDER: readonly AttendanceStatus[] = [
 
 /**
  * Explicit choice of a mark, opened by a long press on a cell of the table (06 Q4): all five values,
- * including "not marked", which the tap cycle can never reach again.
+ * including "not marked", which the tap cycle can never reach again. Every tile stands next to its full
+ * name, so the sheet is also the legend of the table.
  */
 export function AttendanceMarkSheet({ visible, target, onClose, onPick }: AttendanceMarkSheetProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, m } = useI18n();
   const labels = dict.planner.attendance.labels;
+  const tileLabel = useAttendanceTileLabel();
 
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      closeLabel={m.common.actions.close}
-      title={target?.studentName}
-      padded={false}
-      testID="attendance-mark-sheet"
-    >
+    <BottomSheet visible={visible} onClose={onClose} closeLabel={m.common.actions.close} title={target?.studentName} testID="attendance-mark-sheet">
       {target ? (
-        <View style={styles.content}>
+        <View>
           <Text variant="small" color="textMuted" style={styles.hint}>
             {format(m.groups.attendance.markSheetHint, { date: target.lessonDate, title: target.lessonTitle })}
           </Text>
           <View accessibilityRole="menu">
-            {ORDER.map((value) => {
+            {ORDER.map((value, index) => {
               const active = value === target.attendance;
               return (
                 <PressableScale
@@ -69,15 +65,15 @@ export function AttendanceMarkSheet({ visible, target, onClose, onPick }: Attend
                     if (!active) onPick(target, value);
                   }}
                   scaleTo={1}
-                  style={[styles.option, active ? styles.optionActive : null]}
-                  pressedStyle={active ? null : styles.optionPressed}
+                  style={[styles.option, index > 0 ? styles.optionBorder : null]}
+                  pressedStyle={styles.pressed}
                   testID={`attendance-mark-option-${value}`}
                 >
-                  <AttendancePill value={value} label={labels[value].short} />
+                  <AttendanceTile value={value} label={tileLabel(value)} />
                   <Text variant="bodyStrong" style={styles.label}>
                     {labels[value].label}
                   </Text>
-                  {active ? <Icon name="check" size={16} color="greenText" /> : null}
+                  {active ? <Icon name="check" size={theme.sizes.icon.md} color="textStrong" /> : null}
                 </PressableScale>
               );
             })}
@@ -89,18 +85,9 @@ export function AttendanceMarkSheet({ visible, target, onClose, onPick }: Attend
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { paddingHorizontal: 8, paddingBottom: t.space.gutter },
-  hint: { paddingHorizontal: 12, paddingBottom: t.space.sm },
-  option: {
-    minHeight: t.sizes.minTouch + 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: t.space.md,
-    paddingVertical: t.space.xs,
-    paddingHorizontal: 12,
-    borderRadius: t.radii.md,
-  },
-  optionActive: { backgroundColor: t.colors.accentSoft },
-  optionPressed: { backgroundColor: t.colors.tabHover },
+  hint: { paddingBottom: t.space.xs },
+  option: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
+  optionBorder: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
+  pressed: { opacity: 0.6 },
   label: { flex: 1, minWidth: 0 },
 }));

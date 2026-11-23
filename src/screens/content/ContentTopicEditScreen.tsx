@@ -11,8 +11,8 @@ import { useAppNavigation, useRefetchOnFocus, useStillHere, type ScreenParams } 
 import { Hint, useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
-import { makeStyles } from '@/theme';
-import { Button, IconButton, LoadingState, Notice, Screen, Segmented, Text, TextButton } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, IconButton, LoadingState, Notice, Panel, Panels, Screen, Segmented, Text, TextButton } from '@/ui';
 
 import { AnswersSection } from './edit/answers-section';
 import { NumbersConfirmDialog } from './edit/numbers-confirm-dialog';
@@ -22,31 +22,36 @@ import { useTopicEditForm, type EditNotice } from './edit/use-topic-edit-form';
 import { DeleteTopicDialog } from './shared/delete-topic-dialog';
 import { clearEditorFocus, markOpenedFromEditor, peekEditorFocus } from './shared/editor-links';
 import { ImportPanelView } from './shared/import-panel';
-import { pinnedColumn } from './shared/pinned-column';
 import { postTopicDeleted } from './shared/topics-flash';
 import { useImportPanel } from './shared/use-import-panel';
 
 /** Route params of `content.topicEdit` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type ContentTopicEditScreenProps = ScreenParams['content.topicEdit'];
 
-/** Space left above the ringed row when the screen scrolls to it. */
-const FOCUS_SCROLL_MARGIN = 12;
-
 /** A teacher never loads the editor's topic. */
 const NO_QUERIES: readonly [] = [];
 
-type TopicMode = 'view' | 'edit';
 /** The site's long page, split as its phone mapping proposes (07 §1.3): the form, the per-number materials, the import. */
 type EditSection = 'topic' | 'answers' | 'import';
+/** What the panel next to the form shows on a tablet. */
+type SideSection = Exclude<EditSection, 'topic'>;
+
+/** Where the pieces above the highlighted row start; the screen scrolls to it once all are known. */
+type FocusScroll = { header: number | null; panels: number | null; row: number | null; done: boolean; timer: ReturnType<typeof setTimeout> | null };
 
 /**
- * `content.topicEdit` (docs/spec/07-developer-content.md §1.3, §1.5; DEVELOPER only): title, description,
- * the numbers field that replaces the whole set (with the destructive-change preview), the theory and
- * homework files, the statements-and-answers list, the import of numbers into this topic, and «Удалить
- * тему» with its real impact.
+ * `content.topicEdit` (docs/spec/07-developer-content.md §1.3, §1.5; DEVELOPER only; layout: the
+ * `D-topic-edit` mockup): the form — title, description, the numbers field that replaces the whole set
+ * (with the destructive-change preview), the two files — the statements-and-answers list, the import of
+ * numbers into this topic, and «Удалить тему» with its real impact.
+ *
+ * A phone shows one of the three at a time (the switch is in the header), with «Сохранить изменения» as
+ * the sticky action of the form. A tablet keeps the form in the left panel and the import or the
+ * statements-and-answers list in the right one; saving and deleting sit in the header.
  */
 export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.topics.edit;
@@ -57,7 +62,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   const isDeveloper = user.role === 'DEVELOPER';
 
   // Opened by «← К теме» of a number reached through number search: the site's `/edit?number=N#topic-answers`
-  // (07 §1.3, §1.4b) — the statements-and-answers section, on the page of that number, the number ringed.
+  // (07 §1.3, §1.4b) — the statements-and-answers section, on the page of that number, the number highlighted.
   const [focusNumber] = useState(() => peekEditorFocus(topicId));
   useEffect(() => clearEditorFocus(), []);
   const [section, setSection] = useState<EditSection>(focusNumber === null ? 'topic' : 'answers');
@@ -68,7 +73,14 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   // Deleted from this screen: it is on its way out, so the 404 of the last refetch is not news.
   const [deleted, setDeleted] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
-  const focusScroll = useRef<{ sectionY: number | null; rowY: number | null; done: boolean }>({ sectionY: null, rowY: null, done: false });
+  const focusScroll = useRef<FocusScroll>({ header: null, panels: null, row: null, done: false, timer: null });
+  useEffect(
+    () => () => {
+      const { timer } = focusScroll.current;
+      if (timer) clearTimeout(timer);
+    },
+    [],
+  );
 
   const detail = useQuery({
     queryKey: qk('content', 'getTopic', topicId),
@@ -92,15 +104,23 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   if (!isDeveloper || (!deleted && isNotFoundError(detail.error))) return <NotFoundScreen />;
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: false });
-  // The ringed number may sit below the fold of its page: once the section and the row know where they
-  // are, the screen scrolls to the row — one time, never against the user's own scrolling later.
-  const placeFocus = (part: 'sectionY' | 'rowY', y: number) => {
+  // The highlighted number may sit below the fold of its page: once the header, the card and the row know
+  // where they are, the screen scrolls to the row — one time, never against the user's own scrolling later.
+  // (A tablet page does not scroll: the list is in a panel of its own.)
+  const placeFocus = (part: 'header' | 'panels' | 'row', y: number) => {
     const focus = focusScroll.current;
     if (focus.done) return;
     focus[part] = y;
-    if (focus.sectionY === null || focus.rowY === null) return;
-    focus.done = true;
-    scrollRef.current?.scrollTo({ y: Math.max(0, focus.sectionY + focus.rowY - FOCUS_SCROLL_MARGIN), animated: false });
+    if (focus.header === null || focus.panels === null || focus.row === null || focus.timer !== null) return;
+    // The layout events of one pass arrive one by one: scroll after the last of them.
+    focus.timer = setTimeout(() => {
+      focus.timer = null;
+      if (focus.done || focus.header === null || focus.panels === null || focus.row === null) return;
+      focus.done = true;
+      // The row's offset is counted from the card's content: the card padding lies between the two.
+      const y = focus.header + focus.panels + theme.space.card + focus.row - theme.space.md;
+      scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: false });
+    }, 0);
   };
   const openFile = (file: ViewerFile, title: string) => navigation.openFiles([file], { title });
 
@@ -109,54 +129,117 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   const shownAnswersPage = answersPage ?? (topic ? pageOfNumber(topic.homeworkNumbers, focusNumber) : null) ?? 1;
   const uploading = form.theory.uploading || form.homework.uploading;
   const formBusy = form.phase !== 'idle';
+  const side: SideSection = section === 'answers' ? 'answers' : 'import';
 
-  const banners =
-    topic && (notice || form.previewError || (detail.isError && !deleted)) ? (
-      <View style={styles.banners}>
-        {/* In the order things happened: the check that could not be made, then the outcome of the save. */}
-        {form.previewError ? <Notice tone="error" text={form.previewError} testID="edit-preview-error" /> : null}
-        {notice ? (
-          <Notice
-            tone={notice.tone}
-            text={notice.text}
-            onDismiss={() => setNotice(null)}
-            dismissLabel={m.common.actions.close}
-            testID="edit-notice"
-          />
-        ) : null}
-        {/* The cached topic stays on screen when a refresh fails (offline): say so instead of replacing it. */}
-        {detail.isError && !deleted ? (
-          <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="edit-refresh-error" />
-        ) : null}
+  const saveButton = (
+    <Button
+      label={form.phase === 'saving' ? s.saving : form.phase === 'checking' ? s.checking : s.save}
+      loading={formBusy}
+      // Nothing to send while the form equals the saved topic; a running upload has no file id yet.
+      disabled={!form.dirty || uploading}
+      onPress={form.save}
+      testID="edit-save"
+    />
+  );
+  const deleteButton = (
+    <Button
+      label={dict.topics.deleteTopic.label}
+      variant="danger"
+      leftIcon="trash"
+      disabled={formBusy}
+      onPress={() => setDeleteOpen(true)}
+      testID="edit-delete-topic"
+    />
+  );
+  const unsaved =
+    form.dirty && !formBusy ? (
+      <View style={styles.unsaved}>
+        <Text variant="small" color="textMuted" style={styles.grow} testID="edit-unsaved">
+          {uploading ? m.content.edit.waitUploads : m.content.edit.unsaved}
+        </Text>
+        <TextButton label={m.content.edit.reset} tone="muted" onPress={form.reset} style={styles.touch} testID="edit-reset" />
       </View>
     ) : null;
+  const pendingHint =
+    form.phase === 'saving' ? (
+      <Hint>
+        <Text variant="hint" testID="edit-pending-hint">
+          {s.pendingHint}
+        </Text>
+      </Hint>
+    ) : null;
+
+  const sections = (
+    <Segmented<EditSection>
+      options={[
+        { value: 'topic', label: m.content.edit.sections.topic },
+        { value: 'answers', label: m.content.edit.sections.answers },
+        { value: 'import', label: m.content.edit.sections.import },
+      ]}
+      value={section}
+      onChange={(next) => {
+        setSection(next);
+        scrollToTop();
+      }}
+      accessibilityLabel={m.content.edit.sectionsAria}
+      role="tab"
+      scrollable
+      testID="edit-sections"
+    />
+  );
+  const sideSections = (
+    <Segmented<SideSection>
+      options={[
+        { value: 'import', label: m.content.edit.sections.import },
+        { value: 'answers', label: m.content.edit.sections.answers },
+      ]}
+      value={side}
+      onChange={setSection}
+      accessibilityLabel={m.content.edit.sectionsAria}
+      role="tab"
+      fill
+      testID="edit-sections"
+    />
+  );
+
+  const answers = topic ? (
+    <AnswersSection
+      numbers={topic.homeworkNumbers}
+      page={shownAnswersPage}
+      highlightedId={focused?.id}
+      onHighlightLayout={(y) => placeFocus('row', y)}
+      onPageChange={(page) => {
+        setAnswersPage(page);
+        scrollToTop();
+      }}
+      onOpenNumber={(entry) => {
+        // The number screen's «← К теме» then steps back here instead of opening a second editor.
+        markOpenedFromEditor(topicId, entry.number);
+        navigation.push({ screen: 'content.number', topicId, number: entry.number });
+      }}
+    />
+  ) : null;
+  const importer = (
+    <View style={styles.section} testID="edit-import">
+      <View style={styles.sectionHead}>
+        <Text variant="sectionTitle" accessibilityRole="header">
+          {m.content.edit.importTitle}
+        </Text>
+        <Hint>
+          <Text variant="hint">{m.content.edit.importHint}</Text>
+        </Hint>
+      </View>
+      {/* On a tablet the header's «Сохранить изменения» is the screen's gradient action. */}
+      <ImportPanelView state={importState} secondary={theme.tablet} />
+    </View>
+  );
 
   const footer =
-    topic && section === 'topic' ? (
+    topic && !theme.tablet && section === 'topic' ? (
       <View style={styles.footer} testID="edit-save-bar">
-        {form.dirty && !formBusy ? (
-          <View style={styles.unsaved}>
-            <Text variant="caption" color="textMuted" style={styles.grow} testID="edit-unsaved">
-              {uploading ? m.content.edit.waitUploads : m.content.edit.unsaved}
-            </Text>
-            <TextButton label={m.content.edit.reset} tone="muted" onPress={form.reset} style={styles.touch} testID="edit-reset" />
-          </View>
-        ) : null}
-        <Button
-          label={form.phase === 'saving' ? s.saving : form.phase === 'checking' ? s.checking : s.save}
-          loading={formBusy}
-          // Nothing to send while the form equals the saved topic; a running upload has no file id yet.
-          disabled={!form.dirty || uploading}
-          onPress={form.save}
-          testID="edit-save"
-        />
-        {form.phase === 'saving' ? (
-          <Hint>
-            <Text variant="hint" testID="edit-pending-hint">
-              {s.pendingHint}
-            </Text>
-          </Hint>
-        ) : null}
+        {unsaved}
+        {saveButton}
+        {pendingHint}
       </View>
     ) : undefined;
 
@@ -164,109 +247,93 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
     <Screen
       testID="content-topic-edit-screen"
       header={
-        <>
+        <View onLayout={(event) => placeFocus('header', event.nativeEvent.layout.height)}>
           <DetailAppBar
-            title={t.sectionTitle}
-            subtitle={topic?.title}
+            // The topic is the title; the line under it says this is its editor.
+            title={topic?.title ?? t.sectionTitle}
+            subtitle={topic ? t.sectionTitle : undefined}
+            backTitle={m.shell.tabs.topics}
             right={
               topic ? (
                 <IconButton
-                  icon="trash"
-                  accessibilityLabel={dict.topics.deleteTopic.label}
-                  disabled={formBusy}
-                  onPress={() => setDeleteOpen(true)}
-                  testID="edit-delete-topic"
+                  icon="eye"
+                  accessibilityLabel={dict.topics.tabs.view}
+                  onPress={() => navigation.open({ screen: 'content.topic', topicId })}
+                  testID="edit-mode"
                 />
               ) : undefined
             }
+            aside={
+              topic ? (
+                theme.tablet ? (
+                  <>
+                    {deleteButton}
+                    {saveButton}
+                  </>
+                ) : (
+                  sections
+                )
+              ) : undefined
+            }
           />
-          {/* Pinned under the bar: the result of a save stays in view wherever the form is scrolled to. */}
-          {banners}
-        </>
+        </View>
       }
       footer={footer}
       scrollRef={scrollRef}
+      // A tablet page does not scroll: each panel scrolls its own content down to the dock.
+      scroll={!theme.tablet}
+      maxWidth="full"
       onRefresh={refresh}
       refreshing={refreshing}
     >
       {topic ? (
-        <View style={styles.root}>
-          <Segmented<TopicMode>
-            options={[
-              { value: 'view', label: dict.topics.tabs.view },
-              { value: 'edit', label: dict.topics.tabs.edit },
-            ]}
-            value="edit"
-            onChange={(mode) => {
-              if (mode === 'view') navigation.open({ screen: 'content.topic', topicId });
-            }}
-            accessibilityLabel={dict.topics.tabs.aria}
-            role="tab"
-            fill
-            plain
-            testID="edit-mode"
-          />
-
-          {/* In-page tabs like every other section switch of the app (08 §5.7 `--plain`); the ink pill is
-              the style of the top-level navigation bar. */}
-          <Segmented<EditSection>
-            options={[
-              { value: 'topic', label: m.content.edit.sections.topic },
-              { value: 'answers', label: m.content.edit.sections.answers },
-              { value: 'import', label: m.content.edit.sections.import },
-            ]}
-            value={section}
-            onChange={(next) => {
-              setSection(next);
-              scrollToTop();
-            }}
-            accessibilityLabel={m.content.edit.sectionsAria}
-            role="tab"
-            plain
-            scrollable
-            testID="edit-sections"
-          />
-
-          {section === 'topic' ? <TopicFormSection topic={topic} form={form} onOpenFile={openFile} onNotice={setNotice} /> : null}
-
-          {section === 'answers' ? (
-            <View onLayout={focused ? (event) => placeFocus('sectionY', event.nativeEvent.layout.y) : undefined}>
-              <AnswersSection
-                numbers={topic.homeworkNumbers}
-                page={shownAnswersPage}
-                highlightedId={focused?.id}
-                onHighlightLayout={(y) => placeFocus('rowY', y)}
-                onPageChange={(page) => {
-                  setAnswersPage(page);
-                  scrollToTop();
-                }}
-                onOpenNumber={(entry) => {
-                  // The number screen's «← К теме» then steps back here instead of opening a second editor.
-                  markOpenedFromEditor(topicId, entry.number);
-                  navigation.push({ screen: 'content.number', topicId, number: entry.number });
-                }}
-              />
-            </View>
+        <>
+          {/* In the order things happened: the check that could not be made, then the outcome of the save. */}
+          {form.previewError ? <Notice tone="error" text={form.previewError} testID="edit-preview-error" /> : null}
+          {notice ? (
+            <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="edit-notice" />
+          ) : null}
+          {/* The cached topic stays on screen when a refresh fails (offline): say so instead of replacing it. */}
+          {detail.isError && !deleted ? (
+            <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="edit-refresh-error" />
           ) : null}
 
-          {section === 'import' ? (
-            <View style={styles.section} testID="edit-import">
-              <View style={styles.sectionHead}>
-                <Text variant="sectionTitle" accessibilityRole="header">
-                  {m.content.edit.importTitle}
-                </Text>
-                <Hint>
-                  <Text variant="hint">{m.content.edit.importHint}</Text>
-                </Hint>
-              </View>
-              <ImportPanelView state={importState} />
-            </View>
-          ) : null}
-        </View>
+          <View style={theme.tablet ? styles.fill : undefined} onLayout={(event) => placeFocus('panels', event.nativeEvent.layout.y)}>
+            <Panels>
+              {theme.tablet || section === 'topic' ? (
+                <Panel
+                  weight={2}
+                  footer={
+                    theme.tablet && (unsaved || pendingHint) ? (
+                      <View style={styles.footer}>
+                        {unsaved}
+                        {pendingHint}
+                      </View>
+                    ) : undefined
+                  }
+                >
+                  <TopicFormSection topic={topic} form={form} onOpenFile={openFile} onNotice={setNotice} />
+                </Panel>
+              ) : null}
+              {theme.tablet ? (
+                <Panel weight={3} header={sideSections}>
+                  {side === 'answers' ? answers : importer}
+                </Panel>
+              ) : section === 'answers' ? (
+                <Panel>{answers}</Panel>
+              ) : section === 'import' ? (
+                <Panel>{importer}</Panel>
+              ) : null}
+            </Panels>
+          </View>
+
+          {/* The last thing of the form on a phone; a tablet keeps it in the header, next to «Сохранить». */}
+          {!theme.tablet && section === 'topic' ? deleteButton : null}
+        </>
       ) : failure ? (
         <LoadFailure query={detail} testID="edit-error" />
       ) : (
-        <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="edit-loading" />
+        <LoadingState variant="cards" count={2} accessibilityLabel={m.common.a11y.loading} testID="edit-loading" />
       )}
 
       <NumbersConfirmDialog
@@ -296,12 +363,12 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
 }
 
 const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.lg },
-  banners: { ...pinnedColumn, gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingVertical: t.space.md },
+  // Tablet: the wrapper that reports where the panels start passes the page height on to them.
+  fill: { flex: 1, minHeight: 0 },
   section: { gap: t.space.md },
   sectionHead: { gap: t.space.xxs },
   footer: { gap: t.space.sm },
   unsaved: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
   touch: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
 }));

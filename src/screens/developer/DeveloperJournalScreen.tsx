@@ -14,8 +14,10 @@ import { Hint } from '@/providers';
 import { DetailAppBar } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Chip, EmptyState, LoadingState, Notice, Screen, Spinner, Text } from '@/ui';
+import { Button, Card, EmptyState, LoadingState, Notice, Panel, Panels, Screen, Spinner, Text } from '@/ui';
 
+import { ListSlice } from './list-slice';
+import { JournalDetailBody } from './panel/journal-detail-body';
 import { JournalDetailSheet } from './panel/journal-detail-sheet';
 import { JournalEntryCard } from './panel/journal-entry-card';
 import { JournalFiltersSheet } from './panel/journal-filters-sheet';
@@ -37,9 +39,12 @@ export type DeveloperJournalScreenProps = ScreenParams['developer.journal'];
 type ProgressRef = NonNullable<JournalEntry['progressRef']>;
 
 /**
- * `developer.journal` (docs/spec/07-developer-content.md §1.10): who called what on the platform — the
- * audit log, newest first, 50 rows per page. The site's 880-px table becomes cards; its filter row a
- * bottom sheet; its pager "show more" (the next page is also loaded when the list reaches its end).
+ * `developer.journal` (docs/spec/07-developer-content.md §1.10; layout: docs/design/glass-over-paper.md
+ * §7): who called what on the platform — the audit log, newest first, 50 rows per page. The site's 880-px
+ * table becomes rows of one card («what happened», one caption «who · when», a red mark only on a failed
+ * entry); its filter row a bottom sheet behind the header button; its pager "show more" (the next page is
+ * also loaded when the list reaches its end). A row opens the entry's details: a sheet on a phone, the
+ * panel next to the list on a tablet.
  *
  * `outcome` / `days` come from a `dev_errors` notification (00 §3.3): they are the initial filter and stay
  * editable. No realtime, no polling (07 §5): the query runs on entry, on every filter change, on return
@@ -105,9 +110,16 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   };
   const openDetail = (entry: JournalEntry) => {
     setDetail(entry);
-    setDetailOpen(true);
+    // A tablet shows the entry in the panel next to the list; only a phone needs the sheet.
+    if (!theme.tablet) setDetailOpen(true);
   };
   const openHistory = (ref: ProgressRef) => {
+    if (!detailOpen) {
+      // From the tablet panel: no sheet is on screen, the history opens at once.
+      setHistory(ref);
+      setHistoryOpen(true);
+      return;
+    }
     // One sheet at a time, and strictly one after the other: each sheet is a native modal, and iOS refuses
     // to present a second one while the first is still on screen (it is never retried). The history is
     // therefore opened by `onClosed` of the detail sheet, not in the tick that starts its exit.
@@ -124,13 +136,19 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
   };
 
   const actor = filters.actor ? first?.actors.find((candidate) => candidate.id === filters.actor) : undefined;
-  const summary: { key: string; label: string; tone: 'muted' | 'red' }[] = [
-    { key: 'period', label: periodLabel(filters.days, t.filters) ?? plural(locale, filters.days, m.developer.journal.periodForms), tone: 'muted' },
-    ...(filters.category ? [{ key: 'category', label: categoryFilterLabel(filters.category, t.filters), tone: 'muted' as const }] : []),
-    ...(actor ? [{ key: 'actor', label: actorOptionLabel(actor, t.roles), tone: 'muted' as const }] : []),
-    ...(filters.action.trim() ? [{ key: 'action', label: format(m.developer.journal.actionQuoted, { text: filters.action.trim() }), tone: 'muted' as const }] : []),
-    ...(filters.onlyFailed ? [{ key: 'failed', label: t.filters.onlyFailed, tone: 'red' as const }] : []),
-  ];
+  // The selection in force, as one line of plain text: neutral facts are not labels.
+  const summary = [
+    periodLabel(filters.days, t.filters) ?? plural(locale, filters.days, m.developer.journal.periodForms),
+    filters.category ? categoryFilterLabel(filters.category, t.filters) : null,
+    actor ? actorOptionLabel(actor, t.roles) : null,
+    filters.action.trim() ? format(m.developer.journal.actionQuoted, { text: filters.action.trim() }) : null,
+    filters.onlyFailed ? t.filters.onlyFailed : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  // The entry of the tablet panel: the tapped one while it is still in the list, else the newest.
+  const shownEntry = theme.tablet ? (entries.find((entry) => entry.id === detail?.id) ?? entries[0] ?? null) : null;
 
   const header = (
     <View style={styles.header}>
@@ -141,27 +159,18 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           </Text>
         </Hint>
       ) : null}
-      <View style={styles.filterRow}>
-        <Button
-          label={filterCount > 0 ? format(m.developer.journal.filtersCount, { n: filterCount }) : m.developer.journal.filters}
-          variant="outline"
-          leftIcon="filter"
-          onPress={() => setFiltersOpen(true)}
-          testID="journal-filters-open"
-        />
+      <View style={styles.summaryRow}>
+        <Text variant="small" color="textMuted" style={styles.summary} testID="journal-filter-summary">
+          {summary}
+        </Text>
         <View style={styles.total}>
-          {switching && !stalled ? <Spinner size={14} color="accentSolid" /> : null}
+          {switching && !stalled ? <Spinner color="accentSolid" /> : null}
           {first ? (
-            <Text variant="smallMedium" color="textMuted" tabular testID="journal-total">
+            <Text variant="small" color="textMuted" tabular testID="journal-total">
               {plural(locale, first.total, m.developer.journal.entryForms)}
             </Text>
           ) : null}
         </View>
-      </View>
-      <View style={styles.summary} testID="journal-filter-summary">
-        {summary.map((chip) => (
-          <Chip key={chip.key} label={chip.label} tone={chip.tone} />
-        ))}
       </View>
       {stalled ? <Notice tone="warning" text={m.common.errors.network} testID="journal-offline-notice" /> : null}
       {/* Loaded rows stay on screen when a refresh fails (offline): say so instead of replacing them. */}
@@ -174,7 +183,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
 
   const footer =
     first && entries.length > 0 ? (
-      <View style={styles.footer}>
+      <View style={[styles.footer, theme.tablet ? styles.footerPanel : null]}>
         {readPaused || journal.isFetchNextPageError ? (
           <Notice
             tone="error"
@@ -183,7 +192,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           />
         ) : null}
         {first.pageCount > 1 ? (
-          <Text variant="caption" align="center" tabular testID="journal-page-of">
+          <Text variant="small" color="textMuted" align="center" tabular testID="journal-page-of">
             {format(t.pageOf, { page: pages?.length ?? 1, total: first.pageCount })}
           </Text>
         ) : null}
@@ -199,74 +208,118 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
       </View>
     ) : null;
 
+  const list = first ? (
+    <FlashList
+      data={entries}
+      keyExtractor={(entry) => entry.id}
+      renderItem={({ item, index }) => (
+        <View style={switching ? styles.stale : null} testID={`journal-entry-${item.id}`}>
+          <ListSlice first={index === 0} last={index === entries.length - 1}>
+            <JournalEntryCard
+              entry={item}
+              divider={index < entries.length - 1}
+              selected={shownEntry?.id === item.id}
+              onOpen={openDetail}
+            />
+          </ListSlice>
+        </View>
+      )}
+      // The selected row and the dimming live outside the entries.
+      extraData={[switching, shownEntry?.id, entries.length]}
+      // On a phone the head of the page scrolls with the list; on a tablet it stands above the panels.
+      ListHeaderComponent={theme.tablet ? null : header}
+      ListFooterComponent={footer}
+      ListEmptyComponent={
+        <EmptyState
+          variant={theme.tablet ? 'plain' : 'panel'}
+          title={t.empty}
+          action={
+            filterCount > 0 ? (
+              <Button
+                label={m.developer.journal.resetFilters}
+                variant="outline"
+                onPress={() => setFilters(initialJournalFilters({}))}
+                testID="journal-empty-reset"
+              />
+            ) : undefined
+          }
+          testID="journal-empty"
+        />
+      }
+      onEndReached={journal.isFetchNextPageError || paused ? undefined : loadMore}
+      onEndReachedThreshold={0.6}
+      contentContainerStyle={theme.tablet ? undefined : styles.listContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          tintColor={theme.colors.accentSolid}
+          colors={[theme.colors.accentSolid]}
+          progressBackgroundColor={theme.colors.cardBg}
+        />
+      }
+      testID="journal-list"
+    />
+  ) : null;
+
   return (
     <Screen
       testID="developer-journal-screen"
-      header={<DetailAppBar title={t.tab} subtitle={dict.planner.devPanel.title} />}
-      // The journal lives in the stack of the «дев-панель» tab: the tab bar owns the bottom inset.
+      header={
+        <DetailAppBar
+          title={t.tab}
+          backTitle={m.shell.tabs.panel}
+          right={
+            <Button
+              label={filterCount > 0 ? format(m.developer.journal.filtersCount, { n: filterCount }) : m.developer.journal.filters}
+              variant="outline"
+              leftIcon="filter"
+              onPress={() => setFiltersOpen(true)}
+              testID="journal-filters-open"
+            />
+          }
+        />
+      }
+      // The journal lives in the stack of the «дев-панель» tab: the dock owns the bottom inset.
       bottomInset={false}
       scroll={!first}
-      padded={!first}
+      padded={!first || theme.tablet}
+      maxWidth="full"
       onRefresh={!first && isLoadFailed(journal) ? refresh : undefined}
       refreshing={refreshing}
     >
-      {first ? (
-        <FlashList
-          data={entries}
-          keyExtractor={(entry) => entry.id}
-          renderItem={({ item }) => (
-            <View style={[styles.item, switching ? styles.stale : null]}>
-              {/* Keyed by the entry: a recycled cell must not carry another entry's «полностью» state. */}
-              <JournalEntryCard key={item.id} entry={item} onOpen={openDetail} />
-            </View>
-          )}
-          extraData={switching}
-          ListHeaderComponent={header}
-          ListFooterComponent={footer}
-          ListEmptyComponent={
-            <View style={styles.item}>
-              <EmptyState
-                title={t.empty}
-                action={
-                  filterCount > 0 ? (
-                    <Button
-                      label={m.developer.journal.resetFilters}
-                      variant="outline"
-                      onPress={() => setFilters(initialJournalFilters({}))}
-                      testID="journal-empty-reset"
-                    />
-                  ) : undefined
-                }
-                testID="journal-empty"
-              />
-            </View>
-          }
-          onEndReached={journal.isFetchNextPageError || paused ? undefined : loadMore}
-          onEndReachedThreshold={0.6}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.colors.accentSolid}
-              colors={[theme.colors.accentSolid]}
-              progressBackgroundColor={theme.colors.cardBg}
-            />
-          }
-          testID="journal-list"
-        />
-      ) : (
-        // The filter bar stays reachable: a selection that fails to load can still be changed.
+      {!first ? (
+        // The filter button stays reachable: a selection that fails to load can still be changed.
         <>
           {header}
           {isLoadFailed(journal) ? (
             <LoadFailure query={journal} testID="journal-error" />
           ) : (
-            <LoadingState variant="cards" count={5} cardHeight={132} accessibilityLabel={m.common.a11y.loading} testID="journal-loading" />
+            <LoadingState variant="list" count={6} accessibilityLabel={m.common.a11y.loading} testID="journal-loading" />
           )}
         </>
+      ) : theme.tablet ? (
+        <>
+          {header}
+          <Panels>
+            {/* Not a `Panel`: that one scrolls its children, and this list scrolls (and virtualises) itself. */}
+            <Card padded={false} style={styles.listPanel}>
+              {list}
+            </Card>
+            {shownEntry ? (
+              <Panel weight={2} testID="journal-detail-panel">
+                <Text variant="sectionTitle" accessibilityRole="header">
+                  {shownEntry.actionLabel ?? shownEntry.action}
+                </Text>
+                <JournalDetailBody entry={shownEntry} onOpenHistory={openHistory} />
+              </Panel>
+            ) : null}
+          </Panels>
+        </>
+      ) : (
+        list
       )}
 
       <JournalFiltersSheet
@@ -297,12 +350,16 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.md, paddingBottom: t.space.field },
-  filterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  total: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs, flexShrink: 1 },
-  summary: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
-  item: { paddingBottom: t.space.md },
+  // Phone: the list is the page.
+  listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
+  header: { gap: t.space.sm, paddingBottom: t.space.sm },
+  summaryRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: t.space.md, paddingHorizontal: t.space.xxs },
+  summary: { flex: 1, minWidth: 0 },
+  total: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs, flexShrink: 0 },
+  // Rows of the previous selection, while the new one loads.
   stale: { opacity: 0.55 },
-  footer: { gap: t.space.md, paddingTop: t.space.xs },
+  footer: { gap: t.space.md, paddingTop: t.space.md },
+  // Tablet: the list is the content of the left panel, a card that runs down to the dock.
+  listPanel: { flex: 3, minWidth: 0, minHeight: 0, overflow: 'hidden' },
+  footerPanel: { paddingHorizontal: t.space.card, paddingBottom: t.space.card },
 }));

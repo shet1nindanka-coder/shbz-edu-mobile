@@ -12,7 +12,7 @@ import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useScreenFocused, useStillHere, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen, screenTitle } from '@/screens/shell';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, Button, IconButton, LoadingState, Notice, Screen, Segmented, Spinner, Text } from '@/ui';
 
 import { AssignTab } from './card/assign-tab';
@@ -42,13 +42,14 @@ const SCREEN = {
 type Overlay = 'menu' | 'reset' | 'delete';
 
 /**
- * The student card: app bar with the student's name and login, the "⋯" menu (PDF reports, reset
+ * The student card: the header with the student's name, the "⋯" menu (the login, PDF reports, reset
  * password, delete student) and the three segments — homework review (default), assigning a homework,
- * lessons. Results of the menu's actions appear as a banner under the segments: the site redirects to the
+ * lessons. Results of the menu's actions appear as a banner under the header: the site redirects to the
  * students list with a notice, a phone stays where the teacher is.
  */
 export function TeacherStudentScreen({ studentId, segment, assignmentId }: TeacherStudentScreenProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const navigation = useAppNavigation();
   const stillHere = useStillHere();
@@ -77,7 +78,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
   // The account was deleted from this card: the list is already being opened with its notice (D3). Until
   // this screen is popped it shows nothing of the student — and not the "not found" page its reads now give.
   if (deleted) {
-    return <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} />} />;
+    return <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} backTitle={fallbackTitle} />} />;
   }
 
   // Unknown, deleted or somebody else's student: indistinguishable for a teacher (04 §0.1).
@@ -85,11 +86,11 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
 
   if (!student) {
     return (
-      <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} />}>
+      <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} backTitle={fallbackTitle} />}>
         {cardFailure ? (
           <LoadFailure query={card} testID="student-card-error" />
         ) : (
-          <LoadingState variant="cards" tabs count={3} cardHeight={130} accessibilityLabel={m.common.a11y.loading} testID="student-card-loading" />
+          <LoadingState variant="list" count={3} accessibilityLabel={m.common.a11y.loading} testID="student-card-loading" />
         )}
       </Screen>
     );
@@ -108,11 +109,13 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
     else setOverlay(action.kind === 'resetPassword' ? 'reset' : 'delete');
   };
 
+  const hasBanners = notice !== null || report.ready !== null || Boolean(report.error) || report.waitSeconds > 0 || card.isError;
+
   const chrome: CardChrome = {
     header: (
       <DetailAppBar
         title={student.name}
-        subtitle={student.email}
+        backTitle={m.shell.tabs.students}
         right={
           <IconButton
             icon="more"
@@ -121,29 +124,39 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
             testID="student-card-menu"
           />
         }
+        aside={
+          <Segmented<TeacherStudentSegment>
+            role="tab"
+            // A phone gets the short labels and never cuts them: on a narrow phone or with a large OS font
+            // the bar scrolls. A tablet has the room for the full ones next to the title.
+            scrollable={!theme.tablet}
+            options={[
+              {
+                value: 'review',
+                label: theme.tablet
+                  ? activeCount > 0
+                    ? format(t.tabReviewWithCount, { n: activeCount })
+                    : t.tabReview
+                  : activeCount > 0
+                    ? format(t.tabReviewShortWithCount, { n: activeCount })
+                    : t.tabReviewShort,
+              },
+              { value: 'assign', label: theme.tablet ? t.tabAssign : t.tabAssignShort },
+              { value: 'lessons', label: t.tabLessons },
+            ]}
+            value={segment}
+            accessibilityLabel={t.tabsAria}
+            onChange={(next) => {
+              if (next !== segment) navigation.replace({ screen: SCREEN[next], studentId });
+            }}
+            testID="student-card-segments"
+          />
+        }
         testID="student-card-app-bar"
       />
     ),
-    top: (
-      <View style={styles.top}>
-        <Segmented<TeacherStudentSegment>
-          plain
-          role="tab"
-          // Short labels always: the full ones do not fit three segments on a phone. Even those are never
-          // cut — on a narrow phone or with a large OS font the bar scrolls.
-          scrollable
-          options={[
-            { value: 'review', label: activeCount > 0 ? format(t.tabReviewShortWithCount, { n: activeCount }) : t.tabReviewShort },
-            { value: 'assign', label: t.tabAssignShort },
-            { value: 'lessons', label: t.tabLessons },
-          ]}
-          value={segment}
-          accessibilityLabel={t.tabsAria}
-          onChange={(next) => {
-            if (next !== segment) navigation.replace({ screen: SCREEN[next], studentId });
-          }}
-          testID="student-card-segments"
-        />
+    top: hasBanners ? (
+      <>
         {notice ? (
           <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="student-card-notice" />
         ) : null}
@@ -167,8 +180,8 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
         <RetryWaitLine seconds={report.waitSeconds} testID="student-report-wait" />
         {/* The header stays readable when a refresh fails (offline): say so instead of dropping the card. */}
         {card.isError ? <Notice tone="error" text={errorText(card.error, m.common.errors.generic)} testID="student-card-refresh-error" /> : null}
-      </View>
-    ),
+      </>
+    ) : null,
   };
 
   return (
@@ -207,7 +220,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
         testID="student-report-progress"
       >
         <View accessibilityRole="progressbar" accessibilityLabel={m.teacher.report.preparing} accessibilityLiveRegion="polite" style={styles.progress}>
-          <Spinner size={20} color="accentSolid" />
+          <Spinner size={theme.sizes.icon.md} color="accentSolid" />
           <Text variant="bodyStrong">{m.teacher.report.preparing}</Text>
         </View>
       </BottomSheet>
@@ -241,6 +254,5 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
 }
 
 const useStyles = makeStyles((t) => ({
-  top: { gap: t.space.sm, paddingHorizontal: t.space.gutter, paddingTop: t.space.md, paddingBottom: t.space.xs },
   progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.lg },
 }));

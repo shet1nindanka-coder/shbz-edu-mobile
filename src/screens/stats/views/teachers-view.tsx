@@ -1,5 +1,6 @@
 import type { StatisticsTeachersResponse } from '@/api/types';
 import { useI18n } from '@/i18n';
+import { useTheme } from '@/theme';
 import { EmptyState, Text } from '@/ui';
 
 import { unattributedLine } from '../logic';
@@ -10,6 +11,7 @@ import { unattributedLine } from '../logic';
  * list (`TeacherCard`): their number has no upper bound, so they are virtualised.
  */
 export function TeachersView({ data }: { data: StatisticsTeachersResponse }) {
+  const theme = useTheme();
   const { dict } = useI18n();
   const t = dict.planner.teacherStats;
 
@@ -21,7 +23,7 @@ export function TeachersView({ data }: { data: StatisticsTeachersResponse }) {
   // So that the totals do not silently disagree: students without an owner, calls of deleted teachers,
   // lessons created by a developer.
   return unattributed ? (
-    <Text variant="small" color="textMuted" testID="stats-teachers-unattributed">
+    <Text variant="small" color="textMuted" style={{ paddingHorizontal: theme.space.xxs }} testID="stats-teachers-unattributed">
       {unattributed}
     </Text>
   ) : null;

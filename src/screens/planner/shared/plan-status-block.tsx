@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import { planErrorText } from '@/domain/plan-error';
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Button, Notice, Spinner, Text } from '@/ui';
 
 import type { PlanState } from './plan-state';
@@ -30,6 +30,7 @@ export type PlanStatusBlockProps = {
  */
 export function PlanStatusBlock({ state, planError, selectingLabel, aiAvailable, retrying, retryDisabled = false, onRetry, testID }: PlanStatusBlockProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict } = useI18n();
   const common = dict.planner.common;
 
@@ -48,8 +49,8 @@ export function PlanStatusBlock({ state, planError, selectingLabel, aiAvailable,
   if (state.pending) {
     return (
       <View accessibilityRole="progressbar" accessibilityLabel={selectingLabel} accessibilityLiveRegion="polite" style={styles.pending} testID={testID ? `${testID}-pending` : undefined}>
-        <Spinner size={14} color="accentSolid" />
-        <Text variant="smallMedium" color="textMuted" style={styles.pendingText}>
+        <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
+        <Text variant="small" color="textMuted" style={styles.pendingText}>
           {selectingLabel}
         </Text>
       </View>
@@ -75,6 +76,6 @@ export function PlanStatusBlock({ state, planError, selectingLabel, aiAvailable,
 }
 
 const useStyles = makeStyles((t) => ({
-  pending: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: 24 },
+  pending: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs, minHeight: t.sizes.icon.lg },
   pendingText: { flex: 1 },
 }));

@@ -140,6 +140,11 @@ export function countIssued(participants: readonly Pick<HomeworkPlanParticipant,
   return participants.filter(isIssued).length;
 }
 
+/** Minutes the AI planned for a set: the sum over its numbers (a manually added number has none). */
+export function setMinutes(items: readonly Pick<HomeworkPlanItem, 'minutes'>[]): number {
+  return items.reduce((sum, item) => sum + (item.minutes !== null && item.minutes > 0 ? item.minutes : 0), 0);
+}
+
 /** A draft has only the main part: the rows of a set-save answer as draft items. */
 export function toDraftItems(items: readonly LessonBoardItem[]): HomeworkPlanItem[] {
   return items

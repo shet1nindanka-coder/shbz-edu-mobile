@@ -16,7 +16,9 @@ const ru = {
     },
     budgetUsed: "{used} из {limit}",
     budgetOut: "исчерпан",
-    budgetA11y: "{name}: использовано {used} из {limit}"
+    budgetA11y: "{name}: использовано {used} из {limit}",
+    // The warning above the panel tabs: a budget at 80 % or more of its daily limit.
+    budgetSpent: "{name}: израсходовано {percent} % дневного бюджета."
   },
   actions: {
     run: "Выполнить",
@@ -52,7 +54,6 @@ const ru = {
     entryForms: ["{n} запись", "{n} записи", "{n} записей"],
     openEntry: "Открыть запись: {action}",
     systemName: "Системное имя",
-    collapse: "свернуть",
     periodForms: ["{n} день", "{n} дня", "{n} дней"],
     actionQuoted: "«{text}»",
     loadMoreFailed: "Не удалось загрузить следующую страницу.",
@@ -76,7 +77,8 @@ const en: typeof ru = {
     },
     budgetUsed: "{used} of {limit}",
     budgetOut: "used up",
-    budgetA11y: "{name}: {used} of {limit} used"
+    budgetA11y: "{name}: {used} of {limit} used",
+    budgetSpent: "{name}: {percent}% of the daily budget is spent."
   },
   actions: {
     run: "Run",
@@ -111,7 +113,6 @@ const en: typeof ru = {
     entryForms: ["{n} entry", "{n} entries"],
     openEntry: "Open entry: {action}",
     systemName: "System name",
-    collapse: "show less",
     periodForms: ["{n} day", "{n} days"],
     actionQuoted: "“{text}”",
     loadMoreFailed: "Could not load the next page.",

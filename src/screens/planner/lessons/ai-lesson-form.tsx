@@ -7,8 +7,24 @@ import { META_LIMITS } from '@/api/types/limits';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Button, Checkbox, DateTimeField, Notice, Screen, Select, Text, TextArea, TextField, useStatusAnnouncement, type SelectOption } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import {
+  Button,
+  Card,
+  Checkbox,
+  DateTimeField,
+  Notice,
+  Panel,
+  Panels,
+  Screen,
+  SectionCaption,
+  Select,
+  Text,
+  TextArea,
+  TextField,
+  useStatusAnnouncement,
+  type SelectOption,
+} from '@/ui';
 
 import { useDateTimeLabels } from '@/components/date-time';
 import { DurationStepper } from './duration-stepper';
@@ -18,8 +34,8 @@ import { useCreateLesson } from './use-create-lesson';
 
 export type AiLessonFormProps = {
   form: LessonNewFormModel;
-  /** App bar of the screen. */
-  header: ReactNode;
+  /** Builds the header of the screen; on a tablet the form hands it its main button. */
+  header: (aside?: ReactNode) => ReactNode;
   /** Banner and mode switch shown above the fields. */
   top?: ReactNode;
 };
@@ -30,11 +46,14 @@ const NO_SPEED = 0;
 
 /**
  * The AI create form (`TeacherLessonCreateForm`, docs/spec/05-teacher-lessons-plans.md §1.2.d): title,
- * duration, start, topics, a note for AI and the students with their speed. Submitting creates the lesson
- * and opens its board, where the plan of every student is built.
+ * duration, start, topics and a note for AI in one card, the students with their speed in another.
+ * Submitting — the one main button: under the form on a phone, in the header on a tablet, where the two
+ * cards stand side by side — creates the lesson and opens its board, where the plan of every student is
+ * built.
  */
 export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, m, locale } = useI18n();
   const t = dict.planner.lessonCreateForm;
   const dateTimeLabels = useDateTimeLabels();
@@ -78,120 +97,161 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
     });
   };
 
+  const submitButton = (
+    <Button
+      label={create.isPending ? t.creating : t.submit}
+      size={theme.tablet ? 'md' : 'lg'}
+      fullWidth={!theme.tablet}
+      loading={create.isPending}
+      disabled={nobodyChecked || wait.waiting}
+      onPress={submit}
+      testID="lesson-new-submit"
+    />
+  );
+
+  const notices = (
+    <>
+      {top}
+      {error ? <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="lesson-new-error" /> : null}
+    </>
+  );
+
+  const fields = (
+    <>
+      <TextField
+        label={t.titleLabel}
+        value={title}
+        onChangeText={setTitle}
+        placeholder={t.titlePlaceholder}
+        maxLength={META_LIMITS.maxTitleLength}
+        returnKeyType="done"
+        testID="lesson-new-title"
+      />
+
+      <View style={styles.field}>
+        <Text variant="label">{t.durationLabel}</Text>
+        <DurationStepper value={durationMinutes} onChange={setDurationMinutes} accessibilityLabel={t.durationLabel} testID="lesson-new-duration" />
+      </View>
+
+      <DateTimeField
+        label={t.dateTimeLabel}
+        value={startsAt}
+        onChange={setStartsAt}
+        today={mskToday()}
+        placeholder={t.dateTimePlaceholder}
+        labels={dateTimeLabels}
+        locale={locale}
+        helper={m.common.dateTime.moscowTime}
+        testID="lesson-new-starts-at"
+      />
+
+      <TopicsField topics={form.topics} value={topicIds} onChange={setTopicIds} />
+
+      <TextArea
+        label={t.noteLabel}
+        labelAside={
+          <Text variant="small" color="textMuted" tabular>
+            {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
+          </Text>
+        }
+        value={teacherNote}
+        onChangeText={setTeacherNote}
+        placeholder={t.notePlaceholder}
+        maxLength={META_LIMITS.maxTeacherNoteLength}
+        testID="lesson-new-note"
+      />
+    </>
+  );
+
+  const students = (
+    <>
+      {form.members.map((member) => (
+        <View key={member.id} style={styles.student}>
+          <Checkbox
+            label={member.name}
+            checked={studentIds.includes(member.id)}
+            onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
+            testID={`lesson-new-student-${member.id}`}
+            style={styles.studentName}
+          />
+          <Select
+            size="xs"
+            options={speedOptions}
+            value={speeds[member.id] ?? NO_SPEED}
+            onChange={(value) => setPickedSpeeds((current) => ({ ...current, [member.id]: value === NO_SPEED ? null : value }))}
+            placeholder={t.speedNotSet}
+            closeLabel={m.common.actions.close}
+            sheetTitle={format(t.speedAria, { name: member.name })}
+            accessibilityLabel={format(t.speedAria, { name: member.name })}
+            testID={`lesson-new-speed-${member.id}`}
+            style={styles.speed}
+          />
+        </View>
+      ))}
+      {nobodyChecked ? (
+        <Text variant="small" color="redText" accessibilityRole="alert">
+          {dict.apiPlanner.lessons.selectAtLeastOneStudent}
+        </Text>
+      ) : null}
+    </>
+  );
+
+  if (theme.tablet) {
+    return (
+      <Screen testID="lesson-new-ai-form" header={header(submitButton)} scroll={false} maxWidth="full">
+        {notices}
+        {/* Next to nothing it could be dismissed with: the reason stays as long as the button is locked. */}
+        <RetryWaitLine seconds={wait.seconds} testID="lesson-new-wait" />
+        <Panels>
+          <Panel weight={3} contentStyle={styles.fields}>
+            {fields}
+          </Panel>
+          <Panel
+            weight={2}
+            contentStyle={styles.students}
+            header={
+              <Text variant="sectionTitle" accessibilityRole="header">
+                {t.studentsLabel}
+              </Text>
+            }
+          >
+            {students}
+          </Panel>
+        </Panels>
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       testID="lesson-new-ai-form"
-      header={header}
+      header={header()}
       scrollRef={scrollRef}
-      contentContainerStyle={styles.content}
       footer={
         <View style={styles.footer}>
-          <Button
-            label={create.isPending ? t.creating : t.submit}
-            size="lg"
-            fullWidth
-            loading={create.isPending}
-            disabled={nobodyChecked || wait.waiting}
-            onPress={submit}
-            testID="lesson-new-submit"
-          />
+          {submitButton}
           <RetryWaitLine seconds={wait.seconds} testID="lesson-new-wait" />
         </View>
       }
     >
-      <View style={styles.form}>
-        {top}
-        {error ? <Notice tone="error" text={error} onDismiss={() => setError(null)} dismissLabel={m.common.actions.close} testID="lesson-new-error" /> : null}
-
-        <TextField
-          label={t.titleLabel}
-          value={title}
-          onChangeText={setTitle}
-          placeholder={t.titlePlaceholder}
-          maxLength={META_LIMITS.maxTitleLength}
-          returnKeyType="done"
-          testID="lesson-new-title"
-        />
-
-        <View style={styles.field}>
-          <Text variant="label">{t.durationLabel}</Text>
-          <DurationStepper value={durationMinutes} onChange={setDurationMinutes} accessibilityLabel={t.durationLabel} testID="lesson-new-duration" />
-        </View>
-
-        <DateTimeField
-          label={t.dateTimeLabel}
-          value={startsAt}
-          onChange={setStartsAt}
-          today={mskToday()}
-          placeholder={t.dateTimePlaceholder}
-          labels={dateTimeLabels}
-          locale={locale}
-          helper={m.common.dateTime.moscowTime}
-          testID="lesson-new-starts-at"
-        />
-
-        <TopicsField topics={form.topics} value={topicIds} onChange={setTopicIds} />
-
-        <TextArea
-          label={t.noteLabel}
-          labelAside={
-            <Text variant="caption" color="textMuted" tabular>
-              {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
-            </Text>
-          }
-          value={teacherNote}
-          onChangeText={setTeacherNote}
-          placeholder={t.notePlaceholder}
-          maxLength={META_LIMITS.maxTeacherNoteLength}
-          testID="lesson-new-note"
-        />
-
-        <View style={styles.field}>
-          <Text variant="label">{t.studentsLabel}</Text>
-          <View style={styles.students}>
-            {form.members.map((member) => (
-              <View key={member.id} style={styles.student}>
-                <Checkbox
-                  label={member.name}
-                  checked={studentIds.includes(member.id)}
-                  onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
-                  testID={`lesson-new-student-${member.id}`}
-                  style={styles.studentName}
-                />
-                <Select
-                  size="xs"
-                  options={speedOptions}
-                  value={speeds[member.id] ?? NO_SPEED}
-                  onChange={(value) => setPickedSpeeds((current) => ({ ...current, [member.id]: value === NO_SPEED ? null : value }))}
-                  placeholder={t.speedNotSet}
-                  closeLabel={m.common.actions.close}
-                  sheetTitle={format(t.speedAria, { name: member.name })}
-                  accessibilityLabel={format(t.speedAria, { name: member.name })}
-                  testID={`lesson-new-speed-${member.id}`}
-                  style={styles.speed}
-                />
-              </View>
-            ))}
-          </View>
-          {nobodyChecked ? (
-            <Text variant="captionMedium" color="redText" accessibilityRole="alert">
-              {dict.apiPlanner.lessons.selectAtLeastOneStudent}
-            </Text>
-          ) : null}
-        </View>
+      {notices}
+      <Card style={styles.fields}>{fields}</Card>
+      <View style={styles.section}>
+        <SectionCaption>{t.studentsLabel}</SectionCaption>
+        <Card style={styles.students}>{students}</Card>
       </View>
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  // A form starts right under the app bar; the page's 32 pt top padding is for screens with a page header.
-  content: { paddingTop: t.space.lg, paddingBottom: t.space.lg },
-  form: { gap: t.space.lg },
-  field: { gap: t.space.sm },
+  fields: { gap: t.space.lg },
+  field: { gap: t.space.xs },
+  section: { gap: t.space.xs },
   students: { gap: t.space.xs },
-  student: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, minHeight: t.sizes.minTouch },
+  student: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, minHeight: t.sizes.control.md },
   studentName: { flex: 1, minWidth: 0 },
-  speed: { width: 132 },
+  // «Не указана» with the chevron of the compact select.
+  speed: { width: t.sizes.control.md * 3 },
   footer: { gap: t.space.xs },
 }));

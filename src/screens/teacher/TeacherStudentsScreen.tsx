@@ -1,7 +1,6 @@
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import type { ScrollViewInstance } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import type { TeacherStudentListItem } from '@/api/types';
@@ -11,7 +10,7 @@ import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen, Text } from '@/ui';
+import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
 
 import { CreateStudentSheet } from './students/create-student-sheet';
 import { CredentialsSheet, type CreatedCredentials } from './students/credentials-sheet';
@@ -20,7 +19,7 @@ import { useStudentsListNotice } from './students/list-notice';
 import { ResetPasswordSheet } from './students/reset-password-sheet';
 import { StudentActionsSheet, type StudentAction } from './students/student-actions-sheet';
 import { StudentRow } from './students/student-row';
-import { useNoticeScroll } from './students/use-notice-scroll';
+import { StudentSummary } from './students/student-summary';
 
 type ListNotice = { tone: 'success' | 'error'; text: string };
 
@@ -36,12 +35,19 @@ type Overlay =
   | { kind: 'reset'; student: StudentTarget }
   | { kind: 'delete'; student: StudentTarget };
 
+/** Lets the banner be laid out, and the sheet that produced it start closing, before the page moves. */
+const NOTICE_SCROLL_DELAY_MS = 200;
+
 /**
- * `teacher.students` (docs/spec/04-teacher-students.md S2): the teacher's own students, name ascending.
- * A row opens the student's card; its "⋯" (or a long press) offers the login to copy, a password reset and
- * deletion. «Добавить ученика» opens the create form; the new account's login and password are then shown
- * once. Results of the three mutations appear as a banner above the list — the phone form of the site's
- * redirect notices.
+ * `teacher.students` (docs/spec/04-teacher-students.md S2; layout: docs/design/glass-over-paper.md §7):
+ * the teacher's own students, name ascending, as rows of one card — the avatar, the name, the login and
+ * one fact. «Добавить ученика» is the button of the header: it opens the create form in a sheet, and the
+ * new account's login and password are then shown once. Results of the mutations appear as a banner above
+ * the list — the phone form of the site's redirect notices.
+ *
+ * A phone row opens the student's card; its "⋯" menu holds the login to copy, the password reset and
+ * deletion. A tablet shows the list on the left and the selected student's summary on the right, with the
+ * same actions behind the summary's "⋯".
  */
 export function TeacherStudentsScreen() {
   const styles = useStyles();
@@ -50,12 +56,14 @@ export function TeacherStudentsScreen() {
   const { dict, m } = useI18n();
   const t = dict.students.list;
   const navigation = useAppNavigation();
-  const listRef = useRef<FlashListRef<TeacherStudentListItem>>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const [notice, setNotice] = useState<ListNotice | null>(null);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   // The sheet to open once the current one has finished closing.
   const queued = useRef<Overlay | null>(null);
+  // The student whose summary the tablet's second panel shows; null = the first of the list.
+  const [pickedId, setPickedId] = useState<string | null>(null);
 
   const students = useQuery({
     queryKey: qk('teacherStudents', 'listStudents'),
@@ -67,9 +75,13 @@ export function TeacherStudentsScreen() {
 
   const { refreshing, refresh } = usePullRefresh([students]);
 
-  /** A banner is useless below the fold: bring the list back to its top with it. */
   const announce = (next: ListNotice) => setNotice(next);
-  useNoticeScroll(listRef, notice);
+  // A banner is useless below the fold: every new one brings the page back to its top.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), NOTICE_SCROLL_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   // A student deleted from the card: the card returns here and leaves the notice (D3).
   useStudentsListNotice((key) => announce({ tone: 'success', text: t.notices[key] }));
@@ -106,9 +118,54 @@ export function TeacherStudentsScreen() {
     switchOverlay(action === 'resetPassword' ? { kind: 'reset', student: target } : { kind: 'delete', student: target });
   };
 
-  const header = (
-    <View style={styles.header}>
-      <PageHeader title={t.title} gap={0} />
+  const selected = list ? (list.find((student) => student.id === pickedId) ?? list[0] ?? null) : null;
+
+  const rows = (list ?? NO_STUDENTS).map((student, index, all) => (
+    <StudentRow
+      key={student.id}
+      student={student}
+      onPress={theme.tablet ? (picked) => setPickedId(picked.id) : openStudent}
+      selected={theme.tablet && student.id === selected?.id}
+      divider={index < all.length - 1}
+    />
+  ));
+
+  // Loading and failure never hide the header: adding a student does not depend on the list having loaded.
+  const placeholder = list ? (
+    <EmptyState title={t.empty} testID="students-empty" />
+  ) : studentsFailure ? (
+    <LoadFailure query={students} testID="students-error" />
+  ) : (
+    <LoadingState variant="list" count={6} accessibilityLabel={m.common.a11y.loading} testID="students-loading" />
+  );
+
+  return (
+    <Screen
+      testID="teacher-students-screen"
+      header={
+        <ShellAppBar
+          title={screenTitle('teacher.students', m.shell.tabs)}
+          aside={
+            <Button
+              label={t.addStudent}
+              leftIcon="plus"
+              onPress={() => {
+                setNotice(null);
+                setOverlay({ kind: 'create' });
+              }}
+              testID="students-add"
+              // A phone shows the header controls in a row of their own: the button keeps its own width there.
+              style={styles.add}
+            />
+          }
+        />
+      }
+      scroll={!theme.tablet}
+      maxWidth="full"
+      scrollRef={scrollRef}
+      onRefresh={refresh}
+      refreshing={refreshing}
+    >
       {notice ? (
         <Notice
           tone={notice.tone}
@@ -122,73 +179,28 @@ export function TeacherStudentsScreen() {
       {students.isError && list ? (
         <Notice tone="error" text={errorText(students.error, m.common.errors.generic)} testID="students-refresh-error" />
       ) : null}
-      <Button
-        label={t.addStudent}
-        size="lg"
-        leftIcon="userPlus"
-        fullWidth
-        onPress={() => {
-          setNotice(null);
-          setOverlay({ kind: 'create' });
-        }}
-        testID="students-add"
-      />
-      <View style={styles.sectionRow}>
-        <Text variant="sectionTitle" accessibilityRole="header" style={styles.sectionTitle}>
-          {t.currentStudents}
-        </Text>
-        {list && list.length > 0 ? (
-          <Text variant="meta" tabular testID="students-count">
-            {list.length}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
 
-  // Loading and failure live inside the list, under the same header: the title and «Добавить ученика»
-  // never jump, and adding a student does not depend on the list having loaded.
-  const body = list ? (
-    <EmptyState title={t.empty} testID="students-empty" />
-  ) : studentsFailure ? (
-    <LoadFailure query={students} testID="students-error" />
-  ) : (
-    <LoadingState variant="cards" count={6} cardHeight={70} accessibilityLabel={m.common.a11y.loading} testID="students-loading" />
-  );
-
-  return (
-    <Screen
-      testID="teacher-students-screen"
-      header={<ShellAppBar title={screenTitle('teacher.students', m.shell.tabs)} />}
-      bottomInset={false}
-      scroll={false}
-      padded={false}
-    >
-      <FlashList
-        ref={listRef}
-        data={list ?? NO_STUDENTS}
-        keyExtractor={(student) => student.id}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <StudentRow student={item} onOpen={openStudent} onActions={(student) => setOverlay({ kind: 'actions', student })} />
-          </View>
-        )}
-        ListHeaderComponent={header}
-        ListEmptyComponent={body}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            tintColor={theme.colors.accentSolid}
-            colors={[theme.colors.accentSolid]}
-            progressBackgroundColor={theme.colors.cardBg}
-          />
-        }
-        testID="students-list"
-      />
+      {!list || list.length === 0 ? (
+        placeholder
+      ) : theme.tablet ? (
+        <Panels testID="students-panels">
+          <Panel weight={2} padded={false} contentStyle={styles.listPanel} testID="students-list">
+            {rows}
+          </Panel>
+          <Panel weight={3} testID="students-summary">
+            {selected ? (
+              <StudentSummary
+                // Another student must not show this one's reads while its own are on their way.
+                key={selected.id}
+                student={selected}
+                onActions={(student) => setOverlay({ kind: 'actions', student })}
+              />
+            ) : null}
+          </Panel>
+        </Panels>
+      ) : (
+        <ListCard testID="students-list">{rows}</ListCard>
+      )}
 
       <StudentActionsSheet
         student={overlay?.kind === 'actions' ? overlay.student : null}
@@ -239,9 +251,7 @@ export function TeacherStudentsScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.field, paddingBottom: t.space.md },
-  sectionRow: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.sm, marginTop: t.space.xs },
-  sectionTitle: { flexShrink: 1 },
-  item: { paddingBottom: t.space.md },
+  add: { alignSelf: 'flex-start' },
+  // Rows bring their own height and hairlines; the panel adds the card's top and bottom room.
+  listPanel: { gap: 0, paddingVertical: t.space.sm },
 }));

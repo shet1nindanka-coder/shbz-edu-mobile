@@ -5,7 +5,7 @@ import type { GroupCandidate } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { BottomSheet, EmptyState, PressableScale, Text, TextField } from '@/ui';
+import { Avatar, BottomSheet, EmptyState, ListRow, Text, TextField } from '@/ui';
 
 import { isInOtherGroup, suggestCandidates } from '../logic';
 
@@ -64,29 +64,24 @@ export function AddMemberSheet({ visible, groupId, allStudents, onClose, onPick 
           <EmptyState variant="plain" title={dict.planner.common.nobodyFound} testID="member-add-empty" />
         ) : (
           <View accessibilityRole="list">
-            {suggestions.map((student, index) => (
-              <PressableScale
-                key={student.id}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  isInOtherGroup(student, groupId) ? `${student.name}, ${t.inOtherGroup}` : student.name
-                }
-                onPress={() => onPick(student)}
-                scaleTo={1}
-                style={[styles.row, index < suggestions.length - 1 ? styles.rowDivider : null]}
-                pressedStyle={styles.rowPressed}
-                testID={`member-add-${student.id}`}
-              >
-                <Text variant="bodyStrong" numberOfLines={1}>
-                  {student.name}
-                </Text>
-                {isInOtherGroup(student, groupId) ? (
-                  <Text variant="captionMedium" color="yellowText">
-                    {t.inOtherGroup}
-                  </Text>
-                ) : null}
-              </PressableScale>
-            ))}
+            {suggestions.map((student, index) => {
+              const moved = isInOtherGroup(student, groupId);
+              return (
+                <ListRow
+                  key={student.id}
+                  title={student.name}
+                  // The one consequence worth a line: the student leaves the other group at once.
+                  subtitle={moved ? t.inOtherGroup : undefined}
+                  subtitleLines={2}
+                  left={<Avatar name={student.name} tone="neutral" />}
+                  inset={0}
+                  divider={index < suggestions.length - 1}
+                  onPress={() => onPick(student)}
+                  accessibilityLabel={moved ? `${student.name}, ${t.inOtherGroup}` : student.name}
+                  testID={`member-add-${student.id}`}
+                />
+              );
+            })}
           </View>
         )}
       </View>
@@ -96,13 +91,4 @@ export function AddMemberSheet({ visible, groupId, allStudents, onClose, onPick 
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.sm, paddingTop: t.space.xs },
-  row: {
-    minHeight: t.sizes.minTouch + 4,
-    justifyContent: 'center',
-    gap: 2,
-    paddingVertical: t.space.sm,
-    paddingHorizontal: t.space.xxs,
-  },
-  rowDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
-  rowPressed: { backgroundColor: t.colors.tabHover },
 }));

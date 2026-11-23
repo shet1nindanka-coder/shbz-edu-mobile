@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import type { TopicOption } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, Button, EmptyState, Icon, PressableScale, Text, TextField } from '@/ui';
 
 import { filterTopics, toggleId } from './new-lesson-logic';
@@ -24,6 +24,7 @@ export type TopicsFieldProps = {
  */
 export function TopicsField({ topics, value, onChange, disabled = false }: TopicsFieldProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, m } = useI18n();
   const t = dict.planner.lessonCreateForm;
   const [open, setOpen] = useState(false);
@@ -53,14 +54,14 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
               accessibilityLabel={format(t.removeTopic, { title: topic.title })}
               disabled={disabled}
               onPress={() => onChange(value.filter((id) => id !== topic.id))}
-              hitSlop={{ top: 6, bottom: 6 }}
+              hitSlop={{ top: theme.space.xs, bottom: theme.space.xs }}
               testID={`lesson-topic-chip-${topic.id}`}
               style={styles.chip}
             >
               <Text variant="chip" numberOfLines={1} style={styles.chipText}>
                 {topic.title}
               </Text>
-              <Icon name="close" size={13} color="greenText" />
+              <Icon name="close" size={theme.sizes.icon.sm} color="textMuted" />
             </PressableScale>
           ))}
         </View>
@@ -92,7 +93,7 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
             accessibilityLabel={t.topicsSearchAria}
             autoCorrect={false}
             returnKeyType="search"
-            left={<Icon name="search" size={18} color="kicker" />}
+            left={<Icon name="search" size={theme.sizes.icon.md} color="textMuted" />}
             testID="lesson-topics-search"
           />
           {matches.length === 0 ? (
@@ -117,21 +118,21 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
 }
 
 const useStyles = makeStyles((t) => ({
-  field: { gap: t.space.sm },
+  field: { gap: t.space.xs },
   trigger: { alignSelf: 'flex-start' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
+  // A picked topic is a neutral label with a "remove" cross: green is for number statuses.
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: t.space.xxs,
     maxWidth: '100%',
-    minHeight: 32,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    minHeight: t.sizes.control.xs,
+    paddingHorizontal: t.space.xs,
     borderRadius: t.radii.sm,
-    backgroundColor: t.colors.greenSoft,
+    backgroundColor: t.colors.soft2,
   },
-  chipText: { color: t.colors.greenText, flexShrink: 1 },
+  chipText: { color: t.colors.label, flexShrink: 1 },
   sheet: { gap: t.space.md },
   options: { gap: t.space.xs },
 }));

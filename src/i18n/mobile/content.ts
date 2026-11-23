@@ -33,8 +33,7 @@ const ru = {
   },
   list: {
     createAction: "Новая тема",
-    openA11y: "Открыть тему «{title}»",
-    deleteA11y: "Удалить тему «{title}»"
+    openA11y: "Открыть тему «{title}»"
   },
   deleteTopic: {
     loadingImpact: "Проверяем, что будет удалено…",
@@ -48,12 +47,11 @@ const ru = {
     progress: "{percent}%"
   },
   topic: {
-    hideAnswer: "Скрыть ответ",
-    // Accessible names of the answer toggle: every number of the topic has one.
-    showAnswerOf: "Показать ответ № {number}",
-    hideAnswerOf: "Скрыть ответ № {number}",
-    numbersCount: "Всего: {count}",
-    openEdit: "Открыть редактирование темы"
+    // Accessible name of the «⋯» button of a topic (the editor and «Удалить тему» are behind it).
+    actions: "Действия с темой",
+    openEdit: "Открыть редактирование темы",
+    // Under a long grid of number tiles, next to «Показать ещё».
+    shownOf: "Показаны {shown} из {total}"
   },
   number: {
     unsaved: "Есть несохранённые изменения",
@@ -108,8 +106,7 @@ const en: typeof ru = {
   },
   list: {
     createAction: "New topic",
-    openA11y: "Open topic “{title}”",
-    deleteA11y: "Delete topic “{title}”"
+    openA11y: "Open topic “{title}”"
   },
   deleteTopic: {
     loadingImpact: "Checking what will be deleted…",
@@ -123,11 +120,9 @@ const en: typeof ru = {
     progress: "{percent}%"
   },
   topic: {
-    hideAnswer: "Hide answer",
-    showAnswerOf: "Show answer, problem {number}",
-    hideAnswerOf: "Hide answer, problem {number}",
-    numbersCount: "Total: {count}",
-    openEdit: "Edit: open the topic editor"
+    actions: "Topic actions",
+    openEdit: "Edit: open the topic editor",
+    shownOf: "Showing {shown} of {total}"
   },
   number: {
     unsaved: "There are unsaved changes",

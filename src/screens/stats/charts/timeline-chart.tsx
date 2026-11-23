@@ -7,10 +7,11 @@ import { buildProgressTimelineView, buildTimelineChartGeometry, type TimelinePer
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { Icon, Segmented, Text } from '@/ui';
+import { Card, Icon, Segmented, Text } from '@/ui';
 
 import { nearestPointIndex } from '../logic';
 import { ChartHitArea, ChartStepper } from './chart-selection';
+import { accentStops } from './palette';
 
 const PERIODS: readonly TimelinePeriod[] = ['7d', '4w', '8w'];
 
@@ -29,8 +30,9 @@ export type TimelineChartProps = {
 };
 
 /**
- * «Динамика прогресса» (06 §1.6.a item 2, §4.5): period switch, the closed / red totals, the trend
- * against the previous window and a line of closed numbers per day or week. The site shows a point's
+ * «Динамика прогресса» (06 §1.6.a item 2, §4.5; mockup D-stats): period switch, the closed / red totals
+ * as plain figures, the trend against the previous window and a line of closed numbers per day or week in
+ * the accent gradient. The site shows a point's
  * value on hover; here the whole plot is one touch target (a tap selects the nearest point), the arrows
  * beside the caption step point by point, and the caption names the selected one.
  */
@@ -38,6 +40,7 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
   const styles = useStyles();
   const theme = useTheme();
   const gradientId = useId();
+  const accent = accentStops(theme);
   const window = useWindowDimensions();
   const { locale, dict, m } = useI18n();
   const t = dict.students.timelineChart;
@@ -84,25 +87,25 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
       />
 
       <View style={styles.totals}>
-        <TotalPill label={t.closed} value={view.closedTotal} tone="closed" testID="stats-timeline-closed" />
-        <TotalPill label={t.red} value={view.redTotal} tone="red" testID="stats-timeline-red" />
+        <TotalBox label={t.closed} value={view.closedTotal} testID="stats-timeline-closed" />
+        <TotalBox label={t.red} value={view.redTotal} attention testID="stats-timeline-red" />
       </View>
 
       <View style={styles.trend} testID="stats-timeline-trend">
-        <Icon name={trendIcon} size={14} color="accentSolid" />
-        <Text variant="label" color="textMuted" style={styles.trendLabel}>
+        <Icon name={trendIcon} size={theme.sizes.icon.sm} color="textMuted" />
+        <Text variant="small" color="textMuted" style={styles.trendLabel}>
           {view.trend.label}
         </Text>
       </View>
 
       <Hint>
-        <Text variant="hint" color="textMuted">
+        <Text variant="small" color="textMuted">
           {selectedStudentName ? format(t.onlyStudent, { name: selectedStudentName }) : t.allStudents}
         </Text>
       </Hint>
 
       <View style={styles.panel}>
-        <Text variant="cardTitle" accessibilityRole="header">
+        <Text variant="smallStrong" color="textMuted" accessibilityRole="header">
           {view.title}
         </Text>
 
@@ -113,19 +116,24 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
                 <View style={styles.plot}>
                   <Svg width={width} height={PLOT_HEIGHT + TOP * 2}>
                     <Defs>
-                      <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0" stopColor={theme.colors.accentSolid} stopOpacity={0.26} />
-                        <Stop offset="1" stopColor={theme.colors.accentSolid} stopOpacity={0} />
+                      <LinearGradient id={`${gradientId}-area`} x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0" stopColor={accent.to} stopOpacity={0.26} />
+                        <Stop offset="1" stopColor={accent.to} stopOpacity={0} />
+                      </LinearGradient>
+                      {/* In plot coordinates: a flat line has no bounding box for the gradient to span. */}
+                      <LinearGradient id={`${gradientId}-line`} gradientUnits="userSpaceOnUse" x1={px(0)} y1="0" x2={px(100)} y2="0">
+                        <Stop offset="0" stopColor={accent.from} />
+                        <Stop offset="1" stopColor={accent.to} />
                       </LinearGradient>
                     </Defs>
-                    <Line x1={px(0)} y1={py(0)} x2={px(100)} y2={py(0)} stroke={theme.colors.softBorder} strokeWidth={1} />
-                    <Line x1={px(0)} y1={py(50)} x2={px(100)} y2={py(50)} stroke={theme.colors.softBorder} strokeWidth={1} />
-                    <Line x1={px(0)} y1={py(100)} x2={px(100)} y2={py(100)} stroke={theme.colors.progressTrack} strokeWidth={1} />
-                    <Path d={pathOf(chart.area)} fill={`url(#${gradientId})`} />
+                    <Line x1={px(0)} y1={py(0)} x2={px(100)} y2={py(0)} stroke={theme.colors.line} strokeWidth={1} />
+                    <Line x1={px(0)} y1={py(50)} x2={px(100)} y2={py(50)} stroke={theme.colors.line} strokeWidth={1} />
+                    <Line x1={px(0)} y1={py(100)} x2={px(100)} y2={py(100)} stroke={theme.colors.line2} strokeWidth={1} />
+                    <Path d={pathOf(chart.area)} fill={`url(#${gradientId}-area)`} />
                     <Path
                       d={pathOf(chart.line)}
                       fill="none"
-                      stroke={theme.colors.accentSolid}
+                      stroke={`url(#${gradientId}-line)`}
                       strokeWidth={2.5}
                       strokeLinejoin="round"
                       strokeLinecap="round"
@@ -136,8 +144,8 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
                         cx={px(point.x)}
                         cy={py(point.y)}
                         r={index === selectedIndex ? DOT_RADIUS + 1.5 : DOT_RADIUS}
-                        fill={index === selectedIndex ? theme.colors.accentSolid : theme.colors.cardBg}
-                        stroke={theme.colors.accentSolid}
+                        fill={index === selectedIndex ? accent.to : theme.colors.cardBg}
+                        stroke={accent.to}
                         strokeWidth={2.5}
                       />
                     ))}
@@ -159,7 +167,7 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
                     window.width >= point.labelFrom ? (
                       <Text
                         key={`label-${index}`}
-                        variant="captionStrong"
+                        variant="chip"
                         color="textMuted"
                         numberOfLines={1}
                         align="center"
@@ -182,7 +190,7 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
                 </Text>
               ) : (
                 <Hint>
-                  <Text variant="hint" color="textMuted" align="center">
+                  <Text variant="small" color="textMuted" align="center">
                     {m.stats.chart.pointHint}
                   </Text>
                 </Hint>
@@ -201,54 +209,36 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
 
 const LABEL_WIDTH = 72;
 
-function TotalPill({ label, value, tone, testID }: { label: string; value: number; tone: 'closed' | 'red'; testID: string }) {
+/** «Закрыто» / «Красных» of the period: a plain figure in a soft box; the red count is coloured only when there is one. */
+function TotalBox({ label, value, attention = false, testID }: { label: string; value: number; attention?: boolean; testID: string }) {
   const styles = useStyles();
-  const theme = useTheme();
-  const mark = tone === 'closed' ? theme.colors.accentSolid : theme.colors.dangerSolid;
   return (
-    <View
-      style={[styles.pill, { backgroundColor: tone === 'closed' ? theme.colors.greenSoft : theme.colors.redSoft }]}
-      accessible
-      accessibilityLabel={`${label} ${value}`}
-      testID={testID}
-    >
-      <View style={[styles.pillDot, { backgroundColor: mark }]} />
-      <Text variant="label" color="label">
-        {label}
+    <Card style={styles.total} accessibilityLabel={`${label} ${value}`} testID={testID}>
+      <Text variant="small" color="textMuted" numberOfLines={1}>
+        {/* The site writes «Закрыто: 12» in one line; a caption above its figure needs no colon. */}
+        {label.replace(/:\s*$/, '')}
       </Text>
-      <Text variant="smallExtra" tabular style={{ color: mark }}>
+      <Text variant="cardTitle" color={attention && value > 0 ? 'redText' : 'textStrong'} tabular>
         {value}
       </Text>
-    </View>
+    </Card>
   );
 }
 
-const useStyles = makeStyles((t) => ({
-  root: { gap: t.space.md },
-  totals: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: t.space.xs,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: t.radii.md,
-  },
-  pillDot: { width: 9, height: 9, borderRadius: t.radii.full },
-  trend: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-  trendLabel: { flex: 1, minWidth: 0 },
-  panel: {
-    gap: t.space.md,
-    paddingVertical: t.space.gutter,
-    borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.panelBg,
-    paddingHorizontal: t.space.gutter,
-  },
-  plot: { height: PLOT_HEIGHT + TOP * 2 },
-  labels: { height: 18, marginBottom: t.space.sm },
-  label: { position: 'absolute', top: 0, width: LABEL_WIDTH },
-  placeholder: { height: PLOT_HEIGHT + TOP * 2 + 18 },
-  empty: { paddingVertical: t.space.headerGap },
-}));
+const useStyles = makeStyles((t) => {
+  // One line of the date labels under the plot.
+  const labelLine = t.typography.chip.lineHeight ?? t.space.lg;
+  return {
+    root: { gap: t.space.md },
+    totals: { flexDirection: 'row', gap: t.space.sm },
+    total: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+    trend: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+    trendLabel: { flex: 1, minWidth: 0 },
+    panel: { gap: t.space.sm },
+    plot: { height: PLOT_HEIGHT + TOP * 2 },
+    labels: { height: labelLine, marginBottom: t.space.sm },
+    label: { position: 'absolute', top: 0, width: LABEL_WIDTH },
+    placeholder: { height: PLOT_HEIGHT + TOP * 2 + labelLine },
+    empty: { paddingVertical: t.space.lg },
+  };
+});

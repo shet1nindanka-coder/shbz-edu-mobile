@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import type { TeacherHomeworkCheckResult } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Icon, Text } from '@/ui';
 
 export type ReviewInjectionBannerProps = {
@@ -17,12 +17,13 @@ export type ReviewInjectionBannerProps = {
  */
 export function ReviewInjectionBanner({ results, testID }: ReviewInjectionBannerProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict } = useI18n();
   const t = dict.students.review;
   return (
     <View accessibilityRole="alert" style={styles.banner} testID={testID}>
       <View style={styles.title}>
-        <Icon name="alert" size={16} color="textStrong" />
+        <Icon name="alert" size={theme.sizes.icon.sm} color="textStrong" />
         <Text variant="smallBold" style={styles.titleText}>
           {t.injectionTitle}
         </Text>
@@ -36,7 +37,7 @@ export function ReviewInjectionBanner({ results, testID }: ReviewInjectionBanner
           </View>
         ) : null,
       )}
-      <Text variant="captionStrong" color="textMuted">
+      <Text variant="small" color="textMuted">
         {t.injectionUnreliable}
       </Text>
     </View>
@@ -46,14 +47,13 @@ export function ReviewInjectionBanner({ results, testID }: ReviewInjectionBanner
 const useStyles = makeStyles((t) => ({
   banner: {
     gap: t.space.sm,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: t.radii.md,
+    padding: t.space.lg,
+    borderRadius: t.radii.lg,
     borderWidth: t.borders.interactive,
     borderColor: t.colors.textStrong,
     backgroundColor: t.colors.softBg,
   },
   title: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
   titleText: { flex: 1 },
-  quote: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: t.radii.sm, backgroundColor: t.colors.tabHover },
+  quote: { paddingVertical: t.space.xs, paddingHorizontal: t.space.md, borderRadius: t.radii.sm, backgroundColor: t.colors.soft2 },
 }));

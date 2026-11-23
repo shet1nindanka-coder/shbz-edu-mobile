@@ -105,10 +105,10 @@ export function ReorderSheet({ visible, topics, onClose, onSaved }: ReorderSheet
           const title = titles.get(id) ?? '';
           return (
             <View key={id} style={styles.row} testID={`reorder-row-${id}`}>
-              <Text variant="captionBold" color="textMuted" tabular style={styles.position}>
+              <Text variant="small" color="textMuted" tabular style={styles.position}>
                 {String(index + 1)}
               </Text>
-              <Text variant="smallStrong" numberOfLines={2} style={styles.title}>
+              <Text variant="bodyStrong" numberOfLines={2} style={styles.title}>
                 {title}
               </Text>
               <IconButton
@@ -139,12 +139,12 @@ const useStyles = makeStyles((t) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.sm,
-    minHeight: 56,
+    minHeight: t.sizes.row,
     paddingVertical: t.space.xs,
     borderBottomWidth: t.borders.hairline,
     borderBottomColor: t.colors.rowBorder,
   },
-  position: { width: 24, textAlign: 'center' },
-  title: { flex: 1 },
+  position: { width: t.sizes.icon.lg, textAlign: 'center' },
+  title: { flex: 1, minWidth: 0 },
   footer: { gap: t.space.sm },
 }));

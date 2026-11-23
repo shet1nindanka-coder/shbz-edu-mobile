@@ -1,10 +1,17 @@
 // Mobile-only strings of the developer's «Аккаунты» screen (teachers, students, ownership, passwords).
 // Site texts stay in `dict.students.*`.
 const ru = {
-  // The site shows a table row with buttons; a phone row is one touch target that opens a sheet.
+  // The site shows a table row with buttons; here a row is one touch target that opens a sheet.
   row: {
     teacherActions: "Действия с аккаунтом учителя",
-    studentActions: "Учитель, пароль и удаление аккаунта"
+    studentActions: "Учитель, пароль и удаление аккаунта",
+    // The mark of a student whose new teacher is picked but not saved yet.
+    changed: "изменено"
+  },
+  create: {
+    // The header button of a phone: «Новый аккаунт» does not fit next to the segments.
+    short: "Новый",
+    onceHint: "После создания логин и пароль будут показаны один раз — скопируйте их и передайте человеку."
   },
   search: {
     clear: "Очистить поиск"
@@ -25,7 +32,12 @@ const ru = {
 const en: typeof ru = {
   row: {
     teacherActions: "Teacher account actions",
-    studentActions: "Teacher, password and account deletion"
+    studentActions: "Teacher, password and account deletion",
+    changed: "changed"
+  },
+  create: {
+    short: "Add",
+    onceHint: "Once the account is created, its login and password are shown one time — copy them and pass them on."
   },
   search: {
     clear: "Clear search"

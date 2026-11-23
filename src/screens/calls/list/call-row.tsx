@@ -1,43 +1,45 @@
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import type { ParentCallStudentOverview } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, Chip, Text, useTextScale } from '@/ui';
+import { Avatar, Chip, ListRow, accessibilityLabelOf } from '@/ui';
 
-import { callMetaLine, historyButtonLabel, reminderChip, teacherLine } from '../logic';
+import { attentionChip, callMetaLine, callRowCaption, teacherLine } from '../logic';
 
 export type CallRowProps = {
   student: ParentCallStudentOverview;
-  /** TEACHER: «Записать звонок» is offered. A developer only reads. */
+  /** TEACHER: the row opens the record form. A developer only reads: the row opens the history. */
   canRecord: boolean;
-  /** DEVELOPER: the owning teacher is named under the meta line. */
+  /** DEVELOPER: the caption starts with the owning teacher's name. */
   showTeacher: boolean;
   /** The row a notification pointed at: soft accent background that fades out when this turns false. */
   highlighted: boolean;
-  /** The list is refreshing after a saved call: recording again waits for the new state. */
-  recordDisabled: boolean;
-  onRecord: (student: ParentCallStudentOverview) => void;
-  onHistory: (student: ParentCallStudentOverview) => void;
+  /** Tablet: the student whose form the panel next to the list shows. */
+  selected: boolean;
+  divider: boolean;
+  /** Absent when there is nothing to open (a read-only viewer and a student without calls). */
+  onPress?: (student: ParentCallStudentOverview) => void;
+  /** Where the row sits in the list, for scrolling to it. */
+  onLayout?: (studentId: string, y: number) => void;
 };
 
 /**
- * One student of the parent-calls list (06 §1.4 item 4): name, reminder chip, when the parents were last
- * reached, and the two actions. The site's desktop row with three columns becomes a card.
+ * One student of the parent-calls list (06 §1.4 item 4; docs/design/glass-over-paper.md §1 rule 2): the
+ * avatar, the name, one caption — when the parents were last reached — and a chip only when a call is due
+ * or overdue. The whole row is pressed; the form and the history are behind it.
  */
-export function CallRow({ student, canRecord, showTeacher, highlighted, recordDisabled, onRecord, onHistory }: CallRowProps) {
+export function CallRow({ student, canRecord, showTeacher, highlighted, selected, divider, onPress, onLayout }: CallRowProps) {
   const styles = useStyles();
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
-  // Large text: the reminder chip («Созвонились недавно») would leave the name a third of the row and cut
-  // the surname; the chip moves under a name that does not fit next to it instead.
-  const { large } = useTextScale();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.calls;
-  const chip = reminderChip(student.reminder.state, t);
-  const hasHistory = student.totalCalls > 0;
+  const chip = attentionChip(student.reminder.state, t);
+  const caption = callRowCaption(student, t, locale, showTeacher);
+  const id = student.studentId;
 
   // The highlight appears at once and fades out, like the site's row transition.
   const glow = useSharedValue(highlighted ? 1 : 0);
@@ -46,85 +48,45 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, recordDi
   }, [glow, highlighted, reducedMotion, theme]);
   const glowStyle = useAnimatedStyle(() => ({ opacity: glow.get() }));
 
+  // What the row opens is said first; a row that opens nothing is named by the student alone.
+  const action = canRecord
+    ? format(m.calls.row.recordAria, { name: student.studentName })
+    : format(student.totalCalls > 0 ? m.calls.row.historyAria : m.calls.row.historyEmptyAria, {
+        n: student.totalCalls,
+        name: student.studentName,
+      });
+
   return (
-    <Card padded={false} testID={`call-row-${student.studentId}`}>
-      <Animated.View
-        style={[styles.glow, glowStyle]}
-        testID={highlighted ? `call-row-highlight-${student.studentId}` : undefined}
+    <View
+      onLayout={onLayout ? (event: LayoutChangeEvent) => onLayout(id, event.nativeEvent.layout.y) : undefined}
+      testID={`call-row-${id}`}
+    >
+      <Animated.View style={[styles.glow, glowStyle]} testID={highlighted ? `call-row-highlight-${id}` : undefined} />
+      <ListRow
+        title={student.studentName}
+        subtitle={caption}
+        subtitleLines={2}
+        left={<Avatar name={student.studentName} tone="neutral" />}
+        right={chip ? <Chip tone={chip.tone} label={chip.label} /> : undefined}
+        selected={selected}
+        divider={divider}
+        onPress={onPress ? () => onPress(student) : undefined}
+        // The ear gets the whole meta line; the eye has its latest fact and the history behind the row.
+        accessibilityLabel={accessibilityLabelOf([action, chip?.label, callMetaLine(student, t, locale), showTeacher ? teacherLine(student, t) : null])}
+        testID={canRecord ? `call-record-${id}` : `call-history-${id}`}
       />
-      <View style={styles.body}>
-        <View style={[styles.head, large ? styles.headWrap : null]} testID={`call-row-head-${student.studentId}`}>
-          <Text variant="bodyBold" numberOfLines={2} style={large ? styles.nameWrap : styles.name}>
-            {student.studentName}
-          </Text>
-          <Chip tone={chip.tone} label={chip.label} />
-        </View>
-
-        <View style={styles.meta}>
-          <Text variant="small" color="textMuted">
-            {callMetaLine(student, t, locale)}
-          </Text>
-          {showTeacher ? (
-            <Text variant="caption" color="textSoft" testID={`call-row-teacher-${student.studentId}`}>
-              {teacherLine(student, t)}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.actions}>
-          {canRecord ? (
-            <Button
-              label={t.record}
-              accessibilityLabel={format(m.calls.row.recordAria, { name: student.studentName })}
-              onPress={() => onRecord(student)}
-              disabled={recordDisabled}
-              style={styles.record}
-              testID={`call-record-${student.studentId}`}
-            />
-          ) : null}
-          <Button
-            label={historyButtonLabel(student.totalCalls, t)}
-            accessibilityLabel={format(hasHistory ? m.calls.row.historyAria : m.calls.row.historyEmptyAria, {
-              n: student.totalCalls,
-              name: student.studentName,
-            })}
-            variant="outline"
-            onPress={() => onHistory(student)}
-            disabled={!hasHistory}
-            style={canRecord ? styles.history : styles.historyOnly}
-            testID={`call-history-${student.studentId}`}
-          />
-        </View>
-      </View>
-    </Card>
+    </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  // Paddings sit on an inner view: on web a card's own `padding: 0` wins over longhand paddings.
-  body: { padding: t.space.card, gap: t.space.md },
   glow: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     left: 0,
-    borderRadius: t.radii.lg,
     backgroundColor: t.colors.accentSoftStrong,
     pointerEvents: 'none',
   },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
-  name: { flex: 1, minWidth: 0 },
-  headWrap: { flexWrap: 'wrap' },
-  // Its own width while it fits beside the chip, the whole row (and the chip on the next line) when not.
-  nameWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 },
-  meta: { gap: t.space.xxs },
-  // One line while both labels fit, the spare room shared between the two; on a narrow phone (360 pt,
-  // or 375 pt next to «История (23)») the history button moves to a line of its own instead of cutting
-  // «Записать звонок». Neither button shrinks below its label.
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  record: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
-  history: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
-  // A developer has the history button alone: it is as wide as its label.
-  historyOnly: { alignSelf: 'flex-start' },
 }));

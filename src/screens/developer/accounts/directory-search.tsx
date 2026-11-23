@@ -1,5 +1,5 @@
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Icon, IconButton, TextField } from '@/ui';
 
 import type { DirectoryTab } from './accounts-logic';
@@ -11,11 +11,12 @@ export type DirectorySearchProps = {
 };
 
 /**
- * The one search field shared by both tabs (docs/spec/04-teacher-students.md S9b): it filters the list as
- * it is typed, by name or login, so there is nothing to submit — the trailing button only clears it.
+ * The one search field of the directory (docs/spec/04-teacher-students.md S9b): it filters the list as it
+ * is typed, by name or login, so there is nothing to submit — the trailing button only clears it.
  */
 export function DirectorySearch({ tab, value, onChange }: DirectorySearchProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, m } = useI18n();
   const t = dict.students.directory;
 
@@ -23,7 +24,7 @@ export function DirectorySearch({ tab, value, onChange }: DirectorySearchProps) 
     <TextField
       value={value}
       onChangeText={onChange}
-      placeholder={tab === 'teachers' ? t.searchTeachers : t.searchStudents}
+      placeholder={tab === 'teachers' ? t.searchTeachers : tab === 'students' ? t.searchStudents : t.searchAria}
       accessibilityLabel={t.searchAria}
       autoCapitalize="none"
       autoCorrect={false}
@@ -31,7 +32,7 @@ export function DirectorySearch({ tab, value, onChange }: DirectorySearchProps) 
       autoComplete="off"
       returnKeyType="search"
       enterKeyHint="search"
-      left={<Icon name="search" size={18} color="kicker" />}
+      left={<Icon name="search" size={theme.sizes.icon.md} color="textMuted" />}
       right={
         value.length > 0 ? (
           <IconButton

@@ -16,15 +16,18 @@ export type LessonItemRowProps = {
   saving: boolean;
   /** Result marks are cooling down after a rate-limit refusal. */
   resultsBlocked: boolean;
+  /** Hairline under the row. */
+  divider: boolean;
   onResult: (result: LessonItemResult | null) => void;
   onRemove: () => void;
 };
 
 /**
- * One problem of the student's set in a lesson (docs/spec/04-teacher-students.md S6 "row"): «№ N», its
- * topic, the 2 × 2 "how did it go" toggle and "remove from the set". The extra part has a dashed border.
+ * One problem of the student's set in a lesson (docs/spec/04-teacher-students.md S6 "row"): the number
+ * with its topic as the one caption, "remove from the set", and the "how did it go" marks under them —
+ * four worded options do not fit next to a number on a phone.
  */
-export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, onRemove }: LessonItemRowProps) {
+export function LessonItemRow({ item, busy, saving, resultsBlocked, divider, onResult, onRemove }: LessonItemRowProps) {
   const styles = useStyles();
   const theme = useTheme();
   const { dict, m } = useI18n();
@@ -32,13 +35,13 @@ export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, on
   const results = dict.students.lessonResult;
   const numberSign = format(t.number, { n: item.number });
   return (
-    <View style={[styles.row, item.isExtra ? styles.extra : null]} testID={`lesson-item-${item.id}`}>
+    <View style={[styles.row, divider ? styles.divider : null]} testID={`lesson-item-${item.id}`}>
       <View style={styles.head}>
         <View style={styles.titles}>
           <Text variant="bodyBold" tabular>
-            {numberSign}
+            {item.number}
           </Text>
-          <Text variant="caption" color="textMuted" numberOfLines={2}>
+          <Text variant="small" color="textMuted" numberOfLines={1}>
             {item.topicTitle}
           </Text>
         </View>
@@ -46,6 +49,7 @@ export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, on
           icon="trash"
           variant="ghost"
           tint={theme.colors.textMuted}
+          iconSize={theme.sizes.icon.md}
           accessibilityLabel={format(t.removeAria, { n: item.number })}
           disabled={busy}
           onPress={onRemove}
@@ -64,6 +68,8 @@ export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, on
         }))}
         value={item.result}
         onChange={onResult}
+        columns={theme.tablet ? 4 : 2}
+        size="md"
         disabled={busy || saving || resultsBlocked}
         testID={`lesson-item-result-${item.id}`}
       />
@@ -72,17 +78,8 @@ export function LessonItemRow({ item, busy, saving, resultsBlocked, onResult, on
 }
 
 const useStyles = makeStyles((t) => ({
-  row: {
-    gap: t.space.sm,
-    paddingVertical: 12,
-    paddingLeft: 14,
-    paddingRight: 8,
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
-  },
-  extra: { borderStyle: 'dashed', borderColor: t.colors.inputBorder },
+  row: { gap: t.space.xs, paddingVertical: t.space.md },
+  divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
   head: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  titles: { flex: 1, minWidth: 0, gap: 2 },
+  titles: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

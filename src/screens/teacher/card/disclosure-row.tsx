@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { makeStyles } from '@/theme';
-import { Icon, PressableScale, Text, type TextProps } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Icon, PressableScale, Text, type IconName, type TextProps } from '@/ui';
 
 export type DisclosureRowProps = {
   label: string;
@@ -13,6 +13,8 @@ export type DisclosureRowProps = {
   /** Typography of the label; default `smallStrong`. */
   variant?: TextProps['variant'];
   color?: TextProps['color'];
+  /** Mark before the label instead of the chevron's place (the lock of «видно только вам»). */
+  icon?: IconName;
   /** Node at the right edge (a chip). */
   trailing?: ReactNode;
   accessibilityLabel?: string;
@@ -21,10 +23,11 @@ export type DisclosureRowProps = {
 
 /**
  * Header of a small disclosure inside a card ("Check history · 3 runs", "Internal diagnostics",
- * "Completed homework (2)"): a chevron and a label on one 44 pt row; the owner renders the body.
+ * "Completed homework (2)"): a label and a chevron on one 44 pt row; the owner renders the body.
  */
-export function DisclosureRow({ label, expanded, onToggle, meta, variant = 'smallStrong', color, trailing, accessibilityLabel, testID }: DisclosureRowProps) {
+export function DisclosureRow({ label, expanded, onToggle, meta, variant = 'smallStrong', color = 'textMuted', icon, trailing, accessibilityLabel, testID }: DisclosureRowProps) {
   const styles = useStyles();
+  const theme = useTheme();
   return (
     <PressableScale
       accessibilityRole="button"
@@ -36,7 +39,7 @@ export function DisclosureRow({ label, expanded, onToggle, meta, variant = 'smal
       style={styles.row}
       pressedStyle={styles.pressed}
     >
-      <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={16} color="kicker" />
+      {icon ? <Icon name={icon} size={theme.sizes.icon.sm} color="textMuted" /> : null}
       <View style={styles.texts}>
         <Text variant={variant} color={color} style={styles.label}>
           {label}
@@ -48,12 +51,13 @@ export function DisclosureRow({ label, expanded, onToggle, meta, variant = 'smal
         </Text>
       </View>
       {trailing}
+      <Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={theme.sizes.icon.sm} color="textMuted" />
     </PressableScale>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  row: { minHeight: t.sizes.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.sm, borderRadius: t.radii.sm },
+  row: { minHeight: t.sizes.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   pressed: { opacity: 0.6 },
   texts: { flex: 1, minWidth: 0 },
   label: { flexShrink: 1 },

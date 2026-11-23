@@ -30,8 +30,9 @@ export type StudentDetailSheetProps = {
 };
 
 /**
- * Detail sheet of one student row (docs/spec/04-teacher-students.md S9b, mobile note): the login to copy,
- * the owner picker and the site's two row buttons — reset password, delete.
+ * Detail sheet of one student row (docs/spec/04-teacher-students.md S9b; layout: docs/design/
+ * glass-over-paper.md §7 "a row that needs actions"): the login to copy, the owner picker ("move") and the
+ * site's two row buttons — reset password, delete.
  */
 export function StudentDetailSheet({
   student,
@@ -73,7 +74,7 @@ export function StudentDetailSheet({
 
           <View style={styles.owner}>
             {shown.teacherId === null ? (
-              <Text variant="captionMedium" color="dangerSolid" accessibilityRole="alert" testID="student-detail-orphan">
+              <Text variant="small" color="redText" accessibilityRole="alert" testID="student-detail-orphan">
                 {t.noOwner}
               </Text>
             ) : null}
@@ -89,23 +90,22 @@ export function StudentDetailSheet({
               testID="student-detail-owner"
             />
             {dirty ? (
-              <Text variant="captionMedium" color="accentSolid" accessibilityLiveRegion="polite" testID="student-detail-dirty">
+              <Text variant="small" color="accentSolid" accessibilityLiveRegion="polite" testID="student-detail-dirty">
                 {t.dirty}
               </Text>
             ) : null}
             <Hint>
-              <Text variant="caption" color="textMuted">
+              <Text variant="small" color="textMuted">
                 {m.accounts.owner.saveHint}
               </Text>
             </Hint>
           </View>
 
           <View style={styles.buttons}>
-            {dirty ? <Button label={m.common.actions.done} size="lg" onPress={onClose} testID="student-detail-done" /> : null}
+            {dirty ? <Button label={m.common.actions.done} onPress={onClose} testID="student-detail-done" /> : null}
             <Button
               label={dict.students.passwordReset.button}
               variant="outline"
-              size="lg"
               leftIcon="key"
               accessibilityLabel={m.accounts.a11y.resetStudentPassword}
               onPress={() => onSelect('resetPassword', shown)}
@@ -114,7 +114,6 @@ export function StudentDetailSheet({
             <Button
               label={t.delete}
               variant="danger"
-              size="lg"
               leftIcon="trash"
               onPress={() => onSelect('delete', shown)}
               testID="student-detail-delete"
@@ -128,7 +127,7 @@ export function StudentDetailSheet({
 
 const useStyles = makeStyles((t) => ({
   // Room above the copy row for its «Скопировано» pill.
-  content: { gap: t.space.lg, paddingTop: t.space.sm },
+  content: { gap: t.space.md, paddingTop: t.space.sm, paddingBottom: t.space.md },
   owner: { gap: t.space.sm },
-  buttons: { gap: t.space.md },
+  buttons: { gap: t.space.sm },
 }));

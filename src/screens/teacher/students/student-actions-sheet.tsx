@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import type { TeacherStudentListItem } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, CopyRow } from '@/ui';
+import { BottomSheet, Button, CopyRow, ListRow } from '@/ui';
 
 import { useLatched } from './use-latched';
 
@@ -19,8 +19,9 @@ export type StudentActionsSheetProps = {
 };
 
 /**
- * Actions of one student row (docs/spec/04-teacher-students.md S2, mobile note): the login as a
- * copy-on-tap value and the site's three row buttons — view progress, reset password, delete.
+ * Actions of one student of the list (docs/spec/04-teacher-students.md S2, mobile note): the login as a
+ * copy-on-tap value and the site's three row buttons — view progress and reset password as menu rows,
+ * delete as the one red button.
  */
 export function StudentActionsSheet({ student, onClose, onSelect, onClosed }: StudentActionsSheetProps) {
   const styles = useStyles();
@@ -48,25 +49,18 @@ export function StudentActionsSheet({ student, onClose, onSelect, onClosed }: St
             hint={m.teacher.students.copyHint}
             testID="student-actions-login"
           />
-          <View style={styles.buttons}>
-            <Button label={t.viewProgress} size="lg" onPress={() => onSelect('open', shown)} testID="student-actions-open" />
-            <Button
-              label={dict.students.passwordReset.button}
-              variant="outline"
-              size="lg"
-              leftIcon="key"
+          <View>
+            <ListRow title={t.viewProgress} chevron inset={0} onPress={() => onSelect('open', shown)} testID="student-actions-open" />
+            <ListRow
+              title={dict.students.passwordReset.button}
+              chevron
+              inset={0}
+              divider={false}
               onPress={() => onSelect('resetPassword', shown)}
               testID="student-actions-reset"
             />
-            <Button
-              label={t.delete}
-              variant="danger"
-              size="lg"
-              leftIcon="trash"
-              onPress={() => onSelect('delete', shown)}
-              testID="student-actions-delete"
-            />
           </View>
+          <Button label={t.delete} variant="danger" leftIcon="trash" onPress={() => onSelect('delete', shown)} testID="student-actions-delete" />
         </View>
       ) : null}
     </BottomSheet>
@@ -75,6 +69,5 @@ export function StudentActionsSheet({ student, onClose, onSelect, onClosed }: St
 
 const useStyles = makeStyles((t) => ({
   // Room above the copy row for its «Скопировано» pill.
-  content: { gap: t.space.lg, paddingTop: t.space.sm },
-  buttons: { gap: t.space.md },
+  content: { gap: t.space.md, paddingTop: t.space.sm, paddingBottom: t.space.sm },
 }));

@@ -8,15 +8,15 @@ const ru = {
     // handed to the system, which prints it or saves it as a PDF
     print: "Версия для печати",
     // replaces `dict.planner.lessonBoard.hotkeysHint` (no keyboard on a phone)
-    resultHint: "Отметьте итог по каждому номеру касанием.",
+    resultHint: "Нажмите на ученика: откроются его номера, там же отмечается итог по каждому.",
+    // the one caption of a running lesson: how long it still lasts
+    timeLeft: "осталось {n} мин",
     actions: "Действия с уроком",
     // the site finishes without asking; on a touch screen an accidental tap is likelier (05 §7 item 9)
     finishTitle: "Завершить урок?",
     finishDescription:
       "Урок закончится для всех учеников. Номерам без отметки итог проставится сам: «не решил» — если ученик сдавал решение, «не успел» — если не сдавал. Отменить завершение нельзя.",
     finishConfirm: "Да, завершить",
-    expand: "Показать набор: {name}",
-    collapse: "Свернуть набор: {name}",
     noFreeNumbers: "В этой теме все номера уже в наборе.",
     // the topic itself is empty (`m.teacher.assign.noNumbers` on the assign tab says the same)
     noNumbers: "В этой теме пока нет номеров.",
@@ -26,13 +26,13 @@ const ru = {
     // names of a row's controls out of context (explore by touch, the rotor): every row has the same ones
     resultGroupAria: "Итог урока, {number}",
     resultOptionAria: "{result}, {number}",
-    historyAria: "История статуса, {number}",
-    // a button repeated on every participant's card names the student
-    forStudent: "{action}: {name}"
+    historyAria: "История статуса, {number}"
   },
   lessonsList: {
     openLesson: "Открыть урок «{title}»",
-    moreActions: "Действия с уроком «{title}»"
+    // the tablet panel of the selected lesson
+    openBoard: "Открыть доску",
+    resultsOf: "Итоги отмечены: {done} из {total}"
   },
   lessonNew: {
     searchPlaceholder: "Найти группу или ученика",
@@ -75,14 +75,13 @@ const en: typeof ru = {
   lessonBoard: {
     handout: "Handout (PDF)",
     print: "Print version",
-    resultHint: "Tap to mark the result of each problem.",
+    resultHint: "Tap a student to open their problems and mark the result of each one.",
+    timeLeft: "{n} min left",
     actions: "Lesson actions",
     finishTitle: "Finish the lesson?",
     finishDescription:
       "The lesson will end for every student. Problems without a mark get a result automatically: “not solved” if the student submitted a solution, “not reached” if not. This cannot be undone.",
     finishConfirm: "Yes, finish",
-    expand: "Show the set: {name}",
-    collapse: "Collapse the set: {name}",
     noFreeNumbers: "Every problem of this topic is already in the set.",
     noNumbers: "This topic has no problems yet.",
     bankLoading: "Loading the problem bank…",
@@ -90,12 +89,12 @@ const en: typeof ru = {
     numberPlaceholder: "Pick a topic first",
     resultGroupAria: "Lesson result, {number}",
     resultOptionAria: "{result}, {number}",
-    historyAria: "Status history, {number}",
-    forStudent: "{action}: {name}"
+    historyAria: "Status history, {number}"
   },
   lessonsList: {
     openLesson: "Open lesson “{title}”",
-    moreActions: "Actions for lesson “{title}”"
+    openBoard: "Open the board",
+    resultsOf: "Results marked: {done} of {total}"
   },
   lessonNew: {
     searchPlaceholder: "Find a group or a student",

@@ -138,11 +138,10 @@ export function PasswordResetSheet({
     >
       <View style={styles.content}>
         <View style={styles.intro}>
-          <Text variant="kicker">{t.kicker}</Text>
           <Text variant="dialogTitle" accessibilityRole="header">
             {format(t.heading, { name: shown?.name ?? '' })}
           </Text>
-          <Text variant="small" color="label" style={styles.paragraph}>
+          <Text variant="small" color="label">
             {t[audience].consequences}
           </Text>
         </View>
@@ -178,8 +177,7 @@ export function PasswordResetSheet({
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.field, paddingTop: t.space.xxs, paddingBottom: t.space.md },
-  intro: { gap: 10 },
-  paragraph: { lineHeight: 24 },
+  intro: { gap: t.space.xs },
   field: { gap: t.space.sm },
   actions: { flexDirection: 'row', gap: t.space.md },
   submit: { flex: 1 },

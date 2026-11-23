@@ -13,17 +13,21 @@ import { getFileExtension, getMimeTypeFromExtension } from '@/domain/files';
 import { homeworkAssignmentLabel } from '@/domain/homework-label';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
+import { useNowTick } from '@/services/clock';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, LoadingState, Notice, Text } from '@/ui';
+import { Button, EmptyState, ListRow, LoadingState, Notice, Panel, Panels } from '@/ui';
 
+import { useLatched } from '../students/use-latched';
 import { useNoticeScroll } from '../students/use-notice-scroll';
 import { CancelHomeworkDialog } from './cancel-homework-dialog';
 import { CardScreen, type CardChrome } from './card-screen';
 import { DisclosureRow } from './disclosure-row';
 import { ReviewAssignmentCard } from './review-assignment-card';
+import { ReviewAssignmentPanel } from './review-assignment-panel';
 import { buildReviewRows, completedAssignmentIds, hasDiagnostics, reviewRowIndex, type ReviewRow } from './review-logic';
-import { useNowTick } from '@/services/clock';
+import { ReviewNumbersSheet } from './review-numbers-sheet';
+import { reviewSummary } from './review-summary';
 import { useReview } from './use-review';
 import { useStudentGone } from './use-student-gone';
 
@@ -46,10 +50,17 @@ function photoMimeType(originalName: string): string {
   return mime.startsWith('image/') ? mime : 'image/jpeg';
 }
 
+/** The numbers sheet: the grid of one homework's numbers (`numberId` null) or the details of one of them. */
+type NumbersTarget = { assignmentId: string; numberId: string | null; viaAll: boolean };
+
 /**
- * `teacher.student.review` (docs/spec/04-teacher-students.md S4): every homework issued to the student
- * as a collapsible card — photos, AI verdicts, manual traffic-light marks, "accept AI verdicts" with a
- * 10-second undo, the check history and cancelling. Completed homework is folded under one disclosure.
+ * `teacher.student.review` (docs/spec/04-teacher-students.md S4; layout: the `PT-student` / `T-student`
+ * mockups): every homework issued to the student. A phone lists them as cards — a summary with the bar by
+ * status that unfolds into the review; a tablet lists them on the left and shows the selected one on the
+ * right. The review of a homework is «Нужно проверить» — rows of numbers with the three status marks —
+ * with the photos, "accept AI verdicts" and its 10-second undo, the check history and cancelling; every
+ * number, with its verdict, diagnostics and statement, opens in one sheet. Completed homework is folded
+ * under one disclosure.
  */
 export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const styles = useStyles();
@@ -57,6 +68,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const navigation = useAppNavigation();
   const { dict, m, locale } = useI18n();
   const t = dict.students.review;
+  const tablet = theme.tablet;
 
   const review = useReview(studentId);
   const { homeworks, data, assignments } = review;
@@ -74,6 +86,11 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   // Cancelling has its own bucket (shared with issuing, 120 / 60 s), separate from the status marks.
   const cancelWait = useRetryWait();
   const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [numbersFor, setNumbersFor] = useState<NumbersTarget | null>(null);
+  // The status history asked for from the numbers sheet: opened once that sheet has left.
+  const queuedHistory = useRef<string | null>(null);
+  // The homework the tablet's second panel shows; null = the first of the list.
+  const [pickedId, setPickedId] = useState<string | null>(assignmentId ?? null);
   // The homework to bring into view: from the route (a history reference) or from the open history sheet.
   const [focus, setFocus] = useState<{ id: string; seq: number } | null>(assignmentId ? { id: assignmentId, seq: 0 } : null);
   const [focusedParam, setFocusedParam] = useState(assignmentId);
@@ -85,6 +102,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
     setExpandedIds((current) => (current.includes(id) ? current : [...current, id]));
     setCompletedToggled(null);
     setFocus((current) => ({ id, seq: (current?.seq ?? 0) + 1 }));
+    setPickedId(id);
   };
   // The same screen instance was given another target.
   if (assignmentId !== focusedParam) {
@@ -143,89 +161,93 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
 
   const showLessonMode = assignments ? hasDiagnostics(assignments) : false;
 
-  const header = (
-    <View style={styles.header}>
-      <Text variant="sectionTitle" accessibilityRole="header">
-        {t.title}
-      </Text>
+  // The sheet keeps its homework while it slides away.
+  const shownNumbers = useLatched(numbersFor);
+  const numbersAssignment = shownNumbers ? (assignments?.find((assignment) => assignment.id === shownNumbers.assignmentId) ?? null) : null;
+
+  const notices = (
+    <>
       {notice ? (
         <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="review-notice" />
       ) : null}
       {/* Cached homework stays on screen when a refresh fails (offline): say so instead of replacing it. */}
       {homeworks.isError && data ? <Notice tone="error" text={errorText(homeworks.error, m.common.errors.generic)} testID="review-refresh-error" /> : null}
       {data && !data.assignmentsEnabled ? <Notice tone="warning" text={t.dbOutdated} testID="review-db-outdated" /> : null}
-      {showLessonMode ? (
-        <Button
-          label={lessonMode ? t.showDiagnostics : t.hideDiagnostics}
-          variant="outline"
-          size="sm"
-          leftIcon={lessonMode ? 'eye' : 'eyeOff'}
-          onPress={() => setLessonMode((value) => !value)}
-          wrapLabel
-          testID="review-lesson-mode"
-          style={styles.lessonMode}
-        />
-      ) : null}
-    </View>
+    </>
   );
 
-  const body = data ? (
+  const lessonModeButton = showLessonMode ? (
+    <Button
+      label={lessonMode ? t.showDiagnostics : t.hideDiagnostics}
+      variant="outline"
+      size="sm"
+      leftIcon={lessonMode ? 'eye' : 'eyeOff'}
+      onPress={() => setLessonMode((value) => !value)}
+      wrapLabel
+      testID="review-lesson-mode"
+      style={styles.lessonMode}
+    />
+  ) : null;
+
+  const placeholder = data ? (
     data.assignmentsEnabled ? (
       <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="review-empty" />
     ) : null
   ) : homeworksFailure ? (
     <LoadFailure query={homeworks} testID="review-error" />
   ) : (
-    <LoadingState variant="cards" count={3} cardHeight={150} accessibilityLabel={m.common.a11y.loading} testID="review-loading" />
+    <LoadingState variant="list" count={3} accessibilityLabel={m.common.a11y.loading} testID="review-loading" />
+  );
+
+  /** What every view of a homework's review needs besides the homework itself. */
+  const reviewProps = (assignment: TeacherHomeworkAssignment) => ({
+    assignment,
+    lessonMode,
+    now,
+    savingIds: review.savingIds,
+    numberErrors: review.numberErrors,
+    blocked: review.wait.waiting,
+    waitSeconds: review.wait.seconds,
+    error: review.assignmentErrors[assignment.id],
+    accepting: review.acceptingId === assignment.id,
+    onDismissError: () => review.dismissAssignmentError(assignment.id),
+    onStatus: review.setStatus,
+    onAccept: () => review.acceptVerdicts(assignment),
+    onCancel: () => setCancelFor(assignment),
+    onOpenNumber: (homeworkNumberId: string) => setNumbersFor({ assignmentId: assignment.id, numberId: homeworkNumberId, viaAll: false }),
+    onOpenAll: () => setNumbersFor({ assignmentId: assignment.id, numberId: null, viaAll: true }),
+    onOpenPending: (index: number) => openPending(assignment, index),
+    onOpenCheckPhoto: openCheckPhoto,
+  });
+
+  const completedToggle = (row: Extract<ReviewRow, { kind: 'completedToggle' }>) => (
+    <DisclosureRow
+      label={format(t.completedHomeworks, { n: row.count })}
+      expanded={row.open}
+      onToggle={() => setCompletedToggled(!row.open)}
+      testID="review-completed-toggle"
+    />
   );
 
   const renderRow = ({ item: row }: { item: ReviewRow }) => {
-    if (row.kind === 'completedToggle') {
-      return (
-        <View style={styles.item}>
-          <View style={styles.completed}>
-            <DisclosureRow
-              label={format(t.completedHomeworks, { n: row.count })}
-              color="kicker"
-              expanded={row.open}
-              onToggle={() => setCompletedToggled(!row.open)}
-              testID="review-completed-toggle"
-            />
-          </View>
-        </View>
-      );
-    }
+    if (row.kind === 'completedToggle') return <View style={styles.completed}>{completedToggle(row)}</View>;
     const { assignment } = row;
     return (
-      // Keyed by the homework: a recycled cell must not carry another card's open disclosures.
+      // Keyed by the homework: a recycled cell must not carry another card's open rows.
       <View key={assignment.id} style={styles.item}>
         <ReviewAssignmentCard
-          assignment={assignment}
+          {...reviewProps(assignment)}
           expanded={expandedIds.includes(assignment.id)}
           highlighted={flashId === assignment.id}
-          lessonMode={lessonMode}
-          now={now}
-          savingIds={review.savingIds}
-          numberErrors={review.numberErrors}
-          blocked={review.wait.waiting}
-          waitSeconds={review.wait.seconds}
-          error={review.assignmentErrors[assignment.id]}
-          accepting={review.acceptingId === assignment.id}
           onToggle={() => toggle(assignment.id)}
-          onDismissError={() => review.dismissAssignmentError(assignment.id)}
-          onStatus={review.setStatus}
-          onAccept={() => review.acceptVerdicts(assignment)}
-          onCancel={() => setCancelFor(assignment)}
-          onHistory={setHistoryFor}
-          onOpenPending={(index) => openPending(assignment, index)}
-          onOpenCheckPhoto={openCheckPhoto}
         />
       </View>
     );
   };
 
-  return (
-    <CardScreen chrome={chrome}>
+  let content;
+  if (!tablet) {
+    content = (
       <FlashList
         ref={listRef}
         data={rows}
@@ -234,8 +256,13 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
         renderItem={renderRow}
         // Everything a card shows besides its homework: expansion, lesson mode, the clock and the request states.
         extraData={[expandedIds, lessonMode, now, flashId, review.savingIds, review.numberErrors, review.assignmentErrors, review.wait.seconds, review.acceptingId]}
-        ListHeaderComponent={header}
-        ListEmptyComponent={body}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            {notices}
+            {lessonModeButton}
+          </View>
+        }
+        ListEmptyComponent={placeholder}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -250,6 +277,60 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
         }
         testID="review-list"
       />
+    );
+  } else {
+    const first = rows.find((row) => row.kind === 'assignment');
+    const selected =
+      rows.find((row) => row.kind === 'assignment' && row.assignment.id === pickedId) ?? first ?? null;
+    const selectedAssignment = selected && selected.kind === 'assignment' ? selected.assignment : null;
+    content = (
+      <>
+        {notices}
+        {rows.length === 0 ? (
+          placeholder
+        ) : (
+          <Panels testID="review-panels">
+            <Panel weight={2} padded={false} contentStyle={styles.listPanel} footer={lessonModeButton ? <View style={styles.panelFooter}>{lessonModeButton}</View> : undefined} testID="review-list">
+              {rows.map((row) => {
+                if (row.kind === 'completedToggle') {
+                  return (
+                    <View key={row.key} style={styles.panelToggle}>
+                      {completedToggle(row)}
+                    </View>
+                  );
+                }
+                const summary = reviewSummary(row.assignment, now, locale, m);
+                return (
+                  <ListRow
+                    key={row.key}
+                    title={summary.title}
+                    titleLines={2}
+                    subtitle={summary.caption}
+                    subtitleTone={summary.attention ? 'attention' : 'muted'}
+                    meta={summary.done}
+                    selected={row.assignment.id === selectedAssignment?.id}
+                    onPress={() => setPickedId(row.assignment.id)}
+                    accessibilityLabel={`${summary.title}. ${summary.caption}. ${summary.done}`}
+                    testID={`review-assignment-toggle-${row.assignment.id}`}
+                  />
+                );
+              })}
+            </Panel>
+            <Panel weight={3} testID="review-detail">
+              {selectedAssignment ? (
+                // Another homework must not carry this one's kept rows and open disclosures.
+                <ReviewAssignmentPanel key={selectedAssignment.id} {...reviewProps(selectedAssignment)} />
+              ) : null}
+            </Panel>
+          </Panels>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <CardScreen chrome={chrome} panels={tablet}>
+      {content}
 
       {review.undo ? <UndoToast text={review.undo.label} undoLabel={t.undo} onUndo={review.undoAccept} testID="review-undo-toast" /> : null}
 
@@ -261,6 +342,32 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
         onMissing={(message) => {
           setCancelFor(null);
           announce({ tone: 'error', text: message });
+        }}
+      />
+
+      <ReviewNumbersSheet
+        visible={numbersFor !== null}
+        assignment={numbersAssignment}
+        numberId={shownNumbers?.numberId ?? null}
+        viaAll={shownNumbers?.viaAll ?? false}
+        lessonMode={lessonMode}
+        savingIds={review.savingIds}
+        numberErrors={review.numberErrors}
+        blocked={review.wait.waiting}
+        onClose={() => {
+          queuedHistory.current = null;
+          setNumbersFor(null);
+        }}
+        onClosed={() => {
+          const next = queuedHistory.current;
+          queuedHistory.current = null;
+          if (next) setHistoryFor(next);
+        }}
+        onShow={(numberId) => setNumbersFor((current) => (current ? { ...current, numberId } : current))}
+        onStatus={review.setStatus}
+        onHistory={(homeworkNumberId) => {
+          queuedHistory.current = homeworkNumberId;
+          setNumbersFor(null);
         }}
       />
 
@@ -277,10 +384,14 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.md, paddingBottom: t.space.pageBottom },
+  listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
   header: { gap: t.space.md, paddingBottom: t.space.md },
-  // Never wider than the row: on a 320 pt phone the label takes a second line instead of running off the left edge.
+  // Never wider than the row: on a 320 pt phone the label takes a second line instead of running off the edge.
   lessonMode: { alignSelf: 'flex-end', maxWidth: '100%' },
-  item: { paddingBottom: t.space.md },
-  completed: { paddingHorizontal: t.space.md, borderRadius: t.radii.md, backgroundColor: t.colors.tabHover },
+  item: { paddingBottom: t.space.block },
+  completed: { paddingHorizontal: t.space.xxs, paddingBottom: t.space.sm },
+  // Rows bring their own height and hairlines; the panel adds the card's top and bottom room.
+  listPanel: { gap: 0, paddingVertical: t.space.sm },
+  panelToggle: { paddingHorizontal: t.space.card },
+  panelFooter: { paddingHorizontal: t.space.card, paddingBottom: t.space.card },
 }));

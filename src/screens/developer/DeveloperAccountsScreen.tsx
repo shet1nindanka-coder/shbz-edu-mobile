@@ -21,7 +21,7 @@ import {
 } from '@/screens/teacher/students';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, LoadingState, Notice, PageHeader, Screen, Segmented, Text } from '@/ui';
+import { Button, Card, EmptyState, LoadingState, Notice, Panel, Panels, Screen, SectionCaption, Segmented, Text } from '@/ui';
 
 import {
   filterAccounts,
@@ -34,7 +34,9 @@ import {
   type DirectoryTab,
   type OwnerDrafts,
 } from './accounts/accounts-logic';
+import { CreateAccountFields } from './accounts/create-account-fields';
 import { CreateAccountSheet } from './accounts/create-account-sheet';
+import { CreateAccountSubmit } from './accounts/create-account-submit';
 import { DeleteTeacherDialog } from './accounts/delete-teacher-dialog';
 import { DirectorySearch } from './accounts/directory-search';
 import { OwnerSaveBar } from './accounts/owner-save-bar';
@@ -43,6 +45,8 @@ import { StudentDetailSheet, type StudentAction } from './accounts/student-detai
 import { StudentRow } from './accounts/student-row';
 import { TeacherActionsSheet, type TeacherAction } from './accounts/teacher-actions-sheet';
 import { TeacherRow } from './accounts/teacher-row';
+import { useCreateAccountForm } from './accounts/use-create-account-form';
+import { ListSlice } from './list-slice';
 
 type PageNotice = { tone: 'success' | 'error'; text: string };
 
@@ -59,18 +63,25 @@ type Overlay =
   | { kind: 'deleteTeacher'; teacher: ManagedTeacher }
   | { kind: 'deleteStudent'; student: Target };
 
-type Row = { kind: 'teacher'; teacher: ManagedTeacher } | { kind: 'student'; student: ManagedStudent };
+/** A cell of the list: the caption of a section, or one account as a piece of that section's card. */
+type Row =
+  | { kind: 'caption'; section: 'teachers' | 'students'; title: string }
+  | { kind: 'teacher'; teacher: ManagedTeacher; first: boolean; last: boolean }
+  | { kind: 'student'; student: ManagedStudent; first: boolean; last: boolean };
 
 const NO_TEACHERS: readonly ManagedTeacher[] = [];
 const NO_STUDENTS: readonly ManagedStudent[] = [];
 const NO_DRAFTS: OwnerDrafts = {};
 
 /**
- * `developer.accounts` (docs/spec/04-teacher-students.md S9): every teacher and student of the school.
- * «Новый аккаунт» creates either; a teacher row offers the login, a password reset and deletion with
- * transfer of the students; a student row adds the owner picker. Owner changes are drafts until the bar at
- * the bottom saves them all at once. Results appear as a banner above the list — the phone form of the
- * site's redirect notices.
+ * `developer.accounts` (docs/spec/04-teacher-students.md S9; layout: docs/design/glass-over-paper.md §7,
+ * mockup D-accounts): every teacher and student of the school as rows of one card per section — a neutral
+ * avatar, the name and one caption. The header switches between «Все / Учителя / Ученики». A row opens a
+ * sheet with its actions: the login, a password reset, deletion (with transfer of a teacher's students)
+ * and, for a student, the owner picker. Owner changes are drafts until the bar at the bottom saves them
+ * all at once. «Новый аккаунт» is folded behind the header button on a phone and is the panel next to the
+ * directory on a tablet. Results appear as a banner above the list — the app's form of the site's
+ * redirect notices.
  */
 export function DeveloperAccountsScreen() {
   const styles = useStyles();
@@ -82,7 +93,7 @@ export function DeveloperAccountsScreen() {
   const tabs = dict.students.directory;
   const listRef = useRef<FlashListRef<Row>>(null);
 
-  const [tab, setTab] = useState<DirectoryTab>('teachers');
+  const [tab, setTab] = useState<DirectoryTab>('all');
   const [query, setQuery] = useState('');
   const [drafts, setDrafts] = useState<OwnerDrafts>(NO_DRAFTS);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -179,18 +190,43 @@ export function DeveloperAccountsScreen() {
   // The heading must not flip while the credentials sheet plays its exit animation.
   const createdRole = useLatched(overlay?.kind === 'credentials' ? overlay.role : null);
 
-  const visibleTeachers = filterAccounts(teachers, query);
-  const visibleStudents = filterAccounts(students, query);
-  const rows: Row[] =
-    tab === 'teachers'
-      ? visibleTeachers.map((teacher) => ({ kind: 'teacher', teacher }))
-      : visibleStudents.map((student) => ({ kind: 'student', student }));
+  // The form of «Новый аккаунт» lives in the screen: a sheet on a phone, the panel next to the list on a tablet.
+  const createForm = useCreateAccountForm({
+    teachers,
+    onCreated: (account, credentials) => {
+      invalidate();
+      const next: Overlay = { kind: 'credentials', credentials, role: account.role };
+      // From the sheet: the credentials open once it has closed. From the tablet panel nothing is open.
+      if (overlay?.kind === 'create') switchOverlay(next);
+      else setOverlay(next);
+    },
+    onTeacherMissing: invalidate,
+  });
 
-  const tabLabel = (label: string, count: number) => (loaded ? format(tabs.tabWithCount, { label, n: count }) : label);
+  const visibleTeachers = tab === 'students' ? [] : filterAccounts(teachers, query);
+  const visibleStudents = tab === 'teachers' ? [] : filterAccounts(students, query);
+  const caption = (label: string, count: number) => format(tabs.tabWithCount, { label, n: count });
+  const rows: Row[] = [];
+  if (visibleTeachers.length > 0) {
+    rows.push({ kind: 'caption', section: 'teachers', title: caption(tabs.teachers, teachers.length) });
+    visibleTeachers.forEach((teacher, index) =>
+      rows.push({ kind: 'teacher', teacher, first: index === 0, last: index === visibleTeachers.length - 1 }),
+    );
+  }
+  if (visibleStudents.length > 0) {
+    rows.push({ kind: 'caption', section: 'students', title: caption(tabs.students, students.length) });
+    visibleStudents.forEach((student, index) =>
+      rows.push({ kind: 'student', student, first: index === 0, last: index === visibleStudents.length - 1 }),
+    );
+  }
 
-  const header = (
-    <View style={styles.header}>
-      <PageHeader title={t.title} gap={0} />
+  const openCreate = () => {
+    setNotice(null);
+    setOverlay({ kind: 'create' });
+  };
+
+  const notices = (
+    <>
       {notice ? (
         <Notice
           tone={notice.tone}
@@ -204,38 +240,17 @@ export function DeveloperAccountsScreen() {
       {directory.isError && loaded ? (
         <Notice tone="error" text={errorText(directory.error, m.common.errors.generic)} testID="accounts-refresh-error" />
       ) : null}
-      <Button
-        label={t.newAccount}
-        size="lg"
-        leftIcon="userPlus"
-        fullWidth
-        onPress={() => {
-          setNotice(null);
-          setOverlay({ kind: 'create' });
-        }}
-        testID="accounts-add"
-      />
-      <Text variant="sectionTitle" accessibilityRole="header" style={styles.sectionTitle}>
-        {t.directory}
-      </Text>
-      <Segmented
-        options={[
-          { value: 'teachers', label: tabLabel(tabs.teachers, teachers.length) },
-          { value: 'students', label: tabLabel(tabs.students, students.length) },
-        ]}
-        value={tab}
-        onChange={setTab}
-        accessibilityLabel={tabs.tabsAria}
-        role="tab"
-        plain
-        // The labels carry counts: never cut, the bar scrolls if they outgrow the row.
-        scrollable
-        testID="accounts-tabs"
-      />
+    </>
+  );
+
+  // The head of the list: on a phone the banners scroll with it, on a tablet they stand above the panels.
+  const listHeader = (
+    <View style={[styles.listHeader, theme.tablet ? styles.listHeaderPanel : null]}>
+      {theme.tablet ? null : notices}
       <DirectorySearch tab={tab} value={query} onChange={setQuery} />
-      {tab === 'students' && students.length > 0 && changes.length === 0 ? (
+      {tab !== 'teachers' && students.length > 0 && changes.length === 0 ? (
         <Hint>
-          <Text variant="caption" color="textMuted" testID="accounts-owner-hint">
+          <Text variant="small" color="textMuted" testID="accounts-owner-hint">
             {dict.students.studentsManager.pickHint}
           </Text>
         </Hint>
@@ -243,30 +258,130 @@ export function DeveloperAccountsScreen() {
     </View>
   );
 
-  const manager = tab === 'teachers' ? dict.students.teachersManager : dict.students.studentsManager;
-  const total = tab === 'teachers' ? teachers.length : students.length;
+  const manager = tab === 'students' ? dict.students.studentsManager : dict.students.teachersManager;
+  const total = tab === 'teachers' ? teachers.length : tab === 'students' ? students.length : teachers.length + students.length;
 
-  // Loading and failure live inside the list, under the same header: the title and «Новый аккаунт» never
-  // jump. Creating an account does not wait for the list (a student still needs a teacher from it).
-  const body = loaded ? (
-    total === 0 ? (
-      <EmptyState title={manager.empty} testID="accounts-empty" />
-    ) : (
-      <EmptyState title={manager.notFound} hint={manager.notFoundHint} testID="accounts-no-matches" />
-    )
-  ) : directoryFailure ? (
-    <LoadFailure query={directory} testID="accounts-error" />
-  ) : (
-    <LoadingState variant="cards" count={6} cardHeight={84} accessibilityLabel={m.common.a11y.loading} testID="accounts-loading" />
+  // Loading and failure live inside the list, under the same header: the search never jumps. Creating an
+  // account does not wait for the list (a student still needs a teacher from it).
+  const body = (
+    <View style={theme.tablet ? styles.bodyPanel : null}>
+      {loaded ? (
+        total === 0 ? (
+          <EmptyState variant={theme.tablet ? 'plain' : 'panel'} title={manager.empty} testID="accounts-empty" />
+        ) : (
+          <EmptyState
+            variant={theme.tablet ? 'plain' : 'panel'}
+            title={manager.notFound}
+            // «Все» searches both lists: the hint of one list would name only its own accounts.
+            hint={tab === 'all' ? undefined : manager.notFoundHint}
+            testID="accounts-no-matches"
+          />
+        )
+      ) : directoryFailure ? (
+        <LoadFailure query={directory} testID="accounts-error" />
+      ) : (
+        <LoadingState variant="list" count={6} accessibilityLabel={m.common.a11y.loading} testID="accounts-loading" />
+      )}
+    </View>
+  );
+
+  const list = (
+    <FlashList
+      ref={listRef}
+      data={rows}
+      // A row's caption depends on the drafts and on the teachers' names, not only on its own account.
+      extraData={drafts}
+      keyExtractor={(row) => (row.kind === 'caption' ? `c:${row.section}` : row.kind === 'teacher' ? `t:${row.teacher.id}` : `s:${row.student.id}`)}
+      getItemType={(row) => row.kind}
+      renderItem={({ item }) =>
+        item.kind === 'caption' ? (
+          // Inside the tablet panel a section is named by a title; on the page — by a caption above its card.
+          theme.tablet ? (
+            <Text variant="sectionTitle" accessibilityRole="header" style={styles.sectionTitle} testID={`accounts-section-${item.section}`}>
+              {item.title}
+            </Text>
+          ) : (
+            <SectionCaption style={styles.sectionCaption} testID={`accounts-section-${item.section}`}>
+              {item.title}
+            </SectionCaption>
+          )
+        ) : (
+          <ListSlice first={item.first} last={item.last}>
+            {item.kind === 'teacher' ? (
+              <TeacherRow teacher={item.teacher} divider={!item.last} onPress={(teacher) => setOverlay({ kind: 'teacher', teacher })} />
+            ) : (
+              <StudentRow
+                student={item.student}
+                ownerName={teacherNameOf(selectedOwnerId(item.student, drafts, teachers), teachers)}
+                dirty={isOwnerDirty(item.student, drafts, teachers)}
+                divider={!item.last}
+                onPress={(student) => setOverlay({ kind: 'student', studentId: student.id })}
+              />
+            )}
+          </ListSlice>
+        )
+      }
+      ListHeaderComponent={listHeader}
+      ListEmptyComponent={body}
+      contentContainerStyle={theme.tablet ? styles.panelContent : styles.listContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      // On web any scroll event counts as a drag and would blur the search field while it is typed in.
+      keyboardDismissMode={Platform.select({ ios: 'interactive', android: 'on-drag', default: 'none' })}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          tintColor={theme.colors.accentSolid}
+          colors={[theme.colors.accentSolid]}
+          progressBackgroundColor={theme.colors.cardBg}
+        />
+      }
+      testID="accounts-list"
+    />
   );
 
   return (
     <Screen
       testID="developer-accounts-screen"
-      header={<ShellAppBar title={screenTitle('developer.accounts', m.shell.tabs)} />}
+      header={
+        <ShellAppBar
+          title={screenTitle('developer.accounts', m.shell.tabs)}
+          aside={
+            <View style={styles.aside}>
+              <Segmented<DirectoryTab>
+                options={[
+                  { value: 'all', label: dict.planner.journal.filters.all },
+                  { value: 'teachers', label: tabs.teachers },
+                  { value: 'students', label: tabs.students },
+                ]}
+                value={tab}
+                onChange={setTab}
+                accessibilityLabel={tabs.tabsAria}
+                role="tab"
+                // Never cut: next to the button on a narrow phone the bar scrolls instead.
+                scrollable
+                style={theme.tablet ? null : styles.segments}
+                testID="accounts-tabs"
+              />
+              {/* A tablet shows the form itself in the panel next to the list. */}
+              {theme.tablet ? null : (
+                <Button
+                  label={m.accounts.create.short}
+                  accessibilityLabel={t.newAccount}
+                  leftIcon="plus"
+                  onPress={openCreate}
+                  testID="accounts-add"
+                />
+              )}
+            </View>
+          }
+        />
+      }
       bottomInset={false}
       scroll={false}
-      padded={false}
+      padded={theme.tablet}
+      maxWidth="full"
       footer={
         changes.length > 0 ? (
           <OwnerSaveBar
@@ -287,57 +402,33 @@ export function DeveloperAccountsScreen() {
         ) : undefined
       }
     >
-      <FlashList
-        ref={listRef}
-        data={rows}
-        // A row's lines depend on the drafts and on the teachers' names, not only on its own account.
-        extraData={drafts}
-        keyExtractor={(row) => (row.kind === 'teacher' ? `t:${row.teacher.id}` : `s:${row.student.id}`)}
-        getItemType={(row) => row.kind}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            {item.kind === 'teacher' ? (
-              <TeacherRow teacher={item.teacher} onPress={(teacher) => setOverlay({ kind: 'teacher', teacher })} />
-            ) : (
-              <StudentRow
-                student={item.student}
-                ownerName={teacherNameOf(selectedOwnerId(item.student, drafts, teachers), teachers)}
-                dirty={isOwnerDirty(item.student, drafts, teachers)}
-                onPress={(student) => setOverlay({ kind: 'student', studentId: student.id })}
-              />
-            )}
-          </View>
-        )}
-        ListHeaderComponent={header}
-        ListEmptyComponent={body}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        // On web any scroll event counts as a drag and would blur the search field while it is typed in.
-        keyboardDismissMode={Platform.select({ ios: 'interactive', android: 'on-drag', default: 'none' })}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            tintColor={theme.colors.accentSolid}
-            colors={[theme.colors.accentSolid]}
-            progressBackgroundColor={theme.colors.cardBg}
-          />
-        }
-        testID="accounts-list"
-      />
+      {theme.tablet ? (
+        <>
+          {notices}
+          <Panels>
+            {/* Not a `Panel`: that one scrolls its children, and this list scrolls (and virtualises) itself. */}
+            <Card padded={false} style={styles.listPanel} testID="accounts-directory">
+              {list}
+            </Card>
+            <Panel weight={2} testID="accounts-create-panel">
+              <Text variant="sectionTitle" accessibilityRole="header">
+                {t.newAccount}
+              </Text>
+              <CreateAccountFields form={createForm} />
+              <CreateAccountSubmit form={createForm} />
+              <Hint>
+                <Text variant="small" color="textMuted">
+                  {m.accounts.create.onceHint}
+                </Text>
+              </Hint>
+            </Panel>
+          </Panels>
+        </>
+      ) : (
+        list
+      )}
 
-      <CreateAccountSheet
-        visible={overlay?.kind === 'create'}
-        teachers={teachers}
-        onClose={closeOverlay}
-        onCreated={(account, credentials) => {
-          invalidate();
-          switchOverlay({ kind: 'credentials', credentials, role: account.role });
-        }}
-        onTeacherMissing={invalidate}
-        onClosed={openQueued}
-      />
+      <CreateAccountSheet visible={overlay?.kind === 'create'} form={createForm} onClose={closeOverlay} onClosed={openQueued} />
       <CredentialsSheet
         credentials={overlay?.kind === 'credentials' ? overlay.credentials : null}
         title={
@@ -346,8 +437,8 @@ export function DeveloperAccountsScreen() {
         onDone={() => {
           const role = overlay?.kind === 'credentials' ? overlay.role : 'STUDENT';
           closeOverlay();
-          // The new account is on the tab of its role; show it there with the banner.
-          setTab(role === 'TEACHER' ? 'teachers' : 'students');
+          // The new account must be on screen with the banner: «Все» shows it, a single list may not.
+          if (tab !== 'all') setTab(role === 'TEACHER' ? 'teachers' : 'students');
           announce({ tone: 'success', text: role === 'TEACHER' ? t.notices.teacherCreated : t.notices.studentCreated });
         }}
       />
@@ -436,8 +527,17 @@ export function DeveloperAccountsScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.field, paddingBottom: t.space.md },
-  sectionTitle: { marginTop: t.space.xs },
-  item: { paddingBottom: t.space.md },
+  // Phone: the segments take the room left of the button; a tablet header sizes them by their labels.
+  aside: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  segments: { flex: 1, minWidth: 0 },
+  // Phone: the list is the page.
+  listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
+  listHeader: { gap: t.space.md, paddingBottom: t.space.xxs },
+  sectionCaption: { paddingTop: t.space.md, paddingBottom: t.space.sm },
+  // Tablet: the list is the content of the left panel, a card that runs down to the dock.
+  listPanel: { flex: 3, minWidth: 0, minHeight: 0, overflow: 'hidden' },
+  panelContent: { paddingBottom: t.space.lg },
+  listHeaderPanel: { paddingHorizontal: t.space.card, paddingTop: t.space.card },
+  sectionTitle: { paddingHorizontal: t.space.card, paddingTop: t.space.lg, paddingBottom: t.space.xxs },
+  bodyPanel: { paddingHorizontal: t.space.card, paddingTop: t.space.md },
 }));

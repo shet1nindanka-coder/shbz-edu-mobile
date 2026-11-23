@@ -18,7 +18,6 @@ import { makeStyles, useTheme } from '@/theme';
 import {
   BottomSheet,
   Button,
-  Chip,
   DateTimeField,
   EmptyState,
   LoadingState,
@@ -53,7 +52,8 @@ const NO_NUMBERS: readonly AssignNumber[] = [];
 /**
  * `teacher.student.assign` (docs/spec/04-teacher-students.md S5): one homework = numbers of one topic +
  * a deadline + an optional title. The topic is picked in a sheet, the numbers are a list of selectable
- * cards with their statements, and "selected · deadline · assign" stay in a bar under the list.
+ * cards with their statements (two columns on a tablet), and "selected · deadline · assign" stay in a bar
+ * under the list.
  */
 export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const styles = useStyles();
@@ -65,6 +65,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const t = dict.students.assign;
   const dateTimeLabels = useDateTimeLabels();
   const listRef = useRef<FlashListRef<AssignNumber>>(null);
+  const columns = theme.tablet ? 2 : 1;
 
   const board = useQuery({
     queryKey: qk('teacherStudents', 'getAssignBoard', studentId),
@@ -151,9 +152,6 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
 
   const header = (
     <View style={styles.header}>
-      <Text variant="sectionTitle" accessibilityRole="header">
-        {t.title}
-      </Text>
       {notice ? (
         <Notice tone={notice.tone} text={notice.text} onDismiss={() => setNotice(null)} dismissLabel={m.common.actions.close} testID="assign-notice" />
       ) : null}
@@ -181,7 +179,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
             ) : null}
           </View>
           <Hint>
-            <Text variant="caption" color="textMuted">
+            <Text variant="hint" color="textMuted">
               {m.teacher.assign.steps}
             </Text>
           </Hint>
@@ -225,7 +223,12 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const footer = topic ? (
     <View style={styles.bar} testID="assign-bar">
       <View style={[styles.barRow, styles.barRowTop]}>
-        <Chip size="row" tone={picked.length > 0 ? 'green' : 'muted'} label={format(t.selected, { n: picked.length })} />
+        {/* A neutral fact: plain text, not a chip. It lines up with the field, not with field + helper. */}
+        <View style={styles.selected}>
+          <Text variant="bodyStrong" color={picked.length > 0 ? 'textStrong' : 'textMuted'} tabular testID="assign-selected">
+            {format(t.selected, { n: picked.length })}
+          </Text>
+        </View>
         <DateTimeField
           value={deadline}
           today={mskToday()}
@@ -276,8 +279,10 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
         ref={listRef}
         data={numbers}
         keyExtractor={(number) => number.id}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
+        // A tablet has the room for two columns of statements.
+        numColumns={columns}
+        renderItem={({ item, index }) => (
+          <View style={[styles.item, columns > 1 ? (index % columns === 0 ? styles.itemLeft : styles.itemRight) : null]}>
             <NumberSelectCard
               number={item.number}
               status={item.status}
@@ -291,7 +296,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
             />
           </View>
         )}
-        extraData={[picked, issue.isPending]}
+        extraData={[picked, issue.isPending, columns]}
         ListHeaderComponent={header}
         ListEmptyComponent={body}
         contentContainerStyle={styles.listContent}
@@ -329,7 +334,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
             testID="assign-title-input"
           />
           <Hint>
-            <Text variant="caption" color="textMuted">
+            <Text variant="hint" color="textMuted">
               {m.teacher.assign.titleHint}
             </Text>
           </Hint>
@@ -340,14 +345,17 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.md, paddingBottom: t.space.lg },
+  listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.lg },
   header: { gap: t.space.md, paddingBottom: t.space.md },
-  links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, minHeight: 28 },
-  item: { paddingBottom: t.space.md },
+  links: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, minHeight: t.sizes.control.xs },
+  item: { flex: 1, paddingBottom: t.space.block },
+  itemLeft: { paddingRight: t.space.xs },
+  itemRight: { paddingLeft: t.space.xs },
   bar: { gap: t.space.sm },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  // The deadline field carries a helper line: the chip lines up with the field, not with field + helper.
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  // The deadline field carries a helper line: the counter lines up with the field, not with field + helper.
   barRowTop: { alignItems: 'flex-start' },
+  selected: { minHeight: t.sizes.field, justifyContent: 'center' },
   grow: { flex: 1, minWidth: 0 },
   titleButton: { maxWidth: '45%' },
   sheet: { gap: t.space.sm },

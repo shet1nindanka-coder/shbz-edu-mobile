@@ -9,7 +9,6 @@ import { format, plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Dialog, Notice, Spinner, Text, TextButton } from '@/ui';
 
-
 export type DeleteTopicDialogProps = {
   /** The topic to delete; `null` keeps the dialog closed. */
   topic: { id: string; title: string } | null;
@@ -99,7 +98,7 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
       onCancel={close}
       testID={testID ?? 'delete-topic-dialog'}
     >
-      <Text variant="small" color="label" style={styles.paragraph}>
+      <Text variant="small" color="label">
         {t.before}
         <Text variant="smallBold" color="textStrong">
           {format(t.quoted, { title: topic?.title ?? lastTitle })}
@@ -128,7 +127,7 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
       {data && summary ? (
         data.lines.length > 0 ? (
           <View style={styles.impact} testID="delete-topic-impact">
-            <Text variant="small" color="label" style={styles.paragraph}>
+            <Text variant="small" color="label">
               {t.workBefore}
               <Text variant="smallBold" color="textStrong">
                 {String(summary.numbersWithWork)}
@@ -136,13 +135,13 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
               {plural(locale, summary.numbersWithWork, t.workAfterForms)}
             </Text>
             {data.lines.map((line) => (
-              <Text key={line} variant="small" color="label" style={styles.paragraph}>
+              <Text key={line} variant="small" color="label">
                 {`— ${line}`}
               </Text>
             ))}
           </View>
         ) : (
-          <Text variant="small" color="textMuted" style={styles.paragraph} testID="delete-topic-no-work">
+          <Text variant="small" color="textMuted" testID="delete-topic-no-work">
             {t.noWork}
           </Text>
         )
@@ -154,7 +153,6 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
 }
 
 const useStyles = makeStyles((t) => ({
-  paragraph: { lineHeight: 22 },
   loading: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.minTouch },
   impact: { gap: t.space.xxs },
 }));

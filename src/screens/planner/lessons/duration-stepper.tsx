@@ -73,8 +73,9 @@ const useStyles = makeStyles((t) => ({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: t.space.sm,
-    minHeight: t.sizes.minTouch,
+    gap: t.space.xs,
+    minHeight: t.sizes.control.md,
   },
-  value: { minWidth: 76 },
+  // Room for «240 мин» between the two marks, so the row does not jump while the value changes.
+  value: { minWidth: t.sizes.control.md * 2 },
 }));
