@@ -19,7 +19,13 @@ DEVELOPER. UI is bilingual (ru default, en).
 1. `docs/spec/00-unified-contract.md` — canonical types, API contract (112 methods, 9 client members), screen
    registry, navigation. Wins on every name/shape/path/error code.
 2. `docs/spec/90-addendum-*.md` — corrections (`CORRECTION to …` notes override the numbered specs).
-3. `docs/spec/01…09-*.md` — owner specs: layouts, texts, business rules, fixtures, design system.
+3. `docs/spec/01…09-*.md` — owner specs: layouts, texts, business rules, fixtures.
+
+**Everything visual** — colours, scales, components, the dock, the screen header, how a screen is laid out
+on a phone and on a tablet — is ruled by `docs/design/glass-over-paper.md` (the owner-approved «Стекло над
+листом» redesign). It replaces `docs/spec/08-design-system.md` and the layout parts of the owner specs;
+the specs still rule on behaviour, data, site texts, limits and error codes. Read its §1 (the owner's
+rules) before touching a screen.
 
 `docs/foundation.md` is the reference of the shared layers (API binding, mock context, providers, navigation,
 UI kit, i18n, domain helpers, math/files): read the relevant section before writing a screen or a mock member.
@@ -91,9 +97,13 @@ and `/dev-math` (formula gallery) are developer-only pages. The route table is t
 `src/navigation/routes.ts`.
 
 Screens: a screen lives in `src/screens/<area>/<Name>Screen.tsx`; the export name and props are fixed by the
-route file that renders it. Tab roots render `<Screen header={<ShellAppBar title=… />} bottomInset={false}>`,
-pushed screens `<Screen header={<DetailAppBar title=… />}>` (both from `@/screens/shell`). Navigate only
-through `useAppNavigation()` / `useNavTarget()` — never import `expo-router` in a screen.
+route file that renders it. Section roots render `<Screen header={<ShellAppBar title=… aside=… />}>`, pushed
+screens `<Screen header={<DetailAppBar title=… backTitle=… />}>` (both from `@/screens/shell`); the screen
+title is the header title — there is no separate page header. A tablet screen (`useTheme().tablet`, width ≥
+768) uses `<Screen scroll={!theme.tablet} maxWidth="full">` with `<Panels>` / `<Panel>`. The bottom dock is
+one overlay for the whole app (`DockHost` in the root layout), not a navigator's tab bar; `Screen` leaves
+room for it. Navigate only through `useAppNavigation()` / `useNavTarget()` — never import `expo-router` in
+a screen.
 
 Mock members: `src/mock/members/<member>.ts` exports `create<Member>(ctx: MockContext)`. Use `ctx.auth`,
 `ctx.guard`, `ctx.q`, `ctx.limits`, `ctx.progress.write`, `ctx.homework.issue`, `ctx.jobs`, `ctx.errors`
@@ -103,7 +113,8 @@ instead of re-implementing rules; fixtures (`src/mock/fixtures/**`) change only 
 Generated files (never hand-edit, regenerate with the script): `src/lib/i18n/**` (`npm run sync:i18n --
 <site repo>`), `src/components/math/generated/**` (`scripts/build-katex-assets.mjs`),
 `src/services/files/generated/**` + `assets/mock-files/**` (`scripts/build-mock-files.mjs`),
-`assets/images/**` (`scripts/build-icons.mjs`).
+`assets/images/**` (`scripts/build-icons.mjs`), `src/ui/internal/generated/**` (the Lucide icon set,
+`scripts/build-lucide-icons.mjs`; a new icon is added to that script's table).
 
 Rules:
 
@@ -125,9 +136,16 @@ Rules:
 - **i18n** — no hard-coded user-facing strings. Site texts come from `dict.*` (same keys as the site);
   mobile-only texts from `m.<area>.*`, always in both languages. Placeholders via `format()`, plural forms via
   `plural(locale, n, forms)`.
-- **Styling** — `StyleSheet` + theme tokens from `useTheme()`; no hard-coded colours, radii or font sizes in
-  screens. Status colours come from the status meta helper, not from literals. Fonts: one `fontFamily` per
-  weight (never `fontWeight` with a custom family).
+- **Styling** — `makeStyles` + theme tokens from `useTheme()`; no hard-coded colours, radii, font sizes or
+  spacing in screens, and nothing outside the scales: heights 28 · 36 · 44 · 52, radii 8 · 12 · 16 · 24,
+  type 34/24 · 20/17 · 15 · 13 · 12 · 11, spacing 2 · 4 · 8 · 12 · 16 · 24 · 32. One accent (the mint
+  gradient) for the main action and progress; green / yellow / red for number statuses only; glass for
+  navigation only. Status colours come from `theme.status`, not from literals. Font: Onest, one
+  `fontFamily` per weight (never `fontWeight` with a custom family). Icons: Lucide through `<Icon name>`.
+- **Layout** — one screen, one task; a list row is a title, one caption and at most one element on the
+  right, pressed as a whole (no «Открыть» buttons in rows); a coloured label only where attention is
+  needed; forms and secondary actions are folded behind a button that opens a sheet; many numbers never
+  grow a screen (`NumbersOverview` + one selected-number card + the «Все номера» sheet).
 - **Math** — conditions and answers are rendered only through `MathContent` (KaTeX, same output as the site).
 - **Web quirk** — inactive tab scenes stay in the DOM on web (inert); Playwright selectors in screenshot
   scripts need `:not([inert] *)`.

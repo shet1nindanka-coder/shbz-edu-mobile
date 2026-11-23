@@ -230,6 +230,11 @@ Public API of the shared layers, as reported by the agents that built them. Area
 
 ## Theme and UI kit
 
+> **The look of the app was redesigned («Стекло над листом»).** `docs/design/glass-over-paper.md` is the
+> current reference for colours, scales, the component table, the dock, the screen header and tablet
+> panels. The lists below describe the same kit; where a detail differs (sizes, radii, the tab bar, the
+> page header, Feather icons, Montserrat), the design document and the code win.
+
 ### `@/theme`
 
 - `ThemeProvider` — `<ThemeProvider mode={'system' | 'light' | 'dark'}>`; `system` follows the OS live. Can be nested.
