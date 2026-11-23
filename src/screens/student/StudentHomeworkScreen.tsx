@@ -1,26 +1,26 @@
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, RefreshControl, View } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 
 import { HIGHLIGHT_FLASH_MS, errorText, hasErrorCode, qk, useApi } from '@/api';
-import type { StudentCheckResultDto, StudentHomeworkNumberDto } from '@/api/types';
+import type { StudentCheckResultDto } from '@/api/types';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
-import { formatDateTime } from '@/domain/dates';
+import { NumbersOverview } from '@/components/numbers';
+import { deadlineCaption } from '@/domain/deadline-caption';
+import { pickFocusNumberId } from '@/domain/number-focus';
 import { serverClockOffset } from '@/domain/server-clock';
-import { isHomeworkOverdue } from '@/domain/statuses';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, screenTitle } from '@/screens/shell';
 import { useServerNow } from '@/services/clock';
 import { refreshQueries, usePullRefresh } from '@/services/query';
-import { makeStyles, useTheme } from '@/theme';
-import { Card, Chip, Divider, LoadingState, Notice, Screen, Text } from '@/ui';
+import { makeStyles } from '@/theme';
+import { Card, LoadingState, Notice, Screen } from '@/ui';
 
 import { HomeworkCheckBlock } from './work/homework-check-block';
 import { HomeworkNumberCard } from './work/homework-number-card';
 import { HomeworkPhotosBlock } from './work/homework-photos-block';
-import { UNAVAILABLE_RECHECK_MS, homeworkDetailMeta, homeworkLabel, isHomeworkCompleted } from './work/logic';
+import { UNAVAILABLE_RECHECK_MS, homeworkLabel, isHomeworkCompleted } from './work/logic';
 import { useHomeworkCheck } from './work/use-homework-check';
 import { useOnReturn, useScreenLive } from './work/use-screen-live';
 
@@ -28,21 +28,24 @@ import { useOnReturn, useScreenLive } from './work/use-screen-live';
 export type StudentHomeworkScreenProps = ScreenParams['student.homework'];
 
 /**
- * `student.homework` (docs/spec/03-student-homework-lesson.md §1 H2 – H4): one homework — the photo batch,
- * the AI check with its verdicts, and a card per problem with the statement and the student's note.
+ * `student.homework` (docs/spec/03-student-homework-lesson.md §1 H2 – H4; layout: docs/design/
+ * glass-over-paper.md §7, principle 5): one homework. The screen does not grow with the number of problems:
+ * «Осталось 13 из 50», the bar by status, one row of tiles with the numbers that still need work and ONE
+ * card — of the selected number, with its statement and the student's note; every number is in the sheet
+ * «Все номера». Below: the photo batch and the AI check with its verdicts.
  * A homework that no longer exists (cancelled by the teacher) leads back to the list (00 §3.3).
  */
 export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenProps) {
   const styles = useStyles();
-  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const navigation = useAppNavigation();
   const { dict, m, locale } = useI18n();
-  const t = dict.student.homework;
   const live = useScreenLive();
 
-  const listRef = useRef<FlashListRef<StudentHomeworkNumberDto>>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  // The number whose card is shown; null = let the screen choose (the first that needs help).
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -106,11 +109,13 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
     pull.refresh();
   };
 
+  // «Перерешать № N» of a verdict: that number becomes the shown card, the screen returns to it and the
+  // card is ringed for a moment.
   const redo = (result: StudentCheckResultDto) => {
     if (!data) return;
-    const index = data.assignment.numbers.findIndex((number) => number.homeworkNumberId === result.homeworkNumberId);
-    if (index < 0) return;
-    void listRef.current?.scrollToIndex({ index, animated: true, viewOffset: theme.space.md });
+    if (!data.assignment.numbers.some((number) => number.homeworkNumberId === result.homeworkNumberId)) return;
+    setPickedId(result.homeworkNumberId);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
     setHighlighted(result.homeworkNumberId);
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
     highlightTimer.current = setTimeout(() => setHighlighted(null), HIGHLIGHT_FLASH_MS);
@@ -122,21 +127,40 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
   let body;
   if (data && assignment && !gone) {
     const completed = isHomeworkCompleted(assignment);
-    const overdue = isHomeworkOverdue(assignment.deadlineAt, completed, nowMs);
-    const badges = dict.student.deadlineList;
-    const header = (
-      <View style={styles.header}>
-        <View style={styles.meta}>
-          <Text variant="small" color="textMuted" style={styles.metaText} testID="homework-meta">
-            {homeworkDetailMeta(assignment, t, assignment.deadlineAt ? formatDateTime(assignment.deadlineAt, locale) : null)}
-          </Text>
-          {completed ? <Chip tone="green" label={badges.doneBadge} /> : null}
-          {overdue ? <Chip tone="red" label={badges.overdueBadge} /> : null}
-        </View>
+    const deadline = deadlineCaption(assignment.deadlineAt, completed, nowMs, locale, m.common.deadline);
+    const numbers = assignment.numbers.map((number) => ({ id: number.homeworkNumberId, number: number.number, status: number.status }));
+    const selectedId = pickFocusNumberId(numbers, pickedId);
+    const selected = assignment.numbers.find((number) => number.homeworkNumberId === selectedId);
 
+    body = (
+      <>
         {/* The cached homework stays on screen when a refresh fails (offline): say so instead of replacing it. */}
         {detail.isError ? (
           <Notice tone="error" text={errorText(detail.error, m.studentWork.homework.refreshFailed)} testID="homework-refresh-error" />
+        ) : null}
+
+        {numbers.length > 0 ? (
+          <Card testID="homework-numbers">
+            <NumbersOverview
+              numbers={numbers}
+              selectedId={selectedId}
+              onSelect={setPickedId}
+              aside={deadline.text}
+              asideTone={deadline.attention ? 'attention' : 'muted'}
+              testID="homework-overview"
+            />
+          </Card>
+        ) : null}
+
+        {selected ? (
+          <HomeworkNumberCard
+            // Another number must not carry this one's unsaved draft.
+            key={selected.homeworkNumberId}
+            number={selected}
+            notesEnabled={data.notesEnabled}
+            noteMaxLength={data.limits.noteMaxLength}
+            highlighted={highlighted === selected.homeworkNumberId}
+          />
         ) : null}
 
         <Card style={styles.work}>
@@ -146,7 +170,6 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
             maxPhotos={data.limits.maxPhotosPerAssignment}
             onGone={leave}
           />
-          <Divider />
           <HomeworkCheckBlock
             check={assignment.latestCheck}
             hasPhotos={assignment.photos.length > 0}
@@ -155,50 +178,7 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
             onRedo={redo}
           />
         </Card>
-
-        {assignment.numbers.length > 0 ? (
-          <Text variant="sectionTitle" accessibilityRole="header">
-            {t.numbers}
-          </Text>
-        ) : null}
-      </View>
-    );
-
-    body = (
-      <FlashList
-        ref={listRef}
-        data={assignment.numbers}
-        keyExtractor={(number) => number.homeworkNumberId}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <HomeworkNumberCard
-              // A recycled row must not carry another problem's unsaved draft.
-              key={item.homeworkNumberId}
-              number={item}
-              notesEnabled={data.notesEnabled}
-              noteMaxLength={data.limits.noteMaxLength}
-              highlighted={highlighted === item.homeworkNumberId}
-            />
-          </View>
-        )}
-        extraData={highlighted}
-        ListHeaderComponent={header}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        // On web any scroll counts as a drag, including the browser bringing a focused note into view.
-        keyboardDismissMode={Platform.select({ ios: 'interactive', android: 'on-drag', default: 'none' })}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            tintColor={theme.colors.accentSolid}
-            colors={[theme.colors.accentSolid]}
-            progressBackgroundColor={theme.colors.cardBg}
-          />
-        }
-        testID="homework-numbers"
-      />
+      </>
     );
   } else if (isLoadFailed(detail) && !gone) {
     body = <LoadFailure query={detail} testID="homework-error" />;
@@ -206,16 +186,20 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
     body = <LoadingState variant="cards" accessibilityLabel={m.common.a11y.loading} testID="homework-loading" />;
   }
 
-  const showList = Boolean(data && assignment && !gone);
-
   return (
     <Screen
       testID="student-homework-screen"
-      header={<DetailAppBar title={label} subtitle={assignment?.topicTitle} />}
-      // The screen sits inside the «дз» tab: the tab bar owns the bottom inset.
-      bottomInset={false}
-      scroll={!showList}
-      padded={!showList}
+      // The title is the homework's own name or its topic; «ДЗ 2» of that topic goes under it.
+      header={
+        <DetailAppBar
+          title={assignment ? (assignment.title ?? assignment.topicTitle) : label}
+          subtitle={assignment && !assignment.title ? label : undefined}
+          backTitle={m.shell.tabs.homeworks}
+        />
+      }
+      scrollRef={scrollRef}
+      refreshing={refreshing}
+      onRefresh={refresh}
     >
       {body}
     </Screen>
@@ -223,10 +207,5 @@ export function StudentHomeworkScreen({ assignmentId }: StudentHomeworkScreenPro
 }
 
 const useStyles = makeStyles((t) => ({
-  listContent: { paddingHorizontal: t.space.gutter, paddingTop: t.space.lg, paddingBottom: t.space.pageBottom },
-  header: { gap: t.space.field, paddingBottom: t.space.field },
-  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
-  metaText: { flexShrink: 1 },
-  work: { gap: t.space.field },
-  row: { paddingBottom: t.space.md },
+  work: { gap: t.space.md },
 }));

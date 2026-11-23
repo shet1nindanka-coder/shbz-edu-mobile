@@ -22,14 +22,14 @@ const BRAND_PART = 'Школа';
 const BRAND_NAME = `${INK_PART} ${BRAND_PART}`;
 
 /**
- * Logo «ШБЗШкола» in Montserrat Black. The suffix uses the flat brand colour (the site's og:image and
- * print variant); below 22px it switches to the deeper brand tone, as the site's small version does.
+ * Logo «ШБЗШкола» in Onest Black: «ШБЗ» in ink, «Школа» in the muted text colour.
  */
 export function Logo({ size = 24, variant = 'default', monoColor, accessibilityLabel = BRAND_NAME, style }: LogoProps) {
   const theme = useTheme();
   const mono = variant === 'mono' ? (monoColor ?? theme.colors.textStrong) : null;
   const ink = mono ?? (variant === 'onDark' ? theme.colors.onAccent : theme.colors.logoInk);
-  const brand = mono ?? (size < 22 ? theme.colors.brandDeep : theme.colors.brand);
+  // One accent in the design (the mint gradient, for actions): the suffix is a quiet grey, not a green of its own.
+  const brand = mono ?? theme.colors.textMuted;
   const lineHeight = Math.round(size * 1.2);
   return (
     <Text

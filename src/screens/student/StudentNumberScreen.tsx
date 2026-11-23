@@ -30,7 +30,7 @@ const KEYBOARD_SETTLE_MS = 250;
 export function StudentNumberScreen({ number }: StudentNumberScreenProps) {
   const styles = useStyles();
   const api = useApi();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const scroll = useRef<ScrollViewInstance>(null);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,7 +64,7 @@ export function StudentNumberScreen({ number }: StudentNumberScreenProps) {
       testID="student-number-screen"
       header={
         // The title carries the RECORDED spelling once it is known; the eyebrow is the topic.
-        <DetailAppBar title={format(dict.student.number.title, { number: data?.number.number ?? number })} subtitle={data?.topic.title} />
+        <DetailAppBar title={format(dict.student.number.title, { number: data?.number.number ?? number })} subtitle={data?.topic.title} backTitle={m.shell.tabs.homeworks} />
       }
       scrollRef={scroll}
       refreshing={refreshing}

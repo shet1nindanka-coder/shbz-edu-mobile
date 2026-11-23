@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
 import type { LessonItemDto, LessonItemResult, SolutionVerdict } from '@/api/types';
@@ -7,13 +8,14 @@ import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, Card, Chip, Notice, ProgressBar, Spinner, Text, type ChipTone } from '@/ui';
+import { Button, Card, Icon, Notice, ProgressBar, Spinner, Text } from '@/ui';
 
 import { isCheckRunning, lessonItemChip } from './logic';
 import { PickProblemNotice, type PickProblem } from './use-photo-source';
 
-const RESULT_CHIP: Record<LessonItemResult, ChipTone> = { SOLVED: 'green', PARTIAL: 'yellow', NOT_SOLVED: 'red', SKIPPED: 'muted' };
-const VERDICT_CHIP: Record<SolutionVerdict, ChipTone> = { CORRECT: 'green', INCORRECT: 'red', UNCERTAIN: 'muted' };
+/** Only «перерешай» asks for attention; every other outcome is a plain caption (the tile carries the colour). */
+const RESULT_ATTENTION: Record<LessonItemResult, boolean> = { SOLVED: false, PARTIAL: false, NOT_SOLVED: true, SKIPPED: false };
+const VERDICT_ATTENTION: Record<SolutionVerdict, boolean> = { CORRECT: false, INCORRECT: true, UNCERTAIN: false };
 
 export type LessonItemCardProps = {
   item: LessonItemDto;
@@ -34,12 +36,15 @@ export type LessonItemCardProps = {
   /** The photos for this item are being prepared. */
   preparing: boolean;
   onSubmit: (item: LessonItemDto) => void;
+  /** Node on the right of the number: the time left until the end of the lesson. */
+  aside?: ReactNode;
 };
 
 /**
- * One problem of a live lesson (docs/spec/03-student-homework-lesson.md §1 L2 "Lesson item card"): the
- * result or verdict chip, the checking indicator or the time of the last submission, the statement, the
- * check's comment or failure, and the control that sends photos — visible only while the item can be
+ * The card of the current problem of a live lesson (docs/spec/03-student-homework-lesson.md §1 L2 "Lesson
+ * item card"; layout: docs/design/glass-over-paper.md §8): the number with the time left, one caption — the
+ * outcome, the running check or the time of the last submission — the statement, the check's remark, and
+ * the one main action of the screen: «Сдать решение». The control is visible only while the item can be
  * submitted.
  */
 export function LessonItemCard({
@@ -55,6 +60,7 @@ export function LessonItemCard({
   onDismissPickProblem,
   preparing,
   onSubmit,
+  aside,
 }: LessonItemCardProps) {
   const styles = useStyles();
   const { dict, m, locale } = useI18n();
@@ -65,44 +71,55 @@ export function LessonItemCard({
   const chip = lessonItemChip(item);
   const showSubmit = item.canSubmit || uploading;
 
+  const outcome = chip?.kind === 'result' ? t.results[chip.result] : chip?.kind === 'verdict' ? t.verdicts[chip.verdict] : null;
+  const attention = chip?.kind === 'result' ? RESULT_ATTENTION[chip.result] : chip?.kind === 'verdict' ? VERDICT_ATTENTION[chip.verdict] : false;
+  const caption = [item.topicTitle, outcome ?? (submission && !checking ? format(t.submittedAt, { time: formatClockTime(submission.submittedAt, locale) }) : null)]
+    .filter(Boolean)
+    .join(' · ');
+  const remark = submission && submission.status === 'DONE' ? submission.comment : null;
+
   return (
     <Card style={styles.card} testID={`lesson-item-${item.number}`}>
       <View style={styles.head}>
         <Text
-          variant="numberTitle"
+          variant="sectionTitle"
+          tabular
           accessibilityRole="header"
           accessibilityLabel={format(m.studentWork.lesson.itemA11y, { index, number: item.number })}
           style={styles.title}
         >
-          <Text variant="numberTitle" color="textMuted">
-            {index}.{' '}
-          </Text>
-          {format(dict.topics.widgets.numberLabel, { number: item.number })}
+          {item.number}
         </Text>
-        {chip?.kind === 'result' ? <Chip tone={RESULT_CHIP[chip.result]} label={t.results[chip.result]} /> : null}
-        {chip?.kind === 'verdict' ? <Chip tone={VERDICT_CHIP[chip.verdict]} label={t.verdicts[chip.verdict]} /> : null}
+        {aside}
       </View>
 
       <View style={styles.meta}>
-        <Chip tone="muted" label={item.topicTitle} style={styles.topic} />
+        <Text variant="small" color={attention ? 'redText' : 'textMuted'} style={styles.caption} testID={`lesson-outcome-${item.number}`}>
+          {caption}
+        </Text>
         {checking ? (
           <View style={styles.checking} accessible accessibilityLiveRegion="polite" accessibilityLabel={t.checking}>
             <Spinner size={14} />
-            <Text variant="captionStrong" color="textMuted">
+            <Text variant="small" color="textMuted">
               {t.checking}
             </Text>
           </View>
-        ) : submission ? (
-          <Text variant="caption">{format(t.submittedAt, { time: formatClockTime(submission.submittedAt, locale) })}</Text>
         ) : null}
       </View>
 
-      {item.conditionLatex ? <MathContent value={item.conditionLatex} testID={`lesson-condition-${item.number}`} /> : null}
+      {item.conditionLatex ? (
+        <Card>
+          <MathContent value={item.conditionLatex} testID={`lesson-condition-${item.number}`} />
+        </Card>
+      ) : null}
 
-      {submission && submission.status === 'DONE' && submission.comment ? (
-        <Text variant="small" testID={`lesson-comment-${item.number}`}>
-          {submission.comment}
-        </Text>
+      {remark ? (
+        <View style={styles.remark}>
+          {attention ? <Icon name="close" size={16} color="redText" /> : null}
+          <Text variant="small" color={attention ? 'redText' : 'label'} style={styles.remarkText} testID={`lesson-comment-${item.number}`}>
+            {remark}
+          </Text>
+        </View>
       ) : null}
 
       {submission && submission.status === 'FAILED' ? (
@@ -134,7 +151,7 @@ export function LessonItemCard({
                   : format(submission ? t.resubmit : t.submit, { number: item.number })
             }
             accessibilityLabel={uploading || preparing ? undefined : format(t.submitAria, { number: item.number })}
-            variant={submission ? 'outline' : 'primary'}
+            size="lg"
             leftIcon="camera"
             loading={uploading || preparing}
             disabled={submitDisabled}
@@ -161,10 +178,12 @@ export function LessonItemCard({
 
 const useStyles = makeStyles((t) => ({
   card: { gap: t.space.md },
-  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
-  title: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
-  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
-  topic: { flexShrink: 1 },
-  checking: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
+  title: { flexShrink: 1, minWidth: 0 },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm, marginTop: -t.space.sm },
+  caption: { flexShrink: 1, minWidth: 0 },
+  checking: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxs },
+  remark: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
+  remarkText: { flex: 1, minWidth: 0 },
   submit: { gap: t.space.sm },
 }));

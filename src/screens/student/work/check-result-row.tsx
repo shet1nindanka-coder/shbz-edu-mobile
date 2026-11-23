@@ -4,47 +4,46 @@ import { View } from 'react-native';
 import type { SolutionVerdict, StudentCheckResultDto } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
-import { makeStyles, useTheme } from '@/theme';
-import { Button, Chip, PressableScale, Text, type ChipTone } from '@/ui';
+import { makeStyles, type ColorToken } from '@/theme';
+import { PressableScale, Text, TextButton } from '@/ui';
 
 import { recognizedAnswerOf, shortenRecognizedAnswer } from './logic';
 
-const VERDICT_CHIP: Record<SolutionVerdict, ChipTone> = { CORRECT: 'green', INCORRECT: 'red', UNCERTAIN: 'muted' };
+/** Only a wrong solution asks for attention; the other verdicts are plain text. */
+const VERDICT_COLOR: Record<SolutionVerdict, ColorToken> = { CORRECT: 'textStrong', INCORRECT: 'redText', UNCERTAIN: 'textStrong' };
 
 export type CheckResultRowProps = {
   result: StudentCheckResultDto;
-  /** «Перерешать № N»: scroll to the number card of this problem. */
+  /** «Перерешать № N»: show the card of this problem. */
   onRedo: (result: StudentCheckResultDto) => void;
+  /** Hairline under the row; off on the last one. */
+  divider?: boolean;
 };
 
 /**
  * One verdict of a finished check (docs/spec/03-student-homework-lesson.md §1 H2.b "DONE with results"):
- * a stripe in the verdict colour, «№ N» with the verdict pill, the recognised answer (shortened; a tap
- * shows it in full), the comment and — for a wrong solution — the way to the number card.
+ * a row — «051004 · неверно» as its title (red only for a wrong solution), the recognised answer
+ * (shortened; a tap shows it in full) and the comment as its caption, and — for a wrong solution — the way
+ * to the number's card.
  */
-export function CheckResultRow({ result, onRedo }: CheckResultRowProps) {
+export function CheckResultRow({ result, onRedo, divider = true }: CheckResultRowProps) {
   const styles = useStyles();
-  const theme = useTheme();
   const { dict, m } = useI18n();
   const t = dict.student.check;
   const [expanded, setExpanded] = useState(false);
 
-  const stripe =
-    result.verdict === 'CORRECT'
-      ? theme.status.GREEN.text
-      : result.verdict === 'INCORRECT'
-        ? theme.status.RED.text
-        : theme.colors.kicker;
   const answer = recognizedAnswerOf(result);
   const short = answer ? shortenRecognizedAnswer(answer) : null;
   const shortened = answer !== null && short !== answer;
 
   return (
-    <View style={[styles.row, { borderLeftColor: stripe }]} testID={`check-result-${result.number}`}>
-      <View style={styles.head}>
-        <Text variant="smallBold">{format(dict.topics.widgets.numberLabel, { number: result.number })}</Text>
-        <Chip tone={VERDICT_CHIP[result.verdict]} label={t.verdicts[result.verdict]} />
-      </View>
+    <View style={[styles.row, divider ? styles.divider : null]} testID={`check-result-${result.number}`}>
+      <Text variant="bodyStrong" color={VERDICT_COLOR[result.verdict]} accessibilityLabel={`${format(dict.topics.widgets.numberLabel, { number: result.number })}, ${t.verdicts[result.verdict]}`}>
+        <Text variant="bodyStrong" tabular color={VERDICT_COLOR[result.verdict]}>
+          {result.number}
+        </Text>
+        {` · ${t.verdicts[result.verdict].toLocaleLowerCase()}`}
+      </Text>
 
       {answer ? (
         shortened ? (
@@ -70,15 +69,18 @@ export function CheckResultRow({ result, onRedo }: CheckResultRowProps) {
         )
       ) : null}
 
-      {result.comment ? <Text variant="small">{result.comment}</Text> : null}
+      {result.comment ? (
+        <Text variant="small" color="textMuted">
+          {result.comment}
+        </Text>
+      ) : null}
 
       {result.verdict === 'INCORRECT' ? (
         <View style={styles.redo}>
-          <Button
+          <TextButton
             label={format(t.redo, { number: result.number })}
-            variant="outline"
+            variant="buttonSm"
             onPress={() => onRedo(result)}
-            style={styles.redoButton}
             testID={`check-redo-${result.number}`}
           />
           <Hint>
@@ -91,17 +93,8 @@ export function CheckResultRow({ result, onRedo }: CheckResultRowProps) {
 }
 
 const useStyles = makeStyles((t) => ({
-  row: {
-    gap: t.space.xs,
-    paddingVertical: t.space.sm,
-    paddingLeft: t.space.md,
-    paddingRight: t.space.md,
-    borderLeftWidth: 3,
-    borderRadius: t.radii.sm,
-    backgroundColor: t.colors.softBg,
-  },
-  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm },
+  row: { gap: t.space.xxxs, paddingVertical: t.space.md },
+  divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.line },
   answer: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
-  redo: { gap: t.space.xs, marginTop: t.space.xxs },
-  redoButton: { alignSelf: 'flex-start' },
+  redo: { gap: t.space.xxs, marginTop: t.space.xs, alignItems: 'flex-start' },
 }));

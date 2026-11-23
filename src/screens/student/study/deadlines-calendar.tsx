@@ -80,7 +80,7 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
   };
 
   return (
-    <Card padded={12} testID="deadlines-calendar">
+    <Card testID="deadlines-calendar">
       <View style={styles.header}>
         <IconButton icon="chevronLeft" accessibilityLabel={dict.topics.widgets.datetime.prevMonth} onPress={() => onChangeMonth(-1)} testID="calendar-prev" />
         <Text variant="calendarMonth" align="center" numberOfLines={1} accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.month} testID="calendar-month">
@@ -91,8 +91,8 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
 
       <View style={styles.weekdays} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {dict.student.weekdaysShort.map((label) => (
-          <Text key={label} variant="kickerSm" align="center" numberOfLines={1} style={styles.weekday}>
-            {label}
+          <Text key={label} variant="chip" color="textMuted" align="center" numberOfLines={1} style={styles.weekday}>
+            {label.toLocaleLowerCase()}
           </Text>
         ))}
       </View>
@@ -108,6 +108,7 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
                   cell={cell}
                   open={cell.key === openDayKey}
                   accessibilityLabel={cellLabel(cell)}
+                  today={today}
                   onPress={(pressed) => onOpenDay(pressed.key)}
                 />
               ))}

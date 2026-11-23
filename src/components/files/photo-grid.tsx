@@ -1,6 +1,6 @@
-// Grid of solution photos with an optional "add" tile — the phone form of the site's dropzone + thumbnail
-// strip (docs/spec/03-student-homework-lesson.md §1, docs/spec/08-design-system.md §5.15: drag-and-drop
-// does not exist on a phone, the tile is a tap target that opens camera / gallery).
+// Row of solution photos with an optional "add" tile (docs/design/glass-over-paper.md, `.pt` / `.pt.add`):
+// small square thumbnails — the photos are proof that something is attached, a tap opens one full screen —
+// and a dashed tile with a plus that opens camera / gallery. The row wraps; it never takes over the screen.
 import { useState } from 'react';
 import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -24,7 +24,7 @@ export type PhotoGridItem = {
 
 export type PhotoGridProps = {
   photos: PhotoGridItem[];
-  /** Tiles per row. Default 3. */
+  /** Tiles per row: the tiles then share the width. Default: fixed 52-point tiles that wrap. */
   columns?: number;
   /** Opens photo `index` full screen. */
   onOpen?: (index: number) => void;
@@ -34,7 +34,7 @@ export type PhotoGridProps = {
   removingKey?: string | null;
   /** Shows the "add" tile after the photos. */
   onAdd?: () => void;
-  /** Text of the add tile. Default `m.common.photos.add`. */
+  /** State of the add tile («Загружаем…», «Фото добавлено»): spoken as its name and shown after the tiles. */
   addLabel?: string;
   /** The add tile is visible but inert (limit reached, upload running). */
   addDisabled?: boolean;
@@ -44,11 +44,11 @@ export type PhotoGridProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-const GAP = 10;
+const GAP = 8;
 
 export function PhotoGrid({
   photos,
-  columns = 3,
+  columns,
   onOpen,
   onRemove,
   removingKey = null,
@@ -64,7 +64,7 @@ export function PhotoGrid({
   const { m } = useI18n();
   const [width, setWidth] = useState(0);
   // Whole pixels: a fractional tile makes the last one of a row wrap on some densities.
-  const tile = width > 0 ? Math.floor((width - GAP * (columns - 1)) / columns) : 0;
+  const tile = columns === undefined ? theme.sizes.avatarLg : width > 0 ? Math.floor((width - GAP * (columns - 1)) / columns) : 0;
 
   const positions = photoGridPositions(photos);
 
@@ -100,16 +100,17 @@ export function PhotoGrid({
           accessibilityState={{ disabled: addDisabled, busy: addBusy }}
           disabled={addDisabled || addBusy}
           onPress={onAdd}
-          pressedStyle={{ borderColor: theme.colors.accentSolid }}
+          pressedStyle={{ borderColor: theme.colors.textStrong }}
+          testID={testID ? `${testID}-add` : undefined}
           style={[styles.add, { width: tile, height: tile }, addDisabled ? styles.addDisabled : null]}
         >
-          <View style={styles.addIcon}>
-            {addBusy ? <Spinner size={18} /> : <Icon name="plus" size={20} color="greenText" />}
-          </View>
-          <Text variant="captionStrong" color="label" align="center" numberOfLines={2}>
-            {addLabel ?? m.common.photos.add}
-          </Text>
+          {addBusy ? <Spinner size={theme.sizes.spinner} /> : <Icon name="plus" size={theme.sizes.icon.md} color="textMuted" />}
         </PressableScale>
+      ) : null}
+      {tile > 0 && onAdd && addLabel ? (
+        <Text variant="small" color="textMuted" numberOfLines={2} style={styles.addState}>
+          {addLabel}
+        </Text>
       ) : null}
     </View>
   );
@@ -117,25 +118,15 @@ export function PhotoGrid({
 
 const useStyles = makeStyles((t) => ({
   // The top padding leaves room for the remove buttons that overhang the first row.
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, paddingTop: 8, alignSelf: 'stretch' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: GAP, paddingTop: t.space.sm, alignSelf: 'stretch' },
   add: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: t.space.xs,
-    paddingHorizontal: t.space.xs,
     borderRadius: t.radii.md,
     borderWidth: t.borders.interactive,
     borderStyle: 'dashed',
-    borderColor: t.colors.inputBorder,
-    backgroundColor: t.colors.dropzoneBg,
+    borderColor: t.colors.line2,
   },
   addDisabled: { opacity: 0.5 },
-  addIcon: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: t.radii.md,
-    backgroundColor: t.colors.greenSoft,
-  },
+  addState: { flexShrink: 1, minWidth: 0, marginLeft: t.space.xxs },
 }));

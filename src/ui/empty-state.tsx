@@ -3,6 +3,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles } from '@/theme';
 
+import { Card, useInsideSurface } from './card';
 import { Enter } from './enter';
 import { Text } from './text';
 
@@ -13,8 +14,8 @@ export type EmptyStateProps = {
   /** Node under the texts (a button). */
   action?: ReactNode;
   /**
-   * `panel` — dashed soft panel with a 24/600 title (empty section, default).
-   * `plain` — centered muted 14px line with 40 vertical padding (empty list inside a sheet).
+   * `panel` — a card with a title (17 / 700; a dashed soft panel when it sits inside a card); the default.
+   * `plain` — a centred muted line (empty list inside a sheet).
    */
   variant?: 'panel' | 'plain';
   testID?: string;
@@ -24,6 +25,7 @@ export type EmptyStateProps = {
 /** Empty section. It enters with the 260 ms item animation, as on the site. */
 export function EmptyState({ title, hint, action, variant = 'panel', testID, style }: EmptyStateProps) {
   const styles = useStyles();
+  const nested = useInsideSurface();
   if (variant === 'plain') {
     return (
       <View testID={testID} style={[styles.plain, style]}>
@@ -40,7 +42,8 @@ export function EmptyState({ title, hint, action, variant = 'panel', testID, sty
     );
   }
   return (
-    <Enter duration={260} style={[styles.panel, style]}>
+    <Enter duration={260} style={style}>
+      <Card dashed={nested} padded={false} style={styles.panel}>
       <View testID={testID} style={styles.content}>
         <Text variant="emptyTitle" align="center">
           {title}
@@ -52,22 +55,14 @@ export function EmptyState({ title, hint, action, variant = 'panel', testID, sty
         ) : null}
         {action ? <View style={styles.action}>{action}</View> : null}
       </View>
+      </Card>
     </Enter>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  panel: {
-    alignSelf: 'stretch',
-    borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
-    borderStyle: 'dashed',
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-  },
-  content: { alignItems: 'center', gap: 8 },
-  action: { marginTop: 12, alignItems: 'center' },
-  plain: { alignItems: 'center', gap: 8, paddingVertical: 32, paddingHorizontal: 24 },
+  panel: { alignSelf: 'stretch', paddingVertical: t.space.xxl, paddingHorizontal: t.space.xl },
+  content: { alignItems: 'center', gap: t.space.sm },
+  action: { marginTop: t.space.md, alignItems: 'center' },
+  plain: { alignItems: 'center', gap: t.space.sm, paddingVertical: t.space.xxl, paddingHorizontal: t.space.xl },
 }));

@@ -7,10 +7,9 @@ import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, Chip, Notice, Text, TextButton } from '@/ui';
+import { Button, Notice, Text, TextButton } from '@/ui';
 
 import { CheckResultRow } from './check-result-row';
-import { countVerdicts } from './logic';
 import type { HomeworkCheckState } from './use-homework-check';
 
 export type HomeworkCheckBlockProps = {
@@ -35,21 +34,10 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
 
   const { running, starting, pollBroken, limit } = state;
   const label = running ? t.running : starting ? t.starting : t.start;
-  const counts = check && check.status === 'DONE' ? countVerdicts(check.results) : null;
+  const counts = check && check.status === 'DONE' ? check.results : null;
 
   return (
     <View style={styles.block} testID="homework-check">
-      <View style={styles.titles}>
-        <Text variant="cardTitle" accessibilityRole="header">
-          {t.title}
-        </Text>
-        <Hint>
-          <Text variant="small" color="textMuted">
-            {t.subtitle}
-          </Text>
-        </Hint>
-      </View>
-
       {!available ? <Notice tone="warning" text={dict.student.checkErrors.disabled} testID="homework-check-disabled" /> : null}
 
       {state.startError ? (
@@ -68,6 +56,8 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
         loading={starting || running}
         disabled={!hasPhotos || !available || limit.waiting}
         accessibilityHint={!hasPhotos ? t.needPhotos : undefined}
+        size="lg"
+        leftIcon="sparkles"
         fullWidth
         testID="homework-check-start"
       />
@@ -79,7 +69,11 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
         <Text variant="caption" testID="homework-check-need-photos">
           {t.needPhotos}
         </Text>
-      ) : null}
+      ) : (
+        <Hint>
+          <Text variant="hint">{t.subtitle}</Text>
+        </Hint>
+      )}
 
       {running ? (
         <Text variant="small" color="textMuted" testID="homework-check-running">
@@ -110,15 +104,12 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
         ) : (
           <View style={styles.results} testID="homework-check-results">
             {check.checkedAt ? (
-              <Text variant="caption">{format(t.checkedAt, { date: formatDateTime(check.checkedAt, locale) })}</Text>
+              <Text variant="kicker" color="textMuted">
+                {format(t.checkedAt, { date: formatDateTime(check.checkedAt, locale) })}
+              </Text>
             ) : null}
-            <View style={styles.counters}>
-              {counts.correct > 0 ? <Chip tone="green" icon="check" label={format(t.correctCount, { n: counts.correct })} /> : null}
-              {counts.incorrect > 0 ? <Chip tone="red" icon="close" label={format(t.incorrectCount, { n: counts.incorrect })} /> : null}
-              {counts.uncertain > 0 ? <Chip tone="muted" icon="clock" label={format(t.uncertainCount, { n: counts.uncertain })} /> : null}
-            </View>
-            {check.results.map((result) => (
-              <CheckResultRow key={result.homeworkNumberId} result={result} onRedo={onRedo} />
+            {check.results.map((result, index) => (
+              <CheckResultRow key={result.homeworkNumberId} result={result} onRedo={onRedo} divider={index < check.results.length - 1} />
             ))}
           </View>
         )
@@ -129,7 +120,5 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
 
 const useStyles = makeStyles((t) => ({
   block: { gap: t.space.md },
-  titles: { gap: 2 },
-  results: { gap: t.space.sm },
-  counters: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
+  results: { gap: t.space.xxs },
 }));

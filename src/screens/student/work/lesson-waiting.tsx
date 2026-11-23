@@ -5,7 +5,7 @@ import { useCountdown, useWaitText } from '@/components/retry-wait';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Card, Icon, PageHeader, Spinner, Text } from '@/ui';
+import { Card, Icon, Spinner, Text } from '@/ui';
 
 import { secondsUntil } from './logic';
 import { useServerNow } from '@/services/clock';
@@ -34,7 +34,6 @@ export function LessonWaiting({ upcoming, serverOffsetMs }: LessonWaitingProps) 
 
   return (
     <View style={styles.wrap} testID="lesson-waiting">
-      <PageHeader kicker={t.kicker} title={t.title} gap={0} />
       <Card style={styles.card}>
         <Text variant="sectionTitle" accessibilityRole="header">
           {t.noLessonTitle}
@@ -46,12 +45,11 @@ export function LessonWaiting({ upcoming, serverOffsetMs }: LessonWaitingProps) 
         </Text>
 
         {upcoming ? (
-          <Card variant="soft" padded={16} style={styles.next} testID="lesson-upcoming">
-            <Text variant="cardKicker">{m.studentWork.lesson.nextLesson}</Text>
+          <Card style={styles.next} testID="lesson-upcoming">
             <Text variant="bodyBold">{upcoming.title}</Text>
             <View style={styles.when}>
-              <Icon name="calendar" size={14} color="kicker" />
-              <Text variant="meta" style={styles.whenText}>
+              <Icon name="calendarDays" size={16} color="textMuted" />
+              <Text variant="small" color="textMuted" style={styles.whenText}>
                 {date} · {upcoming.groupName ?? m.studentWork.lesson.individual}
               </Text>
             </View>
@@ -62,7 +60,9 @@ export function LessonWaiting({ upcoming, serverOffsetMs }: LessonWaitingProps) 
         ) : null}
 
         {/* Always visible on the site (not a hint): it tells the student not to hunt for a reload. */}
-        <Text variant="small">{m.studentWork.lesson.autoRefresh}</Text>
+        <Text variant="small" color="textMuted">
+          {m.studentWork.lesson.autoRefresh}
+        </Text>
       </Card>
     </View>
   );
@@ -80,8 +80,8 @@ function StartCountdown({ startsAtDeviceMs }: { startsAtDeviceMs: number }) {
       : m.studentWork.lesson.startsSoon;
   return (
     <View style={styles.when} accessible accessibilityRole="timer" accessibilityLabel={text} testID="lesson-countdown">
-      {seconds > 0 ? <Icon name="clock" size={14} color="accentSolid" /> : <Spinner size={14} />}
-      <Text variant="meta" color="accentSolid" tabular style={styles.whenText}>
+      {seconds > 0 ? <Icon name="clock" size={16} color="accentSolid" /> : <Spinner size={14} />}
+      <Text variant="smallStrong" color="accentSolid" tabular style={styles.whenText}>
         {text}
       </Text>
     </View>

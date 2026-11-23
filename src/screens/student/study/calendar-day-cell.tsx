@@ -12,6 +12,10 @@ export type CalendarDayCellProps = {
   open: boolean;
   accessibilityLabel: string;
   onPress: (cell: CalendarCell) => void;
+  /** Moscow day of "now": an unfinished day before it is overdue (red), from it on — still due (yellow). */
+  today: string;
+  /** Cell height; default 48 (the month grid). The week strip uses 52. */
+  height?: number;
 };
 
 /** Height of a day cell on a phone (the site's 64 shrinks to the 44–48 pt range, 02 S4). */
@@ -21,26 +25,23 @@ export const CALENDAR_CELL_HEIGHT = 48;
  * One day of the month grid (08 §5.20). Only a day of the displayed month that has deadlines is a button;
  * a day of a neighbouring month is never marked, even when something is due on it.
  */
-export function CalendarDayCell({ cell, open, accessibilityLabel, onPress }: CalendarDayCellProps) {
+export function CalendarDayCell({ cell, open, accessibilityLabel, onPress, today, height }: CalendarDayCellProps) {
   const theme = useTheme();
   const styles = useStyles();
   const { colors } = theme;
   const marked = cell.state === 'done' || cell.state === 'late';
-  const fill =
-    cell.state === 'late'
-      ? { backgroundColor: colors.calLateBg, borderColor: colors.calLateBorder }
-      : cell.state === 'done'
-        ? { backgroundColor: colors.calOkBg, borderColor: colors.calOkBorder }
-        : cell.state === 'out'
-          ? { backgroundColor: colors.calOutBg, borderColor: colors.calCellBorder }
-          : { backgroundColor: colors.calCellBg, borderColor: colors.calCellBorder };
+  const fill = [
+    cell.state === 'out' ? { backgroundColor: colors.calOutBg } : { backgroundColor: cell.isToday ? colors.cardBg : colors.calCellBg },
+    height === undefined ? null : { height },
+  ];
+  const tone = cell.state === 'done' ? 'done' : cell.key < today ? 'late' : 'due';
 
   const content = (
     <>
-      <Text variant="bodyStrong" tabular color={cell.state === 'out' ? 'calOutText' : 'textStrong'}>
+      <Text variant="smallStrong" tabular color={cell.state === 'out' ? 'calOutText' : 'textStrong'}>
         {cell.day}
       </Text>
-      {marked ? <DiamondMark tone={cell.state === 'late' ? 'late' : 'done'} /> : null}
+      {marked ? <DiamondMark tone={tone} /> : null}
       {cell.isToday ? <View style={styles.todayRing} /> : null}
       {open ? <View style={styles.openRing} /> : null}
     </>
@@ -81,9 +82,8 @@ const useStyles = makeStyles((t) => ({
     height: CALENDAR_CELL_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: t.space.xxs,
     borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
   },
   // Today: a 2 px ring INSIDE the cell.
   todayRing: {
@@ -92,7 +92,7 @@ const useStyles = makeStyles((t) => ({
     right: 0,
     bottom: 0,
     left: 0,
-    borderRadius: t.radii.md - t.borders.hairline,
+    borderRadius: t.radii.md,
     borderWidth: t.borders.strong,
     borderColor: t.colors.calRing,
     pointerEvents: 'none',
@@ -100,13 +100,13 @@ const useStyles = makeStyles((t) => ({
   // The open day: a 3 px ring OUTSIDE the cell.
   openRing: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    bottom: -4,
-    left: -4,
-    borderRadius: t.radii.md + 3,
-    borderWidth: 3,
-    borderColor: t.colors.calRing,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: t.radii.md,
+    borderWidth: t.borders.strong,
+    borderColor: t.colors.accentSolid,
     pointerEvents: 'none',
   },
 }));

@@ -1,36 +1,50 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
 
 import { qk, useApi } from '@/api';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
+import { deadlineCaption } from '@/domain/deadline-caption';
 import { mskToday } from '@/domain/moscow-time';
 import { correctedNow } from '@/domain/server-clock';
-import { useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { Hint } from '@/providers';
 import { ShellAppBar } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
-import { makeStyles, useTheme } from '@/theme';
-import { PageHeader, Screen, Text } from '@/ui';
+import { ListCard, ListRow, Screen, Segmented, Text } from '@/ui';
 
 import { CalendarSkeleton } from './study/calendar-skeleton';
 import { DaySheet } from './study/day-sheet';
-import { groupByMskDay, monthOfInstant, shiftMonth, toDeadlineItems, type CalendarMonth, type DeadlineItem } from './study/deadline-model';
+import {
+  groupByMskDay,
+  monthOfInstant,
+  selectUpcoming,
+  shiftMonth,
+  toDeadlineItems,
+  type CalendarMonth,
+  type DeadlineItem,
+} from './study/deadline-model';
 import { DeadlinesCalendar } from './study/deadlines-calendar';
 import { RefreshError } from './study/refresh-error';
 import { useNow } from './study/use-now';
+import { WeekStrip } from './study/week-strip';
+
+type CalendarView = 'week' | 'month';
+
+/** Rows of the list under the calendar: every unfinished homework, nearest deadline first. */
+const LIST_LIMIT = 50;
 
 /**
- * `student.deadlines` — «Дедлайны» (docs/spec/02-student-study.md S4): a month calendar of homework
- * deadlines; a marked day opens a sheet with that day's homeworks. Every homework with a deadline is
- * shown, done ones included. With no deadlines the calendar is simply unmarked — there is no empty text.
+ * `student.deadlines` — «Дедлайны» (docs/spec/02-student-study.md S4; layout: docs/design/
+ * glass-over-paper.md §8): the current week — or the month, by the switch in the header — with the days
+ * that have deadlines marked, and under it the list of what is still to hand in, nearest first. A marked
+ * day opens a sheet with that day's homeworks; a row opens its homework. Every homework with a deadline is
+ * marked in the calendar, done ones included.
  */
 export function StudentDeadlinesScreen() {
-  const styles = useStyles();
-  const theme = useTheme();
   const api = useApi();
-  const { dict, m, locale } = useI18n();
+  const { m, locale } = useI18n();
+  const [view, setView] = useState<CalendarView>('week');
   const navigation = useAppNavigation();
 
   const deadlines = useQuery({
@@ -60,40 +74,86 @@ export function StudentDeadlinesScreen() {
     navigation.open({ screen: 'student.homework', assignmentId: item.assignmentId });
   };
 
+  const upcoming = useMemo(() => selectUpcoming(items, LIST_LIMIT), [items]);
+  const openDay = (dayKey: string) => {
+    setOpenDayKey(dayKey);
+    setSheetVisible(true);
+  };
+
   return (
     <Screen
       testID="student-deadlines-screen"
-      header={<ShellAppBar title={m.shell.tabs.deadlines} />}
-      bottomInset={false}
+      header={
+        <ShellAppBar
+          title={m.shell.tabs.deadlines}
+          aside={
+            <Segmented<CalendarView>
+              options={[
+                { value: 'week', label: m.student.calendar.week },
+                { value: 'month', label: m.student.calendar.month },
+              ]}
+              value={view}
+              onChange={(next) => {
+                setSheetVisible(false);
+                setOpenDayKey(null);
+                setView(next);
+              }}
+              accessibilityLabel={m.student.calendar.viewA11y}
+              fill
+              testID="deadlines-view"
+            />
+          }
+        />
+      }
       refreshing={refreshing}
       onRefresh={refresh}
     >
-      {/* The kicker («Дедлайны») is the app bar title. */}
-      <PageHeader title={dict.student.deadlines.title} gap={theme.space.cardWide} />
-
       {data ? (
-        <View style={styles.body}>
+        <>
           {deadlines.isError ? <RefreshError error={deadlines.error} testID="deadlines-refresh-error" /> : null}
-          <DeadlinesCalendar
-            items={items}
-            month={month}
-            today={today}
-            openDayKey={openDayKey}
-            onChangeMonth={(delta) => {
-              // Turning the month closes the open day, as on the site.
-              setSheetVisible(false);
-              setOpenDayKey(null);
-              setChosenMonth(shiftMonth(month, delta));
-            }}
-            onOpenDay={(dayKey) => {
-              setOpenDayKey(dayKey);
-              setSheetVisible(true);
-            }}
-          />
-          <Hint>
-            <Text variant="hint">{m.student.calendar.swipeHint}</Text>
-          </Hint>
-        </View>
+          {view === 'week' ? (
+            <WeekStrip items={items} now={now} today={today} openDayKey={openDayKey} onOpenDay={openDay} />
+          ) : (
+            <>
+              <DeadlinesCalendar
+                items={items}
+                month={month}
+                today={today}
+                openDayKey={openDayKey}
+                onChangeMonth={(delta) => {
+                  setSheetVisible(false);
+                  setOpenDayKey(null);
+                  setChosenMonth(shiftMonth(month, delta));
+                }}
+                onOpenDay={openDay}
+              />
+              <Hint>
+                <Text variant="hint">{m.student.calendar.swipeHint}</Text>
+              </Hint>
+            </>
+          )}
+
+          <ListCard testID="deadlines-list">
+            {upcoming.length === 0 ? (
+              <ListRow title={m.student.calendar.nothingDue} titleLines={2} testID="deadlines-list-empty" />
+            ) : (
+              upcoming.map((item) => {
+                const caption = deadlineCaption(item.deadlineAt, false, now, locale, m.common.deadline);
+                return (
+                  <ListRow
+                    key={item.id}
+                    title={item.label}
+                    subtitle={caption.text}
+                    subtitleTone={caption.attention ? 'attention' : 'muted'}
+                    onPress={() => openHomework(item)}
+                    accessibilityLabel={format(m.student.calendar.rowA11y, { title: item.label, caption: caption.text })}
+                    testID={`deadlines-row-${item.id}`}
+                  />
+                );
+              })
+            )}
+          </ListCard>
+        </>
       ) : isLoadFailed(deadlines) ? (
         <LoadFailure query={deadlines} home testID="deadlines-error" />
       ) : (
@@ -112,7 +172,3 @@ export function StudentDeadlinesScreen() {
     </Screen>
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  body: { gap: t.space.md },
-}));

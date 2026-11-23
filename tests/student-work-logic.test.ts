@@ -32,7 +32,6 @@ import {
   homeworkDetailMeta,
   homeworkLabel,
   homeworkListMeta,
-  homeworkNumbersA11yParts,
   isCheckRunning,
   isHomeworkCompleted,
   isOlderSubmission,
@@ -123,34 +122,6 @@ describe("homework list", () => {
       homeworkListMeta({ solvedCount: 0, totalNumbers: 2, photosCount: 1 }, en.student.submissions, "20 November 2026"),
       "Due 20 November 2026 · 0 of 2 done · Photos: 1"
     );
-  });
-
-  it("card name speaks every number's traffic light, grouped by status in the site's order (#234)", () => {
-    const texts = (locale: "ru" | "en") => {
-      const dict = locale === "ru" ? ru : en;
-      const m = getMobileDictionary(locale).studentWork.list;
-      return {
-        group: m.numbersGroupA11y,
-        numberLabel: dict.topics.widgets.numberLabel,
-        unmarked: m.numbersUnmarkedA11y,
-        statuses: { GREEN: dict.status.GREEN.label, YELLOW: dict.status.YELLOW.label, RED: dict.status.RED.label }
-      };
-    };
-    const numbers = [
-      { number: "118", status: "RED" as const },
-      { number: "120", status: null },
-      { number: "007", status: "GREEN" as const },
-      { number: "124", status: null }
-    ];
-    assert.deepEqual(homeworkNumbersA11yParts(numbers, texts("ru")), [
-      "Решен с первого раза: № 007",
-      "Нужна помощь преподавателя: № 118",
-      "Не отмечены: № 120, № 124"
-    ]);
-    assert.deepEqual(homeworkNumbersA11yParts([{ number: "5", status: "YELLOW" }], texts("en")), [
-      `${en.status.YELLOW.label}: ${en.topics.widgets.numberLabel.replace("{number}", "5")}`
-    ]);
-    assert.deepEqual(homeworkNumbersA11yParts([], texts("ru")), []);
   });
 
   it("detail meta: «Дедлайн до … · Выполнено …»", () => {

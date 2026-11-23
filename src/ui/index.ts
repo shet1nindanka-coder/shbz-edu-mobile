@@ -31,6 +31,7 @@ export { Enter, type EnterProps } from './enter';
 export { ErrorState, type ErrorStateProps } from './error-state';
 export { Icon, ICON_NAMES, navIcons, type IconName, type IconProps } from './icon';
 export { IconButton, type IconButtonProps, type IconButtonVariant } from './icon-button';
+export { IconTile, type IconTileProps } from './icon-tile';
 export {
   formatDateTimeDisplay,
   formatDateTimeValue,
@@ -41,11 +42,13 @@ export {
   type TodayInput,
 } from './internal/date-time';
 export { hitSlopFor, PressableScale, type PressableScaleProps, type PressableState } from './internal/pressable-scale';
+export { ListCard, type ListCardProps } from './list-card';
 export { ListRow, type ListRowProps } from './list-row';
 export { LoadingState, type LoadingStateProps } from './loading-state';
 export { Logo, type LogoProps } from './logo';
 export { MetricPill, type MetricPillProps } from './metric-pill';
 export { NavCard, type NavCardProps, type NavCardStat } from './nav-card';
+export { NumberTile, STATUS_ICONS, type NumberTileProps } from './number-tile';
 export { Notice, type NoticeProps, type NoticeTone } from './notice';
 export { PageGlow, type PageGlowProps } from './page-glow';
 export { PageHeader, type PageHeaderMetric, type PageHeaderProps } from './page-header';
@@ -53,12 +56,14 @@ export { PasswordField, type PasswordFieldProps } from './password-field';
 export { completionPercent, ProgressBar, type ProgressBarProps } from './progress-bar';
 export { Screen, type ScreenProps } from './screen';
 export { SearchField, type SearchFieldProps } from './search-field';
+export { SectionCaption, type SectionCaptionProps } from './section-caption';
 export { SectionCard, type SectionCardProps } from './section-card';
 export { Segmented, type SegmentedOption, type SegmentedProps } from './segmented';
 export { Select, type SelectOption, type SelectProps } from './select';
 export { Skeleton, type SkeletonProps } from './skeleton';
 export { Spinner, type SpinnerProps } from './spinner';
 export { StatusBadge, type StatusBadgeProps } from './status-badge';
+export { StatusBar, type StatusBarProps, type StatusCounts } from './status-bar';
 export { StatusOptionGroup, type StatusOption, type StatusOptionGroupProps } from './status-option-group';
 export { Switch, type SwitchProps } from './switch';
 export { Tabs, type TabOption, type TabsProps } from './tabs';

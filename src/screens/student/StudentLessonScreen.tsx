@@ -106,11 +106,20 @@ export function StudentLessonScreen() {
 
   const { refreshing, refresh } = usePullRefresh([lesson]);
   const refreshError = lesson.isError && data ? errorText(lesson.error, m.studentWork.lesson.refreshFailed) : null;
-  const header = <ShellAppBar title={screenTitle('student.lesson', m.shell.tabs)} />;
-
   if (data && active) {
     return (
-      <Screen testID="student-lesson-screen" header={header} bottomInset={false} scroll={false} padded={false}>
+      <Screen
+        testID="student-lesson-screen"
+        // During a lesson the header says which one: the lesson's title and its group.
+        header={
+          <ShellAppBar
+            title={screenTitle('student.lesson', m.shell.tabs)}
+            subtitle={active.groupName ? `${active.title} · ${active.groupName}` : active.title}
+          />
+        }
+        onRefresh={refresh}
+        refreshing={refreshing}
+      >
         <LessonLive
           // Upload state, errors and the "joined" mark belong to one lesson.
           key={active.lessonId}
@@ -118,8 +127,6 @@ export function StudentLessonScreen() {
           lesson={active}
           serverOffsetMs={serverOffsetMs}
           live={live}
-          refreshing={refreshing}
-          onRefresh={refresh}
           refreshError={refreshError}
         />
       </Screen>
@@ -127,7 +134,12 @@ export function StudentLessonScreen() {
   }
 
   return (
-    <Screen testID="student-lesson-screen" header={header} bottomInset={false} onRefresh={refresh} refreshing={refreshing}>
+    <Screen
+      testID="student-lesson-screen"
+      header={<ShellAppBar title={screenTitle('student.lesson', m.shell.tabs)} />}
+      onRefresh={refresh}
+      refreshing={refreshing}
+    >
       {data ? (
         <>
           {refreshError ? <Notice tone="error" text={refreshError} testID="lesson-refresh-error" /> : null}

@@ -31,7 +31,6 @@ import {
   Text,
   TextButton,
   TextField,
-  TitleDot,
 } from '@/ui';
 
 import { loginFailureOf, loginFailureText, type LoginFailure } from './login-error';
@@ -129,31 +128,19 @@ export function LoginScreen() {
     : null;
 
   return (
-    <Screen glow="login" testID="login-screen" contentContainerStyle={styles.page}>
-      <View style={styles.topRow}>
-        <Logo size={26} />
-        <Segmented
-          options={LOCALE_OPTIONS}
-          value={localePending ?? preferences.locale}
-          onChange={setLocale}
-          disabled={localePending !== null}
-          accessibilityLabel={m.shell.login.languageAria}
-          testID="login-locale"
-        />
-      </View>
-
+    <Screen testID="login-screen" dock={false} contentContainerStyle={styles.page}>
       <View style={styles.block}>
-        <View style={styles.titleRow}>
+        <Logo size={34} />
+        <View style={styles.titles}>
           <Text variant="loginTitle" accessibilityRole="header">
             {dict.login.title}
           </Text>
-          <TitleDot size={9} />
+          <Hint>
+            <Text variant="body" color="textMuted">
+              {dict.login.subtitle}
+            </Text>
+          </Hint>
         </View>
-        <Hint>
-          <Text variant="body" color="textMuted" style={styles.subtitle}>
-            {dict.login.subtitle}
-          </Text>
-        </Hint>
 
         {notice ? (
           <Notice
@@ -178,9 +165,10 @@ export function LoginScreen() {
           />
         ) : null}
 
-        <Card style={styles.card}>
+        {/* The form sits on the page itself: the sign-in screen has one thing on it. */}
           <View style={styles.form}>
             <TextField
+              size="lg"
               label={dict.login.loginLabel}
               value={login}
               onChangeText={changeLogin}
@@ -200,6 +188,7 @@ export function LoginScreen() {
             />
             <PasswordField
               ref={passwordRef}
+              size="lg"
               label={dict.login.passwordLabel}
               value={password}
               onChangeText={setPassword}
@@ -228,14 +217,13 @@ export function LoginScreen() {
             <Button
               label={pending ? dict.login.submitting : dict.login.submit}
               onPress={() => void submit()}
-              size="field"
+              size="lg"
               fullWidth
               loading={pending}
               disabled={locked}
               testID="login-submit"
             />
           </View>
-        </Card>
 
         {helpContact ? (
           <Text variant="small" color="textMuted" align="center" style={styles.help}>
@@ -284,29 +272,39 @@ export function LoginScreen() {
             ) : null}
           </Card>
         ) : null}
+        <View style={styles.locale}>
+          <Segmented
+            options={LOCALE_OPTIONS}
+            value={localePending ?? preferences.locale}
+            onChange={setLocale}
+            disabled={localePending !== null}
+            accessibilityLabel={m.shell.login.languageAria}
+            testID="login-locale"
+            style={styles.localeSwitch}
+          />
+        </View>
       </View>
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  page: { paddingTop: t.space.lg },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  block: { width: '100%', maxWidth: 416, alignSelf: 'center', marginTop: 56 },
-  titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.xs },
-  subtitle: { marginTop: t.space.xs },
-  notice: { marginTop: t.space.field },
-  card: { marginTop: t.space.xl },
-  form: { gap: t.space.field },
+  page: { paddingTop: t.space.xxl * 2, paddingHorizontal: t.space.xl },
+  block: { width: '100%', maxWidth: 416, alignSelf: 'center', gap: t.space.lg },
+  titles: { gap: t.space.xxs, marginTop: t.space.md },
+  notice: {},
+  form: { gap: t.space.lg },
   wait: { marginTop: t.space.xs },
-  help: { marginTop: t.space.field },
-  demo: { marginTop: t.space.xl },
+  help: {},
+  demo: {},
   demoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: t.space.gutter,
+    paddingHorizontal: t.space.card,
     paddingVertical: t.space.md,
   },
-  demoHint: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.sm },
+  demoHint: { paddingHorizontal: t.space.card, paddingBottom: t.space.sm },
+  locale: { alignItems: 'center', marginTop: t.space.lg },
+  localeSwitch: { alignSelf: 'center' },
 }));

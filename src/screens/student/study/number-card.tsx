@@ -2,7 +2,8 @@ import { View } from 'react-native';
 
 import type { StudentNumberDetailResponse } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { homeworkStatusShortLabel } from '@/domain/statuses';
+import { statusLabel } from '@/components/numbers';
+import { homeworkStatusLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
@@ -23,7 +24,7 @@ export type NumberCardProps = {
  */
 export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
   const styles = useStyles();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.student.numberCard;
   const { number } = detail;
   const hasCondition = Boolean(number.conditionLatex && number.conditionLatex.trim());
@@ -33,10 +34,21 @@ export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
       <View style={styles.body}>
         <View style={styles.statusBlock}>
           <View style={styles.titleRow}>
-            <Text variant="sectionTitle" accessibilityRole="header" testID="number-card-title">
-              {format(dict.topics.widgets.numberLabel, { number: number.number })}
+            <Text
+              variant="sectionTitle"
+              tabular
+              accessibilityRole="header"
+              accessibilityLabel={format(dict.topics.widgets.numberLabel, { number: number.number })}
+              style={styles.title}
+              testID="number-card-title"
+            >
+              {number.number}
             </Text>
-            <StatusBadge status={number.status} label={homeworkStatusShortLabel(number.status, dict)} />
+            <StatusBadge
+              status={number.status}
+              label={statusLabel(number.status, m.common.statuses)}
+              accessibilityLabel={homeworkStatusLabel(number.status, dict)}
+            />
           </View>
           <Hint>
             <Text variant="hint">{t.statusHint}</Text>
@@ -44,10 +56,9 @@ export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
         </View>
 
         {hasCondition && number.conditionLatex ? (
-          <View style={styles.block}>
-            <Text variant="kickerSm">{t.condition}</Text>
+          <Card accessibilityLabel={t.condition}>
             <MathContent value={number.conditionLatex} testID="number-condition" />
-          </View>
+          </Card>
         ) : null}
 
         {detail.notesEnabled ? (
@@ -66,8 +77,8 @@ export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
 }
 
 const useStyles = makeStyles((t) => ({
-  body: { gap: t.space.field },
+  body: { gap: t.space.md },
   statusBlock: { gap: t.space.xs },
-  titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
-  block: { gap: t.space.xs },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  title: { flex: 1, minWidth: 0 },
 }));

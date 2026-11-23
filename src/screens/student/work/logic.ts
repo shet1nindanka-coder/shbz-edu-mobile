@@ -81,33 +81,6 @@ export function homeworkListMeta(
   );
 }
 
-const STATUS_ORDER: readonly HomeworkNumberStatus[] = ['GREEN', 'YELLOW', 'RED'];
-
-/**
- * The traffic-light chips of a list card as spoken text, one piece per status in the site's order
- * (green, yellow, red, then the unmarked ones): «Нужна помощь преподавателя: № 118».
- *
- * WHY: the card is one pressable element for screen readers (iOS hides its descendants), so the colours a
- * sighted student reads off the chips have to be in its name; grouping keeps a long homework short to hear.
- */
-export function homeworkNumbersA11yParts(
-  numbers: readonly { number: string; status: HomeworkNumberStatus | null }[],
-  texts: { group: string; numberLabel: string; unmarked: string; statuses: Record<HomeworkNumberStatus, string> },
-): string[] {
-  const groups: { label: string; status: HomeworkNumberStatus | null }[] = [
-    ...STATUS_ORDER.map((status) => ({ label: texts.statuses[status], status })),
-    { label: texts.unmarked, status: null },
-  ];
-  const parts: string[] = [];
-  for (const group of groups) {
-    const members = numbers.filter((number) => (number.status ?? null) === group.status);
-    if (members.length === 0) continue;
-    const list = members.map((number) => format(texts.numberLabel, { number: number.number })).join(', ');
-    parts.push(format(texts.group, { status: group.label, numbers: list }));
-  }
-  return parts;
-}
-
 /**
  * Meta line of the detail header (03 §1 H2): «Дедлайн до {date} · » + «Выполнено {solved} из {total}».
  * `deadlineDateTime` is the already formatted date and time, or null.
@@ -288,6 +261,34 @@ export function lessonItemChip(item: Pick<LessonItemDto, 'result' | 'submission'
   const submission = item.submission;
   if (submission && submission.status === 'DONE' && submission.verdict) return { kind: 'verdict', verdict: submission.verdict };
   return null;
+}
+
+/**
+ * Colour of an item's tile in the strip of the live lesson: the teacher's / the check's result as a number
+ * status (solved → green, with mistakes → yellow, not solved → red), a wrong latest submission without a
+ * result → red, everything else → no mark. A student never sets it.
+ */
+export function lessonTileStatus(item: Pick<LessonItemDto, 'result' | 'submission'>): HomeworkNumberStatus | null {
+  if (item.result === 'SOLVED') return 'GREEN';
+  if (item.result === 'PARTIAL') return 'YELLOW';
+  if (item.result === 'NOT_SOLVED') return 'RED';
+  if (item.result === 'SKIPPED') return null;
+  const submission = item.submission;
+  return submission && submission.status === 'DONE' && submission.verdict === 'INCORRECT' ? 'RED' : null;
+}
+
+/** Items shown in the strip: the main part, and the extra part once it is unlocked. */
+export function visibleLessonItems(parts: LessonParts): LessonItemDto[] {
+  return parts.extraUnlocked ? [...parts.main, ...parts.extra] : parts.main;
+}
+
+/**
+ * The item whose card is shown: the picked one while it is still visible, else the first that can be
+ * submitted now, else the first that is not closed, else the first.
+ */
+export function pickLessonItemId(items: readonly LessonItemDto[], pickedId: string | null): string | null {
+  if (pickedId && items.some((item) => item.id === pickedId)) return pickedId;
+  return (items.find((item) => item.canSubmit) ?? items.find((item) => !item.closed) ?? items[0])?.id ?? null;
 }
 
 export function hasRunningSubmission(items: readonly Pick<LessonItemDto, 'submission'>[]): boolean {

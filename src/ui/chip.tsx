@@ -18,6 +18,7 @@ export type ChipProps = {
   size?: 'sm' | 'row';
   icon?: IconName;
   accessibilityLabel?: string;
+  testID?: string;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -39,7 +40,7 @@ export function chipColors(tone: ChipTone, t: Theme): { bg: string; text: string
 }
 
 /** Borderless chip (`.chip`): 28 high, radius 8, 12 / 600, soft fill + status text; never wraps — a label longer than the row is cut with «…». */
-export function Chip({ label, tone = 'muted', size = 'sm', icon, accessibilityLabel, style }: ChipProps) {
+export function Chip({ label, tone = 'muted', size = 'sm', icon, accessibilityLabel, testID, style }: ChipProps) {
   const theme = useTheme();
   const styles = useStyles();
   const colors = chipColors(tone, theme);
@@ -48,6 +49,7 @@ export function Chip({ label, tone = 'muted', size = 'sm', icon, accessibilityLa
     <View
       accessible
       accessibilityLabel={accessibilityLabel ?? label}
+      testID={testID}
       style={[styles.base, row ? styles.row : styles.sm, { backgroundColor: colors.bg }, style]}
     >
       {icon ? <Icon name={icon} size={16} tint={tone === 'streak' ? theme.colors.streakFlame : colors.text} /> : null}

@@ -3,14 +3,15 @@
 // Site texts stay in `dict.nav`, `dict.login`, `dict.settings`, `dict.interface`, `dict.shells`,
 // `dict.numberSearch`, `dict.student.notifications`.
 const ru = {
-  // `dict.nav.*` is lowercase by design («обзор», «дз») and labels the tab bar; app bars use these titles.
+  // `dict.nav.*` is lowercase by design («обзор», «дз») and labels the dock; screen headers and "back"
+  // links use these titles.
   tabs: {
     overview: "Обзор",
     lesson: "Урок",
-    homeworks: "ДЗ",
+    homeworks: "Домашние задания",
     deadlines: "Дедлайны",
     theory: "Теория",
-    info: "Общая инфа",
+    info: "Баллы",
     topics: "Темы",
     students: "Ученики",
     groups: "Группы",
@@ -20,6 +21,7 @@ const ru = {
     statistics: "Статистика",
     panel: "Дев-панель",
     settings: "Настройки",
+    profile: "Профиль",
     more: "Ещё"
   },
   nav: {
@@ -51,6 +53,10 @@ const ru = {
     demoData: "Демо-данные и переключатели"
   },
   settings: {
+    // rows of the profile screen
+    scores: "Баллы и разбалловка",
+    account: "Имя и пароль",
+    onPlatformSince: "на платформе с {date}",
     app: "Приложение",
     lockKicker: "Блокировка",
     remindersKicker: "Напоминания",
@@ -142,6 +148,7 @@ const en: typeof ru = {
     statistics: "Statistics",
     panel: "Dev panel",
     settings: "Settings",
+    profile: "Profile",
     more: "More"
   },
   nav: {
@@ -171,6 +178,9 @@ const en: typeof ru = {
     demoData: "Demo data and switches"
   },
   settings: {
+    scores: "Scores and grading",
+    account: "Name and password",
+    onPlatformSince: "on the platform since {date}",
     app: "App",
     lockKicker: "Lock",
     remindersKicker: "Reminders",

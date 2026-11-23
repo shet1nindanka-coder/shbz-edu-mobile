@@ -4,29 +4,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, View } from 'react-native';
 
 import { format, plural, useI18n } from '@/i18n';
-import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
-import { Hint, IS_MOCK_BUILD, useCurrentUser, usePendingWritesSummary, usePreferences } from '@/providers';
+import { useRefetchOnFocus } from '@/navigation';
+import { Hint, useCurrentUser, usePendingWritesSummary, usePreferences } from '@/providers';
 import { authenticateWithBiometrics, getBiometricAvailability, type BiometricAvailability } from '@/services/biometrics';
 import { clearFileCache } from '@/services/files';
 import { useIsOnline } from '@/services/network';
 import { localNotifications, type ExactTimingState, type ReminderPermissionState } from '@/services/notifications';
 import type { ReminderCategory } from '@/services/preferences';
 import { makeStyles } from '@/theme';
-import { Button, Card, Dialog, Divider, Icon, ListRow, Notice, SectionCard, Switch, Text, TextButton } from '@/ui';
+import { Button, Card, Dialog, Icon, Notice, SectionCaption, Switch, Text, TextButton } from '@/ui';
 
 type ReminderRow = { category: ReminderCategory; label: string; hint: string };
 
 /**
- * The "App" block — what exists only in the mobile app (the site's settings page ends with the profile
- * status): the biometric lock, local reminders with their permission state, the data kept on the device,
- * and the entries that the site keeps in its menu (the student's «общая инфа», demo data in mock builds).
+ * The app-only blocks of the profile screen — what exists only in the mobile app: the biometric lock,
+ * local reminders with their permission state, and the data kept on the device. Each is a captioned card.
  */
 export function AppSection() {
   const styles = useStyles();
   const { locale, dict, m } = useI18n();
   const t = m.shell.settings;
   const user = useCurrentUser();
-  const navigation = useAppNavigation();
   const queryClient = useQueryClient();
   const { preferences, setBiometricLock, setReminder } = usePreferences();
   const online = useIsOnline();
@@ -156,10 +154,10 @@ export function AppSection() {
   const version = Constants.expoConfig?.version ?? '';
 
   return (
-    <SectionCard title={t.app}>
-      <View style={styles.panels}>
-        <Card variant="soft">
-          <Text variant="kickerSm">{t.lockKicker}</Text>
+    <View style={styles.sections}>
+      <View style={styles.section}>
+        <SectionCaption>{t.lockKicker}</SectionCaption>
+        <Card style={styles.card}>
           <Switch
             trailing
             label={m.shell.biometrics.title}
@@ -170,15 +168,16 @@ export function AppSection() {
             disabled={!biometricsReady && !preferences.biometricLock}
             onValueChange={(value) => void toggleBiometricLock(value)}
             testID="settings-biometric-lock"
-            style={styles.control}
           />
-          {biometricError ? <Notice tone="error" text={biometricError} style={styles.control} /> : null}
+          {biometricError ? <Notice tone="error" text={biometricError} /> : null}
         </Card>
+      </View>
 
-        <Card variant="soft">
-          <Text variant="kickerSm">{t.remindersKicker}</Text>
+      <View style={styles.section}>
+        <SectionCaption>{t.remindersKicker}</SectionCaption>
+        <Card style={styles.card}>
           {reminderRows.length === 0 ? (
-            <Text variant="small" color="textMuted" style={styles.control}>
+            <Text variant="small" color="textMuted">
               {t.remindersNone}
             </Text>
           ) : (
@@ -192,12 +191,11 @@ export function AppSection() {
                 disabled={!remindersSupported}
                 onValueChange={(value) => void toggleReminder(row.category, value)}
                 testID={`settings-reminder-${row.category}`}
-                style={styles.control}
               />
             ))
           )}
           {reminderRows.length > 0 && !remindersSupported ? (
-            <Text variant="hint" style={styles.control} testID="settings-reminders-unavailable">
+            <Text variant="hint" testID="settings-reminders-unavailable">
               {t.remindersUnavailable}
             </Text>
           ) : null}
@@ -206,7 +204,6 @@ export function AppSection() {
               tone="warning"
               text={t.remindersDenied}
               action={<TextButton label={m.common.actions.openSettings} onPress={() => void Linking.openSettings()} />}
-              style={styles.control}
               testID="settings-reminders-denied"
             />
           ) : null}
@@ -217,80 +214,51 @@ export function AppSection() {
               action={
                 exactTiming?.canAskAgain ? <TextButton label={t.remindersExactAllow} onPress={() => void allowExactTiming()} testID="settings-reminders-exact-allow" /> : undefined
               }
-              style={styles.control}
               testID="settings-reminders-inexact"
             />
           ) : null}
         </Card>
+      </View>
 
-        <Card variant="soft">
-          <Text variant="kickerSm">{t.dataKicker}</Text>
-          <View style={[styles.row, styles.control]}>
-            <Icon name={online ? 'checkCircle' : 'wifiOff'} size={16} color={online ? 'greenText' : 'yellowText'} />
-            <Text variant="smallStrong" style={styles.rowText} testID="settings-connection">
+      <View style={styles.section}>
+        <SectionCaption>{t.dataKicker}</SectionCaption>
+        <Card style={styles.card}>
+          <View style={styles.row}>
+            <Icon name={online ? 'checkCircle' : 'wifiOff'} size={20} color={online ? 'textMuted' : 'yellowText'} />
+            <Text variant="bodyStrong" style={styles.rowText} testID="settings-connection">
               {online ? t.connectionOnline : t.connectionOffline}
             </Text>
           </View>
           {pending.waiting > 0 ? (
-            <Text variant="small" color="textMuted" style={styles.line} testID="settings-pending-writes">
+            <Text variant="small" color="textMuted" testID="settings-pending-writes">
               {plural(locale, pending.waiting, t.pendingForms)}
             </Text>
           ) : null}
           {pending.refused > 0 ? (
-            <Text variant="small" color="yellowText" style={styles.line} testID="settings-refused-writes">
+            <Text variant="small" color="yellowText" testID="settings-refused-writes">
               {plural(locale, pending.refused, t.refusedForms)}
             </Text>
           ) : null}
           <Hint>
-            <Text variant="hint" style={styles.line}>
-              {t.dataHint}
-            </Text>
+            <Text variant="hint">{t.dataHint}</Text>
           </Hint>
-          {cacheCleared ? <Notice tone="success" text={t.cacheCleared} style={styles.control} testID="settings-cache-cleared" /> : null}
+          {cacheCleared ? <Notice tone="success" text={t.cacheCleared} testID="settings-cache-cleared" /> : null}
           <Button
             label={t.clearCache}
             variant="outline"
             size="sm"
             onPress={requestClearCache}
-            style={[styles.control, styles.button]}
+            style={styles.button}
             testID="settings-clear-cache"
           />
         </Card>
-
-        {user.role === 'STUDENT' || IS_MOCK_BUILD ? (
-          <Card variant="soft" padded={false}>
-            <Text variant="kickerSm" style={styles.listKicker}>
-              {dict.nav.sections}
-            </Text>
-            {user.role === 'STUDENT' ? (
-              <ListRow
-                title={m.shell.tabs.info}
-                onPress={() => navigation.open({ screen: 'student.info' })}
-                divider={IS_MOCK_BUILD}
-                testID="settings-student-info"
-              />
-            ) : null}
-            {IS_MOCK_BUILD ? (
-              <ListRow
-                title={m.shell.demo.title}
-                subtitle={m.shell.demo.entryHint}
-                onPress={navigation.openDemoData}
-                divider={false}
-                testID="settings-demo-data"
-              />
-            ) : null}
-          </Card>
-        ) : null}
-
-        {version ? (
-          <>
-            <Divider />
-            <Text variant="caption" color="textSoft" align="center">
-              {format(t.version, { version })}
-            </Text>
-          </>
-        ) : null}
       </View>
+
+      {version ? (
+        <Text variant="small" color="textMuted" align="center">
+          {format(t.version, { version })}
+        </Text>
+      ) : null}
       <Dialog
         visible={clearConfirmOpen}
         title={t.clearCacheOfflineTitle}
@@ -301,16 +269,15 @@ export function AppSection() {
         onCancel={() => setClearConfirmOpen(false)}
         testID="settings-clear-cache-confirm"
       />
-    </SectionCard>
+    </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  panels: { gap: t.space.gutter },
-  control: { marginTop: t.space.md },
-  line: { marginTop: t.space.xs },
+  sections: { gap: t.space.block },
+  section: { gap: t.space.sm },
+  card: { gap: t.space.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   rowText: { flex: 1 },
   button: { alignSelf: 'flex-start' },
-  listKicker: { paddingHorizontal: t.space.lg, paddingTop: t.space.lg, paddingBottom: t.space.xs },
 }));

@@ -119,8 +119,8 @@ const useStyles = makeStyles((t) => ({
   tile: {
     borderRadius: t.radii.md,
     borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
+    borderColor: 'transparent',
+    backgroundColor: t.colors.soft2,
   },
   // The picture is clipped by its own rounded box, so the remove button may overhang the tile corner.
   fill: { flex: 1, borderRadius: t.radii.md - t.borders.hairline, overflow: 'hidden' },

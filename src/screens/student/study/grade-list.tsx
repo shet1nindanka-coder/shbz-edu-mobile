@@ -9,44 +9,34 @@ export type GradeListProps = {
   items: readonly GradeRow[];
 };
 
-/** «Оценка по первичным»: one soft card per grade with its raw-score range and an optional condition. */
+/** «Оценка по первичным»: one row per grade — the grade, its condition when there is one, and the raw-score range on the right. */
 export function GradeList({ items }: GradeListProps) {
   const styles = useStyles();
   const { dict } = useI18n();
   const t = dict.student.examInfo;
   return (
-    <>
-      {items.map((item) => (
-        <View key={item.grade} style={styles.card} testID={`exam-grade-${item.grade}`}>
-          <Text variant="kickerSm">{format(t.grade, { grade: item.grade })}</Text>
-          <View style={styles.range}>
-            <Text variant="metric" tabular>
-              {item.range}
-            </Text>
-            <Text variant="smallStrong" color="textMuted">
-              {t.points}
-            </Text>
+    <View>
+      {items.map((item, index) => (
+        <View key={item.grade} style={[styles.row, index < items.length - 1 ? styles.divider : null]} testID={`exam-grade-${item.grade}`}>
+          <View style={styles.texts}>
+            <Text variant="bodyStrong">{format(t.grade, { grade: item.grade })}</Text>
+            {item.note ? (
+              <Text variant="small" color="textMuted">
+                {item.note}
+              </Text>
+            ) : null}
           </View>
-          {item.note ? (
-            <Text variant="hint" color="textMuted">
-              {item.note}
-            </Text>
-          ) : null}
+          <Text variant="small" color="textMuted" tabular>
+            {item.range} {t.points}
+          </Text>
         </View>
       ))}
-    </>
+    </View>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  card: {
-    gap: t.space.xxs,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: t.radii.lg,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
-    backgroundColor: t.colors.softBg,
-  },
-  range: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  row: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
+  divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.line },
+  texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

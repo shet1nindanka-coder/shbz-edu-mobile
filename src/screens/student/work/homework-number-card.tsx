@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import type { StudentHomeworkNumberDto } from '@/api/types';
 import { MathContent } from '@/components/math';
 import { RetryWaitLine } from '@/components/retry-wait';
-import { homeworkStatusShortLabel } from '@/domain/statuses';
+import { statusLabel } from '@/components/numbers';
+import { homeworkStatusLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
@@ -49,7 +50,7 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
             : null;
 
   return (
-    <Card variant="outline" padded={16} selected={highlighted} style={styles.card} testID={`number-card-${number.number}`}>
+    <Card selected={highlighted} style={styles.card} testID={`number-card-${number.number}`}>
       {note.error ? (
         // The notice holds the server's text only, so its live region speaks it once; the countdown is a
         // plain line under it (a live region around a countdown makes TalkBack read every tick).
@@ -74,20 +75,24 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
       {note.error ? <RetryWaitLine seconds={wait} testID={`number-note-wait-${number.number}`} /> : null}
 
       <View style={styles.head}>
-        <Text variant="numberTitle" accessibilityRole="header" style={styles.title}>
-          {format(t.title, { number: number.number })}
+        <Text variant="sectionTitle" tabular accessibilityRole="header" accessibilityLabel={format(t.title, { number: number.number })} style={styles.title}>
+          {number.number}
         </Text>
-        <StatusBadge status={number.status} label={homeworkStatusShortLabel(number.status, dict)} />
+        {/* The status is read-only for a student: it is set by the check or by the teacher. */}
+        <StatusBadge
+          status={number.status}
+          label={statusLabel(number.status, m.common.statuses)}
+          accessibilityLabel={homeworkStatusLabel(number.status, dict)}
+        />
       </View>
       <Hint>
         <Text variant="hint">{t.statusHint}</Text>
       </Hint>
 
       {number.conditionLatex ? (
-        <View style={styles.section}>
-          <Text variant="cardKicker">{t.condition}</Text>
+        <Card accessibilityLabel={t.condition}>
           <MathContent value={number.conditionLatex} testID={`number-condition-${number.number}`} />
-        </View>
+        </Card>
       ) : null}
 
       {notesEnabled && !note.disabledByServer ? (
@@ -115,8 +120,7 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
 }
 
 const useStyles = makeStyles((t) => ({
-  card: { gap: t.space.sm },
+  card: { gap: t.space.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   title: { flex: 1, minWidth: 0 },
-  section: { gap: t.space.xs },
 }));

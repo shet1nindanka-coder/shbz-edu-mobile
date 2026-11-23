@@ -39,11 +39,11 @@ export function ScoreScaleGrid({ rows, highlightPrimary }: ScoreScaleGridProps) 
               style={[styles.chip, row.primary === highlightPrimary ? styles.highlight : null]}
               testID={`exam-scale-${row.primary}`}
             >
-              <Text variant="smallBold" color="kicker" tabular>
+              <Text variant="bodyBold" tabular>
                 {row.primary}
               </Text>
-              <Icon name="forward" size={12} color="weekDotOff" />
-              <Text variant="cardTitle" tabular style={styles.scaled}>
+              <Icon name="forward" size={16} color="textMuted" />
+              <Text variant="smallStrong" color="textMuted" tabular>
                 {row.secondary}
               </Text>
             </View>
@@ -59,25 +59,23 @@ export function ScoreScaleGrid({ rows, highlightPrimary }: ScoreScaleGridProps) 
 }
 
 const useStyles = makeStyles((t) => ({
-  grid: { gap: 8 },
-  line: { flexDirection: 'row', gap: 8 },
+  grid: { gap: t.space.sm },
+  line: { flexDirection: 'row', gap: t.space.sm },
   chip: {
     flex: 1,
     minHeight: t.sizes.minTouch,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.hairline,
-    borderColor: t.colors.softBorder,
+    gap: t.space.sm,
+    paddingHorizontal: t.space.sm,
+    paddingVertical: t.space.md,
+    borderRadius: t.radii.lg,
+    borderWidth: t.borders.interactive,
+    borderColor: 'transparent',
     backgroundColor: t.colors.softBg,
   },
-  highlight: { borderColor: t.colors.accentSolid, borderWidth: t.borders.interactive },
-  scaled: { fontFamily: t.fonts.extrabold },
-  // As wide as a chip's horizontal padding plus border: with a zero flex basis they are part of the base
-  // size, and a bare filler would end up narrower than the columns above it.
-  filler: { flex: 1, paddingHorizontal: 8 + t.borders.hairline },
+  // The pass threshold: an ink outline, not a colour of its own.
+  highlight: { borderColor: t.colors.textStrong },
+  filler: { flex: 1 },
 }));

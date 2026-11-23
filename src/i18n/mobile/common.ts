@@ -74,6 +74,38 @@ const ru = {
   },
   // The link above a screen title when the parent screen has no shorter name.
   back: "Назад",
+  // Short names of the number statuses (the owner's wording): `label` — in chips and next to a number,
+  // `group` — the heading of a group in «Все номера». The long site names stay for screen readers.
+  statuses: {
+    GREEN: { label: "решил сам", group: "Решил сам" },
+    YELLOW: { label: "исправил", group: "Исправил" },
+    RED: { label: "нужна помощь", group: "Нужна помощь" },
+    none: { label: "не отмечено", group: "Осталось" },
+    // «Нужна помощь · 4», «31 решил сам»
+    groupCount: "{label} · {n}",
+    barPart: "{n} {label}"
+  },
+  numbers: {
+    all: "Все номера",
+    leftOf: "Осталось {left} из {total}",
+    allSolved: "Все номера решены",
+    doneOf: "{done} из {total}",
+    tileA11y: "{number}, {status}",
+    range: "{first}–{last}"
+  },
+  // The one caption of a homework row (`deadlineCaption`). Weekdays are in the genitive («до пятницы»).
+  deadline: {
+    none: "без срока",
+    done: "выполнено",
+    today: "сегодня до {time}",
+    tomorrow: "до завтра, {time}",
+    weekday: "до {weekday}",
+    weekdays: ["понедельника", "вторника", "среды", "четверга", "пятницы", "субботы", "воскресенья"],
+    date: "до {date}",
+    overdueToday: "просрочено сегодня",
+    overdue: "просрочено {days}",
+    dayForms: ["{n} день", "{n} дня", "{n} дней"] as string[]
+  },
   a11y: {
     goBack: "Вернуться назад",
     loading: "Идёт загрузка"
@@ -151,6 +183,34 @@ const en: typeof ru = {
     notSet: "not set"
   },
   back: "Back",
+  statuses: {
+    GREEN: { label: "solved alone", group: "Solved alone" },
+    YELLOW: { label: "corrected", group: "Corrected" },
+    RED: { label: "needs help", group: "Needs help" },
+    none: { label: "not marked", group: "Left" },
+    groupCount: "{label} · {n}",
+    barPart: "{n} {label}"
+  },
+  numbers: {
+    all: "All problems",
+    leftOf: "{left} of {total} left",
+    allSolved: "All problems are solved",
+    doneOf: "{done} of {total}",
+    tileA11y: "{number}, {status}",
+    range: "{first}–{last}"
+  },
+  deadline: {
+    none: "no deadline",
+    done: "done",
+    today: "due today, {time}",
+    tomorrow: "due tomorrow, {time}",
+    weekday: "due {weekday}",
+    weekdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    date: "due {date}",
+    overdueToday: "overdue since today",
+    overdue: "overdue by {days}",
+    dayForms: ["{n} day", "{n} days"]
+  },
   a11y: {
     goBack: "Go back",
     loading: "Loading"

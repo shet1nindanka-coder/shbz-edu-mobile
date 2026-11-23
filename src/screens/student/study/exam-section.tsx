@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
 
 import { makeStyles } from '@/theme';
 import { Card, Text } from '@/ui';
@@ -10,22 +9,19 @@ export type ExamSectionProps = {
   testID?: string;
 };
 
-/** A titled card of the exam info screen (`.shbz-section-title` + `.shbz-card`). */
+/** A titled card of the exam info screen: the title (17 / 700) sits inside the card, above its content. */
 export function ExamSection({ title, children, testID }: ExamSectionProps) {
   const styles = useStyles();
   return (
-    <View style={styles.section} testID={testID}>
+    <Card style={styles.card} testID={testID}>
       <Text variant="sectionTitle" accessibilityRole="header">
         {title}
       </Text>
-      <Card padded={12}>
-        <View style={styles.content}>{children}</View>
-      </Card>
-    </View>
+      {children}
+    </Card>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  section: { gap: t.space.md },
-  content: { gap: t.space.sm },
+  card: { gap: t.space.sm },
 }));

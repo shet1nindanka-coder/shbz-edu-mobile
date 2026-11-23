@@ -10,7 +10,7 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Badge, Dialog, Notice, ProgressBar, Text, useEventAnnouncement } from '@/ui';
+import { Dialog, Notice, ProgressBar, Text, useEventAnnouncement } from '@/ui';
 
 import { applyDeletedPhoto, applyUploadedPhotos, freePhotoSlots } from './logic';
 import { mergeLocalWrite } from './merge-local-write';
@@ -138,7 +138,7 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
     );
   };
 
-  const counter = `${photos.length} / ${maxPhotos}`;
+  const counter = format(m.common.numbers.doneOf, { done: photos.length, total: maxPhotos });
 
   // The dialog names the photo («Фото 2 из 3, IMG_2.jpg»): its place is looked up by id in the current
   // batch, so a batch that changed while the dialog is open still names the right one.
@@ -151,21 +151,18 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
   return (
     <View style={styles.block} testID="homework-photos">
       <View style={styles.head}>
-        <View style={styles.titles}>
-          <Text variant="cardTitle" accessibilityRole="header">
-            {t.title}
-          </Text>
-          <Hint>
-            <Text variant="small" color="textMuted">
-              {t.subtitle}
-            </Text>
-          </Hint>
-        </View>
-        <Badge
-          tone="count"
-          label={counter}
+        <Text variant="bodyBold" accessibilityRole="header" style={styles.titles}>
+          {t.title}
+        </Text>
+        {/* A neutral fact: plain grey text, not a chip. */}
+        <Text
+          variant="small"
+          color="textMuted"
+          tabular
           accessibilityLabel={format(m.studentWork.photos.counterA11y, { count: photos.length, max: maxPhotos })}
-        />
+        >
+          {counter}
+        </Text>
       </View>
 
       {error ? (
@@ -244,8 +241,8 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
 }
 
 const useStyles = makeStyles((t) => ({
-  block: { gap: t.space.md },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.md },
-  titles: { flex: 1, minWidth: 0, gap: 2 },
-  hints: { gap: 2 },
+  block: { gap: t.space.sm },
+  head: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  titles: { flex: 1, minWidth: 0 },
+  hints: { gap: t.space.xxxs },
 }));

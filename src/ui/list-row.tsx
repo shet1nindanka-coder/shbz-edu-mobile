@@ -11,6 +11,8 @@ export type ListRowProps = {
   title: string;
   /** Second line (13, muted): one caption per row. */
   subtitle?: string;
+  /** `attention` draws the caption in the status red: something is overdue or needs help. Default `muted`. */
+  subtitleTone?: 'muted' | 'attention';
   /** Short trailing text (13, muted, tabular): a neutral fact such as «37 из 50». */
   meta?: string;
   /** Node before the texts (avatar, icon tile, unread dot). */
@@ -42,6 +44,7 @@ export type ListRowProps = {
 export function ListRow({
   title,
   subtitle,
+  subtitleTone = 'muted',
   meta,
   left,
   right,
@@ -69,7 +72,7 @@ export function ListRow({
           {title}
         </Text>
         {subtitle ? (
-          <Text variant="small" color="textMuted" numberOfLines={subtitleLines}>
+          <Text variant="small" color={subtitleTone === 'attention' ? 'redText' : 'textMuted'} numberOfLines={subtitleLines}>
             {subtitle}
           </Text>
         ) : null}

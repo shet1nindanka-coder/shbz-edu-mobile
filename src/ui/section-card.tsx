@@ -20,14 +20,18 @@ export type SectionCardProps = {
   children?: ReactNode;
 };
 
-/** Page section: title row (20/700, optional hint and action) and, 18 below, a card with the content. */
+/**
+ * Page section: a caption (13 / 600, muted — `.sec`) with an optional hint and action, and under it a card
+ * with the content. The caption names a block that has no title of its own; a title that belongs INSIDE a
+ * card is a `sectionTitle` text there.
+ */
 export function SectionCard({ title, description, action, card, bare = false, style, children }: SectionCardProps) {
   const styles = useStyles();
   return (
     <View style={[styles.section, style]}>
       <View style={styles.header}>
         <View style={styles.titles}>
-          <Text variant="sectionTitle" accessibilityRole="header">
+          <Text variant="kicker" color="textMuted" accessibilityRole="header">
             {title}
           </Text>
           {description ? (
@@ -44,7 +48,7 @@ export function SectionCard({ title, description, action, card, bare = false, st
 }
 
 const useStyles = makeStyles((t) => ({
-  section: { gap: t.space.field },
-  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: t.space.md },
-  titles: { flex: 1, minWidth: 0, gap: 4 },
+  section: { gap: t.space.sm },
+  header: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: t.space.md, paddingHorizontal: t.space.xxs, paddingTop: t.space.xxs },
+  titles: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

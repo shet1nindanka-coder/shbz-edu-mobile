@@ -7,11 +7,12 @@
 // accessible names of native controls).
 const ru = {
   list: {
-    // spoken status chips of a homework card, grouped by status: «Нужна помощь преподавателя: № 118»
-    numbersGroupA11y: "{status}: {numbers}",
-    numbersUnmarkedA11y: "Не отмечены",
-    archiveShowA11y: "Показать выполненные ДЗ: {count}",
-    archiveHideA11y: "Скрыть выполненные ДЗ: {count}",
+    // The two halves of the list: what is still to do and what is closed.
+    active: "Активные",
+    done: "Выполненные",
+    segmentsA11y: "Какие задания показать",
+    doneEmpty: "Выполненных заданий пока нет.",
+    rowA11y: "{title}. {caption}. Решено {done}",
     refreshFailed: "Не удалось обновить список. Показываем сохранённые данные."
   },
   homework: {
@@ -44,12 +45,10 @@ const ru = {
   lesson: {
     // replaces `dict.student.lesson.autoRefresh` (no page to reload)
     autoRefresh: "Обновлять экран не нужно — урок откроется сам.",
-    nextLesson: "Ближайшее занятие",
     individual: "Индивидуальное занятие",
     startsIn: "Начнётся через {time}",
     startsSoon: "Урок начинается…",
     closedOf: "Закрыто {closed} из {total}",
-    progressA11y: "Основная часть: закрыто {closed} из {total}",
     remainingMinuteForms: ["Осталась {n} минута", "Осталось {n} минуты", "Осталось {n} минут"],
     remainingLessThanMinute: "Осталось меньше минуты",
     // replaces `dict.student.lessonView.noItems` («обновите страницу»)
@@ -68,10 +67,11 @@ const ru = {
 
 const en: typeof ru = {
   list: {
-    numbersGroupA11y: "{status}: {numbers}",
-    numbersUnmarkedA11y: "Not marked yet",
-    archiveShowA11y: "Show completed homework: {count}",
-    archiveHideA11y: "Hide completed homework: {count}",
+    active: "Active",
+    done: "Closed",
+    segmentsA11y: "Which homework to show",
+    doneEmpty: "No completed homework yet.",
+    rowA11y: "{title}. {caption}. Solved {done}",
     refreshFailed: "Could not refresh the list. Showing saved data."
   },
   homework: {
@@ -95,12 +95,10 @@ const en: typeof ru = {
   },
   lesson: {
     autoRefresh: "No need to refresh — the lesson will open on its own.",
-    nextLesson: "Next lesson",
     individual: "Individual lesson",
     startsIn: "Starts in {time}",
     startsSoon: "The lesson is starting…",
     closedOf: "{closed} of {total} closed",
-    progressA11y: "Main part: {closed} of {total} closed",
     remainingMinuteForms: ["{n} minute left", "{n} minutes left"],
     remainingLessThanMinute: "Less than a minute left",
     noItems: "Your teacher hasn't put the set together yet — wait a minute and pull down to refresh.",
