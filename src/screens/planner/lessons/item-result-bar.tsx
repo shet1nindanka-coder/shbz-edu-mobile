@@ -1,10 +1,10 @@
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 
 import type { LessonBoardItem, LessonItemResult } from '@/api/types';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { LESSON_RESULT_ORDER, lessonResultMeta } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { StatusOptionGroup, Text } from '@/ui';
 
 export type ItemResultBarProps = {
@@ -19,6 +19,9 @@ export type ItemResultBarProps = {
   participantId: string;
 };
 
+/** Window width from which half of the screen (the student's panel) holds the four options in one row. */
+const ONE_ROW_MIN_WINDOW = 1024;
+
 /**
  * «Итог урока» of the picked number (docs/spec/05-teacher-lessons-plans.md §1.3 "Result toggle"; layout:
  * mockup `T-board`): the lesson-result options with the site's wording, pinned under the student's numbers
@@ -27,6 +30,8 @@ export type ItemResultBarProps = {
  */
 export function ItemResultBar({ item, disabled, waitSeconds, onResult, participantId }: ItemResultBarProps) {
   const styles = useStyles();
+  const theme = useTheme();
+  const window = useWindowDimensions();
   const { dict, m } = useI18n();
   const results = dict.students.lessonResult;
   const numberSign = format(dict.planner.common.numberSign, { n: item.number });
@@ -47,8 +52,9 @@ export function ItemResultBar({ item, disabled, waitSeconds, onResult, participa
         }))}
         value={item.result}
         onChange={onResult}
-        // Four options with the site's wording («с ошибками») do not fit one row of a sheet or a panel.
-        columns={2}
+        // One row where the four labels of the site («с ошибками») fit — the panel of a landscape tablet;
+        // a 2 × 2 grid in a phone sheet and in a narrow panel.
+        columns={theme.tablet && window.width >= ONE_ROW_MIN_WINDOW ? 4 : 2}
         disabled={disabled}
         testID={`lesson-item-result-${item.id}`}
       />

@@ -11,7 +11,7 @@ import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation, useStillHere } from '@/navigation';
 import { useHintsEnabled } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, CheckRow, DateTimeField, Notice, Panel, Panels, Screen, SectionCaption, Select, Text, TextArea, useStatusAnnouncement } from '@/ui';
+import { Button, Card, Checkbox, DateTimeField, Notice, Panel, Panels, Screen, SectionCaption, Select, Text, TextArea, useStatusAnnouncement } from '@/ui';
 
 import { DurationStepper } from '../lessons/duration-stepper';
 import { checkedMemberIds, toggleId } from '../lessons/new-lesson-logic';
@@ -186,12 +186,13 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
   const students = (
     <>
       {form.members.map((member) => (
-        <CheckRow
+        <Checkbox
           key={member.id}
           label={member.name}
           checked={checkedIds.includes(member.id)}
           onChange={() => setUncheckedIds((current) => toggleId(current, member.id))}
           testID={`draft-new-student-${member.id}`}
+          style={styles.student}
         />
       ))}
       {nobodyChecked ? (
@@ -255,5 +256,7 @@ const useStyles = makeStyles((t) => ({
   field: { gap: t.space.xs },
   section: { gap: t.space.xs },
   students: { gap: t.space.xs },
+  // The same rows as in the lesson form: a check box and a name, 44 high.
+  student: { minHeight: t.sizes.control.md },
   footer: { gap: t.space.xs },
 }));

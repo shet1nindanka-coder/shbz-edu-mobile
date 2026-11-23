@@ -241,7 +241,12 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
           resultWait > 0
         }
         waitSeconds={resultWait}
-        onResult={(result) => controller.markResult(participant.id, current.id, result)}
+        onResult={(result) => {
+          // The marked number stays the shown one: without a pick the board would jump to the next number
+          // that waits for the teacher, and the mark just made could not be seen or corrected.
+          setPickedItems((picked) => ({ ...picked, [participant.id]: current.id }));
+          controller.markResult(participant.id, current.id, result);
+        }}
       />
     );
   };
@@ -359,7 +364,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
       {theme.tablet ? (
         <Panels testID="lesson-board-list">
           <Panel
-            weight={3}
             padded={false}
             contentStyle={styles.classPanel}
             header={
@@ -377,8 +381,8 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
           >
             {rows}
           </Panel>
+          {/* Equal panels: the student's numbers, statement, photos and result buttons need the width. */}
           <Panel
-            weight={2}
             header={
               panelParticipant ? (
                 <Text variant="sectionTitle" accessibilityRole="header" numberOfLines={2}>
