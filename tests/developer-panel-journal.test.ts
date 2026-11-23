@@ -13,7 +13,6 @@ import {
   activeFilterCount,
   actorOptionLabel,
   categoryFilterLabel,
-  collapseError,
   costText,
   initialJournalFilters,
   mergeJournalPages,
@@ -82,13 +81,6 @@ test("tokensText / costText: absent values give null, a missing side counts as 0
   assert.equal(costText("0.5"), "0.50 ₽");
   assert.equal(costText("12.3456"), "12.35 ₽");
   assert.equal(costText("not a number"), null);
-});
-
-test("collapseError: only an error longer than 140 characters is cut", () => {
-  const exact = "x".repeat(140);
-  assert.deepEqual(collapseError(exact), { text: exact, collapsed: false });
-  const long = "y".repeat(141);
-  assert.deepEqual(collapseError(long), { text: `${"y".repeat(140)}…`, collapsed: true });
 });
 
 test("metaJson: pretty-printed with two spaces", () => {

@@ -9,7 +9,6 @@ import {
   applyPendingResults,
   availableNumbers,
   hasScheduleMovedOn,
-  itemOrdinal,
   markParticipantPending,
   minutesAgo,
   needsSchedule,
@@ -105,13 +104,6 @@ test("set parts and the id lists of a save", () => {
   assert.deepEqual(withoutNumber(ids, "num_4"), { mainIds: ["num_1", "num_3"], extraIds: ["num_2"] });
   assert.deepEqual(withNumber(ids, "num_9", false), { mainIds: ["num_1", "num_3", "num_9"], extraIds: ["num_2", "num_4"] });
   assert.deepEqual(withNumber(ids, "num_9", true), { mainIds: ["num_1", "num_3"], extraIds: ["num_2", "num_4", "num_9"] });
-});
-
-test("itemOrdinal: the extra part continues the numbering of the main part", () => {
-  assert.equal(itemOrdinal(0, false, 5), 1);
-  assert.equal(itemOrdinal(4, false, 5), 5);
-  assert.equal(itemOrdinal(0, true, 5), 6);
-  assert.equal(itemOrdinal(1, true, 0), 2);
 });
 
 test("availableNumbers: the numbers of a topic that are not in the set yet", () => {

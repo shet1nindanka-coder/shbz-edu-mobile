@@ -29,12 +29,6 @@ export function isAssignmentCompleted(assignment: Counted): boolean {
   return assignment.totalNumbers > 0 && assignment.solvedCount === assignment.totalNumbers;
 }
 
-export function isAssignmentOverdue(assignment: Counted & Pick<TeacherHomeworkAssignment, 'deadlineAt'>, now: number): boolean {
-  if (isAssignmentCompleted(assignment) || assignment.deadlineAt === null) return false;
-  const deadline = Date.parse(assignment.deadlineAt);
-  return !Number.isNaN(deadline) && deadline < now;
-}
-
 export function unmarkedCount(assignment: Pick<TeacherHomeworkAssignment, 'totalNumbers' | 'markedCount'>): number {
   return Math.max(0, assignment.totalNumbers - assignment.markedCount);
 }

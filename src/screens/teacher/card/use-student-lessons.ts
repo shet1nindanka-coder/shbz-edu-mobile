@@ -258,5 +258,3 @@ export function useStudentLessons(studentId: string) {
     dismissError: (lessonId: string) => setErrors((current) => without(current, [lessonId])),
   };
 }
-
-export type StudentLessonsController = ReturnType<typeof useStudentLessons>;

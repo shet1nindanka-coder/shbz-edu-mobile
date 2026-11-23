@@ -48,9 +48,3 @@ export function subscribeKeptReports(listener: () => void): () => void {
     listeners.delete(listener);
   };
 }
-
-/** Tests only: start from an empty store. */
-export function resetKeptReports(): void {
-  kept.clear();
-  notify();
-}

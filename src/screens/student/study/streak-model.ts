@@ -1,5 +1,5 @@
 // Pure rules of the «Огонёк и ритм» block (docs/spec/02-student-study.md S1, §4.3, §4.4): the texts of
-// the hero and the two panels, the seven week cells, and which animation a counter change plays. No React.
+// the hero and the two panels, the seven week cells. No React.
 import type { StudentStreak } from "@/api/types";
 import { getStudentStreakColorMeta } from "@/domain/student-streak-colors";
 import { getDayOfWeekIndex } from "@/domain/week-buckets";
@@ -82,19 +82,4 @@ export function weekCells(streak: StudentStreak, weekdaysShort: readonly string[
         : format(copy.dayEmptyAria, { day: label }),
     };
   });
-}
-
-/** `ignite` — 0 → above 0; `grow` — an increase; `drop` — a decrease (the site's `useStreakMotion`). */
-export type StreakMotion = "ignite" | "grow" | "drop";
-
-export function streakMotionKind(previous: number, next: number): StreakMotion | null {
-  if (next === previous) return null;
-  if (next > previous) return previous === 0 ? "ignite" : "grow";
-  return "drop";
-}
-
-/** `#rrggbb` with an alpha as `rgba(r, g, b, a)` — the glow of the streak animation is the flame colour, thinned. */
-export function hexWithAlpha(hex: string, alpha: number): string {
-  const [r, g, b] = [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

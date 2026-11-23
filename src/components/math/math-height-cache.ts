@@ -39,7 +39,3 @@ export function getCachedMathHeight(key: string): number | undefined {
 export function setCachedMathHeight(key: string, height: number): void {
   if (Number.isFinite(height) && height > 0) heights.set(key, height);
 }
-
-export function clearMathHeightCache(): void {
-  heights.clear();
-}

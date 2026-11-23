@@ -1,6 +1,6 @@
 // Students area of the teacher (docs/spec/04-teacher-students.md S2, S2a, D1 – D3). The sheets are written
 // against a `{ id, name }` target so the student card and the developer's accounts screen can reuse them.
-export { canSubmitPassword, canSubmitStudentForm, passwordFeedback, shouldSuggestPassword, type PasswordFeedback as PasswordFeedbackState, type StudentFormValues } from './account-form';
+export { canSubmitPassword, canSubmitStudentForm, passwordFeedback, shouldSuggestPassword, type StudentFormValues } from './account-form';
 export { CreateStudentSheet, type CreateStudentSheetProps } from './create-student-sheet';
 export { buildCredentialLines, credentialLineText, credentialsMessage, type CredentialLine } from './credentials-message';
 export { CredentialsSheet, type CreatedCredentials, type CredentialsSheetProps } from './credentials-sheet';

@@ -18,14 +18,6 @@ import { parseMskDateTimeInput, toEpochMs } from '@/domain/moscow-time';
 
 // ───────────────────────────── list ─────────────────────────────
 
-/**
- * Colour of the «выдано {issued} из {total}» chip: green once every participant has the homework,
- * yellow otherwise (an empty draft is never "all issued").
- */
-export function issuedChipTone(plan: Pick<HomeworkPlanListItem, 'issuedCount' | 'participantsCount'>): 'green' | 'yellow' {
-  return plan.participantsCount > 0 && plan.issuedCount === plan.participantsCount ? 'green' : 'yellow';
-}
-
 /** Newest first, as the site orders the list (`createdAt desc`); the id breaks ties so the order is stable. */
 export function sortDrafts<T extends Pick<HomeworkPlanListItem, 'id' | 'createdAt'>>(plans: readonly T[]): T[] {
   return [...plans].sort((left, right) => toEpochMs(right.createdAt) - toEpochMs(left.createdAt) || left.id.localeCompare(right.id));
@@ -203,14 +195,6 @@ export function markDraftParticipantPending(board: HomeworkPlanBoardModel, parti
       participant.id === participantId ? { ...participant, planGeneratedAt: null, planError: null } : participant,
     ),
   };
-}
-
-/** Chip colour of the reason a problem was selected — coloured on this board: gap = yellow, new = green. */
-export function reasonTone(reason: string): 'yellow' | 'green' | 'muted' {
-  if (reason === 'GAP') return 'yellow';
-  if (reason === 'REVIEW') return 'muted';
-  // NEW, and anything unknown falls back to the "new" look, as its label does.
-  return 'green';
 }
 
 /**

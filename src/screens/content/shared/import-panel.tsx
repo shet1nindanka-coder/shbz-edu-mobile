@@ -9,7 +9,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { Button, Card, Icon, Notice, PressableScale, Switch, Text, TextArea, TextButton } from '@/ui';
 
 import { ImportPromptButton } from './import-prompt-button';
-import { useImportPanel, type ImportPanelOptions, type ImportPanelState } from './use-import-panel';
+import type { ImportPanelState } from './use-import-panel';
 
 /** Placeholder of the «JSON текстом» field — a format sample, not a sentence (the site hard-codes it too). */
 const JSON_PLACEHOLDER = '{"formatVersion": 1, "topic": {...}, "numbers": [...]}';
@@ -274,12 +274,6 @@ function SampleCard({ entry }: { entry: ImportNumber }) {
       )}
     </Card>
   );
-}
-
-/** The panel with its own state — for screens that keep it mounted (the topic's edit screen). */
-export function ImportPanel({ hidePromptButton, testID, ...options }: ImportPanelOptions & Omit<ImportPanelViewProps, 'state'>) {
-  const state = useImportPanel(options);
-  return <ImportPanelView state={state} hidePromptButton={hidePromptButton} testID={testID} />;
 }
 
 const useStyles = makeStyles((t) => ({

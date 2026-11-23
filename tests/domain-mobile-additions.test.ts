@@ -41,7 +41,6 @@ import {
   LESSON_RESULT_ORDER,
   homeworkStatusLabel,
   homeworkStatusMeta,
-  homeworkStatusShortLabel,
   isSolvedStatus,
   lessonResultMeta,
   statusTone
@@ -183,10 +182,7 @@ describe("statuses: semantic meta and labels", () => {
 
     assert.equal(homeworkStatusLabel("GREEN", ru), "Решен с первого раза");
     assert.equal(homeworkStatusLabel("RED", en), "Needs the teacher's help");
-    assert.equal(homeworkStatusShortLabel("YELLOW", ru), "Желтый");
-    assert.equal(homeworkStatusShortLabel("YELLOW", en), "Yellow");
     assert.equal(homeworkStatusLabel(null, ru), "Не отмечено");
-    assert.equal(homeworkStatusShortLabel(null, en), "Not marked");
   });
 
   it("lesson results reuse the traffic light and agree with the progress policy", () => {

@@ -51,14 +51,6 @@ export function homeworkStatusLabel(
   return status ? dict.status[status].label : dict.student.statusBadge.unmarked;
 }
 
-/** Badge label of a status («Зеленый»); `null` → «Не отмечено» (the site's `HomeworkStatusBadge`). */
-export function homeworkStatusShortLabel(
-  status: HomeworkNumberStatus | null | undefined,
-  dict: { status: Dictionary["status"]; student: { statusBadge: Dictionary["student"]["statusBadge"] } }
-): string {
-  return status ? dict.status[status].shortLabel : dict.student.statusBadge.unmarked;
-}
-
 /** Display order of the lesson-result toggle. */
 export const LESSON_RESULT_ORDER: readonly LessonItemResult[] = [
   LessonItemResult.SOLVED,

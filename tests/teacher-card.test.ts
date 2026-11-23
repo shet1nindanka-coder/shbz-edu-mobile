@@ -53,7 +53,6 @@ import {
   hasDiagnostics,
   injectionResults,
   isAssignmentCompleted,
-  isAssignmentOverdue,
   latestDoneCheck,
   patchHomeworkStatuses,
   releaseWrites,
@@ -135,15 +134,6 @@ describe("review: derived flags of a homework", () => {
     assert.equal(isAssignmentCompleted(assignment("a", { "1": "GREEN", "2": "YELLOW" })), true);
     assert.equal(isAssignmentCompleted(assignment("a", { "1": "GREEN", "2": "RED" })), false);
     assert.equal(isAssignmentCompleted(assignment("a", {})), false);
-  });
-
-  it("is overdue when not completed and the deadline has passed", () => {
-    const now = Date.parse("2026-11-16T12:00:00.000Z");
-    const past = { deadlineAt: "2026-11-15T20:59:00.000Z" };
-    assert.equal(isAssignmentOverdue(assignment("a", { "1": null }, past), now), true);
-    assert.equal(isAssignmentOverdue(assignment("a", { "1": "GREEN" }, past), now), false);
-    assert.equal(isAssignmentOverdue(assignment("a", { "1": null }, { deadlineAt: "2026-11-17T20:59:00.000Z" }), now), false);
-    assert.equal(isAssignmentOverdue(assignment("a", { "1": null }), now), false);
   });
 
   it("counts unmarked numbers and recomputes the counters when colours change", () => {
@@ -585,7 +575,6 @@ describe("student card: a finished report outlives the card (#324)", () => {
   const report = { period: "7d" as const, file: { uri: "file:///cache/r.pdf", fileName: "r.pdf" } };
 
   it("is kept by student and offered until it is opened or dismissed", () => {
-    store.resetKeptReports();
     let calls = 0;
     const unsubscribe = store.subscribeKeptReports(() => {
       calls += 1;
@@ -605,7 +594,6 @@ describe("student card: a finished report outlives the card (#324)", () => {
   });
 
   it("is never offered in another session (sign-out, another account)", () => {
-    store.resetKeptReports();
     store.keepReport("usr_ilya", 3, report);
     assert.equal(store.keptReportOf("usr_ilya", 4), null);
   });

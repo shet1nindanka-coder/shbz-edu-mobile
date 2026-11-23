@@ -44,20 +44,6 @@ export function groupLessons(lessons: readonly LessonListItem[], now: number): L
   return sections.filter((section) => section.lessons.length > 0);
 }
 
-export type LessonListRow =
-  | { type: 'section'; key: LessonSectionKey; count: number }
-  | { type: 'lesson'; key: string; lesson: LessonListItem };
-
-/** Sections flattened for one virtualised list: a heading row, then its lesson rows. */
-export function buildLessonRows(sections: readonly LessonSection[]): LessonListRow[] {
-  const rows: LessonListRow[] = [];
-  for (const section of sections) {
-    rows.push({ type: 'section', key: section.key, count: section.lessons.length });
-    for (const lesson of section.lessons) rows.push({ type: 'lesson', key: lesson.id, lesson });
-  }
-  return rows;
-}
-
 /** Who the lesson is for on the meta line: the group, or the only student of an individual lesson. */
 export function lessonAudience(lesson: Pick<LessonListItem, 'groupName' | 'soloStudentName'>): string | null {
   return lesson.groupName ?? lesson.soloStudentName ?? null;

@@ -54,7 +54,7 @@ export { PageGlow, type PageGlowProps } from './page-glow';
 export { Panel, Panels, type PanelProps, type PanelsProps } from './panels';
 export { PageHeader, type PageHeaderMetric, type PageHeaderProps } from './page-header';
 export { PasswordField, type PasswordFieldProps } from './password-field';
-export { completionPercent, ProgressBar, type ProgressBarProps } from './progress-bar';
+export { ProgressBar, type ProgressBarProps } from './progress-bar';
 export { Screen, type ScreenProps } from './screen';
 export { SearchField, type SearchFieldProps } from './search-field';
 export { SectionCaption, type SectionCaptionProps } from './section-caption';

@@ -275,5 +275,3 @@ export function useReview(studentId: string) {
     dismissAssignmentError: (assignmentId: string) => setAssignmentErrors((current) => without(current, [assignmentId])),
   };
 }
-
-export type ReviewController = ReturnType<typeof useReview>;

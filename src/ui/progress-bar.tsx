@@ -19,11 +19,6 @@ export type ProgressBarProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** `completionPercent(done, total)` of the site: rounded percent, 0 when there is nothing to do. */
-export function completionPercent(done: number, total: number): number {
-  return total ? Math.round((done / total) * 100) : 0;
-}
-
 /** Progress bar (`.track` / `.fill`): 8 high, round, the mint gradient growing on a neutral track. */
 export function ProgressBar({ value, size = 'sm', accessibilityLabel, transition = 'spring', style }: ProgressBarProps) {
   const theme = useTheme();

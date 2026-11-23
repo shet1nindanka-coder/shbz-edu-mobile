@@ -7,7 +7,6 @@ import assert from "node:assert/strict";
 import type { LessonListItem } from "@/api/types";
 import { mskDate } from "@/domain/moscow-time";
 import {
-  buildLessonRows,
   groupLessons,
   hasScheduleAdvanced,
   lessonAudience,
@@ -79,16 +78,6 @@ test("groupLessons: the Moscow day decides, not the UTC day", () => {
   // 00:30 Moscow on the 17th is still the 16th in UTC.
   const sections = groupLessons([lesson({ id: "after_midnight", startsAt: at(17, 0, 30) })], NOW);
   assert.equal(sections[0]?.key, "upcoming");
-});
-
-test("buildLessonRows: a heading row with the count before each section", () => {
-  const rows = buildLessonRows(
-    groupLessons([lesson({ id: "a", startsAt: at(16, 15) }), lesson({ id: "b", startsAt: at(18, 15) }), lesson({ id: "c", startsAt: at(19, 15) })], NOW),
-  );
-  assert.deepEqual(
-    rows.map((row) => (row.type === "section" ? `${row.key}:${row.count}` : row.lesson.id)),
-    ["today:1", "a", "upcoming:2", "b", "c"],
-  );
 });
 
 test("lesson card facts: date, audience, chips", () => {

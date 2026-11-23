@@ -48,11 +48,6 @@ export function availableNumbers(
   return topic.numbers.filter((number) => !taken.has(number.id));
 }
 
-/** Ordinal shown before a number: the extra part continues the numbering of the main part. */
-export function itemOrdinal(index: number, isExtra: boolean, mainCount: number): number {
-  return (isExtra ? mainCount : 0) + index + 1;
-}
-
 /** Replaces one participant's set in a cached board (the response of a set save). */
 export function replaceParticipantItems(board: LessonBoardModel, participantId: string, items: LessonBoardItem[]): LessonBoardModel {
   return {

@@ -1,5 +1,5 @@
-// Pure decisions of the parent-calls screen (src/screens/calls/logic.ts): the texts of a student row, the
-// rows of the list and the paging of the history sheet.
+// Pure decisions of the parent-calls screen (src/screens/calls/logic.ts): the texts of a student row and the
+// paging of the history sheet.
 /// <reference path="../node_modules/@types/node/assert.d.ts" />
 /// <reference path="../node_modules/@types/node/assert/strict.d.ts" />
 /// <reference path="../node_modules/@types/node/test.d.ts" />
@@ -11,16 +11,12 @@ import { getDictionary } from "@/i18n/get-dictionary";
 import {
   HISTORY_PAGE_SIZE,
   agoLabel,
-  buildCallRows,
   callMetaLine,
   callMetaParts,
   earlierHistoryCursor,
-  historyButtonLabel,
-  longestWordLength,
   historyEntryTime,
   mergeHistory,
   reminderChip,
-  rowIndexOfStudent,
   summaryLine,
   teacherLine,
 } from "@/screens/calls/logic";
@@ -102,37 +98,8 @@ test("reminderChip: tone and label per state", () => {
   assert.deepEqual(reminderChip("ok", en), { tone: "muted", label: "Called recently" });
 });
 
-test("historyButtonLabel: the total, or a dash when there is nothing to open", () => {
-  assert.equal(historyButtonLabel(23, ru), "История (23)");
-  assert.equal(historyButtonLabel(0, ru), "История (—)");
-  assert.equal(historyButtonLabel(1, en), "History (1)");
-});
-
 test("summaryLine: the site's sentence", () => {
   assert.equal(summaryLine({ overdue: 1, due: 2, total: 7 }, ru), "Просрочено: 1 · Пора позвонить: 2 · Всего учеников: 7");
-});
-
-// ───────────────────────────── the list ─────────────────────────────
-
-test("buildCallRows: counters first, then the students in the server's order", () => {
-  const rows = buildCallRows([student({ studentId: "a" }), student({ studentId: "b" })]);
-  assert.deepEqual(
-    rows.map((row) => (row.type === "summary" ? "summary" : row.student.studentId)),
-    ["summary", "a", "b"],
-  );
-});
-
-test("buildCallRows: no students → no rows (the empty state, without counters of zeros)", () => {
-  assert.deepEqual(buildCallRows([]), []);
-});
-
-test("rowIndexOfStudent: the row of the list, counting the summary; -1 for an unknown or missing id", () => {
-  const rows = buildCallRows([student({ studentId: "a" }), student({ studentId: "b" })]);
-  assert.equal(rowIndexOfStudent(rows, "a"), 1);
-  assert.equal(rowIndexOfStudent(rows, "b"), 2);
-  assert.equal(rowIndexOfStudent(rows, "zzz"), -1);
-  assert.equal(rowIndexOfStudent(rows, undefined), -1);
-  assert.equal(rowIndexOfStudent(rows, ""), -1);
 });
 
 // ───────────────────────────── history ─────────────────────────────
@@ -163,14 +130,5 @@ test("historyEntryTime: Moscow wall clock", () => {
   // 15:30 UTC = 18:30 in Moscow.
   assert.equal(historyEntryTime(entry("c1"), "ru"), "5 ноября в 18:30");
   assert.equal(historyEntryTime(entry("c1"), "en"), "5 November at 18:30");
-});
-
-test("longestWordLength: the word a counter label cannot break, at least 4", () => {
-  // «Просрочено» is one word and must get more room than a label that wraps at its space.
-  assert.equal(longestWordLength("Просрочено"), 10);
-  assert.equal(longestWordLength("Пора позвонить"), 9);
-  assert.equal(longestWordLength("Всего учеников"), 8);
-  assert.equal(longestWordLength("Due"), 4);
-  assert.equal(longestWordLength(""), 4);
 });
 

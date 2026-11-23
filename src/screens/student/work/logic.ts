@@ -8,7 +8,6 @@ import type {
   GetHomeworkResponse,
   GetLessonResponse,
   HomeworkNumberStatus,
-  HomeworkSummaryDto,
   LatestHomeworkCheckResponse,
   LessonItemDto,
   LessonItemResult,
@@ -38,62 +37,9 @@ export function splitHomeworks<T extends { totalNumbers: number; solvedCount: nu
   return { active, archived };
 }
 
-export type HomeworkListRow =
-  | { kind: 'homework'; key: string; homework: HomeworkSummaryDto; archived: boolean }
-  /** «Все ДЗ выполнены — новых пока нет.» — shown instead of the active cards. */
-  | { kind: 'allDone'; key: 'all-done' }
-  /** The disclosure «Выполненные ДЗ (N)». */
-  | { kind: 'archiveToggle'; key: 'archive-toggle'; count: number; open: boolean };
-
-/** Rows of the homework list: active cards, the "all done" line, the archive disclosure and its cards. */
-export function buildHomeworkRows(assignments: readonly HomeworkSummaryDto[], archiveOpen: boolean): HomeworkListRow[] {
-  if (assignments.length === 0) return [];
-  const { active, archived } = splitHomeworks(assignments);
-  const rows: HomeworkListRow[] = active.map((homework) => ({ kind: 'homework', key: homework.id, homework, archived: false }));
-  if (active.length === 0) rows.push({ kind: 'allDone', key: 'all-done' });
-  if (archived.length > 0) {
-    rows.push({ kind: 'archiveToggle', key: 'archive-toggle', count: archived.length, open: archiveOpen });
-    if (archiveOpen) {
-      for (const homework of archived) rows.push({ kind: 'homework', key: homework.id, homework, archived: true });
-    }
-  }
-  return rows;
-}
-
 /** Label of an assignment: its own title, else «ДЗ N» by its order inside the topic. */
 export function homeworkLabel(homework: { title: string | null; orderInTopic: number }, homeworkN: string): string {
   return homework.title || format(homeworkN, { n: homework.orderInTopic });
-}
-
-/**
- * Meta line of a list card (03 §1 H1): «ДЗ до {date} · » + «Выполнено {solved} из {total}» + « · Фото: {count}».
- * `deadlineDate` is the already formatted date, or null when the homework has no deadline.
- */
-export function homeworkListMeta(
-  homework: Pick<HomeworkSummaryDto, 'solvedCount' | 'totalNumbers' | 'photosCount'>,
-  texts: { deadlineUntil: string; solvedOf: string; photos: string },
-  deadlineDate: string | null,
-): string {
-  return (
-    (deadlineDate ? format(texts.deadlineUntil, { date: deadlineDate }) : '') +
-    format(texts.solvedOf, { solved: homework.solvedCount, total: homework.totalNumbers }) +
-    (homework.photosCount > 0 ? format(texts.photos, { count: homework.photosCount }) : '')
-  );
-}
-
-/**
- * Meta line of the detail header (03 §1 H2): «Дедлайн до {date} · » + «Выполнено {solved} из {total}».
- * `deadlineDateTime` is the already formatted date and time, or null.
- */
-export function homeworkDetailMeta(
-  homework: { solvedCount: number; totalNumbers: number },
-  texts: { deadlineUntil: string; solvedOf: string },
-  deadlineDateTime: string | null,
-): string {
-  return (
-    (deadlineDateTime ? `${format(texts.deadlineUntil, { date: deadlineDateTime })} · ` : '') +
-    format(texts.solvedOf, { solved: homework.solvedCount, total: homework.totalNumbers })
-  );
 }
 
 // ───────────────────────────── AI check (H2.b) ─────────────────────────────
@@ -223,31 +169,6 @@ export function lessonParts(items: readonly LessonItemDto[]): LessonParts {
   const extra = sorted.filter((item) => item.isExtra);
   const closedMain = main.filter((item) => item.closed).length;
   return { main, extra, closedMain, remainingMain: main.length - closedMain, extraUnlocked: closedMain === main.length };
-}
-
-export type LessonRow =
-  | { kind: 'section'; key: string; part: 'main' | 'extra' }
-  /** `index` — 1-based position inside its part (the extra part starts from 1 again). */
-  | { kind: 'item'; key: string; item: LessonItemDto; index: number }
-  /** The teacher has not put the set together yet. */
-  | { kind: 'noItems'; key: 'no-items' }
-  /** The extra part while the main part is not closed: statements are not shown. */
-  | { kind: 'extraLocked'; key: 'extra-locked'; remaining: number };
-
-/** Rows of the live lesson (03 §1 L2): «Основная часть», then «Дополнительная часть» when it exists. */
-export function buildLessonRows(parts: LessonParts): LessonRow[] {
-  const rows: LessonRow[] = [{ kind: 'section', key: 'section-main', part: 'main' }];
-  if (parts.main.length === 0) rows.push({ kind: 'noItems', key: 'no-items' });
-  parts.main.forEach((item, position) => rows.push({ kind: 'item', key: item.id, item, index: position + 1 }));
-  if (parts.extra.length > 0) {
-    rows.push({ kind: 'section', key: 'section-extra', part: 'extra' });
-    if (parts.extraUnlocked) {
-      parts.extra.forEach((item, position) => rows.push({ kind: 'item', key: item.id, item, index: position + 1 }));
-    } else {
-      rows.push({ kind: 'extraLocked', key: 'extra-locked', remaining: parts.remainingMain });
-    }
-  }
-  return rows;
 }
 
 export type LessonItemChip =

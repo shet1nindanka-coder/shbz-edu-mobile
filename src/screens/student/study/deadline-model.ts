@@ -26,24 +26,6 @@ export function selectUpcoming(items: readonly DeadlineItem[], limit: number = U
     .slice(0, limit);
 }
 
-export type UpcomingBlocks = {
-  /** «Что дальше»: the nearest unfinished homework, or null (the block is then absent). */
-  hero: DeadlineItem | null;
-  /** «Ближайшие ДЗ»: the next up to three. */
-  list: DeadlineItem[];
-  /**
-   * Whether the «Ближайшие ДЗ» block is rendered at all: with a hero and nothing else it is absent; with
-   * no upcoming homework it shows its title and the "no homework yet" chip.
-   */
-  showList: boolean;
-};
-
-/** The visibility matrix of S1 (exact, from the site's `UpcomingDeadlinesCard`). */
-export function splitUpcoming(items: readonly DeadlineItem[], limit: number = UPCOMING_LIMIT): UpcomingBlocks {
-  const [next, ...rest] = selectUpcoming(items, limit);
-  return { hero: next ?? null, list: rest, showList: rest.length > 0 || !next };
-}
-
 /** `dict.student.deadlineList` fields the card texts need. */
 export type DeadlineCardCopy = {
   meta: string;
@@ -98,10 +80,6 @@ export function monthOfInstant(now: number): CalendarMonth {
 export function shiftMonth(month: CalendarMonth, delta: number): CalendarMonth {
   const index = month.year * 12 + (month.month - 1) + delta;
   return { year: Math.floor(index / 12), month: (((index % 12) + 12) % 12) + 1 };
-}
-
-export function isSameMonth(left: CalendarMonth, right: CalendarMonth): boolean {
-  return left.year === right.year && left.month === right.month;
 }
 
 /** Deadlines bucketed by their MOSCOW calendar day (§4.9: «20 Nov 23:59 MSK» is the 20th for everyone). */

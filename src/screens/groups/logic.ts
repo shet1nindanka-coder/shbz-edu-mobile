@@ -29,8 +29,6 @@ export const GROUP_GRADE_MIN = 1;
 export const GROUP_GRADE_MAX = 11;
 /** `MAX_SUGGESTIONS` of the site's add-member search. */
 export const MAX_MEMBER_SUGGESTIONS = 8;
-/** A group card names the first three members, then «и ещё N». */
-export const CARD_MEMBER_NAMES = 3;
 /** `red30 >= 5` paints the number red (06 §4.2 "UI thresholds"). */
 export const RED_ALERT_THRESHOLD = 5;
 /** `StudentProfile.aiNote`: one line, cut by the server at this length. */
@@ -56,32 +54,12 @@ export function parseGradeInput(raw: string): { ok: true; grade: number | null }
   return grade >= GROUP_GRADE_MIN && grade <= GROUP_GRADE_MAX ? { ok: true, grade } : { ok: false };
 }
 
-/** «8 класс · создана 8 августа 2026» — the grade part only when it is set. */
-export function groupCardSubline(
-  group: Pick<GroupListItem, "grade" | "createdAt">,
-  t: GroupsDict["list"],
-  locale: Locale,
-): string {
-  const created = format(t.createdAt, { date: formatShortDate(group.createdAt, locale) });
-  return group.grade ? `${format(t.grade, { n: group.grade })} · ${created}` : created;
-}
-
 /**
  * The one caption of a group row: «8 класс · 4 ученика» — the grade part only when it is set. `students`
  * is the counted word form («4 ученика»), which the caller declines for its locale.
  */
 export function groupRowCaption(group: Pick<GroupListItem, "grade">, students: string, t: GroupsDict["list"]): string {
   return group.grade ? `${format(t.grade, { n: group.grade })} · ${students}` : students;
-}
-
-/** First three names and «и ещё N»; «Учеников пока нет.» for an empty group. */
-export function memberNamesLine(members: readonly { name: string }[], t: GroupsDict["list"]): string {
-  if (members.length === 0) return t.noStudents;
-  const names = members
-    .slice(0, CARD_MEMBER_NAMES)
-    .map((member) => member.name)
-    .join(", ");
-  return members.length > CARD_MEMBER_NAMES ? `${names} ${format(t.andMore, { n: members.length - CARD_MEMBER_NAMES })}` : names;
 }
 
 // ───────────────────────────── members ─────────────────────────────

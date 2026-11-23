@@ -111,7 +111,6 @@ const ru = {
     usePassword: "Войти по паролю"
   },
   numberSearch: {
-    title: "Поиск номера",
     hint: "Введите номер задачи — откроем её карточку."
   },
   reminders: {
@@ -125,7 +124,6 @@ const ru = {
   },
   demo: {
     title: "Демо-данные",
-    entryHint: "Сброс данных, персонажи и переключатели демо-режима.",
     resetData: "Сбросить демо-данные",
     resetConfirmTitle: "Сбросить демо-данные?",
     resetConfirmBody: "Все изменения, сделанные в приложении, будут удалены, а данные вернутся к исходным.",
@@ -234,7 +232,6 @@ const en: typeof ru = {
     usePassword: "Sign in with password"
   },
   numberSearch: {
-    title: "Find a problem",
     hint: "Enter a problem number and we will open its card."
   },
   reminders: {
@@ -248,7 +245,6 @@ const en: typeof ru = {
   },
   demo: {
     title: "Demo data",
-    entryHint: "Data reset, personas and demo-mode switches.",
     resetData: "Reset demo data",
     resetConfirmTitle: "Reset demo data?",
     resetConfirmBody: "Every change made in the app will be removed and the data will return to its initial state.",

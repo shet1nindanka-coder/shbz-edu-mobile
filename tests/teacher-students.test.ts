@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { ApiError } from "../src/api/errors";
+import { ApiError, errorText } from "../src/api/errors";
 import { validatePasswordStrength } from "../src/domain/password-policy";
 import { generatePasswordFromName } from "../src/domain/password-generate";
 import {
@@ -20,7 +20,6 @@ import {
   credentialLineText,
   credentialsMessage,
 } from "../src/screens/teacher/students/credentials-message";
-import { errorText } from "../src/api/errors";
 import { isStudentGone } from "../src/screens/teacher/students/error-text";
 
 describe("password line under the field", () => {

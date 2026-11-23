@@ -21,9 +21,7 @@ import {
   initialTopicId,
   issueOutcomeOf,
   issueStampSignature,
-  issuedChipTone,
   markDraftParticipantPending,
-  reasonTone,
   replaceDraftItems,
   sortDrafts,
   toDraftItems,
@@ -78,14 +76,6 @@ const boardOf = (participants: HomeworkPlanParticipant[]): HomeworkPlanBoardMode
 });
 
 // ───────────────────────────── list ─────────────────────────────
-
-test("issuedChipTone: green only when every participant has the homework", () => {
-  assert.equal(issuedChipTone({ issuedCount: 2, participantsCount: 2 }), "green");
-  assert.equal(issuedChipTone({ issuedCount: 1, participantsCount: 2 }), "yellow");
-  assert.equal(issuedChipTone({ issuedCount: 0, participantsCount: 3 }), "yellow");
-  // An empty draft is never "all issued".
-  assert.equal(issuedChipTone({ issuedCount: 0, participantsCount: 0 }), "yellow");
-});
 
 test("sortDrafts: newest first, stable by id, input untouched", () => {
   const plans = [
@@ -229,13 +219,6 @@ test("replaceDraftItems / markDraftParticipantPending: only the named participan
   // The set stays until the new plan arrives.
   assert.deepEqual(pending.participants[0]?.items, [item("120")]);
   assert.equal(pending.participants[1], board.participants[1]);
-});
-
-test("reasonTone: gap yellow, review neutral, new and unknown green", () => {
-  assert.equal(reasonTone("GAP"), "yellow");
-  assert.equal(reasonTone("REVIEW"), "muted");
-  assert.equal(reasonTone("NEW"), "green");
-  assert.equal(reasonTone("DIAGNOSTIC"), "green");
 });
 
 test("draftCreatedAt: the earliest participant, or the server clock for an empty draft", () => {

@@ -16,12 +16,10 @@ import {
   attendanceTotalText,
   attentionLabels,
   defaultAttendanceLessonId,
-  groupCardSubline,
   hasActiveLesson,
   isInOtherGroup,
   lessonCells,
   memberAttendanceSummary,
-  memberNamesLine,
   normalizeGroupName,
   parseGradeInput,
   speedLabel,
@@ -30,7 +28,6 @@ import {
 } from "@/screens/groups/logic";
 
 const ru = getDictionary("ru").planner;
-const en = getDictionary("en").planner;
 
 // ───────────────────────────── groups list ─────────────────────────────
 
@@ -50,22 +47,6 @@ test("parseGradeInput: empty is no grade, 1..11 is a grade, anything else is ref
   assert.deepEqual(parseGradeInput("8.5"), { ok: false });
   assert.deepEqual(parseGradeInput("-3"), { ok: false });
   assert.deepEqual(parseGradeInput("восемь"), { ok: false });
-});
-
-test("groupCardSubline: the grade part only when the grade is set; the date is a Moscow day", () => {
-  // 21:30 UTC on 7 August is already 8 August in Moscow.
-  const createdAt = "2026-08-07T21:30:00.000Z";
-  assert.equal(groupCardSubline({ grade: 8, createdAt }, ru.groups.list, "ru"), "8 класс · создана 8 августа 2026");
-  assert.equal(groupCardSubline({ grade: null, createdAt }, ru.groups.list, "ru"), "создана 8 августа 2026");
-  assert.equal(groupCardSubline({ grade: 8, createdAt }, en.groups.list, "en"), `${en.groups.list.grade.replace("{n}", "8")} · ${en.groups.list.createdAt.replace("{date}", "8 August 2026")}`);
-});
-
-test("memberNamesLine: three names, then «и ещё N»; an empty group has its own line", () => {
-  const names = (count: number) => Array.from({ length: count }, (_, index) => ({ name: `Ученик ${index + 1}` }));
-  assert.equal(memberNamesLine([], ru.groups.list), "Учеников пока нет.");
-  assert.equal(memberNamesLine(names(3), ru.groups.list), "Ученик 1, Ученик 2, Ученик 3");
-  assert.equal(memberNamesLine(names(4), ru.groups.list), "Ученик 1, Ученик 2, Ученик 3 и ещё 1");
-  assert.equal(memberNamesLine(names(9), ru.groups.list), "Ученик 1, Ученик 2, Ученик 3 и ещё 6");
 });
 
 // ───────────────────────────── members ─────────────────────────────

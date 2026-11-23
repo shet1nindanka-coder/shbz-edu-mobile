@@ -1,6 +1,6 @@
 /**
  * Pure decisions of the parent-calls screen (docs/spec/06-teacher-groups-calls-stats.md §1.4, §4.4): the
- * texts of a student row, the rows of the list, the paging of the history sheet. No React, no React
+ * texts of a student row, the paging of the history sheet. No React, no React
  * Native — unit-tested in `tests/calls-logic.test.ts`.
  *
  * Days ("today", "3 d ago") are never computed here: they arrive from the server, counted in Moscow
@@ -88,31 +88,9 @@ export function callRowCaption(student: ParentCallStudentOverview, t: CallsDict,
   return showTeacher ? `${student.teacherName ?? "—"} · ${latest}` : latest;
 }
 
-/** «История (23)»; «История (—)» when there is nothing to open (the button is then disabled). */
-export function historyButtonLabel(totalCalls: number, t: CallsDict): string {
-  return format(t.history, { n: totalCalls === 0 ? "—" : totalCalls });
-}
-
 /** The site's summary line, read out for the three counters. */
 export function summaryLine(counts: { overdue: number; due: number; total: number }, t: CallsDict): string {
   return format(t.summary, counts);
-}
-
-// ───────────────────────────── the list ─────────────────────────────
-
-/** The sticky counters come first, then one row per student in the server's order. */
-export type CallListRow = { type: "summary" } | { type: "student"; student: ParentCallStudentOverview };
-
-export function buildCallRows(students: readonly ParentCallStudentOverview[]): CallListRow[] {
-  // No students: the list shows its empty state, without counters of zeros above it.
-  if (students.length === 0) return [];
-  return [{ type: "summary" }, ...students.map((student) => ({ type: "student" as const, student }))];
-}
-
-/** Index of a student's row for scroll-to (a notification link); -1 when the student is not listed. */
-export function rowIndexOfStudent(rows: readonly CallListRow[], studentId: string | null | undefined): number {
-  if (!studentId) return -1;
-  return rows.findIndex((row) => row.type === "student" && row.student.studentId === studentId);
 }
 
 // ───────────────────────────── history ─────────────────────────────
@@ -161,13 +139,5 @@ export function buildCallJournal(students: readonly ParentCallStudentOverview[])
 /** «5 ноября в 18:30» — Moscow time, whatever the device zone is. */
 export function historyEntryTime(entry: Pick<ParentCallEntry, "calledAt">, locale: Locale): string {
   return formatMsk(entry.calledAt, "dayMonthTime", locale) ?? "";
-}
-
-/**
- * Length of the longest word of a label, at least 4. The summary counters share their row in this
- * proportion, so a one-word label gets the room it cannot give up by wrapping.
- */
-export function longestWordLength(label: string): number {
-  return label.split(/\s+/).reduce((longest, word) => Math.max(longest, word.length), 4);
 }
 

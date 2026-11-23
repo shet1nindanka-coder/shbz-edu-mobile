@@ -10,8 +10,6 @@ export const JOURNAL_DEFAULT_DAYS = 7;
 /** The site debounces the "action" text filter by this much. */
 export const JOURNAL_ACTION_DEBOUNCE_MS = 450;
 export const JOURNAL_ACTION_MAX_LENGTH = 60;
-/** An error longer than this is collapsed behind «полностью». */
-export const JOURNAL_ERROR_COLLAPSE_AT = 140;
 
 /** Values of the period select, in the site's order; 0 = all time. */
 export const JOURNAL_PERIODS = [1, 7, 30, 90, 0] as const;
@@ -102,11 +100,6 @@ export function costText(costRub: string | null): string | null {
   if (costRub === null) return null;
   const value = Number(costRub);
   return Number.isFinite(value) ? `${value.toFixed(2)} ₽` : null;
-}
-
-/** The first 140 characters and an ellipsis for a long error; the whole text otherwise. */
-export function collapseError(error: string, limit: number = JOURNAL_ERROR_COLLAPSE_AT): { text: string; collapsed: boolean } {
-  return error.length > limit ? { text: `${error.slice(0, limit)}…`, collapsed: true } : { text: error, collapsed: false };
 }
 
 /** `meta` pretty-printed for the detail sheet. */

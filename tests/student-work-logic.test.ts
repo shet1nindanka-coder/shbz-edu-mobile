@@ -23,15 +23,11 @@ import {
   applyStartedCheck,
   applySubmission,
   applyUploadedPhotos,
-  buildHomeworkRows,
-  buildLessonRows,
   countVerdicts,
   delayUntilLessonEdge,
   freePhotoSlots,
   hasRunningSubmission,
-  homeworkDetailMeta,
   homeworkLabel,
-  homeworkListMeta,
   isCheckRunning,
   isHomeworkCompleted,
   isOlderSubmission,
@@ -84,50 +80,10 @@ describe("homework list", () => {
     assert.deepEqual(archived.map((item) => item.id), ["b", "d"]);
   });
 
-  it("rows: active cards, then the collapsed archive", () => {
-    const rows = buildHomeworkRows([hw("a", 0, 3), hw("b", 2, 2)], false);
-    assert.deepEqual(rows.map((row) => row.kind), ["homework", "archiveToggle"]);
-    assert.deepEqual(rows[1], { kind: "archiveToggle", key: "archive-toggle", count: 1, open: false });
-  });
-
-  it("rows: an open archive lists its cards after the toggle", () => {
-    const rows = buildHomeworkRows([hw("a", 0, 3), hw("b", 2, 2), hw("c", 1, 1)], true);
-    assert.deepEqual(rows.map((row) => row.key), ["a", "archive-toggle", "b", "c"]);
-    assert.equal(rows[2].kind === "homework" && rows[2].archived, true);
-  });
-
-  it("rows: nothing active → the 'all done' line before the archive", () => {
-    const rows = buildHomeworkRows([hw("b", 2, 2)], false);
-    assert.deepEqual(rows.map((row) => row.kind), ["allDone", "archiveToggle"]);
-  });
-
-  it("rows: an empty list has no rows (the screen shows the empty state)", () => {
-    assert.deepEqual(buildHomeworkRows([], true), []);
-  });
-
   it("label: own title, else «ДЗ N»", () => {
     assert.equal(homeworkLabel({ title: null, orderInTopic: 2 }, ru.common.homeworkN), "ДЗ 2");
     assert.equal(homeworkLabel({ title: "", orderInTopic: 3 }, en.common.homeworkN), "Homework 3");
     assert.equal(homeworkLabel({ title: "Парабола", orderInTopic: 2 }, ru.common.homeworkN), "Парабола");
-  });
-
-  it("list meta: deadline, solved counter, photos only when attached", () => {
-    const t = ru.student.submissions;
-    assert.equal(homeworkListMeta({ solvedCount: 1, totalNumbers: 3, photosCount: 0 }, t, null), "Выполнено 1 из 3");
-    assert.equal(
-      homeworkListMeta({ solvedCount: 1, totalNumbers: 3, photosCount: 2 }, t, "20 ноября 2026 г."),
-      "ДЗ до 20 ноября 2026 г. · Выполнено 1 из 3 · Фото: 2"
-    );
-    assert.equal(
-      homeworkListMeta({ solvedCount: 0, totalNumbers: 2, photosCount: 1 }, en.student.submissions, "20 November 2026"),
-      "Due 20 November 2026 · 0 of 2 done · Photos: 1"
-    );
-  });
-
-  it("detail meta: «Дедлайн до … · Выполнено …»", () => {
-    const t = ru.student.homework;
-    assert.equal(homeworkDetailMeta({ solvedCount: 2, totalNumbers: 3 }, t, "20.11.2026, 23:59"), "Дедлайн до 20.11.2026, 23:59 · Выполнено 2 из 3");
-    assert.equal(homeworkDetailMeta({ solvedCount: 2, totalNumbers: 3 }, t, null), "Выполнено 2 из 3");
   });
 });
 
@@ -365,23 +321,6 @@ describe("live lesson", () => {
   it("the extra part is unlocked when every main item is closed — also with no main items", () => {
     assert.equal(lessonParts([item("a", 0, { closed: true }), item("e", 1, { isExtra: true })]).extraUnlocked, true);
     assert.equal(lessonParts([item("e", 0, { isExtra: true })]).extraUnlocked, true);
-  });
-
-  it("rows: main section, then a locked extra part without its statements", () => {
-    const rows = buildLessonRows(lessonParts([item("a", 0), item("b", 1), item("e", 2, { isExtra: true })]));
-    assert.deepEqual(rows.map((row) => row.kind), ["section", "item", "item", "section", "extraLocked"]);
-    assert.deepEqual(rows[4], { kind: "extraLocked", key: "extra-locked", remaining: 2 });
-  });
-
-  it("rows: an unlocked extra part is numbered from 1 again", () => {
-    const rows = buildLessonRows(lessonParts([item("a", 0, { closed: true }), item("e1", 1, { isExtra: true }), item("e2", 2, { isExtra: true })]));
-    const indices = rows.flatMap((row) => (row.kind === "item" ? [row.index] : []));
-    assert.deepEqual(indices, [1, 1, 2]);
-  });
-
-  it("rows: no main items → the 'set is not ready' row; no extra section without extra items", () => {
-    const rows = buildLessonRows(lessonParts([]));
-    assert.deepEqual(rows.map((row) => row.kind), ["section", "noItems"]);
   });
 
   it("chip: the result wins, else the verdict of a finished latest submission", () => {

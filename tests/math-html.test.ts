@@ -7,7 +7,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { KATEX_CSS, KATEX_VERSION } from "@/components/math/generated/katex-css";
 import {
-  clearMathHeightCache,
   getCachedMathHeight,
   hashString,
   mathHeightKey,
@@ -180,7 +179,6 @@ test("height cache key: value | width | fontScale | theme (+ clamp)", () => {
 });
 
 test("height cache stores positive finite heights only", () => {
-  clearMathHeightCache();
   setCachedMathHeight("a", 120);
   setCachedMathHeight("b", 0);
   setCachedMathHeight("c", Number.NaN);
