@@ -322,9 +322,6 @@ function labelNotInName(app: AppHandle): string[] {
   const normalise = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
   const bad: string[] = [];
   for (const node of nodes) {
-    // The shell's "back" link shows where it leads («‹ Темы») and is named «Вернуться назад» by the shell's
-    // own rule (src/screens/shell/DetailAppBar.tsx); it is not a button of these areas.
-    if (/(^|-)app-bar-back$/.test(String(node.props.testID))) continue;
     // A control that shows one caption (a button, a link); composite cards name their title, not all text.
     // Text hidden from accessibility is a picture, not a caption (the initials of the header's avatar).
     const decorative = (child: HostNode) => child.props.importantForAccessibility === 'no' || child.props.accessibilityElementsHidden === true;

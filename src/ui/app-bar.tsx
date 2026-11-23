@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
+import { accessibilityLabelOf } from './a11y';
 import { ScreenHeader } from './screen-header';
 
 export type AppBarProps = {
@@ -38,7 +39,17 @@ export function AppBar({ title, subtitle, left, right, onBack, backLabel, backTi
       title={title}
       titleNode={left}
       subtitle={subtitle}
-      back={onBack && backLabel ? { label: backTitle ?? backLabel, onPress: onBack, accessibilityLabel: backLabel } : undefined}
+      back={
+        onBack && backLabel
+          ? {
+              label: backTitle ?? backLabel,
+              onPress: onBack,
+              // The spoken name starts with the visible text («Темы, вернуться назад»), so voice control
+              // finds the link by what the eye reads on it.
+              accessibilityLabel: backTitle && backTitle !== backLabel ? accessibilityLabelOf([backTitle, backLabel]) : backLabel,
+            }
+          : undefined
+      }
       actions={right}
       aside={aside}
       safeTop={safeTop}
