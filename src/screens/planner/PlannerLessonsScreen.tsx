@@ -137,6 +137,7 @@ export function PlannerLessonsScreen() {
             key={lesson.id}
             lesson={lesson}
             today={key === 'today'}
+            now={now}
             selected={selected?.id === lesson.id}
             divider={hasMore || index < shown.length - 1}
             onPress={pressRow}

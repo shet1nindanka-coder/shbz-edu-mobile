@@ -190,6 +190,6 @@ const useStyles = makeStyles((t) => ({
   parts: { gap: t.space.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
   // Three tiles in a row, as in the mockup: a six-digit number with its mark fits a third of a phone sheet.
-  tile: { flexGrow: 1, flexBasis: '30%', maxWidth: '33%' },
+  tile: { flexGrow: 1, flexBasis: '30%', maxWidth: '31.5%' },
   add: { alignSelf: 'flex-start' },
 }));

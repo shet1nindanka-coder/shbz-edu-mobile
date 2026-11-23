@@ -36,7 +36,7 @@ export type AiLessonFormProps = {
   form: LessonNewFormModel;
   /** Builds the header of the screen; on a tablet the form hands it its main button. */
   header: (aside?: ReactNode) => ReactNode;
-  /** Banner and mode switch shown above the fields. */
+  /** Banners shown above the fields. */
   top?: ReactNode;
 };
 

@@ -167,7 +167,7 @@ const useStyles = makeStyles((t) => ({
   body: { gap: t.space.md },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
   // Three tiles in a row: a six-digit number with its mark fits a third of a phone sheet.
-  tile: { flexGrow: 1, flexBasis: '30%', maxWidth: '33%' },
+  tile: { flexGrow: 1, flexBasis: '30%', maxWidth: '31.5%' },
   item: { gap: t.space.xs },
   link: { alignSelf: 'flex-start' },
 }));

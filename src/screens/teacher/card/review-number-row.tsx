@@ -85,7 +85,7 @@ const useStyles = makeStyles((t) => ({
   texts: { flex: 1, minWidth: 0, minHeight: t.sizes.minTouch, justifyContent: 'center', gap: t.space.xxxs },
   // A tablet has the room for one line: the number in its own column, then the caption.
   textsWide: { flex: 1, minWidth: 0, minHeight: t.sizes.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.lg },
-  numberWide: { flexShrink: 0 },
+  numberWide: { flexShrink: 0, minWidth: t.sizes.row },
   caption: { flexShrink: 1 },
   pressed: { opacity: 0.6 },
 }));

@@ -529,7 +529,8 @@ export function DeveloperAccountsScreen() {
 const useStyles = makeStyles((t) => ({
   // Phone: the segments take the room left of the button; a tablet header sizes them by their labels.
   aside: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  segments: { flex: 1, minWidth: 0 },
+  // Longhands: on web the kit's own `flexGrow: 0` would win over a `flex` shorthand.
+  segments: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
   // Phone: the list is the page.
   listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
   listHeader: { gap: t.space.md, paddingBottom: t.space.xxs },

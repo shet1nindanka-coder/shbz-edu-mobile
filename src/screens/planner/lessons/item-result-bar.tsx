@@ -4,7 +4,7 @@ import type { LessonBoardItem, LessonItemResult } from '@/api/types';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { LESSON_RESULT_ORDER, lessonResultMeta } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
-import { makeStyles, useTheme } from '@/theme';
+import { makeStyles } from '@/theme';
 import { StatusOptionGroup, Text } from '@/ui';
 
 export type ItemResultBarProps = {
@@ -27,7 +27,6 @@ export type ItemResultBarProps = {
  */
 export function ItemResultBar({ item, disabled, waitSeconds, onResult, participantId }: ItemResultBarProps) {
   const styles = useStyles();
-  const theme = useTheme();
   const { dict, m } = useI18n();
   const results = dict.students.lessonResult;
   const numberSign = format(dict.planner.common.numberSign, { n: item.number });
@@ -48,8 +47,8 @@ export function ItemResultBar({ item, disabled, waitSeconds, onResult, participa
         }))}
         value={item.result}
         onChange={onResult}
-        // One row where the four labels fit (a tablet panel), a 2 × 2 grid on a phone.
-        columns={theme.tablet ? 4 : 2}
+        // Four options with the site's wording («с ошибками») do not fit one row of a sheet or a panel.
+        columns={2}
         disabled={disabled}
         testID={`lesson-item-result-${item.id}`}
       />

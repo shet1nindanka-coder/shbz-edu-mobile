@@ -11,7 +11,7 @@ export type CaptionText = {
 
 /**
  * Words of the one caption of a student on the lesson board (`participantCaption`), all from the site's
- * dictionary: «не распознано — отметьте вручную · 064012», «нет сдач 12 мин», «в классе с 17:02»…
+ * dictionary: «064012 · не распознано — отметьте вручную», «нет сдач 12 мин», «в классе с 17:02»…
  */
 export function useParticipantCaptionText(): (caption: ParticipantCaption) => CaptionText {
   const { dict, locale } = useI18n();
@@ -25,7 +25,8 @@ export function useParticipantCaptionText(): (caption: ParticipantCaption) => Ca
       case 'planPending':
         return { text: t.aiSelecting, attention: false };
       case 'attention':
-        return { text: `${reasons[caption.reason]} · ${caption.number}`, attention: true };
+        // The number first: a long reason is cut at the end of the line, the number must not be.
+        return { text: `${caption.number} · ${reasons[caption.reason]}`, attention: true };
       case 'notOpened':
         return { text: t.notOpened, attention: caption.alert };
       case 'idle':

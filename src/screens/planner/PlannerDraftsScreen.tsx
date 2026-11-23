@@ -7,6 +7,7 @@ import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
 import { PlannerSegments, ShellAppBar, screenTitle } from '@/screens/shell';
+import { useNowTick } from '@/services/clock';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
@@ -40,6 +41,8 @@ export function PlannerDraftsScreen() {
   const plans = useMemo(() => (data ? sortDrafts(data) : []), [data]);
 
   const { refreshing, refresh } = usePullRefresh([drafts]);
+  // Only decides whether a row's date needs its year.
+  const now = useNowTick(60_000);
 
   const open = (plan: HomeworkPlanListItem) => navigation.open({ screen: 'planner.draftBoard', planId: plan.id });
   // The tablet panel shows the tapped draft, or the newest one.
@@ -47,7 +50,7 @@ export function PlannerDraftsScreen() {
   const pressRow = theme.tablet ? (plan: HomeworkPlanListItem) => setSelectedId(plan.id) : open;
 
   const rows = plans.map((plan, index) => (
-    <DraftRow key={plan.id} plan={plan} selected={selected?.id === plan.id} divider={index < plans.length - 1} onPress={pressRow} />
+    <DraftRow key={plan.id} plan={plan} now={now} selected={selected?.id === plan.id} divider={index < plans.length - 1} onPress={pressRow} />
   ));
 
   return (

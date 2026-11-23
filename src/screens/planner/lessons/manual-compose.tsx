@@ -24,7 +24,7 @@ export type ManualComposeProps = {
   topics: readonly ComposeBoardTopic[];
   /** Builds the header of the screen. */
   header: (aside?: ReactNode) => ReactNode;
-  /** Banner and mode switch shown above the grid. */
+  /** Banners shown above the grid. */
   top?: ReactNode;
 };
 

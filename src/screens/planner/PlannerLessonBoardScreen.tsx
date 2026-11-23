@@ -138,10 +138,12 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   // runs, how long it still lasts.
   const left = minutesLeft(lesson, now);
   const duration = format(dict.planner.common.minutesShort, { n: lesson.durationMinutes });
+  // On a tablet the group is the title of the class panel, right above this line.
+  const groupName = theme.tablet ? null : lesson.group?.name;
   const kicker = accessibilityLabelOf(
     isLive
-      ? [lesson.group?.name, dict.planner.lessonStatus.ACTIVE, left !== null ? format(m.planner.lessonBoard.timeLeft, { n: left }) : duration]
-      : [lesson.group?.name, formatDateTime(lesson.startsAt ?? lesson.createdAt, locale), duration, dict.planner.lessonStatus[lesson.status]],
+      ? [groupName, dict.planner.lessonStatus.ACTIVE, left !== null ? format(m.planner.lessonBoard.timeLeft, { n: left }) : duration]
+      : [groupName, formatDateTime(lesson.startsAt ?? lesson.createdAt, locale), duration, dict.planner.lessonStatus[lesson.status]],
     ' · ',
   );
 
