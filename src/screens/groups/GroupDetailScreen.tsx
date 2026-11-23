@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n';
 import type { ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen, screenTitle } from '@/screens/shell';
 import { makeStyles, useTheme } from '@/theme';
-import { LoadingState, Panels, Screen } from '@/ui';
+import { LoadingState, Panel, Panels, Screen } from '@/ui';
 
 import {
   GroupActions,
@@ -17,7 +17,6 @@ import {
   hasGroupNotices,
 } from './detail/group-detail-parts';
 import { GROUP_SIDE_TABS, GROUP_TABS, useGroupDetail } from './detail/use-group-detail';
-import { ScrollPanel } from './shared/scroll-panel';
 
 /** Route params of `groups.detail` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type GroupDetailScreenProps = ScreenParams['groups.detail'];
@@ -66,10 +65,10 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
           </View>
         ) : null}
         <Panels>
-          <ScrollPanel weight={2} refreshing={state.refreshing} onRefresh={state.refresh} testID="group-members-panel">
+          <Panel edges weight={2} refreshing={state.refreshing} onRefresh={state.refresh} testID="group-members-panel">
             <GroupTabBody state={state} tab="members" />
-          </ScrollPanel>
-          <ScrollPanel
+          </Panel>
+          <Panel edges
             weight={3}
             header={<GroupTabsBar state={state} tabs={GROUP_SIDE_TABS} />}
             refreshing={state.refreshing}
@@ -77,7 +76,7 @@ export function GroupDetailScreen({ groupId }: GroupDetailScreenProps) {
             testID="group-parts-panel"
           >
             <GroupTabBody state={state} tab={state.tab} />
-          </ScrollPanel>
+          </Panel>
         </Panels>
         <GroupSettingsHost state={state} />
       </Screen>

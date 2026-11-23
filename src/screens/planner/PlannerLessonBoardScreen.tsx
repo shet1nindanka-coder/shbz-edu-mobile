@@ -8,7 +8,6 @@ import { planRequestedAtOf, useHandout } from '@/components/lessons';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { ProgressHistorySheet } from '@/components/progress-history';
 import { RetryWaitLine } from '@/components/retry-wait';
-import { UndoToast } from '@/components/undo-toast';
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
@@ -29,6 +28,7 @@ import {
   Screen,
   SectionCaption,
   Text,
+  TextButton,
   accessibilityLabelOf,
   useNavigationFocused,
 } from '@/ui';
@@ -194,7 +194,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
 
   const titleOf = (participant: LessonBoardParticipant) => accessibilityLabelOf([participant.studentName, currentOf(participant)?.number], ' · ');
 
-  const detailOf = (participant: LessonBoardParticipant, top?: ReactNode) => {
+  const detailOf = (participant: LessonBoardParticipant, slots: { top?: ReactNode; results?: ReactNode } = {}) => {
     const view = views.get(participant.id);
     if (!view) return null;
     const undo = controller.undo && controller.undo.participantId === participant.id ? controller.undo : null;
@@ -213,7 +213,8 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
         itemErrors={controller.itemErrors}
         now={now}
         undoText={undo ? undo.label : null}
-        top={top}
+        top={slots.top}
+        results={slots.results}
         onUndo={controller.undoRemoval}
         onSelect={(item) => setPickedItems((picked) => ({ ...picked, [participant.id]: item.id }))}
         onRetry={() => controller.regenerate(participant.id)}
@@ -345,6 +346,16 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
     >
       <BoardNotices lesson={lesson} controller={controller} handout={handout} />
 
+      {/* A number removed in a student's sheet can be put back there; once the sheet is closed, here. */}
+      {controller.undo && sheetMode && openId === null ? (
+        <Notice
+          tone="success"
+          text={controller.undo.label}
+          action={<TextButton label={dict.planner.common.undo} onPress={controller.undoRemoval} testID="lesson-undo-toast-undo" />}
+          testID="lesson-undo-toast"
+        />
+      ) : null}
+
       {theme.tablet ? (
         <Panels testID="lesson-board-list">
           <Panel
@@ -390,8 +401,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
                 <Text variant="sectionTitle" accessibilityRole="header">
                   {titleOf(participants[0])}
                 </Text>
-                {detailOf(participants[0])}
-                {resultBarOf(participants[0])}
+                {detailOf(participants[0], { results: resultBarOf(participants[0]) })}
               </Card>
             ) : (
               <ListCard testID="lesson-board-list">{rows}</ListCard>
@@ -400,11 +410,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
           {finishButton}
         </>
       )}
-
-      {/* With the sheet closed nothing else shows that a number was just removed. */}
-      {controller.undo && sheetMode && openId === null ? (
-        <UndoToast text={controller.undo.label} undoLabel={dict.planner.common.undo} onUndo={controller.undoRemoval} testID="lesson-undo-toast" />
-      ) : null}
 
       {sheetMode ? (
         <BottomSheet
@@ -420,7 +425,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
           footer={sheetParticipant ? resultBarOf(sheetParticipant) : undefined}
           testID="lesson-participant-sheet"
         >
-          {sheetParticipant ? detailOf(sheetParticipant, sheetTop) : null}
+          {sheetParticipant ? detailOf(sheetParticipant, { top: sheetTop }) : null}
         </BottomSheet>
       ) : null}
 

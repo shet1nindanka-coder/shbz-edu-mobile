@@ -9,24 +9,25 @@ import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { makeStyles } from '@/theme';
 import {
+  accessibilityLabelOf,
   Avatar,
   BottomSheet,
   Button,
   Card,
   Chip,
   EmptyState,
+  ListCard,
   ListRow,
   LoadingState,
   Notice,
   SectionCaption,
   Text,
   TextButton,
-  accessibilityLabelOf,
   useInsideSurface,
+  useRowInset,
 } from '@/ui';
 
 import { RED_ALERT_THRESHOLD, activityLabel, attentionLabels, summaryTiles, type SummaryTile } from '../logic';
-import { Rows, useRowInset } from '../shared/rows';
 import { CountUp } from './count-up';
 import { ReportExportNotice, studentReportKey, type ReportExport } from './use-report-export';
 
@@ -91,7 +92,7 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
       {/* While the member sheet is open it shows the outcome of a report itself. */}
       {sheetOpen ? null : <ReportExportNotice report={report} testID="group-statistics-report-error" />}
 
-      <Rows>
+      <ListCard>
         {data.members.map((row, index) => {
           const flags = attentionLabels(row.attention, dict.planner.groupStatistics);
           const caption = flags.length > 0 ? flags.join(' · ') : activityLabel(row, t, locale);
@@ -116,7 +117,7 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
             />
           );
         })}
-      </Rows>
+      </ListCard>
 
       <MemberStatsSheet row={openedRow} visible={sheetOpen && openedRow !== null} report={report} onClose={() => setSheetOpen(false)} />
     </View>

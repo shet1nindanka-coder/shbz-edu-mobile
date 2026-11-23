@@ -5,10 +5,9 @@ import type { AttendanceStatus, GroupAttendanceLesson, GroupAttendanceResponse }
 import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { PressableScale, Select, Text, TextButton } from '@/ui';
+import { ListCard, PressableScale, Select, Text, TextButton, useRowInset } from '@/ui';
 
 import { defaultAttendanceLessonId, lessonCells, type AttendanceCell } from '../logic';
-import { Rows, useRowInset } from '../shared/rows';
 import { AttendanceTile, useAttendanceTileLabel } from './attendance-tile';
 
 type Member = GroupAttendanceResponse['members'][number];
@@ -77,7 +76,7 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
         />
       ) : null}
 
-      <Rows>
+      <ListCard>
         {members.map((member, index) => {
           const cell = cells.get(member.id);
           const saving = cell ? busy.has(cell.participantId) : false;
@@ -125,7 +124,7 @@ export function AttendanceLessonList({ members, lessons, busy, disabled, onSet, 
             </View>
           );
         })}
-      </Rows>
+      </ListCard>
     </View>
   );
 }

@@ -63,7 +63,7 @@ export function NumbersField({
       />
 
       {/* Neutral facts of the parsed list: plain text, not labels. */}
-      <Text variant="small" color="textMuted" tabular>
+      <Text variant="small" color="textMuted">
         {summary.state === 'ok'
           ? summary.first !== null && summary.last !== null
             ? `${plural(locale, summary.count, dict.topics.widgets.numberForms)} · ${format(t.range, { from: summary.first, to: summary.last })}`

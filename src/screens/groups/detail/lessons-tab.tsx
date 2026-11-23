@@ -5,9 +5,8 @@ import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { makeStyles } from '@/theme';
-import { EmptyState, ListRow, SectionCaption, TextButton } from '@/ui';
+import { EmptyState, ListCard, ListRow, SectionCaption, TextButton, useRowInset } from '@/ui';
 
-import { Rows, useRowInset } from '../shared/rows';
 
 export type LessonsTabProps = {
   lessons: GroupDetailResponse['lessons'];
@@ -35,7 +34,7 @@ export function LessonsTab({ lessons }: LessonsTabProps) {
         <EmptyState variant="plain" title={t.noLessons} testID="group-lessons-empty" />
       ) : (
         <>
-          <Rows>
+          <ListCard>
             {lessons.recent.map((lesson, index) => {
               const caption = `${formatDateTime(lesson.startsAt ?? lesson.createdAt, locale)} · ${format(common.minutesShort, { n: lesson.durationMinutes })}`;
               return (
@@ -53,7 +52,7 @@ export function LessonsTab({ lessons }: LessonsTabProps) {
                 />
               );
             })}
-          </Rows>
+          </ListCard>
           {canOpenList ? (
             <TextButton
               label={t.allLessons}

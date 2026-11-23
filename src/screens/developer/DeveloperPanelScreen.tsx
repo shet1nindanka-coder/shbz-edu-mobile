@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { View, type ScrollViewInstance } from 'react-native';
+import { View, useWindowDimensions, type ScrollViewInstance } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import type { DeveloperPanelTab } from '@/api/types';
@@ -26,6 +26,9 @@ import { useSettingsForm } from './panel/use-settings-form';
 /** Route params of `developer.panel` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
 export type DeveloperPanelScreenProps = ScreenParams['developer.panel'];
 
+/** From this window width the five segments and the save button fit the header row at full size. */
+const ROOMY_HEADER_FROM = 1024;
+
 /** The last segment of the header is not a tab of this screen: it opens the journal. */
 const JOURNAL = 'journal';
 type PanelSegment = DeveloperPanelTab | typeof JOURNAL;
@@ -47,6 +50,7 @@ type PanelSegment = DeveloperPanelTab | typeof JOURNAL;
 export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
   const styles = useStyles();
   const theme = useTheme();
+  const window = useWindowDimensions();
   const api = useApi();
   const navigation = useAppNavigation();
   const { dict, m } = useI18n();
@@ -107,9 +111,9 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
                 onChange={selectTab}
                 accessibilityLabel={t.tabsAria}
                 role="tab"
-                // Five dictionary labels: shown in full on a phone and with a large OS font (the bar scrolls
-                // when they cannot fit), never ellipsized.
-                scrollable
+                // Five dictionary labels: shown in full on a phone, on a narrow tablet and with a large OS
+                // font (the bar scrolls when they cannot fit), never ellipsized.
+                scrollable={window.width < ROOMY_HEADER_FROM}
                 style={styles.segments}
                 testID="panel-tabs"
               />
@@ -141,8 +145,8 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
           {panel.isError ? (
             <Notice tone="error" text={errorText(panel.error, m.developer.panel.refreshFailed)} testID="panel-refresh-error" />
           ) : null}
-          {/* «Статус» shows the same counters in its own boxes. */}
-          {active === 'status' ? null : <StatusChips figures={panelFigures(data.stats, data.settings, t)} />}
+          {/* The counters live on «Статус»; the actions change them, so that tab repeats the three main ones. */}
+          {active === 'actions' ? <StatusChips figures={panelFigures(data.stats, data.settings, t)} /> : null}
           {theme.tablet && active === 'settings' ? (
             <View style={styles.statusLine}>
               <SettingsStatusLine form={form} />

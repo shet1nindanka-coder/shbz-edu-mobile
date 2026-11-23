@@ -10,13 +10,12 @@ import { useAppNavigation, useRefetchOnFocus, useStillHere } from '@/navigation'
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ListCard, LoadingState, Notice, Panels, Screen } from '@/ui';
+import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
 
 import { GroupDetailPane } from './detail/group-detail-pane';
 import { CreateGroupSheet } from './list/create-group-sheet';
 import { GroupRow } from './list/group-row';
 import { GROUPS_LIST_NOTICE, groupNoticeChannel, postGroupNotice, useGroupNotice } from './shared/notice-store';
-import { ScrollPanel } from './shared/scroll-panel';
 
 /**
  * `groups.list` (docs/spec/06-teacher-groups-calls-stats.md §1.1; layout: docs/design/glass-over-paper.md
@@ -109,7 +108,7 @@ export function GroupsListScreen() {
     return (
       <Screen testID="groups-list-screen" header={<ShellAppBar title={title} />} scroll={false} maxWidth="full">
         <Panels>
-          <ScrollPanel
+          <Panel edges
             weight={2}
             padded={false}
             refreshing={refreshing}
@@ -124,7 +123,7 @@ export function GroupsListScreen() {
           >
             {notice || (groups.isError && data) ? <View style={styles.panelNotices}>{notices}</View> : null}
             {rows}
-          </ScrollPanel>
+          </Panel>
           {selectedId ? (
             // A key per group: its tab, banners and sheets never carry over to the next one.
             <GroupDetailPane

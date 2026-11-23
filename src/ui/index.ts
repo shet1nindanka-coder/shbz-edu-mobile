@@ -42,7 +42,7 @@ export {
   type TodayInput,
 } from './internal/date-time';
 export { hitSlopFor, PressableScale, type PressableScaleProps, type PressableState } from './internal/pressable-scale';
-export { ListCard, type ListCardProps } from './list-card';
+export { ListCard, useRowInset, type ListCardProps } from './list-card';
 export { ListRow, type ListRowProps } from './list-row';
 export { LoadingState, type LoadingStateProps } from './loading-state';
 export { Logo, type LogoProps } from './logo';

@@ -7,11 +7,10 @@ import type { GroupCandidate, GroupDetail, GroupDetailResponse, GroupMember } fr
 import { statusBreakdown } from '@/components/numbers';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Avatar, Button, Dialog, EmptyState, ListRow, Notice, SectionCaption } from '@/ui';
+import { Avatar, Button, Dialog, EmptyState, ListCard, ListRow, Notice, SectionCaption, useRowInset } from '@/ui';
 
 import { speedLabel } from '../logic';
 import { invalidateGroupMembership } from '../shared/invalidate';
-import { Rows, useRowInset } from '../shared/rows';
 import { useFlash } from '../shared/use-flash';
 import { AddMemberSheet } from './add-member-sheet';
 import { FlashText } from './flash-text';
@@ -159,7 +158,7 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
       {group.members.length === 0 ? (
         <EmptyState variant="plain" title={m.groups.members.empty} testID="group-members-empty" />
       ) : (
-        <Rows testID="group-members-list">
+        <ListCard testID="group-members-list">
           {group.members.map((member, index) => (
             <ListRow
               key={member.id}
@@ -177,7 +176,7 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
               testID={`member-ai-toggle-${member.id}`}
             />
           ))}
-        </Rows>
+        </ListCard>
       )}
 
       <MemberSheet

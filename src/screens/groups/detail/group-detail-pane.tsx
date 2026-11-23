@@ -3,9 +3,8 @@ import { View } from 'react-native';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { EmptyState, LoadingState, Text } from '@/ui';
+import { EmptyState, LoadingState, Panel, Text } from '@/ui';
 
-import { ScrollPanel } from '../shared/scroll-panel';
 import { GroupActions, GroupMenuButton, GroupNotices, GroupSettingsHost, GroupTabBody, GroupTabsBar } from './group-detail-parts';
 import { GROUP_TABS, useGroupDetail } from './use-group-detail';
 
@@ -27,7 +26,7 @@ export function GroupDetailPane({ groupId, weight, onGone }: GroupDetailPaneProp
   const { data, group } = state;
 
   return (
-    <ScrollPanel
+    <Panel edges
       weight={weight}
       refreshing={state.refreshing}
       onRefresh={state.refresh}
@@ -62,7 +61,7 @@ export function GroupDetailPane({ groupId, weight, onGone }: GroupDetailPaneProp
       ) : (
         <LoadingState variant="list" count={4} accessibilityLabel={m.common.a11y.loading} testID="group-loading" />
       )}
-    </ScrollPanel>
+    </Panel>
   );
 }
 

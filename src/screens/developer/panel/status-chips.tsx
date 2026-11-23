@@ -6,8 +6,9 @@ import { Card, Text } from '@/ui';
 import type { PanelFigure } from './logic';
 
 /**
- * The strip above the panel tabs that are not «Статус» (07 §1.9 layout item 2): queue, AI runs in 24 h and
- * storage as three plain figures of one card. Only a value that signals a problem is coloured.
+ * The strip above the service actions (07 §1.9 layout item 2): queue, AI runs in 24 h and storage as three
+ * plain figures of one card — what the actions below change. Only a value that signals a problem is
+ * coloured.
  */
 export function StatusChips({ figures }: { figures: readonly PanelFigure[] }) {
   const styles = useStyles();

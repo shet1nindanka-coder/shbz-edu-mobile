@@ -11,10 +11,9 @@ import { useCurrentUser } from '@/providers';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ListCard, LoadingState, Notice, Panels, Screen, Text } from '@/ui';
+import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen, Text } from '@/ui';
 
 import { CallRow } from './list/call-row';
-import { ScrollPanel } from './list/scroll-panel';
 import { summaryLine } from './logic';
 import { CallJournalPanel } from './panels/call-journal-panel';
 import { RecordCallPanel } from './panels/record-call-panel';
@@ -251,7 +250,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
     return (
       <Screen testID="calls-list-screen" header={header} scroll={false} maxWidth="full">
         <Panels>
-          <ScrollPanel weight={3} padded={false} scrollRef={scrollRef} refreshing={refreshing} onRefresh={refresh} testID="calls-list">
+          <Panel edges weight={3} padded={false} scrollRef={scrollRef} refreshing={refreshing} onRefresh={refresh} testID="calls-list">
             <View style={styles.panelHead}>
               {notices}
               {summary}
@@ -264,7 +263,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
             >
               {rows}
             </View>
-          </ScrollPanel>
+          </Panel>
           {selected ? (
             <RecordCallPanel weight={2} student={selected} settling={settling} onSaved={onSaved} onMissing={onMissing} />
           ) : (

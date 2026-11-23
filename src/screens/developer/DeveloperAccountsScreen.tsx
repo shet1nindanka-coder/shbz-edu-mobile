@@ -360,7 +360,7 @@ export function DeveloperAccountsScreen() {
                 accessibilityLabel={tabs.tabsAria}
                 role="tab"
                 // Never cut: next to the button on a narrow phone the bar scrolls instead.
-                scrollable
+                scrollable={!theme.tablet}
                 style={theme.tablet ? null : styles.segments}
                 testID="accounts-tabs"
               />

@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { RefreshControl, View, useWindowDimensions } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import type { TeacherStatsEntry } from '@/api/types';
@@ -19,6 +19,16 @@ import { PlatformView } from './views/platform-view';
 import { ProgressView } from './views/progress-view';
 import { TeachersView } from './views/teachers-view';
 
+/** From this window width the three view names fit the header row at full size. */
+const ROOMY_HEADER_FROM = 1024;
+
+/** A row of the screen's list: one teacher card, or the whole body of a view that is not a list. */
+type StatsRow = { kind: 'teacher'; entry: TeacherStatsEntry } | { kind: 'body' };
+const BODY_ROWS: readonly StatsRow[] = [{ kind: 'body' }];
+
+/** Route params of `stats.main`: the site's `?view=` and `?studentId=` (06 §1.6). */
+export type StatsMainScreenProps = ScreenParams['stats.main'];
+
 /**
  * `stats.main` (docs/spec/06-teacher-groups-calls-stats.md §1.6; layout: docs/design/glass-over-paper.md
  * §7, mockup D-stats): the developer's statistics tab. Three views behind the segmented control of the
@@ -32,16 +42,10 @@ import { TeachersView } from './views/teachers-view';
  * for anyone else). Statistics has no realtime event of its own: it refreshes on focus, on
  * pull-to-refresh and with the staff-wide invalidation of the `groups` member.
  */
-/** A row of the screen's list: one teacher card, or the whole body of a view that is not a list. */
-type StatsRow = { kind: 'teacher'; entry: TeacherStatsEntry } | { kind: 'body' };
-const BODY_ROWS: readonly StatsRow[] = [{ kind: 'body' }];
-
-/** Route params of `stats.main`: the site's `?view=` and `?studentId=` (06 §1.6). */
-export type StatsMainScreenProps = ScreenParams['stats.main'];
-
 export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: StatsMainScreenProps = {}) {
   const styles = useStyles();
   const theme = useTheme();
+  const window = useWindowDimensions();
   const api = useApi();
   const queryClient = useQueryClient();
   const { locale, dict, m } = useI18n();
@@ -189,8 +193,8 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
               value={view}
               onChange={selectView}
               accessibilityLabel={t.viewsAria}
-              // No label is cut: on a narrow phone the bar scrolls, the selected view kept in sight.
-              scrollable
+              // No label is cut: where the row is too narrow the bar scrolls, the selected view kept in sight.
+              scrollable={window.width < ROOMY_HEADER_FROM}
               role="tab"
               testID="stats-views"
             />

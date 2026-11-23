@@ -256,7 +256,7 @@ function SampleCard({ entry }: { entry: ImportNumber }) {
   const t = dict.topics.importPanel;
   return (
     <Card style={styles.sampleCard}>
-      <Text variant="bodyBold" tabular>
+      <Text variant="bodyBold">
         {format(t.sampleNumber, { number: entry.number })}
       </Text>
       <MathContent value={entry.conditionLatex} variant="bare" />
