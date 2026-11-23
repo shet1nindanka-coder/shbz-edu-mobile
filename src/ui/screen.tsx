@@ -93,7 +93,8 @@ export function Screen({
     ? {
         // The header brings its own top padding (status bar + gap); a screen without one starts at the page top.
         paddingTop: header ? 0 : theme.space.pageTop,
-        paddingBottom: theme.space.pageBottom + bottom,
+        // A page that does not scroll (tablet panels, a screen that owns a list) ends right above the dock.
+        paddingBottom: (scroll ? theme.space.pageBottom : theme.space.xxs) + bottom,
         gap: theme.space.block,
       }
     : { paddingBottom: bottom };

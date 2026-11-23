@@ -51,6 +51,7 @@ export { NavCard, type NavCardProps, type NavCardStat } from './nav-card';
 export { NumberTile, STATUS_ICONS, type NumberTileProps } from './number-tile';
 export { Notice, type NoticeProps, type NoticeTone } from './notice';
 export { PageGlow, type PageGlowProps } from './page-glow';
+export { Panel, Panels, type PanelProps, type PanelsProps } from './panels';
 export { PageHeader, type PageHeaderMetric, type PageHeaderProps } from './page-header';
 export { PasswordField, type PasswordFieldProps } from './password-field';
 export { completionPercent, ProgressBar, type ProgressBarProps } from './progress-bar';

@@ -28,6 +28,8 @@ export type ListRowProps = {
   inset?: number;
   /** Bold title (unread notification). */
   emphasized?: boolean;
+  /** The row whose content the panel next to the list shows (tablet): a soft fill behind it. */
+  selected?: boolean;
   titleLines?: number;
   subtitleLines?: number;
   disabled?: boolean;
@@ -53,6 +55,7 @@ export function ListRow({
   divider = true,
   inset,
   emphasized = false,
+  selected = false,
   titleLines = 1,
   subtitleLines = 1,
   disabled = false,
@@ -90,6 +93,7 @@ export function ListRow({
     styles.row,
     { paddingHorizontal: inset ?? theme.space.card },
     divider ? styles.divider : null,
+    selected ? styles.selected : null,
     disabled ? styles.disabled : null,
     style,
   ];
@@ -106,7 +110,7 @@ export function ListRow({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (subtitle ? `${title}. ${subtitle}` : title)}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, selected }}
       disabled={disabled}
       onPress={onPress}
       scaleTo={1}
@@ -129,6 +133,7 @@ const useStyles = makeStyles((t) => ({
   },
   divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
   pressed: { opacity: 0.6 },
+  selected: { backgroundColor: t.colors.softBg },
   texts: { flex: 1, minWidth: 0, gap: 2 },
   meta: { flexShrink: 0, maxWidth: '45%' },
   disabled: { opacity: 0.5 },

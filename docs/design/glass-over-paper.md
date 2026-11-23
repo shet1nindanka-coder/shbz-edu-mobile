@@ -109,6 +109,7 @@ Font: **Onest** (`@expo-google-fonts/onest`), one `fontFamily` per weight (400 /
 | Switch between views | `<Segmented options value onChange fill />` (44 track, 36 segments) |
 | Fields | `<TextField>` (44; `size="lg"` 52 on the login form), `<TextArea>`, `<Select>`, `<DateTimeField>`, `<Switch label trailing />` |
 | Details of a row | `<BottomSheet visible title onClose>` — radius 24, a centred 520 card on a tablet |
+| Tablet panels | `<Screen scroll={!theme.tablet} maxWidth="full">` + `<Panels><Panel weight header footer tabletOnly /></Panels>`; `<ListRow selected />` marks the row shown in the next panel |
 | Empty / loading / error | `<EmptyState>`, `<LoadingState variant="list">`, `<LoadFailure>`, `<Notice>` |
 
 Short status names (the owner's wording) are `m.common.statuses`: «решил сам / исправил / нужна помощь /
