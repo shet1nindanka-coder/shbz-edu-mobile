@@ -162,7 +162,7 @@ export function Drilldown({ topics, students }: DrilldownProps) {
           ))}
         </View>
 
-        <InsightBox kicker={t.now} text={insight} testID="stats-drilldown-insight" />
+        <InsightBox caption={t.now} text={insight} testID="stats-drilldown-insight" />
 
         {/* SPEC-GAP: the site has no retry here (changing a select refetches); a phone needs an explicit one. */}
         {loadError ? (

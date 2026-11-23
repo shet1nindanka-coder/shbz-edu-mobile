@@ -298,7 +298,8 @@ const useStyles = makeStyles((t) => ({
     backgroundColor: t.colors.softBg,
   },
   dropLoaded: { borderStyle: 'solid', borderColor: t.colors.greenSolid, backgroundColor: t.colors.greenSoft },
-  sources: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
+  // The text link drops under the button on a narrow phone: no extra air between the two then.
+  sources: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: t.space.md },
   toggle: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
   mono: { ...t.typography.mono },
   preview: { gap: t.space.md },

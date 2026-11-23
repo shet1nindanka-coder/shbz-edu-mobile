@@ -78,7 +78,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
   // The account was deleted from this card: the list is already being opened with its notice (D3). Until
   // this screen is popped it shows nothing of the student — and not the "not found" page its reads now give.
   if (deleted) {
-    return <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} backTitle={fallbackTitle} />} />;
+    return <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} />} />;
   }
 
   // Unknown, deleted or somebody else's student: indistinguishable for a teacher (04 §0.1).
@@ -86,7 +86,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
 
   if (!student) {
     return (
-      <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} backTitle={fallbackTitle} />}>
+      <Screen testID="teacher-student-screen" header={<DetailAppBar title={fallbackTitle} />}>
         {cardFailure ? (
           <LoadFailure query={card} testID="student-card-error" />
         ) : (

@@ -2,12 +2,16 @@ import type { TeacherStudentListItem } from '@/api/types';
 import { format, useI18n } from '@/i18n';
 import { Avatar, ListRow, Text } from '@/ui';
 
+import { usePanelRow } from './use-panel-row';
+
 export type StudentRowProps = {
   student: TeacherStudentListItem;
   /** Tap on the row: open the student's card (a phone), or show the summary in the next panel (a tablet). */
   onPress: (student: TeacherStudentListItem) => void;
   /** The row whose summary the panel next to the list shows (tablet). */
   selected?: boolean;
+  /** The row sits in a tablet list panel (see `usePanelRow`). */
+  panel?: boolean;
   /** Hairline under the row; a `ListCard` switches it off on its last row. */
   divider?: boolean;
 };
@@ -18,8 +22,9 @@ export type StudentRowProps = {
  * are solved, or, in red, how many need help. The whole row is pressed; the login to copy, the password
  * reset and deletion live in the student's "⋯" menu.
  */
-export function StudentRow({ student, onPress, selected = false, divider }: StudentRowProps) {
+export function StudentRow({ student, onPress, selected = false, panel = false, divider }: StudentRowProps) {
   const { dict, m } = useI18n();
+  const panelRow = usePanelRow();
   const t = dict.students.list;
   const needsHelp = student.redCount > 0;
   const fact = needsHelp
@@ -42,6 +47,8 @@ export function StudentRow({ student, onPress, selected = false, divider }: Stud
       }
       selected={selected}
       divider={divider}
+      inset={panel ? panelRow.inset : undefined}
+      style={panel ? panelRow.style : undefined}
       onPress={() => onPress(student)}
       accessibilityLabel={[student.name, `${t.loginLabel}: ${student.email}`, fact].filter(Boolean).join('. ')}
       accessibilityHint={t.viewProgress}

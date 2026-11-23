@@ -14,6 +14,7 @@ import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { ListRow, LoadingState, Notice, Panel, Panels, Text } from '@/ui';
 
+import { usePanelRow } from '../students/use-panel-row';
 import { CardScreen, type CardChrome } from './card-screen';
 import { LessonAddSheet } from './lesson-add-sheet';
 import { LessonCard } from './lesson-card';
@@ -39,6 +40,7 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
   const navigation = useAppNavigation();
   const { dict, m, locale } = useI18n();
   const t = dict.students.lessons;
+  const panelRow = usePanelRow();
 
   const controller = useStudentLessons(studentId);
   const { list, lessons } = controller;
@@ -167,6 +169,8 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
                   subtitle={metaOf(lesson)}
                   subtitleLines={2}
                   selected={lesson.id === selected?.id}
+                  inset={panelRow.inset}
+                  style={panelRow.style}
                   divider={index < lessons.length - 1}
                   onPress={() => setPickedId(lesson.id)}
                   testID={`student-lesson-toggle-${lesson.id}`}

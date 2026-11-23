@@ -65,7 +65,8 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, selected
       <ListRow
         title={student.studentName}
         subtitle={caption}
-        subtitleLines={2}
+        // The teacher's name in front makes a developer's caption a line longer.
+        subtitleLines={showTeacher ? 3 : 2}
         left={<Avatar name={student.studentName} tone="neutral" />}
         right={chip ? <Chip tone={chip.tone} label={chip.label} /> : undefined}
         selected={selected}

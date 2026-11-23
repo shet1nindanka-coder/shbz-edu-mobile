@@ -86,7 +86,7 @@ export function ProgressView({ data, filterPending, onTimelineStudentChange }: P
               <LegendRow key={segment.key} segment={segment} divider={index > 0} />
             ))}
           </View>
-          <InsightBox kicker={t.keyInsight} text={issuedInsight(homework, t)} testID="stats-issued-insight" />
+          <InsightBox caption={t.keyInsight} text={issuedInsight(homework, t)} testID="stats-issued-insight" />
         </StatsCard>
       </Columns>
 

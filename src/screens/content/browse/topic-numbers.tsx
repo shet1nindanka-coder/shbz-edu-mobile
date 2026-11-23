@@ -30,6 +30,8 @@ export function TopicNumbers({ numbers, isDeveloper, onOpenNumber }: TopicNumber
   const t = dict.topics.view;
   const [expanded, setExpanded] = useState(false);
   const prefix = commonPrefixLength(numbers);
+  // Tails of three digits and numbers that short by themselves fit a square tile, seven to a phone row.
+  const compact = prefix > 0 || numbers.every((entry) => entry.number.length <= 3);
   const shown = expanded ? numbers : numbers.slice(0, GRID_LIMIT);
   const first = numbers[0]?.number;
   const last = numbers[numbers.length - 1]?.number;
@@ -75,7 +77,7 @@ export function TopicNumbers({ numbers, isDeveloper, onOpenNumber }: TopicNumber
                 onPress={() => onOpenNumber(entry)}
                 accessibilityLabel={format(m.content.edit.openNumber, { number: entry.number })}
                 testID={`topic-number-${entry.number}`}
-                style={prefix > 0 ? styles.cellShort : styles.cellWide}
+                style={compact ? styles.cellShort : styles.cellWide}
               />
             ))}
           </View>
@@ -99,9 +101,9 @@ const useStyles = makeStyles((t) => ({
   titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.md },
   grow: { flex: 1, minWidth: 0 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  // Three-digit tails sit in square cells; a whole number keeps the tile's own padding.
+  // Up to three digits sit in square cells; a longer number keeps the tile's own padding.
   cellShort: { width: t.sizes.tile, paddingHorizontal: 0 },
-  cellWide: { minWidth: t.sizes.control.lg + t.space.xl },
+  cellWide: { minWidth: t.sizes.control.lg + t.space.lg },
   more: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   touch: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
 }));

@@ -126,6 +126,7 @@ export function TeacherStudentsScreen() {
       student={student}
       onPress={theme.tablet ? (picked) => setPickedId(picked.id) : openStudent}
       selected={theme.tablet && student.id === selected?.id}
+      panel={theme.tablet}
       divider={index < all.length - 1}
     />
   ));

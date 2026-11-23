@@ -19,6 +19,7 @@ import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, ListRow, LoadingState, Notice, Panel, Panels } from '@/ui';
 
 import { useLatched } from '../students/use-latched';
+import { usePanelRow } from '../students/use-panel-row';
 import { useNoticeScroll } from '../students/use-notice-scroll';
 import { CancelHomeworkDialog } from './cancel-homework-dialog';
 import { CardScreen, type CardChrome } from './card-screen';
@@ -69,6 +70,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const { dict, m, locale } = useI18n();
   const t = dict.students.review;
   const tablet = theme.tablet;
+  const panelRow = usePanelRow();
 
   const review = useReview(studentId);
   const { homeworks, data, assignments } = review;
@@ -309,6 +311,8 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
                     subtitleTone={summary.attention ? 'attention' : 'muted'}
                     meta={summary.done}
                     selected={row.assignment.id === selectedAssignment?.id}
+                    inset={panelRow.inset}
+                    style={panelRow.style}
                     onPress={() => setPickedId(row.assignment.id)}
                     accessibilityLabel={`${summary.title}. ${summary.caption}. ${summary.done}`}
                     testID={`review-assignment-toggle-${row.assignment.id}`}

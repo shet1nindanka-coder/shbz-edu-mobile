@@ -208,7 +208,7 @@ const useStyles = makeStyles((t) => ({
   pending: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.control.xs },
   pendingText: { flex: 1 },
   partHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: t.space.sm },
-  // Two to a row where they fit; a long label takes the whole row.
+  // Two to a row on a tablet; a phone has no room for two of these labels side by side.
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  action: { flexGrow: 1, flexBasis: '45%' },
+  action: { flexGrow: 1, flexBasis: t.tablet ? '45%' : '100%' },
 }));

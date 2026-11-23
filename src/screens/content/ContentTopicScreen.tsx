@@ -87,13 +87,13 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
           {detail.isError && !deleted && !isTopicLeaving(topicId) ? (
             <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="topic-refresh-error" />
           ) : null}
+          {topic.description ? (
+            <Text variant="body" color="label" testID="topic-description">
+              {topic.description}
+            </Text>
+          ) : null}
           <Panels>
             <Panel weight={2} testID="topic-materials">
-              {topic.description ? (
-                <Text variant="body" color="label" testID="topic-description">
-                  {topic.description}
-                </Text>
-              ) : null}
               <TopicFiles theoryFile={topic.theoryFile} homeworkFile={topic.homeworkFile} onOpen={openFile} />
             </Panel>
             <Panel weight={3} testID="topic-numbers">

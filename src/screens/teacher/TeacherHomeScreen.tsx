@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
+import { cloneElement } from 'react';
 import { View } from 'react-native';
 
 import { errorText, qk, useApi } from '@/api';
 import type { LessonListItem, TeacherStudentListItem } from '@/api/types';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { statusBreakdown } from '@/components/numbers';
-import { formatMsk } from '@/domain/dates';
 import { lessonWhen } from '@/domain/lesson-when';
 import { correctedNow } from '@/domain/server-clock';
 import { format, plural, useI18n } from '@/i18n';
@@ -209,7 +209,8 @@ export function TeacherHomeScreen() {
             contentStyle={styles.panelRows}
             testID="teacher-home-attention"
           >
-            {attentionRows(0)}
+            {/* The hairline under the last row separates it from «Ближайшие занятия» only. */}
+            {attentionRows(0).map((row, index, all) => (index === all.length - 1 && later.length === 0 ? cloneElement(row, { divider: false }) : row))}
             {later.length > 0 ? (
               <>
                 <Text variant="kicker" color="textMuted" accessibilityRole="header" style={styles.subCaption}>
@@ -219,7 +220,7 @@ export function TeacherHomeScreen() {
                   <ListRow
                     key={lesson.id}
                     title={lesson.title}
-                    subtitle={[formatMsk(lesson.startsAt, 'dayMonthTime', locale), lessonAudience(lesson)].filter(Boolean).join(' · ')}
+                    subtitle={whenOf(lesson)}
                     inset={0}
                     divider={index < later.length - 1}
                     onPress={() => openBoard(lesson)}

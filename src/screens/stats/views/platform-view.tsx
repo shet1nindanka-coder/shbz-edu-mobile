@@ -39,7 +39,7 @@ export function PlatformView({ data }: { data: StatisticsPlatformResponse }) {
               <ProgressRow key={row.key} row={row} />
             ))}
           </View>
-          <InsightBox kicker={t.keyInsight} text={bankInsight(overview, t)} testID="stats-bank-insight" />
+          <InsightBox caption={t.keyInsight} text={bankInsight(overview, t)} testID="stats-bank-insight" />
           <Hint>
             <Text variant="small" color="textMuted">
               {t.bankExplainer}
