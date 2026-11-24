@@ -55,7 +55,7 @@ number → one or two words. Each visible string must pass «would the screen be
   are said when they are broken (the error), counters appear when 80 % of the limit is used.
 - **A section caption** only where a screen has two or more lists; never one that repeats the header.
 - **An empty state is one short line** (and its action button, if there is an action).
-- **Dates are short**: «24 ноя, 16:00», no year inside the current year, no seconds, «МСК» only where a
+- **Dates are short**: «24 нояб., 16:00» (`formatMsk(…, 'dayMonthShort')`), no year inside the current year, no seconds, «МСК» only where a
   time is entered.
 - **Nothing is lost for a screen reader**: what was cut from the eye stays in the `accessibilityLabel` of
   the row / control.

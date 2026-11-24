@@ -207,11 +207,11 @@ test("currentSpeeds: the current profile speed unless the teacher picked one for
   assert.deepEqual(currentSpeeds(fresh, { s1: 2, s2: null, gone: 5 }), { s1: 2, s2: null, s3: 9 });
 });
 
-// The text diet (glass-over-paper §1a "Dates are short"): «17 ноя, 12:00», no year inside the current one.
-test("rowDateTime: a short day with a three-letter month inside the current Moscow year, the full date outside it", () => {
+// The text diet (glass-over-paper §1a "Dates are short"): «17 нояб., 12:00», no year inside the current one.
+test("rowDateTime: a short day and month inside the current Moscow year, the full date outside it", () => {
   const now = Date.parse("2026-11-24T09:00:00.000Z");
-  assert.equal(rowDateTime("2026-11-17T09:00:00.000Z", now, "ru"), "17 ноя, 12:00");
-  assert.equal(rowDateTime("2026-09-03T14:30:00.000Z", now, "ru"), "3 сен, 17:30");
+  assert.equal(rowDateTime("2026-11-17T09:00:00.000Z", now, "ru"), "17 нояб., 12:00");
+  assert.equal(rowDateTime("2026-09-03T14:30:00.000Z", now, "ru"), "3 сент., 17:30");
   assert.equal(rowDateTime("2026-05-05T06:00:00.000Z", now, "ru"), "5 мая, 09:00");
   assert.equal(rowDateTime("2026-11-17T09:00:00.000Z", now, "en"), "17 Nov, 12:00");
   // Another year: the caption keeps it.
@@ -220,8 +220,8 @@ test("rowDateTime: a short day with a three-letter month inside the current Mosc
   assert.equal(rowDateTime("2026-12-31T22:30:00.000Z", now, "ru"), "01.01.2027, 01:30");
 });
 
-test("rowDay: no full stop and no fourth letter in the month, null for a missing date", () => {
-  assert.equal(rowDay("2026-02-07T09:00:00.000Z", "ru"), "7 фев");
-  assert.equal(rowDay("2026-06-30T09:00:00.000Z", "ru"), "30 июн");
+test("rowDay: the shared short month, null for a missing date", () => {
+  assert.equal(rowDay("2026-02-07T09:00:00.000Z", "ru"), "7 февр.");
+  assert.equal(rowDay("2026-06-30T09:00:00.000Z", "ru"), "30 июн.");
   assert.equal(rowDay("", "ru"), null);
 });

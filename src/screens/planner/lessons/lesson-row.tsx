@@ -21,7 +21,7 @@ export type LessonRowProps = {
 
 /**
  * One lesson of the list (docs/spec/05-teacher-lessons-plans.md §1.1 item 4; layout: docs/design/
- * glass-over-paper.md §1 rules 2 – 3, §1a): the title, ONE caption — when and for whom («17 ноя, 12:00 ·
+ * glass-over-paper.md §1 rules 2 – 3, §1a): the title, ONE caption — when and for whom («17 нояб., 12:00 ·
  * 8А») — and one mark on the right, only when there is something to notice: the count of failed plans in
  * red, «Идёт» for the lesson that is going on, a spinner while the AI still selects. The words behind the
  * marks («ошибок: 2», «подбор идёт 1 / 3») are the row's accessible name. The whole row is pressed; the
