@@ -11,7 +11,7 @@ import { useCurrentUser } from '@/providers';
 import { DetailAppBar, ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
+import { Button, EmptyState, IconButton, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
 
 import { CreateTopicSheet } from './browse/create-topic-sheet';
 import { ReorderSheet } from './browse/reorder-sheet';
@@ -26,7 +26,7 @@ type ListNotice = { tone: 'success' | 'error'; text: string };
  * `content.topics` (docs/spec/07-developer-content.md §1.1; layout: docs/design/glass-over-paper.md §7):
  * the shared topic bank as rows of one card. A TEACHER browses it read-only; for a DEVELOPER it is the
  * home tab and also the place to create topics (AI import or the manual form) and change their order —
- * both behind the buttons of the header. A phone opens a topic as a pushed screen; a tablet shows the
+ * both behind the buttons of the header. A row is the title and the count of numbers (§1a). A phone opens a topic as a pushed screen; a tablet shows the
  * selected topic in the panel next to the list.
  */
 export function ContentTopicsScreen() {
@@ -68,18 +68,12 @@ export function ContentTopicsScreen() {
     else navigation.push({ screen: 'content.topic', topicId: topic.id });
   };
 
+  // The main action keeps its two words; changing the order is a secondary one — an icon with a spoken name.
   const actions = isDeveloper ? (
     <View style={styles.actions}>
       <Button label={m.content.list.createAction} leftIcon="plus" onPress={() => setCreateOpen(true)} style={styles.action} testID="topics-create" />
       {list && list.length > 1 ? (
-        <Button
-          label={m.content.reorder.action}
-          variant="outline"
-          leftIcon="list"
-          onPress={() => setReorderOpen(true)}
-          style={styles.action}
-          testID="topics-reorder"
-        />
+        <IconButton icon="list" accessibilityLabel={m.content.reorder.title} onPress={() => setReorderOpen(true)} testID="topics-reorder" />
       ) : null}
     </View>
   ) : undefined;
@@ -175,8 +169,9 @@ export function ContentTopicsScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  // Under the title on a phone the two actions share the row's width; on a tablet they keep their own.
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
+  // Under the title on a phone «Новая тема» takes the row and the order button stays a square; on a tablet
+  // both keep their own width.
+  actions: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   action: t.tablet ? {} : { flexGrow: 1 },
   // A panel of rows: they bring their own padding and hairlines, the panel adds only the card's edge.
   listPanel: { gap: 0, paddingTop: t.space.sm, paddingBottom: t.space.sm },

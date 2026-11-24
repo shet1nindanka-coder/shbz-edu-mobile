@@ -40,10 +40,10 @@ const NOTICE_SCROLL_DELAY_MS = 200;
 
 /**
  * `teacher.students` (docs/spec/04-teacher-students.md S2; layout: docs/design/glass-over-paper.md §7):
- * the teacher's own students, name ascending, as rows of one card — the avatar, the name, the login and
- * one fact. «Добавить ученика» is the button of the header: it opens the create form in a sheet, and the
- * new account's login and password are then shown once. Results of the mutations appear as a banner above
- * the list — the phone form of the site's redirect notices.
+ * the teacher's own students, name ascending, as rows of one card — the avatar, the name and, in red, how
+ * many numbers need help. «Добавить» is the button of the header: it opens the create form in a sheet, and
+ * the new account's login and password are then shown once. Results of the mutations appear as a short
+ * banner above the list — the phone form of the site's redirect notices (their long wording is cut, §1a).
  *
  * A phone row opens the student's card; its "⋯" menu holds the login to copy, the password reset and
  * deletion. A tablet shows the list on the left and the selected student's summary on the right, with the
@@ -55,6 +55,7 @@ export function TeacherStudentsScreen() {
   const api = useApi();
   const { dict, m } = useI18n();
   const t = dict.students.list;
+  const mt = m.teacher.students;
   const navigation = useAppNavigation();
   const scrollRef = useRef<ScrollViewInstance>(null);
 
@@ -84,7 +85,7 @@ export function TeacherStudentsScreen() {
   }, [notice]);
 
   // A student deleted from the card: the card returns here and leaves the notice (D3).
-  useStudentsListNotice((key) => announce({ tone: 'success', text: t.notices[key] }));
+  useStudentsListNotice(() => announce({ tone: 'success', text: mt.deleted }));
 
   const closeOverlay = () => {
     queued.current = null;
@@ -148,7 +149,9 @@ export function TeacherStudentsScreen() {
           title={screenTitle('teacher.students', m.shell.tabs)}
           aside={
             <Button
-              label={t.addStudent}
+              // The screen is «Ученики»: the button says the verb, a screen reader hears the whole name.
+              label={dict.planner.common.add}
+              accessibilityLabel={t.addStudent}
               leftIcon="plus"
               onPress={() => {
                 setNotice(null);
@@ -220,7 +223,7 @@ export function TeacherStudentsScreen() {
         title={dict.students.createForm.createdTitle}
         onDone={() => {
           closeOverlay();
-          announce({ tone: 'success', text: t.notices.studentCreated });
+          announce({ tone: 'success', text: mt.created });
         }}
       />
       <ResetPasswordSheet
@@ -228,7 +231,7 @@ export function TeacherStudentsScreen() {
         onClose={closeOverlay}
         onDone={() => {
           closeOverlay();
-          announce({ tone: 'success', text: t.notices.passwordReset });
+          announce({ tone: 'success', text: mt.passwordChanged });
         }}
         onMissing={(message) => {
           closeOverlay();
@@ -240,7 +243,7 @@ export function TeacherStudentsScreen() {
         onClose={closeOverlay}
         onDeleted={() => {
           closeOverlay();
-          announce({ tone: 'success', text: t.notices.studentDeleted });
+          announce({ tone: 'success', text: mt.deleted });
         }}
         onMissing={(message) => {
           closeOverlay();

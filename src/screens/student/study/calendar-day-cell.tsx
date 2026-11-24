@@ -1,112 +1,81 @@
 import { View } from 'react-native';
 
-import { makeStyles, useTheme } from '@/theme';
+import { makeStyles, type Theme } from '@/theme';
 import { PressableScale, Text } from '@/ui';
 
+import { DayMarks } from './day-marks';
 import type { CalendarCell } from './deadline-model';
-import { DiamondMark } from './diamond-mark';
 
 export type CalendarDayCellProps = {
   cell: CalendarCell;
-  /** The day whose sheet is open: drawn with the outer ring. */
-  open: boolean;
+  /** The picked day: its number stands on a soft disc. */
+  selected: boolean;
+  /** The whole day in words — the date, «сегодня», how many homeworks and their state. */
   accessibilityLabel: string;
   onPress: (cell: CalendarCell) => void;
-  /** Moscow day of "now": an unfinished day before it is overdue (red), from it on — still due (yellow). */
-  today: string;
-  /** Cell height; default 48 (the month grid). The week strip uses 52. */
-  height?: number;
 };
 
-/** Height of a day cell on a phone (the site's 64 shrinks to the 44–48 pt range, 02 S4). */
-export const CALENDAR_CELL_HEIGHT = 48;
-
 /**
- * One day of the month grid (08 §5.20). Only a day of the displayed month that has deadlines is a button;
- * a day of a neighbouring month is never marked, even when something is due on it.
+ * One day of the month grid, in the proportions of the iPhone calendar: the number at the top of a tall
+ * cell and, under it, the marks of the day's homeworks. Today's number is ringed with the accent, the
+ * picked day stands on a soft disc. Every day of the displayed month is pressed as a whole; a day of a
+ * neighbouring month is dimmed, never marked and never pressed, even when something is due on it.
  */
-export function CalendarDayCell({ cell, open, accessibilityLabel, onPress, today, height }: CalendarDayCellProps) {
-  const theme = useTheme();
+export function CalendarDayCell({ cell, selected, accessibilityLabel, onPress }: CalendarDayCellProps) {
   const styles = useStyles();
-  const { colors } = theme;
-  const marked = cell.state === 'done' || cell.state === 'late';
-  const fill = [
-    cell.state === 'out' ? { backgroundColor: colors.calOutBg } : { backgroundColor: cell.isToday ? colors.cardBg : colors.calCellBg },
-    height === undefined ? null : { height },
-  ];
-  const tone = cell.state === 'done' ? 'done' : cell.key < today ? 'late' : 'due';
 
-  const content = (
-    <>
-      <Text variant="smallStrong" tabular color={cell.state === 'out' ? 'calOutText' : 'textStrong'}>
-        {cell.day}
-      </Text>
-      {marked ? <DiamondMark tone={tone} /> : null}
-      {cell.isToday ? <View style={styles.todayRing} /> : null}
-      {open ? <View style={styles.openRing} /> : null}
-    </>
-  );
-
-  if (!marked) {
+  if (!cell.inMonth) {
     return (
-      <View
-        accessible
-        accessibilityLabel={accessibilityLabel}
-        accessibilityElementsHidden={cell.state === 'out'}
-        importantForAccessibility={cell.state === 'out' ? 'no-hide-descendants' : 'yes'}
-        style={[styles.cell, fill]}
-      >
-        {content}
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.cell}>
+        <View style={[styles.day, styles.dimmed]}>
+          <Text variant="bodyStrong" tabular color="textMuted">
+            {cell.day}
+          </Text>
+        </View>
       </View>
     );
   }
+
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ expanded: open }}
+      accessibilityState={{ selected }}
       onPress={() => onPress(cell)}
-      // The cell is narrower than 44 pt on small phones; the gap between cells is shared as hit area.
-      hitSlop={2}
+      scaleTo={1}
+      pressedStyle={styles.pressed}
       testID={`calendar-day-${cell.key}`}
-      style={[styles.cell, fill]}
+      style={styles.cell}
     >
-      {content}
+      <View style={[styles.day, selected ? styles.selected : null, cell.isToday ? styles.today : null]}>
+        <Text variant={cell.isToday ? 'bodyBold' : 'bodyStrong'} tabular color={cell.isToday ? 'accentSolid' : 'textStrong'}>
+          {cell.day}
+        </Text>
+      </View>
+      <DayMarks marks={cell.marks} more={cell.more} />
     </PressableScale>
   );
 }
 
+/** What a cell needs at least: the number's disc, the marks and the air around them. */
+export function calendarCellMinHeight(t: Theme): number {
+  return t.space.xxs * 3 + t.sizes.control.sm + (t.typography.dock.lineHeight ?? 0);
+}
+
 const useStyles = makeStyles((t) => ({
-  cell: {
-    flex: 1,
-    height: CALENDAR_CELL_HEIGHT,
+  // The cell takes its share of the week row and the whole height the row has; the content stays at the top.
+  cell: { flex: 1, minWidth: 0, alignItems: 'center', gap: t.space.xxs, paddingVertical: t.space.xxs },
+  day: {
+    width: t.sizes.control.sm,
+    height: t.sizes.control.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: t.space.xxs,
-    borderRadius: t.radii.md,
-  },
-  // Today: a 2 px ring INSIDE the cell.
-  todayRing: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: t.radii.md,
+    borderRadius: t.radii.full,
     borderWidth: t.borders.strong,
-    borderColor: t.colors.calRing,
-    pointerEvents: 'none',
+    borderColor: 'transparent',
   },
-  // The open day: a 3 px ring OUTSIDE the cell.
-  openRing: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: t.radii.md,
-    borderWidth: t.borders.strong,
-    borderColor: t.colors.accentSolid,
-    pointerEvents: 'none',
-  },
+  today: { borderColor: t.colors.accentSolid },
+  selected: { backgroundColor: t.colors.soft2 },
+  dimmed: { opacity: 0.4 },
+  pressed: { opacity: 0.6 },
 }));

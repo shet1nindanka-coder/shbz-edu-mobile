@@ -9,6 +9,7 @@
 import type { Locale, ParentCallEntry, ParentCallReminderState, ParentCallStudentOverview } from "@/api/types";
 import { LIMITS } from "@/api/types";
 import { formatMsk } from "@/domain/dates";
+import { mskParts, type DateInput } from "@/domain/moscow-time";
 import { format, type Dictionary } from "@/lib/i18n";
 
 type CallsDict = Dictionary["planner"]["calls"];
@@ -61,34 +62,33 @@ export function teacherLine(student: Pick<ParentCallStudentOverview, "teacherNam
   return format(t.teacher, { name: student.teacherName ?? "—" });
 }
 
-export type ReminderChip = { tone: "red" | "yellow" | "muted"; label: string };
+/** The chip of a list row: `label` is its one word, `full` the site's label for a screen reader. */
+export type AttentionChip = { tone: "red" | "yellow"; label: string; full: string };
 
-/** Status chip of a row. `ok` is shown for a brand-new student without calls as well. */
-export function reminderChip(state: ParentCallReminderState, t: CallsDict): ReminderChip {
-  if (state === "overdue") return { tone: "red", label: t.overdue };
-  if (state === "due") return { tone: "yellow", label: t.due };
-  return { tone: "muted", label: t.ok };
-}
-
-/** The chip of a list row: only a state that needs attention gets one; «созвонились недавно» is no news. */
-export function attentionChip(state: ParentCallReminderState, t: CallsDict): ReminderChip | null {
-  const chip = reminderChip(state, t);
-  return chip.tone === "muted" ? null : chip;
+/**
+ * The chip of a list row: only a state that needs attention gets one — «пора» or a red «просрочено»;
+ * «созвонились недавно» is no news. `short` are the one-word labels of the app.
+ */
+export function attentionChip(state: ParentCallReminderState, t: CallsDict, short: { due: string; overdue: string }): AttentionChip | null {
+  if (state === "overdue") return { tone: "red", label: short.overdue, full: t.overdue };
+  if (state === "due") return { tone: "yellow", label: short.due, full: t.due };
+  return null;
 }
 
 /**
- * The one caption of a list row: the latest fact of the meta line — the unanswered attempt when there was
- * one after the last successful call, that call otherwise — led by the owning teacher's name for a
- * developer. The whole line is in the row's spoken name and in the history behind the row. Call comments
- * never go into it: a row can be read over a shoulder, a comment only in the opened history.
+ * The one caption of a list row, and only when it says something the chip does not: how long ago the
+ * parents were last reached («30 дн. назад»; `never` — «не звонили» — before the first such call) on a
+ * row whose call is due. A developer reads the owning teacher's name there instead. Everything else — the
+ * dates, the unanswered attempt — is in the row's spoken name and in the history behind the row. Call
+ * comments never go into it: a row can be read over a shoulder, a comment only in the opened history.
  */
-export function callRowCaption(student: ParentCallStudentOverview, t: CallsDict, locale: Locale, showTeacher: boolean): string {
-  const parts = callMetaParts(student, t, locale);
-  const latest = parts[parts.length - 1] ?? "";
-  return showTeacher ? `${student.teacherName ?? "—"} · ${latest}` : latest;
+export function callRowCaption(student: ParentCallStudentOverview, t: CallsDict, never: string, showTeacher: boolean): string | undefined {
+  if (showTeacher) return student.teacherName ?? undefined;
+  if (student.reminder.state === "ok") return undefined;
+  return student.lastReachedAt ? agoLabel(student.reminder.daysSinceAnchor, t) : never;
 }
 
-/** The site's summary line, read out for the three counters. */
+/** The site's summary line: the spoken name of the list (the eye has the chips of the rows). */
 export function summaryLine(counts: { overdue: number; due: number; total: number }, t: CallsDict): string {
   return format(t.summary, counts);
 }
@@ -136,8 +136,17 @@ export function buildCallJournal(students: readonly ParentCallStudentOverview[])
   return entries.filter((row) => row.entry.calledAt >= cutoff).sort((left, right) => (left.entry.calledAt < right.entry.calledAt ? 1 : -1));
 }
 
-/** «5 ноября в 18:30» — Moscow time, whatever the device zone is. */
+/** «5 ноября в 18:30» — Moscow time, whatever the device zone is. The spoken form of a history entry. */
 export function historyEntryTime(entry: Pick<ParentCallEntry, "calledAt">, locale: Locale): string {
   return formatMsk(entry.calledAt, "dayMonthTime", locale) ?? "";
+}
+
+/**
+ * The day of a history entry as the eye reads it: «5 нояб.» within the current Moscow year, «5 ноября
+ * 2025» for an older call. The time of day is in the spoken form only.
+ */
+export function historyEntryDay(entry: Pick<ParentCallEntry, "calledAt">, now: DateInput, locale: Locale): string {
+  const sameYear = mskParts(entry.calledAt).year === mskParts(now).year;
+  return formatMsk(entry.calledAt, sameYear ? "dayMonthShort" : "shortDate", locale) ?? "";
 }
 

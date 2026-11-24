@@ -6,7 +6,7 @@ import type { ViewerFile } from '@/components/files';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Text, TextArea, TextField } from '@/ui';
+import { TextArea, TextField } from '@/ui';
 
 import { NumbersField } from '../shared/numbers-field';
 
@@ -23,7 +23,8 @@ export type TopicFormSectionProps = {
 /**
  * The topic's form (docs/spec/07-developer-content.md §1.3 item 4; layout: the `D-topic-edit` mockup):
  * the title, the description, the numbers field that replaces the whole set on save, and the two files as
- * boxes that open their own sheet. Rendered inside one card; the save button belongs to the screen.
+ * boxes that open their own sheet. No card title and no «Файлы» caption (§1a): the fields and the boxes
+ * name themselves. Rendered inside one card; the save button belongs to the screen.
  */
 export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFormSectionProps) {
   const styles = useStyles();
@@ -35,9 +36,6 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
 
   return (
     <View style={styles.root} testID="edit-form">
-      <Text variant="sectionTitle" accessibilityRole="header">
-        {m.content.edit.sections.topic}
-      </Text>
       <TextField
         label={t.titleLabel}
         value={form.values.title}
@@ -51,7 +49,8 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
       />
       <TextArea
         ref={descriptionRef}
-        label={t.descriptionLabel}
+        // «Описание» without the site's «— необязательно»: an empty optional field explains itself.
+        label={dict.topics.createForm.descriptionLabel}
         value={form.values.description}
         onChangeText={form.setDescription}
         numberOfLines={3}
@@ -61,17 +60,13 @@ export function TopicFormSection({ topic, form, onOpenFile, onNotice }: TopicFor
       <NumbersField
         value={form.values.numbers}
         onChangeText={form.setNumbers}
-        description={t.numbersDescription}
         rows={5}
         disabled={locked}
         error={form.missing === 'numbers' ? m.content.edit.numbersRequired : null}
         testID="edit-numbers"
       />
 
-      <View style={styles.files}>
-        <Text variant="label" accessibilityRole="header">
-          {t.files}
-        </Text>
+      <View style={styles.files} accessibilityLabel={t.files}>
         {/* One bucket for both boxes, so the wait is shown once, above them. */}
         <RetryWaitLine seconds={form.uploadWait.seconds} testID="edit-upload-wait" />
         <View style={styles.boxes}>

@@ -4,7 +4,6 @@ import { View } from 'react-native';
 import { qk, useApi } from '@/api';
 import type { TeacherStudentListItem } from '@/api/types';
 import { statusLabel } from '@/components/numbers';
-import { formatMsk } from '@/domain/dates';
 import { deadlineCaption } from '@/domain/deadline-caption';
 import { homeworkAssignmentLabel } from '@/domain/homework-label';
 import { format, useI18n } from '@/i18n';
@@ -12,6 +11,8 @@ import { useAppNavigation } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 import { makeStyles, useTheme } from '@/theme';
 import { Avatar, Button, Card, IconButton, ListRow, LoadingState, Text } from '@/ui';
+
+import { shortWhen } from './short-when';
 
 export type StudentSummaryProps = {
   student: TeacherStudentListItem;
@@ -23,9 +24,10 @@ export type StudentSummaryProps = {
 const SUMMARY_ROWS = 4;
 
 /**
- * The selected student next to the list (tablet; docs/design/glass-over-paper.md §7 "Tablet"): who it is,
- * the counters by status, the homeworks that are still open and the lessons ahead. Everything here is a
- * way into the student's card — the review, a homework, a lesson board.
+ * The selected student next to the list (tablet; docs/design/glass-over-paper.md §7 "Tablet", texts: §1a):
+ * who it is, three figures by status with one-word labels, the homeworks that are still open (the deadline
+ * and «1/3») and the lessons ahead (when). Everything here is a way into the student's card — the review, a
+ * homework, a lesson board. The login is in the "⋯" menu.
  *
  * The homeworks and the lessons are the reads of the card's «Проверка» and «Занятия» segments (the same
  * cache entries), so opening the card afterwards shows them at once.
@@ -51,10 +53,11 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
   const open = homeworks.data?.assignments.filter((assignment) => assignment.solvedCount < assignment.totalNumbers).slice(0, SUMMARY_ROWS);
   const ahead = lessons.data?.lessons.filter((lesson) => lesson.status !== 'FINISHED').slice(0, SUMMARY_ROWS);
 
+  // One word under a figure; a screen reader hears the status' whole name.
   const boxes = [
-    { key: 'green', value: student.greenCount, label: statusLabel('GREEN', m.common.statuses), attention: false },
-    { key: 'yellow', value: student.yellowCount, label: statusLabel('YELLOW', m.common.statuses), attention: false },
-    { key: 'red', value: student.redCount, label: statusLabel('RED', m.common.statuses), attention: student.redCount > 0 },
+    { key: 'green', value: student.greenCount, label: m.teacher.students.figureAlone, spoken: statusLabel('GREEN', m.common.statuses), attention: false },
+    { key: 'yellow', value: student.yellowCount, label: statusLabel('YELLOW', m.common.statuses), spoken: statusLabel('YELLOW', m.common.statuses), attention: false },
+    { key: 'red', value: student.redCount, label: m.teacher.students.figureHelp, spoken: statusLabel('RED', m.common.statuses), attention: student.redCount > 0 },
   ];
 
   return (
@@ -65,9 +68,6 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
           <Text variant="sectionTitle" accessibilityRole="header" numberOfLines={2}>
             {student.name}
           </Text>
-          <Text variant="small" color="textMuted" numberOfLines={1} selectable>
-            {student.email}
-          </Text>
         </View>
         <IconButton
           icon="more"
@@ -76,7 +76,8 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
           testID={`student-actions-${student.id}`}
         />
         <Button
-          label={dict.students.list.viewProgress}
+          label={dict.planner.common.open}
+          accessibilityLabel={dict.students.list.viewProgress}
           rightIcon="forward"
           onPress={() => navigation.open({ screen: 'teacher.student.review', studentId: student.id })}
           testID={`student-summary-open-${student.id}`}
@@ -85,7 +86,7 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
 
       <View style={styles.boxes}>
         {boxes.map((box) => (
-          <Card key={box.key} accessibilityLabel={`${box.label}: ${box.value}`} style={styles.box}>
+          <Card key={box.key} accessibilityLabel={`${box.spoken}: ${box.value}`} style={styles.box}>
             <Text variant="sectionTitle" tabular color={box.attention ? 'redText' : 'textStrong'}>
               {box.value}
             </Text>
@@ -135,7 +136,8 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
             <ListRow
               key={lesson.id}
               title={lesson.title}
-              subtitle={[formatMsk(lesson.startsAt ?? lesson.createdAt, 'dayMonthTime', locale), lesson.groupName].filter(Boolean).join(' · ')}
+              subtitle={shortWhen(lesson.startsAt ?? lesson.createdAt, now, locale)}
+              accessibilityLabel={[lesson.title, shortWhen(lesson.startsAt ?? lesson.createdAt, now, locale), lesson.groupName].filter(Boolean).join('. ')}
               inset={0}
               divider={index < ahead.length - 1}
               onPress={() => navigation.open({ screen: 'planner.lessonBoard', lessonId: lesson.id })}
@@ -151,7 +153,7 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
 const useStyles = makeStyles((t) => ({
   summary: { gap: t.space.lg },
   head: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  titles: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  titles: { flex: 1, minWidth: 0 },
   boxes: { flexDirection: 'row', gap: t.space.sm },
   box: { flex: 1, minWidth: 0, alignItems: 'center', gap: t.space.xxxs },
   caption: { paddingBottom: t.space.xxs },

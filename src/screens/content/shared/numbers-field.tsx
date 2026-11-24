@@ -12,8 +12,6 @@ export type NumbersFieldProps = {
   /** Raw text of the field: «1-5, 8, 12-14». The server parses it again. */
   value: string;
   onChangeText: (value: string) => void;
-  /** Explanation above the "final list" line; default `dict.topics.numbersField.description`. */
-  description?: string;
   /** Visible lines of the field (the site uses 4 in create, 5 in edit). */
   rows?: number;
   disabled?: boolean;
@@ -24,18 +22,12 @@ export type NumbersFieldProps = {
 
 /**
  * Numbers field shared by manual create and topic edit (site: `TopicNumbersField`,
- * docs/spec/07-developer-content.md §1.6): free text parsed live with `parseNumbersInput`, with the
- * count, the range and the list compressed back into ranges shown under it.
+ * docs/spec/07-developer-content.md §1.6; text: docs/design/glass-over-paper.md §1a): free text parsed
+ * live with `parseNumbersInput`. What the eye gets is the field's name and, next to it, how many numbers
+ * the text gives — a bare figure; the count in words and the range are spoken. The format is said by the
+ * error when nothing parses; the list compressed back into ranges is the screen's one hint.
  */
-export function NumbersField({
-  value,
-  onChangeText,
-  description,
-  rows = 4,
-  disabled = false,
-  error = null,
-  testID = 'numbers-field',
-}: NumbersFieldProps) {
+export function NumbersField({ value, onChangeText, rows = 4, disabled = false, error = null, testID = 'numbers-field' }: NumbersFieldProps) {
   const styles = useStyles();
   const { dict, locale } = useI18n();
   const t = dict.topics.numbersField;
@@ -44,14 +36,26 @@ export function NumbersField({
   const summary = useMemo(() => summarizeNumbersInput(deferred), [deferred]);
   const computing = deferred !== value;
   const unrecognized = summary.state === 'unrecognized' && !computing;
+  const facts =
+    summary.state === 'ok'
+      ? summary.first !== null && summary.last !== null
+        ? `${plural(locale, summary.count, dict.topics.widgets.numberForms)} · ${format(t.range, { from: summary.first, to: summary.last })}`
+        : plural(locale, summary.count, dict.topics.widgets.numberForms)
+      : t.empty;
 
   return (
     <View style={styles.root}>
       <TextArea
-        label={t.label}
+        label={dict.topics.edit.numbers}
+        labelAside={
+          summary.state === 'ok' ? (
+            <Text variant="small" color="textMuted" tabular testID={`${testID}-count`}>
+              {String(summary.count)}
+            </Text>
+          ) : undefined
+        }
         value={value}
         onChangeText={onChangeText}
-        placeholder={t.placeholder}
         numberOfLines={rows}
         disabled={disabled}
         autoCapitalize="none"
@@ -59,30 +63,15 @@ export function NumbersField({
         // Ranges need a dash and lists a comma: the plain number pad has neither.
         keyboardType="numbers-and-punctuation"
         error={unrecognized ? t.unrecognized : error}
+        accessibilityLabel={t.label}
+        accessibilityHint={facts}
         testID={testID}
       />
-
-      {/* Neutral facts of the parsed list: plain text, not labels. */}
-      <Text variant="small" color="textMuted">
-        {summary.state === 'ok'
-          ? summary.first !== null && summary.last !== null
-            ? `${plural(locale, summary.count, dict.topics.widgets.numberForms)} · ${format(t.range, { from: summary.first, to: summary.last })}`
-            : plural(locale, summary.count, dict.topics.widgets.numberForms)
-          : t.empty}
-      </Text>
-
-      {computing ? (
-        <Text variant="small" color="textMuted">
-          {t.computing}
-        </Text>
-      ) : summary.state === 'ok' ? (
+      {summary.state === 'ok' && !computing ? (
         <Hint>
-          <View style={styles.summary} testID={`${testID}-summary`}>
-            <Text variant="hint">{description ?? t.description}</Text>
-            <Text variant="small" color="label">
-              {format(t.finalList, { list: summary.preview })}
-            </Text>
-          </View>
+          <Text variant="hint" numberOfLines={1} testID={`${testID}-summary`}>
+            {format(t.finalList, { list: summary.preview })}
+          </Text>
         </Hint>
       ) : null}
     </View>
@@ -91,5 +80,4 @@ export function NumbersField({
 
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.xs },
-  summary: { gap: t.space.xxs },
 }));

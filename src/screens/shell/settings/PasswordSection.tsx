@@ -99,7 +99,6 @@ export function PasswordSection() {
           label={t.currentPassword}
           value={currentPassword}
           onChangeText={setCurrentPassword}
-          placeholder={t.currentPasswordPlaceholder}
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
@@ -113,7 +112,6 @@ export function PasswordSection() {
           label={t.newPassword}
           value={newPassword}
           onChangeText={setNewPassword}
-          placeholder={t.newPasswordPlaceholder}
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
@@ -127,7 +125,6 @@ export function PasswordSection() {
           label={t.repeatPassword}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          placeholder={t.repeatPasswordPlaceholder}
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}

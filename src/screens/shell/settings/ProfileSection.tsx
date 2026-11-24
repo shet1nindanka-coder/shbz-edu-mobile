@@ -71,7 +71,6 @@ export function ProfileSection() {
           label={t.name}
           value={name}
           onChangeText={setName}
-          placeholder={t.namePlaceholder}
           maxLength={MAX_USER_NAME_LENGTH}
           autoComplete="name"
           textContentType="name"

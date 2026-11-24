@@ -1,11 +1,11 @@
 // Pure rules of the homework deadline blocks (docs/spec/02-student-study.md S1, S4, §4.5, §4.9): which
-// homeworks are "upcoming", what a deadline card says, and how the month grid is marked. No React.
+// homeworks are "upcoming", how the month grid is marked and which day the calendar opens on. No React.
 import type { HomeworkDeadlineSummary } from "@/api/types";
-import { formatDate } from "@/domain/dates";
-import { mskDayKey, mskMonthGrid, mskParts, parseDayKey } from "@/domain/moscow-time";
-import { completionPercent, isHomeworkOverdue } from "@/domain/statuses";
+import { formatDayKey, formatMonthLabel } from "@/domain/dates";
+import { calendarDaysBetweenMsk, dayKeyToDate, mskDate, mskDayKey, mskMonthGrid, mskParts, mskWeekdayIndex, parseDayKey } from "@/domain/moscow-time";
+import { isHomeworkOverdue } from "@/domain/statuses";
 import { mapStudentHomeworksToDeadlineItems } from "@/domain/student-deadline-groups";
-import { format, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 /** One homework with a deadline: `{ id, label, assignmentId, deadlineAt, totalNumbers, solvedNumbers, status }`. */
 export type DeadlineItem = ReturnType<typeof mapStudentHomeworksToDeadlineItems>[number];
@@ -24,45 +24,6 @@ export function selectUpcoming(items: readonly DeadlineItem[], limit: number = U
     .filter((item) => item.status !== "DONE")
     .sort((left, right) => new Date(left.deadlineAt).getTime() - new Date(right.deadlineAt).getTime())
     .slice(0, limit);
-}
-
-/** `dict.student.deadlineList` fields the card texts need. */
-export type DeadlineCardCopy = {
-  meta: string;
-  progress: string;
-  progressDone: string;
-  progressNotStarted: string;
-};
-
-export type DeadlineCardTexts = {
-  /** 0–100, rounded. */
-  percent: number;
-  /** «ДЗ до 20 ноября 2026 г. · Выполнено 3 из 8». */
-  meta: string;
-  /** «Прогресс ДЗ: 38%» / «ДЗ выполнено полностью» / «ДЗ ещё не начато». */
-  progress: string;
-  /** «3/8». */
-  fraction: string;
-  done: boolean;
-  /** Not done and the deadline has passed (instant comparison against the corrected clock). */
-  overdue: boolean;
-};
-
-export function describeDeadline(item: DeadlineItem, copy: DeadlineCardCopy, locale: Locale, now: number): DeadlineCardTexts {
-  const percent = completionPercent(item.solvedNumbers, item.totalNumbers);
-  const done = item.status === "DONE";
-  return {
-    percent,
-    meta: format(copy.meta, {
-      date: formatDate(item.deadlineAt, locale),
-      solved: item.solvedNumbers,
-      total: item.totalNumbers,
-    }),
-    progress: percent === 100 ? copy.progressDone : percent === 0 ? copy.progressNotStarted : format(copy.progress, { percent }),
-    fraction: `${item.solvedNumbers}/${item.totalNumbers}`,
-    done,
-    overdue: isHomeworkOverdue(item.deadlineAt, done, now),
-  };
 }
 
 // ───────────────────────────── calendar ─────────────────────────────
@@ -95,38 +56,92 @@ export function groupByMskDay(items: readonly DeadlineItem[]): Map<string, Deadl
 }
 
 /**
- * `out` — a day of a neighbouring month (never marked, never tappable, even with deadlines);
- * `plain` — no deadlines; `done` — every homework of the day is done (amber); `late` — at least one is
- * not (red).
+ * The mark of one homework in its day cell: `late` — not done and the deadline has passed (red), `due` —
+ * not done, still ahead (ink), `done` (muted).
  */
-export type CalendarCellState = "out" | "plain" | "done" | "late";
+export type DayMarkTone = "late" | "due" | "done";
+
+/** A day cell draws at most this many marks; a busier day draws one fewer and «+N». */
+export const MAX_DAY_MARKS = 3;
+
+const MARK_ORDER: Record<DayMarkTone, number> = { late: 0, due: 1, done: 2 };
+
+/** The instant decides, like the caption of a homework row: due today at 20:00 is overdue at 20:01. */
+export function markToneOf(item: DeadlineItem, now: number): DayMarkTone {
+  if (item.status === "DONE") return "done";
+  return isHomeworkOverdue(item.deadlineAt, false, now) ? "late" : "due";
+}
+
+/** The marks of a day, the most urgent first, and how many homeworks are left without a mark of their own. */
+export function dayMarks(items: readonly DeadlineItem[], now: number): { marks: DayMarkTone[]; more: number } {
+  const tones = items.map((item) => markToneOf(item, now)).sort((left, right) => MARK_ORDER[left] - MARK_ORDER[right]);
+  if (tones.length <= MAX_DAY_MARKS) return { marks: tones, more: 0 };
+  const marks = tones.slice(0, MAX_DAY_MARKS - 1);
+  return { marks, more: tones.length - marks.length };
+}
 
 export type CalendarCell = {
   /** Moscow day key, "YYYY-MM-DD". */
   key: string;
   /** Day of the month, 1–31. */
   day: number;
-  state: CalendarCellState;
+  /** A day of the displayed month. A neighbouring month's day is dimmed, never marked and never pressed. */
+  inMonth: boolean;
   /** Today's ring: only inside the displayed month. */
   isToday: boolean;
-  /** Homeworks due that day; empty for `out` and `plain`. */
+  /** Homeworks due that day; empty for a day of a neighbouring month, even with deadlines on it. */
   items: DeadlineItem[];
+  marks: DayMarkTone[];
+  /** Homeworks without a mark of their own: drawn as «+N». */
+  more: number;
 };
 
-/** The 42 cells (6 × 7, Monday first) of a month with their marks. */
+/** The 42 cells (6 × 7, Monday first) of a month with their marks; `now` is the server-corrected clock. */
 export function buildCalendarCells(
   month: CalendarMonth,
   byDay: ReadonlyMap<string, DeadlineItem[]>,
-  today: string,
+  now: number,
 ): CalendarCell[] {
+  const today = mskDayKey(now);
   return mskMonthGrid(month.year, month.month).map((key) => {
     const parts = parseDayKey(key);
     const day = parts?.day ?? 0;
     const inMonth = parts !== null && parts.year === month.year && parts.month === month.month;
-    if (!inMonth) return { key, day, state: "out", isToday: false, items: [] };
+    if (!inMonth) return { key, day, inMonth, isToday: false, items: [], marks: [], more: 0 };
     const items = byDay.get(key) ?? [];
-    const state: CalendarCellState =
-      items.length === 0 ? "plain" : items.some((item) => item.status !== "DONE") ? "late" : "done";
-    return { key, day, state, isToday: key === today, items };
+    return { key, day, inMonth, isToday: key === today, items, ...dayMarks(items, now) };
   });
+}
+
+/**
+ * The day a tablet shows next to the month before anything is picked: today when something is due on it,
+ * else the nearest day with a homework (a tie goes to the day ahead), else today.
+ */
+export function nearestDeadlineDay(items: readonly DeadlineItem[], today: string): string {
+  let best: string | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const item of items) {
+    const key = mskDayKey(item.deadlineAt);
+    const distance = calendarDaysBetweenMsk(dayKeyToDate(today), dayKeyToDate(key));
+    const closer = Math.abs(distance) < Math.abs(bestDistance) || (Math.abs(distance) === Math.abs(bestDistance) && distance > bestDistance);
+    if (closer) {
+      best = key;
+      bestDistance = distance;
+    }
+  }
+  return best ?? today;
+}
+
+/** «Ноябрь» inside the current year, «Январь 2027» outside it (dates are short: no year when it is this one). */
+export function monthTitle(month: CalendarMonth, now: number, locale: Locale): string {
+  const label = formatMonthLabel(mskDate({ year: month.year, month: month.month, day: 1 }), locale);
+  const name = label.replace(/\s*\d{4}.*$/, "");
+  return month.year === mskParts(now).year ? name : `${name} ${month.year}`;
+}
+
+/** «среда, 26 ноября» — the title of a day's homeworks; `weekdays` are nominative, Monday first. */
+export function dayTitle(dayKey: string, weekdays: readonly string[], locale: Locale): string {
+  const date = formatDayKey(dayKey, "dayMonth", locale) ?? dayKey;
+  const weekday = weekdays[mskWeekdayIndex(dayKeyToDate(dayKey))];
+  return weekday ? `${weekday}, ${date}` : date;
 }

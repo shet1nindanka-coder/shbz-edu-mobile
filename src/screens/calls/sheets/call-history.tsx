@@ -5,10 +5,14 @@ import { View } from 'react-native';
 import { errorText, qk, useApi } from '@/api';
 import type { ParentCallEntry, ParentCallStudentOverview } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Button, Notice, Text } from '@/ui';
+import { useNowTick } from '@/services/clock';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, Icon, Notice, Text, accessibilityLabelOf } from '@/ui';
 
-import { HISTORY_PAGE_SIZE, earlierHistoryCursor, historyEntryTime, mergeHistory } from '../logic';
+import { HISTORY_PAGE_SIZE, earlierHistoryCursor, historyEntryDay, historyEntryTime, mergeHistory } from '../logic';
+
+/** The year of «now» decides whether an entry shows its year: an hour's precision is plenty. */
+const NOW_TICK_MS = 3_600_000;
 
 export type CallHistoryProps = {
   /** The student whose calls are shown (the live overview row). */
@@ -25,7 +29,8 @@ export type CallHistoryProps = {
  * queries behind this block are excluded from the persisted cache (src/services/query/persist-policy.ts).
  *
  * The block has no scroller of its own: it lives inside a sheet or a panel that scrolls, and the log
- * grows only by a page per «Показать более ранние».
+ * grows only by a page per «Показать ещё». It has no caption: the rows — a phone glyph and a day — say
+ * what they are; the list's name is spoken.
  */
 export function CallHistory({ student, showTeacher }: CallHistoryProps) {
   const styles = useStyles();
@@ -34,6 +39,7 @@ export function CallHistory({ student, showTeacher }: CallHistoryProps) {
   // Earlier pages are requested only after the user asks for them.
   const [expanded, setExpanded] = useState(false);
   const cursor = earlierHistoryCursor(student);
+  const now = useNowTick(NOW_TICK_MS);
 
   const earlier = useInfiniteQuery({
     // The key names the anchor: a newly recorded call shifts the overview's 20 and starts a new chain.
@@ -61,17 +67,11 @@ export function CallHistory({ student, showTeacher }: CallHistoryProps) {
 
   return (
     <View style={styles.block}>
-      <View accessibilityRole="list" testID="call-history-list">
+      <View accessibilityRole="list" accessibilityLabel={m.calls.history.title} testID="call-history-list">
         {entries.map((entry, index) => (
-          <CallHistoryEntry key={entry.id} entry={entry} showTeacher={showTeacher} divider={index < entries.length - 1} />
+          <CallHistoryEntry key={entry.id} entry={entry} now={now} showTeacher={showTeacher} divider={index < entries.length - 1} />
         ))}
       </View>
-
-      {cursor !== null ? (
-        <Text variant="small" color="textMuted" tabular testID="call-history-shown">
-          {format(m.calls.history.shownOf, { shown: entries.length, total: Math.max(student.totalCalls, entries.length) })}
-        </Text>
-      ) : null}
 
       {paused || earlier.isError ? (
         <Notice
@@ -83,7 +83,12 @@ export function CallHistory({ student, showTeacher }: CallHistoryProps) {
 
       {hasMore ? (
         <Button
-          label={loading ? m.common.states.loading : m.calls.history.showEarlier}
+          label={loading ? m.common.states.loading : m.common.actions.showMore}
+          // «Показано 20 из 34» is said, not shown: the eye sees the log itself.
+          accessibilityLabel={accessibilityLabelOf([
+            m.calls.history.showEarlier,
+            format(m.calls.history.shownOf, { shown: entries.length, total: Math.max(student.totalCalls, entries.length) }),
+          ])}
           variant="outline"
           onPress={showEarlier}
           loading={loading}
@@ -97,36 +102,52 @@ export function CallHistory({ student, showTeacher }: CallHistoryProps) {
 
 export type CallHistoryEntryProps = {
   entry: ParentCallEntry;
+  /** The current instant (a coarse tick): a call of an earlier year shows its year. */
+  now: number;
   showTeacher: boolean;
   divider: boolean;
-  /** The journal names the student above the line; a student's own history does not need to. */
+  /** The journal names the student in the head line; a student's own history does not need to. */
   studentName?: string;
 };
 
-/** One call: when and how it ended, who called (developer), and the comment with the teacher's line breaks. */
-export function CallHistoryEntry({ entry, showTeacher, divider, studentName }: CallHistoryEntryProps) {
+/**
+ * One call (docs/design/glass-over-paper.md §1a): a phone glyph for how it ended — with «не дозвонились»
+ * only on an unanswered one — the day, who called (developer), and the comment with the teacher's line
+ * breaks. The time of day and the site's wording are in the spoken name of the head line.
+ */
+export function CallHistoryEntry({ entry, now, showTeacher, divider, studentName }: CallHistoryEntryProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.calls;
-  const outcome = entry.outcome === 'REACHED' ? t.reached : t.noAnswer;
-  const when = historyEntryTime(entry, locale);
-  const by = showTeacher && entry.teacherName ? ` ${format(m.calls.history.by, { name: entry.teacherName })}` : '';
+  const reached = entry.outcome === 'REACHED';
+  const day = historyEntryDay(entry, now, locale);
+  const teacher = showTeacher ? entry.teacherName : null;
+  // The journal's head line is the student, so the day moves under it, next to the teacher.
+  const caption = studentName ? (teacher ? format(m.calls.history.by, { day, name: teacher }) : day) : teacher;
 
   return (
     <View style={[styles.entry, divider ? styles.entryDivider : null]} testID={`call-history-entry-${entry.id}`}>
-      {studentName ? (
-        <View style={styles.entryHead}>
-          <Text variant="bodyStrong" numberOfLines={1} style={styles.entryName}>
-            {studentName}
-          </Text>
+      <View
+        accessible
+        accessibilityLabel={accessibilityLabelOf([studentName, historyEntryTime(entry, locale), reached ? t.reached : t.noAnswer, teacher])}
+        style={styles.entryHead}
+      >
+        <Icon name={reached ? 'phone' : 'phoneMissed'} size={theme.sizes.icon.sm} color={reached ? 'textStrong' : 'textMuted'} />
+        <Text variant="bodyStrong" tabular={!studentName} numberOfLines={1} style={styles.entryName}>
+          {studentName ?? day}
+        </Text>
+        {reached ? null : (
           <Text variant="small" color="textMuted" numberOfLines={1}>
-            {outcome}
+            {m.calls.history.noAnswer}
           </Text>
-        </View>
+        )}
+      </View>
+      {caption ? (
+        <Text variant="small" color="textMuted" tabular numberOfLines={1}>
+          {caption}
+        </Text>
       ) : null}
-      <Text variant={studentName ? 'small' : 'bodyStrong'} color={studentName ? 'textMuted' : 'textStrong'}>
-        {studentName ? `${when}${by}` : `${when} · ${outcome}${by}`}
-      </Text>
       {entry.comment ? (
         // Pre-wrapped like on the site: the teacher's line breaks are kept.
         <Text variant={studentName ? 'body' : 'small'} color={studentName ? 'textStrong' : 'textMuted'} selectable>
@@ -141,6 +162,6 @@ const useStyles = makeStyles((t) => ({
   block: { gap: t.space.md },
   entry: { gap: t.space.xxxs, paddingVertical: t.space.md },
   entryDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
-  entryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.sm },
+  entryHead: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
   entryName: { flex: 1, minWidth: 0 },
 }));

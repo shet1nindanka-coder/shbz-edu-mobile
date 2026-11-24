@@ -16,8 +16,8 @@ const at = (iso: string) => deadlineCaption(iso, false, NOW, "ru", ru);
 
 describe("deadline caption", () => {
   it("names today and tomorrow with the time", () => {
-    assert.deepEqual(at("2026-11-18T20:59:00.000Z"), { text: "сегодня до 23:59", attention: false });
-    assert.deepEqual(at("2026-11-19T20:59:00.000Z"), { text: "до завтра, 23:59", attention: false });
+    assert.deepEqual(at("2026-11-18T20:59:00.000Z"), { text: "сегодня, 23:59", attention: false });
+    assert.deepEqual(at("2026-11-19T20:59:00.000Z"), { text: "завтра, 23:59", attention: false });
   });
 
   it("names the weekday within a week and the date beyond it", () => {
@@ -35,7 +35,7 @@ describe("deadline caption", () => {
 
   it("counts Moscow days: 23:59 MSK of the 19th is «завтра» even when the device is a day ahead", () => {
     // 20:59 UTC on the 19th is 23:59 in Moscow on the 19th.
-    assert.equal(at("2026-11-19T20:59:00.000Z").text, "до завтра, 23:59");
+    assert.equal(at("2026-11-19T20:59:00.000Z").text, "завтра, 23:59");
   });
 
   it("a finished homework and a homework without a deadline are plain facts", () => {
@@ -45,8 +45,8 @@ describe("deadline caption", () => {
   });
 
   it("has an English wording", () => {
-    assert.equal(deadlineCaption("2026-11-19T20:59:00.000Z", false, NOW, "en", en).text, "due tomorrow, 23:59");
+    assert.equal(deadlineCaption("2026-11-19T20:59:00.000Z", false, NOW, "en", en).text, "tomorrow, 23:59");
     assert.equal(deadlineCaption("2026-11-20T20:59:00.000Z", false, NOW, "en", en).text, "due Friday");
-    assert.equal(deadlineCaption("2026-11-16T20:59:00.000Z", false, NOW, "en", en).text, "overdue by 2 days");
+    assert.equal(deadlineCaption("2026-11-16T20:59:00.000Z", false, NOW, "en", en).text, "2 days overdue");
   });
 });

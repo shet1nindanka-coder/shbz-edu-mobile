@@ -145,15 +145,21 @@ export function NotificationsScreen() {
             >
               <View style={[styles.dot, unread ? styles.dotUnread : null]} />
               <View style={styles.texts}>
-                <Text variant={unread ? 'bodyBold' : 'bodyStrong'}>{item.title}</Text>
-                {item.body ? (
+                {/* A list of messages, not the messages: the title, when, and one line of the text; the
+                    whole text is on the screen the row opens (and in the spoken name). */}
+                <View style={styles.head}>
+                  <Text variant={unread ? 'bodyBold' : 'bodyStrong'} numberOfLines={2} style={styles.title}>
+                    {item.title}
+                  </Text>
                   <Text variant="small" color="textMuted">
+                    {formatNotificationTime(item.createdAt, t, locale)}
+                  </Text>
+                </View>
+                {item.body ? (
+                  <Text variant="small" color="textMuted" numberOfLines={1}>
                     {item.body}
                   </Text>
                 ) : null}
-                <Text variant="small" color="textMuted">
-                  {formatNotificationTime(item.createdAt, t, locale)}
-                </Text>
               </View>
             </PressableScale>
           );
@@ -180,4 +186,6 @@ const useStyles = makeStyles((t) => ({
   dot: { width: t.space.sm, height: t.space.sm, borderRadius: t.radii.full, marginTop: t.space.sm, backgroundColor: 'transparent' },
   dotUnread: { backgroundColor: t.colors.textStrong },
   texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  head: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.sm },
+  title: { flex: 1, minWidth: 0 },
 }));

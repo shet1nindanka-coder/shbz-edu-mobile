@@ -13,7 +13,7 @@ export type CallRowProps = {
   student: ParentCallStudentOverview;
   /** TEACHER: the row opens the record form. A developer only reads: the row opens the history. */
   canRecord: boolean;
-  /** DEVELOPER: the caption starts with the owning teacher's name. */
+  /** DEVELOPER: the caption is the owning teacher's name. */
   showTeacher: boolean;
   /** The row a notification pointed at: soft accent background that fades out when this turns false. */
   highlighted: boolean;
@@ -27,21 +27,20 @@ export type CallRowProps = {
 };
 
 /**
- * One student of the parent-calls list (06 §1.4 item 4; docs/design/glass-over-paper.md §1 rule 2): the
- * avatar, the name, one caption — when the parents were last reached — and a chip only when a call is due
- * or overdue. The whole row is pressed; the form and the history are behind it.
+ * One student of the parent-calls list (06 §1.4 item 4; docs/design/glass-over-paper.md §1a): the avatar
+ * and the name; only when a call is due — how long ago the parents were reached and a one-word chip. The
+ * whole row is pressed; the form and the history are behind it, the dates are in the row's spoken name.
  */
 export function CallRow({ student, canRecord, showTeacher, highlighted, selected, divider, onPress, onLayout }: CallRowProps) {
   const styles = useStyles();
   const theme = useTheme();
   const reducedMotion = useReducedMotion();
-  // Large text: the chip («Пора позвонить») leaves the name a third of the row and would cut the surname;
-  // a name that does not fit next to it takes a second line instead.
+  // Large text: next to the chip a long name would lose its surname; it takes a second line instead.
   const { large } = useTextScale();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.calls;
-  const chip = attentionChip(student.reminder.state, t);
-  const caption = callRowCaption(student, t, locale, showTeacher);
+  const chip = attentionChip(student.reminder.state, t, m.calls.row);
+  const caption = callRowCaption(student, t, m.calls.row.never, showTeacher);
   const id = student.studentId;
 
   // The highlight appears at once and fades out, like the site's row transition.
@@ -69,15 +68,14 @@ export function CallRow({ student, canRecord, showTeacher, highlighted, selected
         title={student.studentName}
         titleLines={large ? 2 : 1}
         subtitle={caption}
-        // The teacher's name in front makes a developer's caption a line longer.
-        subtitleLines={showTeacher ? 3 : 2}
         left={<Avatar name={student.studentName} tone="neutral" />}
         right={chip ? <Chip tone={chip.tone} label={chip.label} /> : undefined}
         selected={selected}
         divider={divider}
         onPress={onPress ? () => onPress(student) : undefined}
-        // The ear gets the whole meta line; the eye has its latest fact and the history behind the row.
-        accessibilityLabel={accessibilityLabelOf([action, chip?.label, callMetaLine(student, t, locale), showTeacher ? teacherLine(student, t) : null])}
+        // The ear gets the site's label of the state and its whole meta line; the eye has the chip, the
+        // days and the history behind the row.
+        accessibilityLabel={accessibilityLabelOf([action, chip?.full, callMetaLine(student, t, locale), showTeacher ? teacherLine(student, t) : null])}
         testID={canRecord ? `call-record-${id}` : `call-history-${id}`}
       />
     </View>

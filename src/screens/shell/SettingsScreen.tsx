@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatDate } from '@/domain/dates';
-import { format, plural, useI18n } from '@/i18n';
+import { plural, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { IS_MOCK_BUILD, useCurrentUser, usePendingWritesCount, useSession } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
@@ -76,11 +75,9 @@ export function SettingsScreen() {
                 <Text variant="cardTitle" numberOfLines={1}>
                   {user.name}
                 </Text>
+                {/* The login and the sign-up date are in the account sheet: the card says who, nothing more. */}
                 <Text variant="small" color="textMuted" numberOfLines={1} testID="settings-role">
-                  {user.email} · {dict.roles[user.role].toLocaleLowerCase()}
-                </Text>
-                <Text variant="small" color="textMuted" numberOfLines={1}>
-                  {format(m.shell.settings.onPlatformSince, { date: formatDate(user.createdAt, locale) })}
+                  {dict.roles[user.role].toLocaleLowerCase()}
                 </Text>
               </View>
             </View>

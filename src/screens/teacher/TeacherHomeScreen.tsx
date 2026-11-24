@@ -29,10 +29,8 @@ import {
   Panels,
   PressableScale,
   Screen,
-  SectionCaption,
   StatusBar,
   Text,
-  TextButton,
   navIcons,
 } from '@/ui';
 
@@ -44,9 +42,10 @@ const UPCOMING_ROWS = 3;
 
 /**
  * `teacher.home` — «Обзор» (docs/spec/04-teacher-students.md S1; layout: docs/design/glass-over-paper.md
- * §7): what is next and who needs the teacher. One card for the nearest lesson with «Открыть доску», then
- * «Требуют внимания» — students with numbers marked «нужна помощь» and the parent calls that are due. A
- * tablet adds «Ближайшие занятия» and the «Прогресс» panel with a bar by status per student.
+ * §7, texts: §1a): what is next and who needs the teacher. One card for the nearest lesson with «Открыть
+ * доску», then who needs attention — a student's name with the red count of numbers marked «нужна помощь»,
+ * and «Звонки» with the count of parent calls that are due. A tablet adds «Ближайшие занятия» and the
+ * «Прогресс» panel with a bar by status per student.
  *
  * The blocks are assembled from reads the app already makes: the overview summary and the call counters
  * (this screen's own), the students list (the «ученики» section) and the lessons list (the «занятия»
@@ -105,12 +104,15 @@ export function TeacherHomeScreen() {
   const openStudent = (student: TeacherStudentListItem) => navigation.open({ screen: 'teacher.student.review', studentId: student.id });
   const openBoard = (lesson: LessonListItem) => navigation.open({ screen: 'planner.lessonBoard', lessonId: lesson.id });
 
-  const whenOf = (lesson: LessonListItem) => {
-    const when = lesson.startsAt ? lessonWhen(lesson.startsAt, lesson.status === 'ACTIVE', now, locale, mt) : '';
+  /** The one caption of a lesson: when it is («Сегодня в 17:00»). */
+  const whenOf = (lesson: LessonListItem) => (lesson.startsAt ? lessonWhen(lesson.startsAt, lesson.status === 'ACTIVE', now, locale, mt) : '');
+  /** For screen readers the when-line also names the group or the only student («Сегодня в 17:00 · 11А»). */
+  const spokenWhenOf = (lesson: LessonListItem) => {
     const who = lessonAudience(lesson);
-    return who ? format(mt.lessonWith, { when, who }) : when;
+    return who ? format(mt.lessonWith, { when: whenOf(lesson), who }) : whenOf(lesson);
   };
 
+  // Spoken only: the row shows «Звонки» and one number.
   const callParts = calls
     ? [
         calls.due > 0 ? format(mt.callsLine, { label: t.calls.due, n: calls.due }) : null,
@@ -125,7 +127,13 @@ export function TeacherHomeScreen() {
         key={student.id}
         left={<Avatar name={student.name} tone="neutral" />}
         title={student.name}
-        subtitle={plural(locale, student.redCount, mt.needHelpForms)}
+        // The one fact: how many numbers are marked «нужна помощь» — a red number, the words are spoken.
+        right={
+          <Text variant="bodyStrong" color="redText" tabular>
+            {student.redCount}
+          </Text>
+        }
+        accessibilityLabel={`${student.name}. ${plural(locale, student.redCount, mt.needHelpForms)}`}
         inset={inset}
         onPress={() => openStudent(student)}
         testID={`teacher-home-attention-${student.id}`}
@@ -140,9 +148,14 @@ export function TeacherHomeScreen() {
               <Icon name={navIcons.teacher.calls} size={theme.sizes.icon.md} color="label" />
             </View>
           }
-          title={t.calls.title}
-          subtitle={callParts.join(' · ')}
-          subtitleTone={calls.overdue > 0 ? 'attention' : 'muted'}
+          title={t.calls.kicker}
+          // Due and overdue calls are different students: one number, red when some call is overdue.
+          right={
+            <Text variant="bodyStrong" color={calls.overdue > 0 ? 'redText' : 'textMuted'} tabular>
+              {calls.due + calls.overdue}
+            </Text>
+          }
+          accessibilityLabel={`${t.calls.title}. ${callParts.join(' · ')}`}
           inset={inset}
           onPress={() => navigation.open({ screen: 'calls.list' })}
           testID="teacher-home-attention-calls"
@@ -170,7 +183,7 @@ export function TeacherHomeScreen() {
         </View>
         <Button
           label={mt.openBoard}
-          accessibilityLabel={format(mt.openBoardOf, { title: nextLesson.title, when: whenOf(nextLesson) })}
+          accessibilityLabel={format(mt.openBoardOf, { title: nextLesson.title, when: spokenWhenOf(nextLesson) })}
           size={theme.tablet ? 'md' : 'lg'}
           rightIcon={theme.tablet ? 'forward' : undefined}
           onPress={() => openBoard(nextLesson)}
@@ -221,6 +234,7 @@ export function TeacherHomeScreen() {
                     key={lesson.id}
                     title={lesson.title}
                     subtitle={whenOf(lesson)}
+                    accessibilityLabel={`${lesson.title}. ${spokenWhenOf(lesson)}`}
                     inset={0}
                     divider={index < later.length - 1}
                     onPress={() => openBoard(lesson)}
@@ -233,12 +247,9 @@ export function TeacherHomeScreen() {
           <Panel
             weight={2}
             header={
-              <View style={styles.panelHead}>
-                <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelTitle}>
-                  {mt.progress}
-                </Text>
-                <TextButton label={mt.allStudents} onPress={() => navigation.open({ screen: 'teacher.students' })} testID="teacher-home-all-students" />
-              </View>
+              <Text variant="sectionTitle" accessibilityRole="header">
+                {mt.progress}
+              </Text>
             }
             contentStyle={styles.panelRows}
             testID="teacher-home-progress"
@@ -284,8 +295,8 @@ export function TeacherHomeScreen() {
       <>
         {refreshError}
         {lessonCard}
-        <Enter index={1} style={styles.block}>
-          <SectionCaption>{mt.attention}</SectionCaption>
+        {/* One list on the screen: no caption above it (§1a). */}
+        <Enter index={1}>
           <ListCard testID="teacher-home-attention">{attentionRows(undefined)}</ListCard>
         </Enter>
       </>
@@ -307,7 +318,6 @@ export function TeacherHomeScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  block: { gap: t.space.sm },
   lesson: { gap: t.space.md },
   lessonWide: { flexDirection: 'row', alignItems: 'center', gap: t.space.lg },
   lessonHead: { flex: t.tablet ? 1 : undefined, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: t.tablet ? t.space.lg : t.space.md },
@@ -323,8 +333,6 @@ const useStyles = makeStyles((t) => ({
   },
   // Rows bring their own height and hairlines: the panel's gap between blocks is not wanted between them.
   panelRows: { gap: 0 },
-  panelHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  panelTitle: { flexShrink: 1 },
   subCaption: { paddingTop: t.space.lg, paddingBottom: t.space.xxs },
   progressRow: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   rowDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },

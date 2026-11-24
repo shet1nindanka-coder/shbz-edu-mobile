@@ -18,16 +18,16 @@ export type StudentRowProps = {
 
 /**
  * One student of the list (docs/spec/04-teacher-students.md S2; layout: docs/design/glass-over-paper.md
- * §1 rule 2): the avatar, the name, ONE caption — the login — and one fact on the right: how many numbers
- * are solved, or, in red, how many need help. The whole row is pressed; the login to copy, the password
- * reset and deletion live in the student's "⋯" menu.
+ * §1 rule 2, texts: §1a): the avatar and the name; on the right a red number — how many numbers need help
+ * — or nothing. The whole row is pressed; the login, the password reset and deletion live in the student's
+ * "⋯" menu. A screen reader still hears the login and the counters.
  */
 export function StudentRow({ student, onPress, selected = false, panel = false, divider }: StudentRowProps) {
   const { dict, m } = useI18n();
   const panelRow = usePanelRow();
   const t = dict.students.list;
   const needsHelp = student.redCount > 0;
-  const fact = needsHelp
+  const spokenFact = needsHelp
     ? format(m.common.statuses.groupCount, { label: m.common.statuses.RED.label, n: student.redCount })
     : student.solvedCount > 0
       ? format(m.teacher.students.solved, { n: student.solvedCount })
@@ -37,11 +37,10 @@ export function StudentRow({ student, onPress, selected = false, panel = false, 
     <ListRow
       left={<Avatar name={student.name} tone="neutral" />}
       title={student.name}
-      subtitle={student.email}
       right={
-        fact ? (
-          <Text variant="small" color={needsHelp ? 'redText' : 'textMuted'} tabular numberOfLines={1}>
-            {fact}
+        needsHelp ? (
+          <Text variant="bodyStrong" color="redText" tabular numberOfLines={1}>
+            {student.redCount}
           </Text>
         ) : undefined
       }
@@ -49,7 +48,7 @@ export function StudentRow({ student, onPress, selected = false, panel = false, 
       divider={divider}
       {...(panel ? panelRow(selected, divider ?? true) : null)}
       onPress={() => onPress(student)}
-      accessibilityLabel={[student.name, `${t.loginLabel}: ${student.email}`, fact].filter(Boolean).join('. ')}
+      accessibilityLabel={[student.name, `${t.loginLabel}: ${student.email}`, spokenFact].filter(Boolean).join('. ')}
       accessibilityHint={t.viewProgress}
       testID={`student-open-${student.id}`}
     />

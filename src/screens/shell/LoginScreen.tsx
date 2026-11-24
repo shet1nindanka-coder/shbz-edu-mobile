@@ -132,9 +132,6 @@ export function LoginScreen() {
       <View style={styles.block}>
         <Logo size={34} />
         <View style={styles.titles}>
-          <Text variant="loginTitle" accessibilityRole="header">
-            {dict.login.title}
-          </Text>
           <Hint>
             <Text variant="body" color="textMuted">
               {dict.login.subtitle}
@@ -172,7 +169,6 @@ export function LoginScreen() {
               label={dict.login.loginLabel}
               value={login}
               onChangeText={changeLogin}
-              placeholder={m.shell.login.loginPlaceholder}
               keyboardType="email-address"
               inputMode="email"
               autoCapitalize="none"
@@ -192,7 +188,6 @@ export function LoginScreen() {
               label={dict.login.passwordLabel}
               value={password}
               onChangeText={setPassword}
-              placeholder={dict.login.passwordPlaceholder}
               showLabel={dict.login.showPassword}
               hideLabel={dict.login.hidePassword}
               showAccessibilityLabel={dict.login.showPasswordAria}
@@ -248,14 +243,13 @@ export function LoginScreen() {
             </View>
             {demoOpen ? (
               <>
-                <Text variant="caption" color="textMuted" style={styles.demoHint}>
-                  {m.shell.login.demoHint}
-                </Text>
                 {personas.map((persona) => (
                   <ListRow
                     key={persona.login}
                     title={persona.name || persona.login}
-                    subtitle={`${persona.login} · ${persona.role ? dict.roles[persona.role] : m.shell.login.demoNoAccount}`}
+                    // The login goes into the form on a tap; the row only says who this is.
+                    meta={persona.role ? dict.roles[persona.role].toLocaleLowerCase() : m.shell.login.demoNoAccount}
+                    accessibilityLabel={`${persona.name || persona.login}, ${persona.login}, ${persona.role ? dict.roles[persona.role] : m.shell.login.demoNoAccount}`}
                     chevron={false}
                     onPress={() => {
                       changeLogin(persona.login);
@@ -304,7 +298,6 @@ const useStyles = makeStyles((t) => ({
     paddingHorizontal: t.space.card,
     paddingVertical: t.space.md,
   },
-  demoHint: { paddingHorizontal: t.space.card, paddingBottom: t.space.sm },
   locale: { alignItems: 'center', marginTop: t.space.lg },
   localeSwitch: { alignSelf: 'center' },
 }));

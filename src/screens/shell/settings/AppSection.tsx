@@ -5,7 +5,7 @@ import { AppState, Linking, View } from 'react-native';
 
 import { format, plural, useI18n } from '@/i18n';
 import { useRefetchOnFocus } from '@/navigation';
-import { Hint, useCurrentUser, usePendingWritesSummary, usePreferences } from '@/providers';
+import { Hint, useCurrentUser, useHintsEnabled, usePendingWritesSummary, usePreferences } from '@/providers';
 import { authenticateWithBiometrics, getBiometricAvailability, type BiometricAvailability } from '@/services/biometrics';
 import { clearFileCache } from '@/services/files';
 import { useIsOnline } from '@/services/network';
@@ -24,6 +24,7 @@ export function AppSection() {
   const styles = useStyles();
   const { locale, dict, m } = useI18n();
   const t = m.shell.settings;
+  const hints = useHintsEnabled();
   const user = useCurrentUser();
   const queryClient = useQueryClient();
   const { preferences, setBiometricLock, setReminder } = usePreferences();
@@ -125,20 +126,26 @@ export function AppSection() {
   const reminderRows: ReminderRow[] =
     user.role === 'STUDENT'
       ? [
-          { category: 'homeworkDeadlines', label: t.reminderHomework, hint: t.reminderHomeworkHint },
-          { category: 'lessonStart', label: t.reminderLesson, hint: t.reminderLessonHint },
+          // Under «Напоминания» a row needs one word: what the reminder is about.
+          { category: 'homeworkDeadlines', label: m.shell.tabs.deadlines, hint: t.reminderHomeworkHint },
+          { category: 'lessonStart', label: m.shell.tabs.lesson, hint: t.reminderLessonHint },
         ]
       : user.role === 'TEACHER'
         ? [{ category: 'parentCalls', label: dict.planner.calls.title, hint: t.reminderCallsHint }]
         : [];
 
   const biometricsReady = biometrics?.status === 'available';
+  // A reason is said when the switch cannot be used; how the lock works is a hint (design doc §1a).
   const biometricDescription =
     biometrics?.status === 'notEnrolled'
       ? m.shell.biometrics.notEnrolled
       : biometrics?.status === 'unavailable'
         ? m.shell.biometrics.unavailable
-        : m.shell.biometrics.hint;
+        : hints
+          ? m.shell.biometrics.hint
+          : undefined;
+  // A device without a sensor has nothing to offer here (unless a stored lock must be switched off).
+  const lockShown = biometrics?.status !== 'unavailable' || preferences.biometricLock;
   const remindersSupported = localNotifications.supported && permission?.status !== 'unavailable';
   // Refused for good: only the device settings can allow it. Not asked yet (Android 13+ reports that as
   // "denied" too, see `permissionStateOf`) is not a refusal: a tap on a switch shows the OS prompt.
@@ -155,8 +162,7 @@ export function AppSection() {
 
   return (
     <View style={styles.sections}>
-      <View style={styles.section}>
-        <SectionCaption>{t.lockKicker}</SectionCaption>
+      {lockShown ? (
         <Card style={styles.card}>
           <Switch
             trailing
@@ -171,35 +177,30 @@ export function AppSection() {
           />
           {biometricError ? <Notice tone="error" text={biometricError} /> : null}
         </Card>
-      </View>
+      ) : null}
 
+      {reminderRows.length > 0 ? (
       <View style={styles.section}>
         <SectionCaption>{t.remindersKicker}</SectionCaption>
         <Card style={styles.card}>
-          {reminderRows.length === 0 ? (
-            <Text variant="small" color="textMuted">
-              {t.remindersNone}
-            </Text>
-          ) : (
-            reminderRows.map((row) => (
-              <Switch
-                key={row.category}
-                trailing
-                label={row.label}
-                description={row.hint}
-                value={preferences.reminders[row.category] && remindersSupported && remindersAllowed}
-                disabled={!remindersSupported}
-                onValueChange={(value) => void toggleReminder(row.category, value)}
-                testID={`settings-reminder-${row.category}`}
-              />
-            ))
-          )}
-          {reminderRows.length > 0 && !remindersSupported ? (
+          {reminderRows.map((row) => (
+            <Switch
+              key={row.category}
+              trailing
+              label={row.label}
+              description={hints ? row.hint : undefined}
+              value={preferences.reminders[row.category] && remindersSupported && remindersAllowed}
+              disabled={!remindersSupported}
+              onValueChange={(value) => void toggleReminder(row.category, value)}
+              testID={`settings-reminder-${row.category}`}
+            />
+          ))}
+          {!remindersSupported ? (
             <Text variant="hint" testID="settings-reminders-unavailable">
               {t.remindersUnavailable}
             </Text>
           ) : null}
-          {reminderRows.length > 0 && remindersDenied ? (
+          {remindersDenied ? (
             <Notice
               tone="warning"
               text={t.remindersDenied}
@@ -219,16 +220,18 @@ export function AppSection() {
           ) : null}
         </Card>
       </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <SectionCaption>{t.dataKicker}</SectionCaption>
         <Card style={styles.card}>
-          <View style={styles.row}>
-            <Icon name={online ? 'checkCircle' : 'wifiOff'} size={20} color={online ? 'textMuted' : 'yellowText'} />
-            <Text variant="bodyStrong" style={styles.rowText} testID="settings-connection">
-              {online ? t.connectionOnline : t.connectionOffline}
-            </Text>
-          </View>
+          {/* A working connection is not news: the row appears when it is lost. */}
+          {online ? null : (
+            <View style={styles.row}>
+              <Icon name="wifiOff" size={20} color="yellowText" />
+              <Text variant="bodyStrong" style={styles.rowText} testID="settings-connection">
+                {t.connectionOffline}
+              </Text>
+            </View>
+          )}
           {pending.waiting > 0 ? (
             <Text variant="small" color="textMuted" testID="settings-pending-writes">
               {plural(locale, pending.waiting, t.pendingForms)}
@@ -252,11 +255,10 @@ export function AppSection() {
             testID="settings-clear-cache"
           />
         </Card>
-      </View>
 
       {version ? (
-        <Text variant="small" color="textMuted" align="center">
-          {format(t.version, { version })}
+        <Text variant="small" color="textMuted" align="center" accessibilityLabel={format(t.version, { version })}>
+          {version}
         </Text>
       ) : null}
       <Dialog

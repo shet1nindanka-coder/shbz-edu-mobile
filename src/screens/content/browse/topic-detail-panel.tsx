@@ -61,7 +61,7 @@ export function TopicDetailPanel({ topicId, title, isDeveloper, onDelete }: Topi
                 {shownTitle}
               </Text>
               {topic?.description ? (
-                <Text variant="small" color="textMuted">
+                <Text variant="small" color="textMuted" numberOfLines={1} accessibilityLabel={topic.description}>
                   {topic.description}
                 </Text>
               ) : null}
@@ -77,7 +77,7 @@ export function TopicDetailPanel({ topicId, title, isDeveloper, onDelete }: Topi
             {detail.isError ? <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="topic-refresh-error" /> : null}
             <TopicFiles theoryFile={topic.theoryFile} homeworkFile={topic.homeworkFile} onOpen={openFile} />
             <Divider color="rowBorder" />
-            <TopicNumbers numbers={topic.homeworkNumbers} isDeveloper={isDeveloper} onOpenNumber={openNumber} />
+            <TopicNumbers numbers={topic.homeworkNumbers} onOpenNumber={openNumber} />
           </>
         ) : failure ? (
           <LoadFailure query={detail} testID="topic-error" />

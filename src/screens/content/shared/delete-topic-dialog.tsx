@@ -27,7 +27,8 @@ function isTopicImpact(value: unknown): value is TopicImpact {
 /**
  * "Delete topic" confirmation with the real impact (docs/spec/07-developer-content.md §1.8 variant B,
  * §4.4, §7 Q5): every entry point first reads `GET /topics/{id}/impact`, shows what is destroyed and
- * sends the `numbersWithWork` the user saw. A `409 deleteChanged` carries the fresh impact — the dialog
+ * sends the `numbersWithWork` the user saw. The dialog says the consequence once — the question, what
+ * goes with the topic and, when there is student work, its lines; a topic without work adds nothing. A `409 deleteChanged` carries the fresh impact — the dialog
  * stays open with the new numbers.
  */
 export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteTopicDialogProps) {
@@ -83,7 +84,6 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
   return (
     <Dialog
       visible={topic !== null}
-      kicker={dict.topics.widgets.confirm.kicker}
       title={t.title}
       confirmLabel={dict.topics.widgets.confirm.confirm}
       pendingLabel={dict.topics.widgets.confirm.pending}
@@ -109,9 +109,6 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
       {impact.isPending && !impactFailure && topic !== null ? (
         <View style={styles.loading} accessibilityRole="progressbar" accessibilityLabel={m.content.deleteTopic.loadingImpact}>
           <Spinner />
-          <Text variant="small" color="textMuted">
-            {m.content.deleteTopic.loadingImpact}
-          </Text>
         </View>
       ) : null}
 
@@ -124,27 +121,21 @@ export function DeleteTopicDialog({ topic, onClose, onDeleted, testID }: DeleteT
         />
       ) : null}
 
-      {data && summary ? (
-        data.lines.length > 0 ? (
-          <View style={styles.impact} testID="delete-topic-impact">
-            <Text variant="small" color="label">
-              {t.workBefore}
-              <Text variant="smallBold" color="textStrong">
-                {String(summary.numbersWithWork)}
-              </Text>
-              {plural(locale, summary.numbersWithWork, t.workAfterForms)}
+      {data && summary && data.lines.length > 0 ? (
+        <View style={styles.impact} testID="delete-topic-impact">
+          <Text variant="small" color="label">
+            {t.workBefore}
+            <Text variant="smallBold" color="textStrong">
+              {String(summary.numbersWithWork)}
             </Text>
-            {data.lines.map((line) => (
-              <Text key={line} variant="small" color="label">
-                {`— ${line}`}
-              </Text>
-            ))}
-          </View>
-        ) : (
-          <Text variant="small" color="textMuted" testID="delete-topic-no-work">
-            {t.noWork}
+            {plural(locale, summary.numbersWithWork, t.workAfterForms)}
           </Text>
-        )
+          {data.lines.map((line) => (
+            <Text key={line} variant="small" color="label">
+              {`— ${line}`}
+            </Text>
+          ))}
+        </View>
       ) : null}
 
       {error ? <Notice tone="error" text={error} testID="delete-topic-error" /> : null}

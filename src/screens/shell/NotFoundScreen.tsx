@@ -21,7 +21,8 @@ export function NotFoundScreen({ description }: NotFoundScreenProps) {
       <ErrorState
         numeral="404"
         title={dict.shells.notFoundTitle}
-        description={description ?? dict.shells.notFoundDescription}
+        // The title says it; a line is added only when the caller knows what exactly is gone.
+        description={description}
         retryLabel={dict.common.home}
         onRetry={navigation.goHome}
       />

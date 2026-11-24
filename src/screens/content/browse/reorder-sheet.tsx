@@ -6,7 +6,6 @@ import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { TopicListItem } from '@/api/types';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, IconButton, Notice, Text } from '@/ui';
 
@@ -84,7 +83,7 @@ export function ReorderSheet({ visible, topics, onClose, onSaved }: ReorderSheet
           {error ? <Notice tone="error" text={error} testID="reorder-error" /> : null}
           <RetryWaitLine seconds={wait.seconds} testID="reorder-wait" />
           <Button
-            label={save.isPending ? m.common.states.saving : m.content.reorder.save}
+            label={save.isPending ? m.common.states.saving : dict.common.save}
             loading={save.isPending}
             disabled={!changed || wait.waiting}
             onPress={() => {
@@ -98,9 +97,6 @@ export function ReorderSheet({ visible, topics, onClose, onSaved }: ReorderSheet
       testID="reorder-sheet"
     >
       <View style={styles.root}>
-        <Hint>
-          <Text variant="hint">{m.content.reorder.sheetHint}</Text>
-        </Hint>
         {order.map((id, index) => {
           const title = titles.get(id) ?? '';
           return (

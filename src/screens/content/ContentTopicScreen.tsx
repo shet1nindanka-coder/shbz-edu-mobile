@@ -25,7 +25,8 @@ export type ContentTopicScreenProps = ScreenParams['content.topic'];
 /**
  * `content.topic` (docs/spec/07-developer-content.md §1.2; layout: docs/design/glass-over-paper.md §7): the
  * topic as a student gets it — the theory and tasks files — and its numbers as a grid of tiles; a tile
- * opens the number with its statement and answer. Read-only for both roles; a DEVELOPER additionally gets
+ * opens the number with its statement and answer. The two cards carry no titles (§1a): rows and tiles
+ * say what they are. Read-only for both roles; a DEVELOPER additionally gets
  * the «⋯» with the way to the editor and «Удалить тему».
  */
 export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
@@ -87,8 +88,9 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
           {detail.isError && !deleted && !isTopicLeaving(topicId) ? (
             <Notice tone="error" text={errorText(detail.error, m.common.errors.generic)} testID="topic-refresh-error" />
           ) : null}
+          {/* The description is data, but not a paragraph to read here: one line (§1a). */}
           {topic.description ? (
-            <Text variant="body" color="label" testID="topic-description">
+            <Text variant="small" color="textMuted" numberOfLines={1} accessibilityLabel={topic.description} testID="topic-description">
               {topic.description}
             </Text>
           ) : null}
@@ -97,7 +99,7 @@ export function ContentTopicScreen({ topicId }: ContentTopicScreenProps) {
               <TopicFiles theoryFile={topic.theoryFile} homeworkFile={topic.homeworkFile} onOpen={openFile} />
             </Panel>
             <Panel weight={3} testID="topic-numbers">
-              <TopicNumbers numbers={topic.homeworkNumbers} isDeveloper={isDeveloper} onOpenNumber={openNumber} />
+              <TopicNumbers numbers={topic.homeworkNumbers} onOpenNumber={openNumber} />
             </Panel>
           </Panels>
         </>
