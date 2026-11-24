@@ -4,8 +4,9 @@
 // the descendants of such an element, so what the card showed besides them was never spoken, and the nested
 // «Открыть ДЗ» button could not be reached.
 // The row of the redesigned list shows a title, one caption (the deadline — «просрочено 2 дня», «выполнено» —
-// or the running check) and «N из M»; the numbers and their statuses live inside the homework. The rule is
-// the same: the name of the row holds everything the row shows, and nothing pressable hides inside it.
+// or the running check) and the short figure «N/M»; the numbers and their statuses live inside the homework.
+// The rule is the same: the name of the row holds everything the row shows — the figure with the word the
+// eye does not need («Решено 0/3») — and nothing pressable hides inside it.
 import { describe, expect, it } from '@jest/globals';
 
 import { byTestId, visit } from './support/drive';
@@ -39,9 +40,10 @@ describe('homework list card speaks what it shows (#234)', () => {
     const card = byTestId(app, 'homework-card-hw_ilya_overdue');
     const name = label(card);
     expect(name).toMatch(/просрочено \d+ (день|дня|дней)/);
-    expect(name).toContain('Решено 0 из 3');
+    expect(name).toContain('Решено 0/3');
     const shown = shownTexts(card as HostNode);
     expect(shown.length).toBe(3); // the title, one caption, the progress
+    expect(shown[2]).toBe('0/3');
     for (const text of shown) expect(name).toContain(text);
     expect((card as HostNode).props.accessibilityRole).toBe('button');
 
@@ -62,8 +64,10 @@ describe('homework list card speaks what it shows (#234)', () => {
     const card = byTestId(app, 'homework-card-hw_ilya_done');
     const name = label(card);
     expect(name).toContain('. выполнено. ');
-    expect(name).toContain('Решено 2 из 2');
-    for (const text of shownTexts(card as HostNode)) expect(name).toContain(text);
+    expect(name).toContain('Решено 2/2');
+    const shown = shownTexts(card as HostNode);
+    expect(shown).toContain('2/2');
+    for (const text of shown) expect(name).toContain(text);
     expect(name).not.toMatch(/просрочено/i);
     expect(nestedControls(card as HostNode)).toEqual([]);
   });

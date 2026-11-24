@@ -412,12 +412,33 @@ describe('lesson duration stepper (#335)', () => {
 });
 
 describe('sticky list headers are read once (#336)', () => {
-  it('calls: only the in-list summary is reachable', async () => {
+  // The summary sentence («Просрочено: 1 · Пора позвонить: 2 · …») and its sticky copy are gone: the screen
+  // is its list. What the sentence told is spoken by the rows themselves, each reachable exactly once.
+  it('calls: no summary is left to be read twice — every row is reachable once and speaks its own state', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/calls' });
     await app.settle();
-    const summaries = all(rootOf(app), (node) => node.props.testID === 'calls-summary');
-    expect(summaries.length).toBeGreaterThan(0);
-    expect(summaries.filter(readable)).toHaveLength(1);
+    expect(all(rootOf(app), (node) => node.props.testID === 'calls-summary')).toEqual([]);
+    expect(visibleText(app)).not.toMatch(/Просрочено: \d|Пора позвонить: \d|Всего учеников/);
+    const overview = await call(app, () => app.mock.groups.getParentCallsOverview());
+    expect(overview.students.length).toBeGreaterThan(0);
+    const spokenState = { overdue: 'Просрочено', due: 'Пора позвонить' } as const;
+    let due = 0;
+    for (const student of overview.students) {
+      const rows = all(rootOf(app), (node) => node.props.testID === `call-record-${student.studentId}`).filter(readable);
+      expect(rows).toHaveLength(1);
+      const label = String(rows[0].props.accessibilityLabel);
+      expect(label).toContain(student.studentName);
+      const state = student.reminder.state;
+      if (state === 'ok') {
+        expect(label).not.toMatch(/Просрочено|Пора позвонить/);
+        continue;
+      }
+      due += 1;
+      expect(label).toContain(spokenState[state]);
+    }
+    // The fixture has students of both kinds, or the loop proves nothing.
+    expect(due).toBeGreaterThan(0);
+    expect(due).toBeLessThan(overview.students.length);
   });
 
   it('lessons: each section header is reachable once', async () => {
@@ -468,10 +489,26 @@ describe('calls: the row that opens the history (#339)', () => {
     if (!row) return;
     const label = String(row.props.accessibilityLabel);
     expect(label.startsWith(`Записать звонок: ${student.studentName}`)).toBe(true);
+    // A row is its name; one whose call is due adds how long ago the parents were reached and a one-word
+    // chip («пора» / «просрочено») — the row speaks the site's label of that state («Пора позвонить» /
+    // «Просрочено») and its whole line of dates, so the words differ only by the case.
     const shown = shownOn(row);
     expect(shown[0]).toBe(student.studentName);
-    expect(shown.length).toBeGreaterThan(1);
-    for (const text of shown) expect(label).toContain(text);
+    for (const text of shown) expect(label.toLowerCase()).toContain(text.toLowerCase());
+    const dueStudent = overview.students.find((each) => each.reminder.state !== 'ok');
+    expect(dueStudent).toBeDefined();
+    if (!dueStudent) return;
+    const dueRow = byTestId(app, `call-record-${dueStudent.studentId}`);
+    expect(dueRow).toBeTruthy();
+    if (!dueRow) return;
+    const dueLabel = String(dueRow.props.accessibilityLabel);
+    const dueShown = shownOn(dueRow);
+    // The name, the caption and the chip.
+    expect(dueShown).toHaveLength(3);
+    expect(dueShown[0]).toBe(dueStudent.studentName);
+    expect(dueShown[2]).toBe(dueStudent.reminder.state === 'overdue' ? 'просрочено' : 'пора');
+    for (const text of dueShown) expect(dueLabel.toLowerCase()).toContain(text.toLowerCase());
+    expect(dueLabel).toContain(dueStudent.reminder.state === 'overdue' ? 'Просрочено' : 'Пора позвонить');
 
     await tap(app, `#call-record-${student.studentId}`);
     expect(hasTestId(app, 'call-record-sheet')).toBe(true);

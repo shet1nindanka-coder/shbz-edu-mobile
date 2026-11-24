@@ -2,7 +2,7 @@
 // finishes while the teacher is elsewhere, and what screen readers hear and when.
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { byTestId, fill, hasTestId, tap, visibleText, visit } from './support/drive';
+import { fill, hasTestId, tap, visibleText, visit } from './support/drive';
 import type { AppHandle } from './support/launch';
 
 const ANNA = 'teacher@example.com';
@@ -134,7 +134,9 @@ describe('group report ready notice (#215)', () => {
 });
 
 describe('credentials sheet: a repeated copy', () => {
-  it('is spoken again on Android, where the unchanged live region stays silent', async () => {
+  // The after-copy sentence is no longer drawn (a tick and a short «Скопировано» pill show the copy): there is
+  // no live region left to stay silent on a repeat, and every copy is announced directly on both platforms.
+  it('is spoken again, on Android too: every copy is announced, the first and the repeated one', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/students' });
     await tap(app, '#students-add');
     await fill(app, '#create-student-name', 'Новый Ученик');
@@ -145,20 +147,23 @@ describe('credentials sheet: a repeated copy', () => {
     const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard'); // eslint-disable-line @typescript-eslint/no-require-imports
     const clipboard = jest.spyOn(Clipboard, 'setStringAsync').mockResolvedValue(true);
     const voice = spyAnnouncements();
-    const feedback = () => byTestId(app, 'credentials-feedback');
+    // What the create form said while it was filled («Пароль подходит.») is not a part of this.
+    voice.clear();
+    const said = 'Логин скопирован — можно вставлять.';
     try {
       await tap(app, '#credentials-line-login');
       await app.settle();
       expect(clipboard).toHaveBeenCalledWith('repeat.copy@example.com');
-      expect(feedback()?.props.accessibilityLiveRegion).toBe('polite');
-      const said = feedback()?.children.join('') ?? '';
-      expect(said).toMatch(/Логин/);
-      // The first copy changes the live region: nothing is announced directly on Android.
-      if (platformOs() === 'android') expect(voice.plain()).toEqual([]);
+      // The sentence is spoken, not shown — and no live region repeats it for TalkBack.
+      expect(hasTestId(app, 'credentials-feedback')).toBe(false);
+      expect(visibleText(app)).not.toContain(said);
+      expect(voice.spoken()).toEqual([said]);
       await tap(app, '#credentials-line-login');
       await app.settle();
-      expect(feedback()?.children.join('')).toBe(said);
-      if (platformOs() === 'android') expect(voice.plain()).toEqual([said]);
+      expect(clipboard).toHaveBeenCalledTimes(2);
+      expect(voice.spoken()).toEqual([said, said]);
+      // TalkBack gets a plain announcement each time; VoiceOver a queued one (behind the button's name).
+      if (platformOs() === 'android') expect(voice.plain()).toEqual([said, said]);
       else expect(voice.plain()).toEqual([]);
     } finally {
       voice.restore();

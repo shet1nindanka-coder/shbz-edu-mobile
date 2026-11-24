@@ -27,7 +27,7 @@ const withFontScale = (fontScale: number) => () => {
 
 describe('student card headers name what tells them apart (#235)', () => {
   // The folded card reads «title — ONE caption — N из M»: the overdue chip became the caption «просрочено
-  // 2 дня», the dates became the deadline wording of the caption («до пятницы», «сегодня до 23:59»).
+  // 2 дня», the dates became the short deadline of the caption («27 нояб., 16:00», «сегодня, 23:59»).
   it('a homework header carries its overdue caption, topic and deadline', async () => {
     const app = await visit({ as: ANNA, url: '/teacher/students/usr_ilya' });
     const overdue = labelOf(app, 'review-assignment-toggle-hw_ilya_overdue');
@@ -41,7 +41,7 @@ describe('student card headers name what tells them apart (#235)', () => {
     const today = labelOf(app, 'review-assignment-toggle-hw_ilya_today');
     expect(today).not.toBe(overdue);
     expect(today).not.toContain('просрочено');
-    expect(today).toMatch(/сегодня до \d\d:\d\d/);
+    expect(today).toMatch(/сегодня, \d\d:\d\d/);
     expect(byTestId(app, 'review-assignment-toggle-hw_ilya_overdue')?.props.accessibilityState).toMatchObject({ expanded: false });
   });
 
@@ -56,7 +56,8 @@ describe('student card headers name what tells them apart (#235)', () => {
 });
 
 describe('the journal row names everything it shows', () => {
-  // A row is «action — who · when»; the category moved to the detail sheet the row opens.
+  // A row is «action — who · time»; the name speaks them with the role and the full date marked «МСК» in
+  // between, so each fact of the caption is looked up on its own. The category is in the detail the row opens.
   it('the action, who and the Moscow time are part of the row button; the category is in its detail', async () => {
     const app = await visit({ as: DEV, url: '/developer/panel/journal' });
     const open = all(app.screen.container as unknown as HostNode, (node) => typeof node.props.testID === 'string' && /^journal-entry-.+-open$/.test(node.props.testID)).at(0);
@@ -65,7 +66,9 @@ describe('the journal row names everything it shows', () => {
     expect(label).toMatch(/МСК/);
     const shown = all(open!, (node) => node.type === 'Text' && node.children.every((child) => typeof child === 'string')).map((node) => textOf(node).trim()).filter((text) => text !== '');
     expect(shown.length).toBeGreaterThanOrEqual(2);
-    for (const text of shown) expect(label).toContain(text);
+    const facts = shown.flatMap((text) => text.split(' · '));
+    expect(facts.length).toBeGreaterThanOrEqual(3);
+    for (const fact of facts) expect(label).toContain(fact);
 
     expect(await tap(app, `#${String(open?.props.testID)}`)).toBe(true);
     expect(hasTestId(app, 'journal-detail-action')).toBe(true);
@@ -81,25 +84,43 @@ describe('buttons stay readable at a large OS text size (#241, #242)', () => {
     expect(flattenStyle(button!.props.style).maxWidth).toBeUndefined();
   });
 
-  // The two actions moved into the header's aside row. They are sized by their labels (no fixed basis, no
-  // `flex: 1`, no cap) in a row that wraps: at a large text size the second one goes under the first
-  // instead of both being cut («Новая те…»).
-  it.each([1, 1.3] as const)('developer topics: at font scale %s the header actions keep their label width in a row that wraps', async (fontScale) => {
+  // The header's aside row has ONE labelled action now — «Новая тема», sized by its label (no fixed basis,
+  // no `flex: 1`, no cap) — and «Порядок тем» is an icon button with a spoken name: a square that neither
+  // grows nor takes width from the label, so nothing is cut at a large text size («Новая те…») and the row
+  // has nothing to wrap.
+  it.each([1, 1.3] as const)('developer topics: at font scale %s «Новая тема» keeps its label width next to the order icon button', async (fontScale) => {
     const app = await visit({ as: DEV, url: '/developer/topics', arrange: withFontScale(fontScale) });
-    for (const id of ['topics-create', 'topics-reorder']) {
-      const button = byTestId(app, id);
-      expect(button).toBeTruthy();
-      const style = flattenStyle(button!.props.style);
-      expect(style.flexGrow).toBe(1);
-      expect([undefined, 'auto']).toContain(style.flexBasis);
-      expect(style.flex).toBeUndefined();
-      expect(style.flexShrink).toBeUndefined();
-      expect(style.maxWidth).toBeUndefined();
-      expect(style.width).toBeUndefined();
-      let row = button!.parent;
+    const create = byTestId(app, 'topics-create');
+    expect(create).toBeTruthy();
+    const style = flattenStyle(create!.props.style);
+    expect(style.flexGrow).toBe(1);
+    expect([undefined, 'auto']).toContain(style.flexBasis);
+    expect(style.flex).toBeUndefined();
+    expect(style.flexShrink).toBeUndefined();
+    expect(style.maxWidth).toBeUndefined();
+    expect(style.width).toBeUndefined();
+    expect(textOf(create!).trim()).toBe('Новая тема');
+
+    const reorder = byTestId(app, 'topics-reorder');
+    expect(reorder).toBeTruthy();
+    expect(reorder!.props.accessibilityRole).toBe('button');
+    expect(reorder!.props.accessibilityLabel).toBe('Порядок тем');
+    expect(all(reorder!, (node) => node.type === 'Text' && textOf(node).trim() !== '')).toEqual([]);
+    const square = flattenStyle(reorder!.props.style);
+    expect(square.width).toBeGreaterThanOrEqual(44);
+    expect(square.height).toBe(square.width);
+    expect(square.flex).toBeUndefined();
+    expect(square.flexGrow).toBeUndefined();
+    expect(square.flexShrink).toBeUndefined();
+
+    // The same row holds both.
+    const rowOf = (node: HostNode) => {
+      let row = node.parent;
       while (row && flattenStyle(row.props.style).flexDirection !== 'row') row = row.parent;
-      expect(flattenStyle(row?.props.style).flexWrap).toBe('wrap');
-    }
+      return row;
+    };
+    expect(rowOf(create!)).toBeTruthy();
+    expect(rowOf(reorder!)).toBe(rowOf(create!));
   });
 });
 

@@ -280,13 +280,35 @@ describe('screen readers reach the planner cards and hear their signals (#236)',
     expect(row).toBeTruthy();
     if (!row) return;
     const label = labelOf(app, 'lesson-participant-toggle-lp_les_live_kirill');
-    // One caption per row now: what the student is at; «2/7» on the right is spoken in words.
-    expect(label).toMatch(/ещё не открыл урок|в классе с|нет сдач/);
+    // The eye gets the short «не вошёл» (a caption only where the teacher should look); the ear gets the
+    // site's full wording. «0/7» on the right is spoken in words.
     const [name, caption, count] = textsOf(row);
     expect(label).toContain(name);
-    expect(label).toContain(caption);
+    expect(caption).toBe('не вошёл');
+    expect(label).toContain('ещё не открыл урок');
     expect(count).toMatch(/^\d+\/\d+$/);
-    expect(label).toContain(count.replace('/', ' из '));
+    expect(label).toContain(`решено ${count.replace('/', ' из ')}`);
+
+    // Every row of the class: the name, the state and the count are spoken — also where the row shows no
+    // caption at all (a student who is simply working).
+    const rows = app.screen.queryAllByTestId(/^lesson-participant-toggle-/) as unknown as HostNode[];
+    expect(rows.length).toBeGreaterThan(1);
+    let silentRows = 0;
+    for (const each of rows) {
+      const spoken = String(each.props.accessibilityLabel);
+      const shown = textsOf(each);
+      expect(spoken).toContain(shown[0]);
+      const number = shown[shown.length - 1];
+      expect(number).toMatch(/^\d+\/\d+$/);
+      expect(spoken).toContain(`решено ${number.replace('/', ' из ')}`);
+      // The state is between the name and the count, whether or not the row draws it.
+      expect(spoken).toMatch(/ещё не открыл урок|в классе с \d|нет сдач \d|проверяется|проверка не удалась|не распознано|надпись-инструкция|задач: \d|ИИ подбирает|Ошибка/);
+      if (shown.length === 2) silentRows += 1;
+      // A drawn caption is spoken as it is, or in the site's fuller words («не вошёл», «№ 010206»).
+      else if (shown[1] === 'не вошёл') expect(spoken).toContain('ещё не открыл урок');
+      else expect(spoken).toContain(shown[1].replace(/^№ /, ''));
+    }
+    expect(silentRows).toBeGreaterThan(0);
   });
 
   it('drafts: the card and a failed participant speak their chips', async () => {

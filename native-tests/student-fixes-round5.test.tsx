@@ -3,14 +3,15 @@
 // #405: the streak block of the home screen repeated the day of the cached response as "today" on a later
 //       Moscow day (a cold start offline from the persisted cache, or a screen left open over midnight):
 //       «Сегодня сделано» kept that day's count and the week marked that day as today.
-//       The streak now lives in the «За неделю» card of «Обзор» (the bar of today, the line «Сегодня: …» and
-//       the streak chip); the app bar has no streak pill any more.
+//       The streak now lives in the week card of «Обзор»: the figure of the week, the streak chip and one
+//       bar per day. The line «Сегодня: …» is gone — what was closed today is the bar of today (a mint bar
+//       or a grey stub) and the spoken name of its column; the app bar has no streak pill any more.
 // Sweep: a re-read the student screens start because the SERVER side changed (the return to a tab, a poll
 //       that saw a finished check, a schedule edge) no longer cancels a read already on its way.
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { byTestId, visibleText, visit } from './support/drive';
-import type { HostNode } from './support/tree';
+import { all, flattenStyle, type HostNode } from './support/tree';
 
 function textIn(node: HostNode | null): string {
   return node ? visibleText({ screen: { container: node } } as never).replace(/\s+/g, ' ').trim() : '';
@@ -22,6 +23,23 @@ function label(node: HostNode | null): string {
 
 /** The bar of today in «За неделю»: the column that carries the spoken name of the day (its caption is the testID). */
 const todayColumn = (app: Parameters<typeof byTestId>[0]): HostNode | null => byTestId(app, 'streak-week-today')?.parent ?? null;
+
+/**
+ * What the eye reads of today in the week card: the bar of an active day is as tall as its share of the
+ * week's best day (a percentage); a day with nothing closed is a grey stub of a fixed height.
+ */
+function todayBar(app: Parameters<typeof byTestId>[0]): 'bar' | 'stub' {
+  const column = todayColumn(app);
+  expect(column).not.toBeNull();
+  // The column is the bar's box, then the weekday letter; the box holds the one bar.
+  const box = (column as HostNode).children.find((child): child is HostNode => typeof child !== 'string' && child.type === 'View');
+  expect(box).toBeDefined();
+  const heights = all(box as HostNode, (node) => node !== box && flattenStyle(node.props.style).height !== undefined).map(
+    (node) => flattenStyle(node.props.style).height,
+  );
+  expect(heights.length).toBeGreaterThan(0);
+  return heights.some((height) => typeof height === 'string' && height.endsWith('%')) ? 'bar' : 'stub';
+}
 
 describe('#405 streak block on a later Moscow day', () => {
   it('shows nothing solved today and marks the real day, while the cached streak is not re-read', async () => {
@@ -35,7 +53,10 @@ describe('#405 streak block on a later Moscow day', () => {
     expect(todayBefore).not.toBe('');
     // ilya closed a problem on the server's today: the panel shows it before the day changes.
     expect(cached!.solvedToday).toBeGreaterThan(0);
-    expect(textIn(byTestId(app, 'streak-solved-today'))).toMatch(/^Сегодня: \d+ номер/);
+    expect(todayBefore).toMatch(new RegExp(`закрыто номеров — ${cached!.solvedToday}$`));
+    expect(todayBar(app)).toBe('bar');
+    const weekBefore = Number(textIn(byTestId(app, 'streak-solved-week')));
+    expect(weekBefore).toBeGreaterThanOrEqual(cached!.solvedToday);
     const updatedAt = app.queryClient.getQueryState(streakKey)?.dataUpdatedAt;
 
     // A day later on the wall clock (as after a night's sleep), with no read made: the streak is the
@@ -45,11 +66,11 @@ describe('#405 streak block on a later Moscow day', () => {
 
     expect(app.queryClient.getQueryState(streakKey)?.dataUpdatedAt).toBe(updatedAt);
     expect(app.queryClient.getQueryData<{ streak: { dailyActivity: { date: string }[] } }>(streakKey)?.streak.dailyActivity.at(-1)?.date).toBe(lastDay.date);
-    expect(textIn(byTestId(app, 'streak-solved-today'))).toBe('Сегодня: без закрытых номеров');
     const todayAfter = label(todayColumn(app));
     expect(todayAfter).not.toBe(todayBefore);
-    // The new day is the last cell, and nothing was closed on it.
+    // The new day is the last cell, and nothing was closed on it: a grey stub, named so.
     expect(todayAfter).toMatch(/нет закрытых номеров/);
+    expect(todayBar(app)).toBe('stub');
   });
 });
 
@@ -83,8 +104,8 @@ describe('#405 review: the streak chip of «За неделю» counts the cache
     expect(byTestId(app, 'home-streak')).not.toBeNull();
     // A lapsed streak has no chip, and the new day has nothing closed on it.
     expect(byTestId(app, 'streak-chip')).toBeNull();
-    expect(textIn(byTestId(app, 'streak-solved-today'))).toBe('Сегодня: без закрытых номеров');
     expect(label(todayColumn(app))).toMatch(/нет закрытых номеров/);
+    expect(todayBar(app)).toBe('stub');
   });
 });
 

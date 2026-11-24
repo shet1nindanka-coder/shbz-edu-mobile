@@ -58,7 +58,8 @@ export function ParticipantRow({ participant, caption, planPending, selected = f
       accessibilityLabel={accessibilityLabelOf([
         participant.studentName,
         caption.text,
-        total > 0 && !planPending ? format(m.common.numbers.doneOf, { done, total }) : null,
+        // In words: the «2/7» the eye reads would be spoken as a fraction.
+        total > 0 && !planPending ? format(m.planner.lessonBoard.solvedAria, { done, total }) : null,
       ])}
       testID={`lesson-participant-toggle-${participant.id}`}
     />

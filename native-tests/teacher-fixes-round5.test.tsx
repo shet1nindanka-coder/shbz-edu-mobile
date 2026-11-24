@@ -397,9 +397,20 @@ describe('accessible names contain the visible label (#415)', () => {
 describe('developer journal: the next page parked offline says so (#403)', () => {
   const network = () => require('@/services/network') as typeof import('@/services/network'); // eslint-disable-line @typescript-eslint/no-require-imports
 
+  // The line «Страница 1 из 2» is gone from the eye: where the list is lives in the accessible name of
+  // «Показать ещё», and a loaded page is seen by its rows.
+  const pageOf = (app: AppHandle) => String(byTestId(app, 'journal-more')?.props.accessibilityLabel ?? '');
+  // The list is virtualised: a page is counted in the query's cache, not by the rows on screen.
+  const loadedPages = (app: AppHandle) =>
+    app.queryClient
+      .getQueriesData<{ pages: unknown[] }>({ queryKey: ['developer', 'getJournal'] })
+      .map(([, data]) => data?.pages.length ?? 0)
+      .reduce((max, n) => Math.max(max, n), 0);
+
   it('«Показать ещё» offline shows the network notice; the end-of-list load does not re-fire; the page comes online', async () => {
     const app = await visit({ as: DEV, url: '/developer/panel/journal?days=90' });
-    expect(textOf(byTestId(app, 'journal-page-of')!)).toBe('Страница 1 из 2');
+    expect(pageOf(app)).toBe('Показать ещё. Страница 1 из 2');
+    expect(loadedPages(app)).toBe(1);
     expect(hasTestId(app, 'journal-more-error')).toBe(false);
 
     const api = app.runtime.api.developer;
@@ -408,7 +419,8 @@ describe('developer journal: the next page parked offline says so (#403)', () =>
     expect(await pressTestId(app, 'journal-more')).toBe(true);
     for (let i = 0; i < 4; i += 1) await app.advance(1000);
     await app.settle();
-    expect(textOf(byTestId(app, 'journal-page-of')!)).toBe('Страница 1 из 2');
+    expect(pageOf(app)).toBe('Показать ещё. Страница 1 из 2');
+    expect(loadedPages(app)).toBe(1);
     expect(textOf(byTestId(app, 'journal-more-error')!)).toContain('Нет связи с сервером');
     // One notice: the filter-switch one is not shown with it.
     expect(hasTestId(app, 'journal-offline-notice')).toBe(false);
@@ -425,7 +437,9 @@ describe('developer journal: the next page parked offline says so (#403)', () =>
     await app.rntl.act(async () => network().setSimulatedOffline(false));
     for (let i = 0; i < 4; i += 1) await app.advance(1000);
     await app.settle();
-    expect(textOf(byTestId(app, 'journal-page-of')!)).toBe('Страница 2 из 2');
+    // The second page of two is in: nothing more to show, and the notice is gone.
+    expect(loadedPages(app)).toBe(2);
+    expect(hasTestId(app, 'journal-more')).toBe(false);
     expect(hasTestId(app, 'journal-more-error')).toBe(false);
   });
 });

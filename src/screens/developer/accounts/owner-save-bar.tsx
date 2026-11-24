@@ -27,6 +27,7 @@ export function OwnerSaveBar({ count, saving, error, onDiscard, onSave }: OwnerS
   const { dict, locale } = useI18n();
   const t = dict.students.studentsManager;
   const changed = format(t.changedFor, { students: plural(locale, count, t.changedStudentForms) });
+  const saveLabel = format(dict.students.directory.tabWithCount, { label: dict.common.save, n: count });
   // The refusal appears without moving the focus: spoken on both platforms (on Android a live region on a
   // freshly mounted text may stay silent, and role="alert" alone says nothing).
   useStatusAnnouncement(error);
@@ -42,8 +43,9 @@ export function OwnerSaveBar({ count, saving, error, onDiscard, onSave }: OwnerS
         {/* Discarding is the quiet action; the save takes the rest of the row. */}
         <TextButton label={t.reset} tone="muted" disabled={saving} onPress={onDiscard} testID="owner-save-discard" />
         <Button
-          label={saving ? t.saving : format(dict.students.directory.tabWithCount, { label: dict.common.save, n: count })}
-          accessibilityLabel={saving ? undefined : `${t.save}. ${changed}`}
+          label={saving ? t.saving : saveLabel}
+          // The visible words first (voice control, WCAG 2.5.3), then what the count is.
+          accessibilityLabel={saving ? undefined : `${saveLabel}. ${changed}`}
           variant="dark"
           loading={saving}
           onPress={onSave}

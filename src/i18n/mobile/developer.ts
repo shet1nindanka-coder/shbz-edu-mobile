@@ -115,7 +115,7 @@ const en: typeof ru = {
     rangeError: "Enter a number from {min} to {max}",
     range: "from {min} to {max}",
     fixErrors: "Correct the marked fields",
-    resetA11y: "Discard changes",
+    resetA11y: "Reset changes",
     decrease: "Decrease: {label}",
     increase: "Increase: {label}",
     stepped: "{label}: {value}"

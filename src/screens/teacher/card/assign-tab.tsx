@@ -217,6 +217,9 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   );
 
   const typedTitle = title.trim();
+  // «Выдать · 3»: the count of selected numbers lives in the button it unlocks.
+  const submitLabel =
+    picked.length > 0 ? format(m.common.statuses.groupCount, { label: dict.students.detail.tabAssignShort, n: picked.length }) : dict.students.detail.tabAssignShort;
   const footer = topic ? (
     <View style={styles.bar} testID="assign-bar">
       {/* A phone stacks the deadline row over the button; a tablet has the width for one row. */}
@@ -230,7 +233,8 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
             placeholder={`${t.deadlinePlaceholder}, ${m.common.dateTime.msk}`}
             labels={dateTimeLabels}
             locale={locale}
-            accessibilityLabel={`${t.deadlinePlaceholder}. ${m.common.dateTime.moscowTime}`}
+            // The name starts with the visible words (voice control, WCAG 2.5.3), then spells the zone out.
+            accessibilityLabel={format(m.teacher.assign.deadlineSpoken, { field: `${t.deadlinePlaceholder}, ${m.common.dateTime.msk}` })}
             disabled={issue.isPending}
             testID="assign-deadline"
             style={styles.grow}
@@ -246,15 +250,12 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
           />
         </View>
         <Button
-          // «Выдать · 3»: the count of selected numbers lives in the button it unlocks.
-          label={
-            issue.isPending
-              ? t.assigning
-              : picked.length > 0
-                ? format(m.common.statuses.groupCount, { label: dict.students.detail.tabAssignShort, n: picked.length })
-                : dict.students.detail.tabAssignShort
+          label={issue.isPending ? t.assigning : submitLabel}
+          // With a count the name starts with the visible words (voice control, WCAG 2.5.3): «Выдать · 3.
+          // Выбрано: 3»; without one it is the site's «Выдать ДЗ».
+          accessibilityLabel={
+            issue.isPending ? t.assigning : `${picked.length > 0 ? submitLabel : t.assign}. ${format(t.selected, { n: picked.length })}`
           }
-          accessibilityLabel={issue.isPending ? t.assigning : `${t.assign}. ${format(t.selected, { n: picked.length })}`}
           // In the tablet's one row the button is as high as the field next to it.
           size={theme.tablet ? 'md' : 'lg'}
           loading={issue.isPending}

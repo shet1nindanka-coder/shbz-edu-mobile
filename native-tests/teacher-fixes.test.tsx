@@ -140,9 +140,10 @@ describe('student card lessons: «add a problem» (#110)', () => {
     await wait(app, 2000, 'add sheet: bank loaded');
     await tap(app, '#student-lesson-add-topic');
     await tap(app, 'menuitem:Тригонометрия (в разработке)');
+    // The two cases keep their own short lines under the number select: «Нет номеров» / «Все уже в наборе».
     const text = visibleText(app);
-    expect(text).toContain('В этой теме пока нет номеров.');
-    expect(text).not.toContain('Все номера этой темы уже в наборе.');
+    expect(text).toContain('Нет номеров');
+    expect(text).not.toContain('Все уже в наборе');
   });
 });
 

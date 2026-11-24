@@ -31,6 +31,8 @@ const ru = {
   students: {
     // The site shows three buttons per row; a phone row has one "⋯" that opens them in a sheet.
     actionsFor: "Действия: {name}",
+    // «Открыть» of the tablet summary: its accessible name says whose card.
+    openCardOf: "Открыть карточку: {name}",
     // Spoken fact of a student row without red numbers: how many numbers the student has closed.
     solved: "решено {n}",
     copyHint: "Нажмите, чтобы скопировать",
@@ -92,6 +94,8 @@ const ru = {
     titleSheet: "Название ДЗ",
     // The pencil button is lit once a title is typed: its accessible name carries the title.
     titleSheetOf: "Название ДЗ: {title}",
+    // The accessible name of the deadline field starts with what the field shows («Дедлайн, МСК»).
+    deadlineSpoken: "{field} — московское время",
     assigned: "ДЗ выдано",
     // Footnote of a number that already sits in a homework with a deadline.
     inHomework: "уже в ДЗ",
@@ -127,6 +131,7 @@ const en: typeof ru = {
   },
   students: {
     actionsFor: "Actions: {name}",
+    openCardOf: "Open the card: {name}",
     solved: "{n} solved",
     copyHint: "Tap to copy",
     empty: "No students yet",
@@ -166,6 +171,7 @@ const en: typeof ru = {
   assign: {
     titleSheet: "Homework title",
     titleSheetOf: "Homework title: {title}",
+    deadlineSpoken: "{field} — Moscow time",
     assigned: "Homework assigned",
     inHomework: "already assigned",
     noNumbers: "No problems",

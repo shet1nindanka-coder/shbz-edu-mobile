@@ -53,12 +53,13 @@ describe('the new account password survives leaving the screen (#316)', () => {
     expect(app.path()).toBe('/teacher/students');
     expect(hasTestId(app, 'credentials-sheet')).toBe(true);
     expect(visibleText(app)).toContain(PASSWORD);
-    expect(visibleText(app)).not.toContain('Новый ученик успешно добавлен');
+    expect(visibleText(app)).not.toContain('Ученик добавлен');
 
     expect(await pressTestId(app, 'credentials-done')).toBe(true);
     await app.settle();
     expect(visibleText(app)).not.toContain(PASSWORD);
-    expect(visibleText(app)).toContain('Новый ученик успешно добавлен');
+    // The banner is two words now.
+    expect(visibleText(app)).toContain('Ученик добавлен');
   });
 
   it('developer: the same sheet on the accounts screen comes back after a pushed screen', async () => {

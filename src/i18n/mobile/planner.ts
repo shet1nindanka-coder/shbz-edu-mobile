@@ -15,6 +15,8 @@ const ru = {
     noTime: "Без времени урок не начнётся",
     // the caption of a student who has not opened the running lesson (the site: «ещё не открыл урок»)
     notJoined: "не вошёл",
+    // «2/7» on the right of a student's row, in words for a screen reader (a bare «2/7» is read as a fraction)
+    solvedAria: "решено {done} из {total}",
     noTasks: "Задач пока нет",
     noFreeNumbers: "Все номера уже в наборе",
     // the topic itself is empty (`m.teacher.assign.noNumbers` on the assign tab says the same)
@@ -80,6 +82,7 @@ const en: typeof ru = {
     finishDescription: "Problems without a mark get a result automatically. This cannot be undone.",
     noTime: "A lesson without a time never starts",
     notJoined: "not joined",
+    solvedAria: "{done} of {total} solved",
     noTasks: "No problems yet",
     noFreeNumbers: "Every problem is already in the set",
     noNumbers: "The topic has no problems",

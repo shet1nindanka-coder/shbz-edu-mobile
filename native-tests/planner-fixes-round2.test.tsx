@@ -171,9 +171,10 @@ describe('add-a-problem sheets on an empty topic (#110)', () => {
     await app.settle();
     await tap(app, 'menuitem:Тригонометрия (в разработке)');
     await app.settle();
+    // Two different reasons for an empty number picker keep two different (short) lines.
     const text = visibleText(app);
-    expect(text).toContain('В этой теме пока нет номеров.');
-    expect(text).not.toContain('В этой теме все номера уже в наборе.');
+    expect(text).toContain('В теме нет номеров');
+    expect(text).not.toContain('Все номера уже в наборе');
   });
 });
 

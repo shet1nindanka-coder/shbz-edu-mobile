@@ -83,6 +83,21 @@ async function pickForLesson(app: AppHandle): Promise<void> {
   await app.settle();
 }
 
+/**
+ * The running check has no line of its own any more: the start button says it — «Проверяется…» with a
+ * spinner, busy and switched off for a screen reader.
+ */
+function checkIsRunning(app: AppHandle): boolean {
+  const start = byTestId(app, 'homework-check-start');
+  expect(start).not.toBeNull();
+  const state = (start as HostNode).props.accessibilityState as { busy?: boolean; disabled?: boolean } | undefined;
+  const running = String((start as HostNode).props.accessibilityLabel ?? '') === 'Проверяется…';
+  // The three signals go together.
+  expect(state?.busy === true).toBe(running);
+  if (running) expect(state?.disabled).toBe(true);
+  return running;
+}
+
 async function server<T>(app: AppHandle, request: () => Promise<T>): Promise<T> {
   const pending = request();
   await app.advance(1500);
@@ -96,7 +111,9 @@ describe('homework check (#305, #341)', () => {
     await tap(app, '#homework-check-start');
     await app.advance(1500);
     await app.settle();
-    expect(byTestId(app, 'homework-check-running')).not.toBeNull();
+    expect(checkIsRunning(app)).toBe(true);
+    expect(textIn(byTestId(app, 'homework-check-start'))).toContain('Проверяется…');
+    // The sentence under the button was removed from view; a screen reader is still told, once.
     expect(spoken()).toEqual(['Проверка решения выполняется.']);
   });
 
@@ -131,8 +148,10 @@ describe('homework check (#305, #341)', () => {
     const onServer = await server(app, () => app.mock.studentWork.getHomework('hw_ilya_open'));
     expect(onServer.assignment.photos.length).toBe(1);
     expect(onServer.assignment.latestCheck?.status).toBe('DONE');
-    expect(textIn(byTestId(app, 'homework-photos'))).toContain('1 из 10');
-    expect(byTestId(app, 'homework-check-running')).toBeNull();
+    // The counter of the batch: «1/10» for the eye, in words for a screen reader.
+    expect(textIn(byTestId(app, 'homework-photos'))).toContain('1/10');
+    expect(app.rntl.within(byTestId(app, 'homework-photos') as never).queryByLabelText('Прикреплено фото: 1 из 10')).not.toBeNull();
+    expect(checkIsRunning(app)).toBe(false);
   });
 });
 

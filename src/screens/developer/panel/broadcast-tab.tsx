@@ -77,6 +77,8 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
     setConfirming(false);
     send.mutate();
   };
+  // «Отправить · 10»: the button carries the number of recipients.
+  const sendLabel = send.isPending ? t.sending : format(m.developer.broadcast.sendCount, { n: recipients });
 
   return (
     <>
@@ -155,9 +157,10 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
 
           <View style={styles.submit}>
             <Button
-              label={send.isPending ? t.sending : format(m.developer.broadcast.sendCount, { n: recipients })}
-              // The site's full name, then who gets it: «Отправить уведомление. Уведомление получат все ученики: 10.»
-              accessibilityLabel={`${t.send}. ${mode === 'all' ? format(t.allHint, { n: students.length }) : format(t.picked, { n: picked.length })}`}
+              label={sendLabel}
+              // The visible words first (voice control, WCAG 2.5.3), then who gets it: «Отправить · 10.
+              // Уведомление получат все ученики: 10.»
+              accessibilityLabel={`${sendLabel}. ${mode === 'all' ? format(t.allHint, { n: students.length }) : format(t.picked, { n: picked.length })}`}
               size="lg"
               loading={send.isPending}
               disabled={!canSubmitBroadcast(title) || lock.seconds > 0}

@@ -308,33 +308,51 @@ describe('cool-down stays explained after the error notice is dismissed', () => 
 // Finding #119: on web a Text keeps `min-width: auto` (its longest word), so a flex-item title needs
 // `minWidth: 0` to shrink and wrap a long unbroken word inside the card instead of leaving it.
 describe('deadline card title wraps inside the card', () => {
-  // «Обзор» no longer has the hero deadline card; the card itself lives on in the day sheet of the calendar.
-  it('the title Text of a deadline card (the day sheet of the calendar) can shrink below its longest word', async () => {
+  // The deadline card is gone: the day sheet of the calendar lists the day's homeworks as rows. A row's
+  // title is not a flex item of the row any more — it lies in the column of texts, and it is that column
+  // that must be able to shrink (the title takes the column's width and wraps inside it).
+  it('the title of a homework row in the day sheet of the calendar wraps inside a column that can shrink', async () => {
     const app = await visit({ as: ILYA, url: '/student/deadlines' });
-    const day = pressables(root(app)).find((node) => /^calendar-day-/.test(String(node.props.testID)));
+    // Every day of the month is pressable; only a day with homeworks opens the sheet. Its name says so.
+    const day = pressables(root(app)).find(
+      (node) => /^calendar-day-/.test(String(node.props.testID)) && /\d+ дедлайн/.test(String(node.props.accessibilityLabel ?? '')),
+    );
     expect(day).toBeDefined();
     await tap(app, `#${String(day?.props.testID)}`);
+    expect(byTestId(app, 'deadlines-day-sheet')).not.toBeNull();
     const card = all(root(app), (node) => /^day-sheet-card-/.test(String(node.props.testID)) && !isHidden(node))[0];
     expect(card).toBeDefined();
-    // The first text of the card is its title (head → titleWrap → label).
+    // The first text of the row is its title.
     const title = all(card, (node) => node.type === 'Text')[0];
     expect(textOf(title).length).toBeGreaterThan(0);
-    const style = flattenStyle(title.props.style);
-    expect(style.flexShrink).toBe(1);
-    expect(style.minWidth).toBe(0);
+    expect(String(card.props.accessibilityLabel ?? '')).toContain(textOf(title));
+    // It wraps (two lines) rather than being cut at one.
+    expect(title.props.numberOfLines).toBe(2);
+    const column = flattenStyle(title.parent?.props.style);
+    expect(column.flex).toBe(1);
+    expect(column.minWidth).toBe(0);
   });
 
   // What «Обзор» shows instead of the hero card: the lesson card and the homework rows. Their titles are
-  // one line that is cut, so it is the column of texts that must be able to shrink inside the card.
-  it.each(['home-lesson-card', 'home-upcoming-card-hw_ilya_overdue'])('the texts of #%s on «Обзор» can shrink inside the card', async (testID) => {
+  // one line that is cut, so it is the flex item holding the text that must be able to shrink inside the
+  // card: the column of texts of a homework row, the line itself in the lesson card («Урок · завтра 16:00»
+  // is its only text, between the icon tile and the chevron).
+  it.each([
+    ['home-lesson-card', 'line'],
+    ['home-upcoming-card-hw_ilya_overdue', 'column'],
+  ] as const)('the texts of #%s on «Обзор» can shrink inside the card', async (testID, flexItem) => {
     const app = await visit({ as: ILYA, url: '/student' });
     const card = byTestId(app, testID);
     expect(card).not.toBeNull();
     const title = all(card as HostNode, (node) => node.type === 'Text')[0];
     expect(textOf(title).length).toBeGreaterThan(0);
     expect(title.props.numberOfLines).toBe(1);
-    const column = flattenStyle(title.parent?.props.style);
-    expect(column.flex).toBe(1);
-    expect(column.minWidth).toBe(0);
+    const shrinking = flattenStyle(flexItem === 'line' ? title.props.style : title.parent?.props.style);
+    expect(shrinking.flex).toBe(1);
+    expect(shrinking.minWidth).toBe(0);
+    if (flexItem === 'line') {
+      // The line is a direct child of the row it shrinks in.
+      expect(flattenStyle(title.parent?.props.style).flexDirection).toBe('row');
+    }
   });
 });

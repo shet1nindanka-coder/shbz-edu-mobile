@@ -77,7 +77,8 @@ export function StudentSummary({ student, onActions }: StudentSummaryProps) {
         />
         <Button
           label={dict.planner.common.open}
-          accessibilityLabel={dict.students.list.viewProgress}
+          // The name starts with the visible word (voice control, WCAG 2.5.3) and says whose card.
+          accessibilityLabel={format(m.teacher.students.openCardOf, { name: student.name })}
           rightIcon="forward"
           onPress={() => navigation.open({ screen: 'teacher.student.review', studentId: student.id })}
           testID={`student-summary-open-${student.id}`}

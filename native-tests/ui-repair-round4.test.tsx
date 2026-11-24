@@ -117,7 +117,10 @@ describe('screen events are spoken only from the focused screen (#313 review)', 
       await tap(app, '#homework-check-start');
       await app.advance(1500);
       await app.settle();
-      expect(byTestId(app, 'homework-check-running')).not.toBeNull();
+      // The running check is the start button's own state now («Проверяется…», busy); no line under it.
+      const start = byTestId(app, 'homework-check-start');
+      expect(start?.props.accessibilityLabel).toBe('Проверяется…');
+      expect((start?.props.accessibilityState as { busy?: boolean } | undefined)?.busy).toBe(true);
       expect(voice.spoken()).toEqual(['Проверка решения выполняется.']);
 
       await app.rntl.act(async () => {
