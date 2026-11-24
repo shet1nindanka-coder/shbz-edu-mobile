@@ -89,7 +89,7 @@ const ru = {
     all: "Все номера",
     leftOf: "Осталось {left} из {total}",
     allSolved: "Все номера решены",
-    doneOf: "{done} из {total}",
+    doneOf: "{done}/{total}",
     tileA11y: "{number}, {status}",
     range: "{first}–{last}"
   },
@@ -97,8 +97,8 @@ const ru = {
   deadline: {
     none: "без срока",
     done: "выполнено",
-    today: "сегодня до {time}",
-    tomorrow: "до завтра, {time}",
+    today: "сегодня, {time}",
+    tomorrow: "завтра, {time}",
     weekday: "до {weekday}",
     weekdays: ["понедельника", "вторника", "среды", "четверга", "пятницы", "субботы", "воскресенья"],
     date: "до {date}",
@@ -195,20 +195,20 @@ const en: typeof ru = {
     all: "All problems",
     leftOf: "{left} of {total} left",
     allSolved: "All problems are solved",
-    doneOf: "{done} of {total}",
+    doneOf: "{done}/{total}",
     tileA11y: "{number}, {status}",
     range: "{first}–{last}"
   },
   deadline: {
     none: "no deadline",
     done: "done",
-    today: "due today, {time}",
-    tomorrow: "due tomorrow, {time}",
+    today: "today, {time}",
+    tomorrow: "tomorrow, {time}",
     weekday: "due {weekday}",
     weekdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     date: "due {date}",
-    overdueToday: "overdue since today",
-    overdue: "overdue by {days}",
+    overdueToday: "overdue today",
+    overdue: "{days} overdue",
     dayForms: ["{n} day", "{n} days"]
   },
   a11y: {

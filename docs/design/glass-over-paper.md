@@ -25,6 +25,40 @@ one accent, glass only on navigation.
    a list on the left, the content of the selected item on the right.
 8. **One system of sizes** (§3). Nothing outside the scales.
 9. **Search is a round button** next to the bell, not a field on every screen.
+10. **As little text as possible** (the owner: «слишком много текста, причём везде»). The interface shows,
+    it does not explain. See §1a.
+11. **The dock is switched by a tap or by a slide**: a finger pressed on the dock drags the lens across the
+    items, the item under it lights up, and lifting the finger opens that section.
+
+### 1a. The text diet
+
+What a screen may say, in the order of preference: nothing (a shape, a colour, a position) → an icon → a
+number → one or two words. Each visible string must pass «would the screen be unusable without it?».
+
+- **No sentences on a screen.** No instructions («нажмите на ученика…»), no «what will happen» notes, no
+  descriptions under titles, no explanations under fields, no «обновлять экран не нужно». What truly needs
+  explaining goes into a `<Hint>` (hidden unless the user turns hints on), at most one per screen, at most
+  one line. A consequence that cannot be undone is said once, in the confirm dialog.
+- **A row is its title.** A caption is allowed only when it carries the ONE fact the list is opened for
+  (the deadline of a homework, the time of a lesson, the state that needs attention) — a few words, never
+  two facts joined by «·». Everything else of the item is on the screen the row opens. Logins, e-mails,
+  counters «N номеров · M активных», «добавлен 18 ноября» are not row captions.
+- **The fact on the right is a number or a glyph**, not a phrase: «1/3», «5», a status dot / chip only for
+  attention. Never «решено 11», «выдано 0 из 3».
+- **Numbers speak with a label of one or two words.** A statistic is a figure and its name; no note line
+  under it, no «из 21 выданных ДЗ», no percentages repeated in words.
+- **Status is colour and shape**, not words: a tile, a bar segment, a dot. The words stay in
+  `accessibilityLabel`s and in the «Все номера» sheet's group titles.
+- **Buttons are one or two words** («Составить», «Выдать», «Сохранить», «Удалить»); a universal action is
+  an icon button (plus, trash, download, copy, filter) with an `accessibilityLabel`.
+- **A field has one name** — a label OR a placeholder, not both, and no helper line. Limits and formats
+  are said when they are broken (the error), counters appear when 80 % of the limit is used.
+- **A section caption** only where a screen has two or more lists; never one that repeats the header.
+- **An empty state is one short line** (and its action button, if there is an action).
+- **Dates are short**: «24 ноя, 16:00», no year inside the current year, no seconds, «МСК» only where a
+  time is entered.
+- **Nothing is lost for a screen reader**: what was cut from the eye stays in the `accessibilityLabel` of
+  the row / control.
 
 Product rules the design must keep:
 
