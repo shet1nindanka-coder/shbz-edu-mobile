@@ -178,7 +178,7 @@ describe('«Далее» on a title moves to the next field (#130)', () => {
   /** `this` of every `focus()` call of the TextInput mock: the inputs that were focused, by testID. */
   function focusedInputs(): unknown[] {
     // The app's own registry (loaded by `visit`): the TextInput class the screens render.
-    const { TextInput } = require('react-native') as { TextInput: { prototype: { focus: jest.Mock } } };
+    const { TextInput } = require('react-native') as { TextInput: { prototype: { focus: jest.Mock } } }; // eslint-disable-line @typescript-eslint/no-require-imports
     return TextInput.prototype.focus.mock.contexts.map((context) => (context as { props?: { testID?: unknown } }).props?.testID);
   }
 
