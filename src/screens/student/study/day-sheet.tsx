@@ -1,74 +1,42 @@
-import { View } from 'react-native';
-
-import { formatDayKey } from '@/domain/dates';
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { BottomSheet, Chip, Text } from '@/ui';
+import { BottomSheet, Text } from '@/ui';
 
-import { DeadlineCard } from './deadline-card';
-import type { DeadlineItem } from './deadline-model';
+import { DayHomeworks } from './day-homeworks';
+import { dayTitle, type DeadlineItem } from './deadline-model';
 
 export type DaySheetProps = {
   visible: boolean;
-  /** Moscow day key of the day shown; kept until the sheet has left the screen. */
+  /** Moscow day key of the day shown; it stays the picked day after the sheet is closed. */
   dayKey: string | null;
   /** Homeworks due that day. */
   items: readonly DeadlineItem[];
   now: number;
   onClose: () => void;
-  /** After the exit animation: the owner may forget the day. */
-  onClosed: () => void;
   onOpenHomework: (item: DeadlineItem) => void;
 };
 
 /**
- * Day sheet of the calendar (02 S4a; the site's popover under the day cell): the soft header with the
- * date and the day's homeworks as compact cards with a chevron. A tap on a card leads to the homework.
+ * A day of the calendar unfolded (02 S4a; the site's popover under the day cell): a sheet titled with the
+ * date — «среда, 26 ноября» — and the day's homeworks as rows. A row leads to its homework.
  */
-export function DaySheet({ visible, dayKey, items, now, onClose, onClosed, onOpenHomework }: DaySheetProps) {
-  const styles = useStyles();
+export function DaySheet({ visible, dayKey, items, now, onClose, onOpenHomework }: DaySheetProps) {
   const { dict, m, locale } = useI18n();
-  const t = dict.student.calendar;
   return (
-    <BottomSheet visible={visible} onClose={onClose} onClosed={onClosed} closeLabel={m.common.actions.close} testID="deadlines-day-sheet">
-      <View style={styles.header}>
-        <Text variant="cardKicker">{t.popoverKicker}</Text>
-        <Text variant="cardTitle" accessibilityRole="header" style={styles.date} testID="day-sheet-date">
-          {dayKey ? formatDayKey(dayKey, 'dayMonth', locale) : ''}
-        </Text>
-      </View>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      closeLabel={m.common.actions.close}
+      title={dayKey ? dayTitle(dayKey, m.student.calendar.weekdays, locale) : undefined}
+      testID="deadlines-day-sheet"
+    >
       {items.length === 0 ? (
-        // Cannot happen on opening (only marked days open); it can after a live update removed the homework.
-        <Chip label={t.emptyDay} style={styles.empty} />
+        // Cannot happen on opening (only a day with homeworks opens); it can after a live update removed the homework.
+        <Text variant="body" color="textMuted">
+          {dict.student.calendar.emptyDay}
+        </Text>
       ) : (
-        <View style={styles.list}>
-          {items.map((item) => (
-            <DeadlineCard
-              key={item.id}
-              item={item}
-              variant="compact"
-              showChevron
-              now={now}
-              onPress={onOpenHomework}
-              testID={`day-sheet-card-${item.id}`}
-            />
-          ))}
-        </View>
+        <DayHomeworks items={items} now={now} onOpenHomework={onOpenHomework} inset={0} />
       )}
     </BottomSheet>
   );
 }
-
-const useStyles = makeStyles((t) => ({
-  header: {
-    borderRadius: t.radii.md,
-    backgroundColor: t.colors.softBg,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: t.space.xxs,
-    marginBottom: t.space.md,
-  },
-  date: { fontFamily: t.fonts.extrabold },
-  list: { gap: 8 },
-  empty: { alignSelf: 'flex-start' },
-}));

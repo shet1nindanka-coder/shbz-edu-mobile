@@ -2,9 +2,8 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import type { ParentCallStudentOverview, RecordCallResponse } from '@/api/types';
-import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Panel, SectionCaption, Text } from '@/ui';
+import { Panel, Text } from '@/ui';
 
 import { CallHistory } from '../sheets/call-history';
 import { RecordCallFields, RecordCallSaveButton } from '../sheets/record-call-form';
@@ -26,7 +25,6 @@ export type RecordCallPanelProps = {
  */
 export function RecordCallPanel({ student, weight, settling, onSaved, onMissing }: RecordCallPanelProps) {
   const styles = useStyles();
-  const { m } = useI18n();
   const { studentId, studentName } = student;
   // One object per student: the form starts over when the target changes, not on every reload of the list.
   const target = useMemo<RecordCallTarget>(() => ({ studentId, studentName }), [studentId, studentName]);
@@ -46,7 +44,6 @@ export function RecordCallPanel({ student, weight, settling, onSaved, onMissing 
       <RecordCallSaveButton form={form} settling={settling} />
       {student.history.length > 0 ? (
         <View style={styles.history}>
-          <SectionCaption>{m.calls.history.title}</SectionCaption>
           <CallHistory key={studentId} student={student} showTeacher={false} />
         </View>
       ) : null}
@@ -55,5 +52,6 @@ export function RecordCallPanel({ student, weight, settling, onSaved, onMissing 
 }
 
 const useStyles = makeStyles((t) => ({
-  history: { paddingTop: t.space.xs },
+  // No caption: the hairline is what parts the form from the earlier calls.
+  history: { marginTop: t.space.xs, borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
 }));

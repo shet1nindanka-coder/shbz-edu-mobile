@@ -4,13 +4,14 @@ import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Icon, Notice, Segmented, Text, TextArea } from '@/ui';
+import { Button, Icon, Notice, Segmented, Text, TextArea, accessibilityLabelOf } from '@/ui';
 
 import type { RecordCallForm } from './use-record-call';
 
 /**
  * The fields of «Записать звонок»: how the call ended and the comment, marked as the teacher's own (the
- * lock: nobody else on the platform reads it, except the developer).
+ * lock and «виден только вам»: nobody else on the platform reads it, except the developer). The field has
+ * one name — its label; the site's placeholder sentence is not shown.
  */
 export function RecordCallFields({ form }: { form: RecordCallForm }) {
   const styles = useStyles();
@@ -37,14 +38,16 @@ export function RecordCallFields({ form }: { form: RecordCallForm }) {
         <View style={styles.label}>
           <Icon name="lock" size={theme.sizes.icon.sm} color="textMuted" />
           <Text variant="label" style={styles.labelText}>
-            {m.calls.form.commentLabel}
+            {t.comment}
+          </Text>
+          <Text variant="small" color="textMuted" numberOfLines={1}>
+            {m.calls.form.onlyYou}
           </Text>
         </View>
         <TextArea
           value={form.comment}
           onChangeText={form.setComment}
-          placeholder={t.commentPlaceholder}
-          accessibilityLabel={m.calls.form.commentLabel}
+          accessibilityLabel={accessibilityLabelOf([t.comment, m.calls.form.onlyYou])}
           numberOfLines={3}
           autoCapitalize="sentences"
           disabled={form.pending}
@@ -54,7 +57,7 @@ export function RecordCallFields({ form }: { form: RecordCallForm }) {
 
       <Hint>
         <Text variant="hint" color="textMuted">
-          {t.attemptHint}
+          {m.calls.form.attemptHint}
         </Text>
       </Hint>
 
@@ -78,7 +81,9 @@ export function RecordCallSaveButton({ form, settling }: RecordCallSaveButtonPro
   const t = dict.planner.calls;
   return (
     <Button
-      label={form.pending ? t.saving : t.save}
+      // One word: the sheet is about one call. The site's «Сохранить звонок» is the spoken name.
+      label={form.pending ? t.saving : dict.common.save}
+      accessibilityLabel={form.pending ? t.saving : t.save}
       size="lg"
       fullWidth
       onPress={form.submit}
@@ -93,5 +98,6 @@ const useStyles = makeStyles((t) => ({
   form: { gap: t.space.md },
   field: { gap: t.space.xxs },
   label: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxs },
-  labelText: { flexShrink: 1 },
+  // The name of the field on the left, the privacy promise at the right edge of the same line.
+  labelText: { flex: 1, minWidth: 0 },
 }));

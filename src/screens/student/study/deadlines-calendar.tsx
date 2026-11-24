@@ -7,21 +7,21 @@ import { plural, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Card, Enter, IconButton, Text } from '@/ui';
 
-import { CalendarDayCell } from './calendar-day-cell';
-import { CalendarLegend } from './calendar-legend';
-import { buildCalendarCells, groupByMskDay, type CalendarCell, type CalendarMonth, type DeadlineItem } from './deadline-model';
+import { CalendarDayCell, calendarCellMinHeight } from './calendar-day-cell';
+import { buildCalendarCells, groupByMskDay, monthTitle, type CalendarCell, type CalendarMonth, type DeadlineItem } from './deadline-model';
 
 export type DeadlinesCalendarProps = {
   /** Every homework that has a deadline, done ones included. */
   items: readonly DeadlineItem[];
   month: CalendarMonth;
-  /** Moscow day of the server-corrected clock. */
-  today: string;
-  /** Day whose sheet is open, or null. */
-  openDayKey: string | null;
+  /** The server-corrected clock: today's ring and which homeworks are overdue. */
+  now: number;
+  /** The picked day, or null. */
+  selectedDayKey: string | null;
   onChangeMonth: (delta: -1 | 1) => void;
-  onOpenDay: (dayKey: string) => void;
-  /** Draw the grid without a card of its own and without the legend: inside a tablet panel. */
+  /** A day of the displayed month was pressed; `dayItems` are its homeworks (none on a free day). */
+  onSelectDay: (dayKey: string, dayItems: readonly DeadlineItem[]) => void;
+  /** Draw the month without a card of its own: inside a tablet panel. */
   bare?: boolean;
 };
 
@@ -35,21 +35,22 @@ function chunk<T>(list: readonly T[], size: number): T[][] {
 }
 
 /**
- * Month calendar of homework deadlines (02 S4, 08 §5.20): chevrons and a horizontal swipe turn the month
- * (unbounded both ways), the grid always has 6 × 7 cells from the Monday on or before the 1st, and a
- * marked day opens its sheet. Days are MOSCOW days (02 §4.9).
+ * The month of homework deadlines (02 S4; the owner: «один календарь, на котором всё отмечено», like the
+ * month view of the iPhone calendar). It takes all the height it is given: the month name with the two
+ * arrows, the weekday letters and six week rows that share what is left. Every homework is a mark under
+ * its day — there is no list and no legend; a day is pressed to see its homeworks. Arrows and a
+ * horizontal swipe turn the month (unbounded both ways); days are MOSCOW days (02 §4.9).
  */
-export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMonth, onOpenDay, bare = false }: DeadlinesCalendarProps) {
+export function DeadlinesCalendar({ items, month, now, selectedDayKey, onChangeMonth, onSelectDay, bare = false }: DeadlinesCalendarProps) {
   const styles = useStyles();
   const { dict, m, locale } = useI18n();
   const t = dict.student.calendar;
 
   const byDay = useMemo(() => groupByMskDay(items), [items]);
-  const rows = useMemo(() => chunk(buildCalendarCells(month, byDay, today), 7), [month, byDay, today]);
-  const monthLabel = formatMonthLabel(mskDate({ year: month.year, month: month.month, day: 1 }), locale);
+  const rows = useMemo(() => chunk(buildCalendarCells(month, byDay, now), 7), [month, byDay, now]);
 
   // Swipe between months with the plain responder props: claimed only for a clearly horizontal drag, so
-  // vertical scrolling and taps on days keep working.
+  // pulling the page down and taps on days keep working.
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   // Capture phase: the start point is recorded even when a day cell takes the touch; never claimed here.
   const rememberStart = (event: GestureResponderEvent): boolean => {
@@ -71,25 +72,35 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
     if (Math.abs(dx) >= SWIPE_DISTANCE) onChangeMonth(dx < 0 ? 1 : -1);
   };
 
+  // The marks have no legend: a screen reader hears what they mean with the day.
   const cellLabel = (cell: CalendarCell): string => {
     const parts = [formatDayKey(cell.key, 'dayMonth', locale) ?? String(cell.day)];
     if (cell.isToday) parts.push(t.legendToday);
     if (cell.items.length > 0) {
+      const tones = new Set([...cell.marks, ...cell.items.slice(cell.marks.length).map(() => 'done' as const)]);
       parts.push(plural(locale, cell.items.length, m.student.calendar.deadlineForms));
-      parts.push(cell.state === 'late' ? t.legendIncomplete : m.student.calendar.allDone);
+      parts.push(tones.has('late') ? dict.student.deadlineList.overdueBadge : tones.has('due') ? t.legendIncomplete : m.student.calendar.allDone);
     }
     return parts.join(', ');
   };
 
   const Frame = bare ? View : Card;
   return (
-    <Frame testID="deadlines-calendar">
-      <View style={styles.header}>
-        <IconButton icon="chevronLeft" accessibilityLabel={dict.topics.widgets.datetime.prevMonth} onPress={() => onChangeMonth(-1)} testID="calendar-prev" />
-        <Text variant="calendarMonth" align="center" numberOfLines={1} accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.month} testID="calendar-month">
-          {monthLabel}
+    <Frame {...(bare ? {} : { padded: false })} testID="deadlines-calendar" style={[styles.frame, bare ? null : styles.card]}>
+      <View style={[styles.header, bare ? null : styles.inset]}>
+        <Text
+          variant="calendarMonth"
+          numberOfLines={1}
+          accessibilityRole="header"
+          accessibilityLabel={formatMonthLabel(mskDate({ year: month.year, month: month.month, day: 1 }), locale)}
+          accessibilityLiveRegion="polite"
+          style={styles.month}
+          testID="calendar-month"
+        >
+          {monthTitle(month, now, locale)}
         </Text>
-        <IconButton icon="chevronRight" accessibilityLabel={dict.topics.widgets.datetime.nextMonth} onPress={() => onChangeMonth(1)} testID="calendar-next" />
+        <IconButton icon="chevronLeft" variant="ghost" accessibilityLabel={dict.topics.widgets.datetime.prevMonth} onPress={() => onChangeMonth(-1)} testID="calendar-prev" />
+        <IconButton icon="chevronRight" variant="ghost" accessibilityLabel={dict.topics.widgets.datetime.nextMonth} onPress={() => onChangeMonth(1)} testID="calendar-next" />
       </View>
 
       <View style={styles.weekdays} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -100,7 +111,7 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
         ))}
       </View>
 
-      <View onStartShouldSetResponderCapture={rememberStart} onMoveShouldSetResponder={isHorizontalDrag} onResponderRelease={onSwipeEnd}>
+      <View style={styles.grid} onStartShouldSetResponderCapture={rememberStart} onMoveShouldSetResponder={isHorizontalDrag} onResponderRelease={onSwipeEnd}>
         {/* The key replays the entrance when the month changes. */}
         <Enter key={`${month.year}-${month.month}`} duration={180} offset={6} style={styles.grid}>
           {rows.map((row) => (
@@ -109,32 +120,36 @@ export function DeadlinesCalendar({ items, month, today, openDayKey, onChangeMon
                 <CalendarDayCell
                   key={cell.key}
                   cell={cell}
-                  open={cell.key === openDayKey}
+                  selected={cell.key === selectedDayKey}
                   accessibilityLabel={cellLabel(cell)}
-                  today={today}
-                  onPress={(pressed) => onOpenDay(pressed.key)}
+                  onPress={(pressed) => onSelectDay(pressed.key, pressed.items)}
                 />
               ))}
             </View>
           ))}
         </Enter>
       </View>
-
-      {bare ? null : (
-        <View style={styles.legend}>
-          <CalendarLegend />
-        </View>
-      )}
     </Frame>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, marginBottom: t.space.field },
-  month: { flex: 1 },
-  weekdays: { flexDirection: 'row', gap: t.space.xxs, marginBottom: t.space.sm },
+  // The month fills its place: the screen down to the dock on a phone, the panel on a tablet.
+  frame: { flex: 1, minHeight: 0 },
+  // The week lines run closer to the card's edge than its text, as in a calendar.
+  card: { paddingHorizontal: t.space.sm, paddingTop: t.space.sm, paddingBottom: t.space.xxs },
+  header: { flexDirection: 'row', alignItems: 'center', minHeight: t.sizes.minTouch },
+  inset: { paddingLeft: t.space.sm },
+  month: { flex: 1, minWidth: 0 },
+  weekdays: { flexDirection: 'row', paddingVertical: t.space.xxs },
   weekday: { flex: 1 },
-  grid: { gap: t.space.xxs },
-  row: { flexDirection: 'row', gap: t.space.xxs },
-  legend: { marginTop: t.space.lg, paddingHorizontal: t.space.xxs },
+  grid: { flex: 1, minHeight: 0 },
+  // Six rows share the height; a short window keeps every row tall enough for its marks and scrolls.
+  row: {
+    flex: 1,
+    flexDirection: 'row',
+    minHeight: calendarCellMinHeight(t),
+    borderTopWidth: t.borders.hairline,
+    borderTopColor: t.colors.line,
+  },
 }));

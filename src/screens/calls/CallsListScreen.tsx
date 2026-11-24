@@ -11,7 +11,7 @@ import { useCurrentUser } from '@/providers';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen, Text } from '@/ui';
+import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
 
 import { CallRow } from './list/call-row';
 import { summaryLine } from './logic';
@@ -33,6 +33,9 @@ type Overlay = { kind: 'record'; target: RecordCallTarget } | { kind: 'history';
  * §7): who needs a parent call. A TEACHER sees the own students and records calls; a DEVELOPER sees every
  * student with the teacher's name and only reads. The server sorts the rows (overdue → due → ok) and
  * counts the days in Moscow time.
+ *
+ * The screen is its list (docs/design/glass-over-paper.md §1a): the site's summary sentence is the spoken
+ * name of the list, the eye has the order of the rows and their chips.
  *
  * Phone: one card of rows; a row opens a sheet — the record form with the earlier calls under it for a
  * teacher, the history alone for a developer. Tablet: the list is the left panel; the right one is the
@@ -185,7 +188,7 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
   const selected = panels && canRecord ? (liveRow(pickedId) ?? students[0] ?? null) : null;
 
   // ── pieces ─────────────────────────────────────────────────────────────────────────────────────
-  // The sentence of the empty state links to the students section; a developer has accounts instead.
+  // The empty state leads to the students section; a developer has accounts instead.
   const studentsLink: AppLink = isDeveloper ? { screen: 'developer.accounts' } : { screen: 'teacher.students' };
 
   const notices = (
@@ -206,12 +209,9 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
     </>
   );
 
-  // The site's summary line, as plain muted text: the chips of the rows carry the colour.
-  const summary = data ? (
-    <Text variant="small" color="textMuted" tabular accessibilityRole="summary" style={panels ? null : styles.summary} testID="calls-summary">
-      {summaryLine(data.counts, t)}
-    </Text>
-  ) : null;
+  // The site's summary sentence is not shown: the rows come sorted and carry the chips. It names the list.
+  const summary = data ? summaryLine(data.counts, t) : undefined;
+  const hasNotices = notice !== null || (overview.isError && data !== undefined);
 
   const rows = students?.map((student, index) => (
     <CallRow
@@ -251,11 +251,9 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
       <Screen testID="calls-list-screen" header={header} scroll={false} maxWidth="full">
         <Panels>
           <Panel edges weight={3} padded={false} scrollRef={scrollRef} refreshing={refreshing} onRefresh={refresh} testID="calls-list">
-            <View style={styles.panelHead}>
-              {notices}
-              {summary}
-            </View>
+            {hasNotices ? <View style={styles.panelHead}>{notices}</View> : null}
             <View
+              accessibilityLabel={summary}
               onLayout={(event) => {
                 layout.current.header = 0;
                 layout.current.list = event.nativeEvent.layout.y;
@@ -297,11 +295,11 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
         students.length === 0 ? (
           <EmptyState
             title={t.emptyTitle}
-            hint={`${t.emptyBefore}${t.emptyLink}${t.emptyAfter}`}
             action={
               navigation.canOpen(studentsLink) ? (
                 <Button
-                  label={format(m.calls.empty.openSection, { section: screenTitle(studentsLink.screen, m.shell.tabs) })}
+                  label={screenTitle(studentsLink.screen, m.shell.tabs)}
+                  accessibilityLabel={format(m.calls.empty.openSection, { section: screenTitle(studentsLink.screen, m.shell.tabs) })}
                   variant="outline"
                   rightIcon="forward"
                   onPress={() => navigation.open(studentsLink)}
@@ -312,16 +310,14 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
             testID="calls-empty"
           />
         ) : (
-          <>
-            {summary}
-            <View
-              onLayout={(event) => {
-                layout.current.list = event.nativeEvent.layout.y;
-              }}
-            >
-              <ListCard testID="calls-list">{rows}</ListCard>
-            </View>
-          </>
+          <View
+            accessibilityLabel={summary}
+            onLayout={(event) => {
+              layout.current.list = event.nativeEvent.layout.y;
+            }}
+          >
+            <ListCard testID="calls-list">{rows}</ListCard>
+          </View>
         )
       ) : isLoadFailed(overview) ? (
         <LoadFailure query={overview} testID="calls-error" />
@@ -334,7 +330,5 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
 }
 
 const useStyles = makeStyles((t) => ({
-  // Stands where a section caption would: one muted line above the card.
-  summary: { paddingHorizontal: t.space.xxs },
   panelHead: { gap: t.space.md, paddingHorizontal: t.space.card, paddingTop: t.space.sm, paddingBottom: t.space.xs },
 }));

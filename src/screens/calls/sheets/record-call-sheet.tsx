@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import type { ParentCallStudentOverview, RecordCallResponse } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { BottomSheet, SectionCaption } from '@/ui';
+import { BottomSheet } from '@/ui';
 
 import { CallHistory } from './call-history';
 import { RecordCallFields, RecordCallSaveButton } from './record-call-form';
@@ -27,7 +27,7 @@ export type RecordCallSheetProps = {
 /**
  * What a row of the list opens for a teacher (06 §1.4 "Call form", §3.10): the record form — outcome,
  * the comment only the teacher reads, Save in the sheet's footer — and the student's earlier calls under
- * it. The form is emptied when the sheet has closed: a cancelled comment never comes back.
+ * it, without a caption. The form is emptied when the sheet has closed: a cancelled comment never comes back.
  */
 export function RecordCallSheet({ target, student, settling, onClose, onSaved, onMissing }: RecordCallSheetProps) {
   const styles = useStyles();
@@ -55,8 +55,7 @@ export function RecordCallSheet({ target, student, settling, onClose, onSaved, o
         <View style={styles.content}>
           <RecordCallFields form={form} />
           {history ? (
-            <View>
-              <SectionCaption>{m.calls.history.title}</SectionCaption>
+            <View style={styles.history}>
               <CallHistory key={history.studentId} student={history} showTeacher={false} />
             </View>
           ) : null}
@@ -68,4 +67,6 @@ export function RecordCallSheet({ target, student, settling, onClose, onSaved, o
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.lg, paddingTop: t.space.xs },
+  // No caption: the hairline is what parts the form from the earlier calls.
+  history: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
 }));

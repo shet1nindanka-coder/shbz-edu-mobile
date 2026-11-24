@@ -144,13 +144,13 @@ export function CallHistoryEntry({ entry, now, showTeacher, divider, studentName
         )}
       </View>
       {caption ? (
-        <Text variant="small" color="textMuted" tabular numberOfLines={1}>
+        <Text variant="small" color="textMuted" tabular numberOfLines={1} style={styles.entryBody}>
           {caption}
         </Text>
       ) : null}
       {entry.comment ? (
         // Pre-wrapped like on the site: the teacher's line breaks are kept.
-        <Text variant={studentName ? 'body' : 'small'} color={studentName ? 'textStrong' : 'textMuted'} selectable>
+        <Text variant={studentName ? 'body' : 'small'} color={studentName ? 'textStrong' : 'textMuted'} selectable style={styles.entryBody}>
           {entry.comment}
         </Text>
       ) : null}
@@ -164,4 +164,6 @@ const useStyles = makeStyles((t) => ({
   entryDivider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
   entryHead: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
   entryName: { flex: 1, minWidth: 0 },
+  // Under the head's text, not under its glyph.
+  entryBody: { paddingLeft: t.sizes.icon.sm + t.space.xs },
 }));

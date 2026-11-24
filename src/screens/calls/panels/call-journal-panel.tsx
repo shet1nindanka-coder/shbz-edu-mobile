@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import type { ParentCallStudentOverview } from '@/api/types';
 import { useI18n } from '@/i18n';
+import { useNowTick } from '@/services/clock';
 import { makeStyles, useTheme } from '@/theme';
 import { EmptyState, Icon, Panel, Text } from '@/ui';
 
@@ -26,6 +27,8 @@ export function CallJournalPanel({ students, weight, showTeacher }: CallJournalP
   const theme = useTheme();
   const { m } = useI18n();
   const journal = useMemo(() => buildCallJournal(students), [students]);
+  // Coarse: only the year of «now» matters to an entry (a call of an earlier year shows its year).
+  const now = useNowTick(3_600_000);
 
   return (
     <Panel
@@ -48,6 +51,7 @@ export function CallJournalPanel({ students, weight, showTeacher }: CallJournalP
           <CallHistoryEntry
             key={entry.id}
             entry={entry}
+            now={now}
             studentName={studentName}
             showTeacher={showTeacher}
             divider={index < journal.length - 1}
