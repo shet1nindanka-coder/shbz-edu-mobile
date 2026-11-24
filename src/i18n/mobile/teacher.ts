@@ -34,6 +34,7 @@ const ru = {
     // Spoken fact of a student row without red numbers: how many numbers the student has closed.
     solved: "решено {n}",
     copyHint: "Нажмите, чтобы скопировать",
+    empty: "Учеников пока нет",
     // One word under a figure of the tablet summary (the yellow one is `m.common.statuses.YELLOW.label`).
     figureAlone: "сам",
     figureHelp: "помощь",
@@ -128,6 +129,7 @@ const en: typeof ru = {
     actionsFor: "Actions: {name}",
     solved: "{n} solved",
     copyHint: "Tap to copy",
+    empty: "No students yet",
     figureAlone: "alone",
     figureHelp: "help",
     created: "Student added",

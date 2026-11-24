@@ -219,47 +219,51 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const typedTitle = title.trim();
   const footer = topic ? (
     <View style={styles.bar} testID="assign-bar">
-      <View style={styles.barRow}>
-        <DateTimeField
-          value={deadline}
-          today={mskToday()}
-          onChange={setDeadline}
-          // The zone is said where the time is entered, in three letters.
-          placeholder={`${t.deadlinePlaceholder}, ${m.common.dateTime.msk}`}
-          labels={dateTimeLabels}
-          locale={locale}
-          accessibilityLabel={`${t.deadlinePlaceholder}. ${m.common.dateTime.moscowTime}`}
-          disabled={issue.isPending}
-          testID="assign-deadline"
-          style={styles.grow}
-        />
-        {/* The optional title: a pencil, lit once a title is typed. */}
-        <IconButton
-          icon="edit"
-          accessibilityLabel={typedTitle ? format(m.teacher.assign.titleSheetOf, { title: typedTitle }) : m.teacher.assign.titleSheet}
-          active={typedTitle !== ''}
-          disabled={issue.isPending}
-          onPress={() => setTitleOpen(true)}
-          testID="assign-title-open"
+      {/* A phone stacks the deadline row over the button; a tablet has the width for one row. */}
+      <View style={theme.tablet ? styles.barWide : styles.barStack}>
+        <View style={[styles.barRow, theme.tablet ? styles.grow : null]}>
+          <DateTimeField
+            value={deadline}
+            today={mskToday()}
+            onChange={setDeadline}
+            // The zone is said where the time is entered, in three letters.
+            placeholder={`${t.deadlinePlaceholder}, ${m.common.dateTime.msk}`}
+            labels={dateTimeLabels}
+            locale={locale}
+            accessibilityLabel={`${t.deadlinePlaceholder}. ${m.common.dateTime.moscowTime}`}
+            disabled={issue.isPending}
+            testID="assign-deadline"
+            style={styles.grow}
+          />
+          {/* The optional title: a pencil, lit once a title is typed. */}
+          <IconButton
+            icon="edit"
+            accessibilityLabel={typedTitle ? format(m.teacher.assign.titleSheetOf, { title: typedTitle }) : m.teacher.assign.titleSheet}
+            active={typedTitle !== ''}
+            disabled={issue.isPending}
+            onPress={() => setTitleOpen(true)}
+            testID="assign-title-open"
+          />
+        </View>
+        <Button
+          // «Выдать · 3»: the count of selected numbers lives in the button it unlocks.
+          label={
+            issue.isPending
+              ? t.assigning
+              : picked.length > 0
+                ? format(m.common.statuses.groupCount, { label: dict.students.detail.tabAssignShort, n: picked.length })
+                : dict.students.detail.tabAssignShort
+          }
+          accessibilityLabel={issue.isPending ? t.assigning : `${t.assign}. ${format(t.selected, { n: picked.length })}`}
+          // In the tablet's one row the button is as high as the field next to it.
+          size={theme.tablet ? 'md' : 'lg'}
+          loading={issue.isPending}
+          disabled={!canAssign(picked.length, deadline) || wait.waiting}
+          onPress={submit}
+          testID="assign-submit"
+          style={theme.tablet ? styles.submitWide : null}
         />
       </View>
-      <Button
-        // «Выдать · 3»: the count of selected numbers lives in the button it unlocks.
-        label={
-          issue.isPending
-            ? t.assigning
-            : picked.length > 0
-              ? format(m.common.statuses.groupCount, { label: dict.students.detail.tabAssignShort, n: picked.length })
-              : dict.students.detail.tabAssignShort
-        }
-        accessibilityLabel={issue.isPending ? t.assigning : `${t.assign}. ${format(t.selected, { n: picked.length })}`}
-        size="lg"
-        fullWidth
-        loading={issue.isPending}
-        disabled={!canAssign(picked.length, deadline) || wait.waiting}
-        onPress={submit}
-        testID="assign-submit"
-      />
       {/* Under the locked button, not in the notice: closing the notice or changing the topic keeps the lock. */}
       <RetryWaitLine wait={wait} testID="assign-wait" />
     </View>
@@ -339,7 +343,11 @@ const useStyles = makeStyles((t) => ({
   itemLeft: { paddingRight: t.space.xs },
   itemRight: { paddingLeft: t.space.xs },
   bar: { gap: t.space.sm },
+  barStack: { gap: t.space.sm },
+  barWide: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  // Room for «Выдаем…» and «Выдать · 12» without the button changing its width.
+  submitWide: { minWidth: t.sizes.row * 3 },
   grow: { flex: 1, minWidth: 0 },
   sheet: { paddingBottom: t.space.sm },
 }));

@@ -191,7 +191,8 @@ const useStyles = makeStyles((t) => ({
   body: { gap: t.space.md },
   pending: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.control.xs },
   pendingText: { flex: 1 },
-  // One row: the two worded actions share the width, the two icon buttons keep their 44.
+  // One row: the two worded actions share what the two 44 icon buttons leave. On a 390 pt phone that is
+  // ~105 pt each, so they give up half of a button's side padding to keep «Выдать ДЗ» whole.
   actions: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  action: { flex: 1, minWidth: 0 },
+  action: { flexGrow: 1, flexShrink: 1, minWidth: 0, paddingHorizontal: t.space.sm },
 }));

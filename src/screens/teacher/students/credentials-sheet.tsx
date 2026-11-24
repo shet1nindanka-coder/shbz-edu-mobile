@@ -193,7 +193,7 @@ function CredentialRow({ line, copied, showPill, copiedLabel, hint, onCopy }: Cr
 }
 
 const useStyles = makeStyles((t) => ({
-  content: { gap: t.space.lg, paddingTop: t.space.xxs },
+  content: { gap: t.space.lg, paddingTop: t.space.xxs, paddingBottom: t.space.lg },
   intro: { gap: t.space.xs },
   message: {
     // A soft panel inside the sheet.

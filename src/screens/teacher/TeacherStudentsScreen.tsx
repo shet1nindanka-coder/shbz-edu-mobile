@@ -134,7 +134,7 @@ export function TeacherStudentsScreen() {
 
   // Loading and failure never hide the header: adding a student does not depend on the list having loaded.
   const placeholder = list ? (
-    <EmptyState title={t.empty} testID="students-empty" />
+    <EmptyState title={mt.empty} testID="students-empty" />
   ) : studentsFailure ? (
     <LoadFailure query={students} testID="students-error" />
   ) : (

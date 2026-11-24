@@ -121,7 +121,8 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
   const canOpenSource = sourceLink !== null && navigation.canOpen(sourceLink);
 
   // The one caption of the board: the topic (unless the title names it) and the deadline, worded like a
-  // homework row's — «Логарифмические уравнения · до пятницы». Who has the homework is the rows' check marks.
+  // homework row's — «Логарифмические уравнения · до пятницы». Who has the homework is the rows' check
+  // marks; the group is the title of the list panel on a tablet and the rows themselves on a phone.
   const deadline = draftDeadlineCaption(
     { deadlineAt: plan.deadlineAt, issuedCount: controller.issuedCount, participantsCount: participants.length },
     now,
@@ -129,8 +130,7 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
     m.common.deadline,
   );
   const topic = plan.topicTitle && !plan.title.includes(plan.topicTitle) ? plan.topicTitle : null;
-  // On a tablet the group is the title of the list panel, right above this line.
-  const kicker = accessibilityLabelOf([topic, theme.tablet ? null : plan.group?.name, deadline.text], ' · ');
+  const kicker = accessibilityLabelOf([topic, deadline.text], ' · ');
 
   const views = new Map(
     participants.map((participant) => {
@@ -344,7 +344,9 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
       ) : (
         <>
           <View style={styles.section}>
-            <SectionCaption testID="draft-board-kicker">{kicker}</SectionCaption>
+            <SectionCaption testID="draft-board-kicker" style={deadline.attention ? styles.overdue : undefined}>
+              {kicker}
+            </SectionCaption>
             {single && participants[0] ? (
               // A draft for one student: no list to pick from, the set is right on the page.
               <Card style={styles.singleCard}>
@@ -415,6 +417,8 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
 
 const useStyles = makeStyles((t) => ({
   section: { gap: t.space.xs },
+  // A passed deadline with sets still to issue: the caption asks for attention.
+  overdue: { color: t.colors.redText },
   singleCard: { gap: t.space.md },
   // The rows bring their own padding; the head of the list panel lines up with them.
   panelHead: { gap: t.space.xxs, paddingHorizontal: t.space.card, paddingTop: t.space.card },

@@ -43,6 +43,8 @@ const ru = {
     noStudents: "Учеников пока нет",
     durationDecrease: "Уменьшить на 5 минут",
     durationIncrease: "Увеличить на 5 минут",
+    // the compact start picker of the manual composer: «Начало, МСК» fits next to the duration stepper
+    start: "Начало",
     // the main button of the manual composer once numbers are ticked: «Составить · 3»
     composeCount: "Составить · {n}",
     statementsLoading: "Загружаем условия…"
@@ -102,6 +104,7 @@ const en: typeof ru = {
     noStudents: "No students yet",
     durationDecrease: "Decrease by 5 minutes",
     durationIncrease: "Increase by 5 minutes",
+    start: "Start",
     composeCount: "Compose · {n}",
     statementsLoading: "Loading statements…"
   },

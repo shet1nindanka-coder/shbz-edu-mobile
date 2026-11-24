@@ -148,9 +148,9 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
                 onChange={setStartsAt}
                 today={mskToday()}
                 // The compact trigger shares its row with the stepper: «Lesson date and time» does not fit
-                // there at 390 pt, so the trigger shows the short site label — with the zone, said where a
-                // time is entered — and is announced by the full one.
-                placeholder={`${dict.planner.homeworkPlans.createForm.dateTimePlaceholder}, ${m.common.dateTime.msk}`}
+                // there at 390 pt, so the trigger shows one word with the zone — said where a time is
+                // entered — and is announced by the full site label.
+                placeholder={`${m.planner.lessonNew.start}, ${m.common.dateTime.msk}`}
                 accessibilityLabel={`${t.dateTimePlaceholder}, ${m.common.dateTime.msk}`}
                 labels={dateTimeLabels}
                 locale={locale}
