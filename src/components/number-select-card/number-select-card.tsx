@@ -1,11 +1,11 @@
 import { View } from 'react-native';
 
 import type { HomeworkNumberStatus } from '@/api/types';
-import { statusLabel } from '@/components/numbers/status-labels';
+import { NumberStatusMark } from '@/components/numbers/number-status-mark';
 import { MathContent } from '@/components/math';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Card, CheckMark, StatusBadge, Text } from '@/ui';
+import { Card, CheckMark, Text } from '@/ui';
 
 export type NumberSelectCardProps = {
   number: string;
@@ -29,7 +29,7 @@ export type NumberSelectCardProps = {
  */
 export function NumberSelectCard({ number, status, selected, conditionLatex, footnote, disabled, onToggle, testID }: NumberSelectCardProps) {
   const styles = useStyles();
-  const { dict, m } = useI18n();
+  const { dict } = useI18n();
   const name = format(dict.topics.widgets.numberSelectAria, { number });
   // The card is one element for a screen reader (iOS reads none of its children): the student's status
   // — what the card exists to show — and the footnote are in the name, the statement in the hint.
@@ -50,7 +50,8 @@ export function NumberSelectCard({ number, status, selected, conditionLatex, foo
     >
       <View style={styles.top}>
         <CheckMark checked={selected} />
-        <StatusBadge status={status} label={statusLabel(status, m.common.statuses)} accessibilityLabel={statusText} />
+        {/* Status is colour: a dot for a solved number, a word only for «нужна помощь» (design doc §1a). */}
+        <NumberStatusMark status={status} />
       </View>
       <Text variant="numberTitle" tabular>
         {number}

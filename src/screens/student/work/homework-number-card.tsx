@@ -1,3 +1,4 @@
+import { NumberStatusMark } from '@/components/numbers';
 import { View } from 'react-native';
 
 import type { StudentHomeworkNumberDto } from '@/api/types';
@@ -9,7 +10,6 @@ import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Card, Notice, Text, TextArea, TextButton } from '@/ui';
 
-import { NumberStatusMark } from '../study/number-status-mark';
 import { useNoteEditor } from '../study/use-note-editor';
 
 export type HomeworkNumberCardProps = {

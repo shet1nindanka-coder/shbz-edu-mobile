@@ -1,3 +1,4 @@
+import { NumberStatusMark } from '@/components/numbers';
 import { View } from 'react-native';
 
 import type { StudentNumberDetailResponse } from '@/api/types';
@@ -9,7 +10,6 @@ import { makeStyles } from '@/theme';
 import { Card, Text } from '@/ui';
 
 import { NoteField } from './note-field';
-import { NumberStatusMark } from './number-status-mark';
 
 export type NumberCardProps = {
   detail: StudentNumberDetailResponse;
