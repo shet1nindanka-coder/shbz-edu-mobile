@@ -162,7 +162,8 @@ function LessonForm({ target, onBack }: { target: LessonTarget; onBack?: () => v
     form.isError || !data.aiAvailable ? (
       <>
         {form.isError ? <Notice tone="error" text={errorText(form.error, m.common.errors.generic)} testID="lesson-new-refresh-error" /> : null}
-        {!data.aiAvailable ? <Notice tone="warning" text={t.aiUnavailable} testID="lesson-new-ai-unavailable" /> : null}
+        {/* The short site wording: the form itself shows what is left (the switch moves to «Выбрать вручную»). */}
+        {!data.aiAvailable ? <Notice tone="warning" text={compose.aiUnavailable} testID="lesson-new-ai-unavailable" /> : null}
       </>
     ) : null;
 

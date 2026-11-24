@@ -5,7 +5,7 @@ import { RetryWaitLine } from '@/components/retry-wait';
 import { LESSON_RESULT_ORDER, lessonResultMeta } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { StatusOptionGroup, Text } from '@/ui';
+import { StatusOptionGroup } from '@/ui';
 
 export type ItemResultBarProps = {
   /** The number picked in the grid. */
@@ -26,7 +26,8 @@ const ONE_ROW_MIN_WINDOW = 1024;
  * «Итог урока» of the picked number (docs/spec/05-teacher-lessons-plans.md §1.3 "Result toggle"; layout:
  * mockup `T-board`): the lesson-result options with the site's wording, pinned under the student's numbers
  * — the sheet's footer on a phone, the panel's footer on a tablet — so tapping a tile and then a result
- * never needs a scroll. Tapping the active option clears it.
+ * never needs a scroll. Tapping the active option clears it. The four options name themselves: the group's
+ * title is only its accessible name.
  */
 export function ItemResultBar({ item, disabled, waitSeconds, onResult, participantId }: ItemResultBarProps) {
   const styles = useStyles();
@@ -38,9 +39,6 @@ export function ItemResultBar({ item, disabled, waitSeconds, onResult, participa
 
   return (
     <View style={styles.bar}>
-      <Text variant="label" color="textMuted">
-        {results.aria}
-      </Text>
       <StatusOptionGroup
         // The same group serves every number: the number tells its options apart out of context.
         accessibilityLabel={format(m.planner.lessonBoard.resultGroupAria, { number: numberSign })}

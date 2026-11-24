@@ -36,7 +36,8 @@ const TOTAL_WIDTH = 64;
 /**
  * The attendance matrix (06 §1.2 item 6, Q4; mockup `T-groups`): students down, lessons across, every
  * mark a 44 pt tile. The name column is pinned while the lessons scroll sideways; the table opens
- * scrolled to the newest lessons and the row totals.
+ * scrolled to the newest lessons and the row totals. The header row holds the dates only: the names and
+ * the «5/6» totals need no column titles (the totals say «Итого» to a screen reader).
  */
 export function AttendanceTable({ members, lessons, busy, disabled, onToggle, onChoose, onOpenLesson }: AttendanceTableProps) {
   const styles = useStyles();
@@ -65,11 +66,7 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
     // layer shadow (clipsToBounds), and this card would be the only one without one.
     <View style={[styles.clip, inside ? null : styles.clipCard]}>
       <View style={{ width: nameWidth }}>
-        <View style={[styles.headerRow, styles.cell, inside ? null : styles.nameCell]}>
-          <Text variant="smallStrong" color="textMuted" numberOfLines={1}>
-            {t.student}
-          </Text>
-        </View>
+        <View style={styles.headerRow} />
         {members.map((member) => (
           <View key={member.id} style={[styles.bodyRow, styles.cell, inside ? null : styles.nameCell]}>
             <Text variant="bodyStrong" numberOfLines={2}>
@@ -124,11 +121,7 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
                 </View>
               );
             })}
-            <View style={[styles.cell, styles.totalCell, inside ? null : styles.totalCellCard]}>
-              <Text variant="smallStrong" color="textMuted" numberOfLines={1}>
-                {t.total}
-              </Text>
-            </View>
+            <View style={[styles.totalCell, inside ? null : styles.totalCellCard]} />
           </View>
 
           {members.map((member) => {
@@ -180,7 +173,7 @@ export function AttendanceTable({ members, lessons, busy, disabled, onToggle, on
                   testID={`attendance-total-${member.id}`}
                 >
                   <Text variant="bodyBold" tabular numberOfLines={1}>
-                    {attendanceRatioText(total)}
+                    {attendanceRatioText(total, m.common.numbers.doneOf)}
                   </Text>
                 </View>
               </View>

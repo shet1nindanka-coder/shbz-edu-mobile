@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { View } from 'react-native';
 
 import { qk, useApi } from '@/api';
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
@@ -14,7 +13,6 @@ import { ShellAppBar, useStreakToday, useStudentStreak } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import {
-  Button,
   Card,
   CardPressArea,
   Enter,
@@ -27,13 +25,10 @@ import {
   Panel,
   Panels,
   Screen,
-  SectionCaption,
   Text,
   TextButton,
   navIcons,
 } from '@/ui';
-
-import { mskToday } from '@/domain/moscow-time';
 
 import { monthOfInstant, selectUpcoming, shiftMonth, toDeadlineItems, type CalendarMonth, type DeadlineItem } from './study/deadline-model';
 import { DeadlinesCalendar } from './study/deadlines-calendar';
@@ -42,9 +37,10 @@ import { useNow } from './study/use-now';
 import { WeekCard } from './study/week-card';
 
 /**
- * `student.home` — «Обзор» (docs/spec/02-student-study.md S1; layout: docs/design/glass-over-paper.md §8):
- * what is next and nothing else. One card for the nearest lesson, the nearest homeworks as rows — a title,
- * the deadline, «1 из 3» — and one card «За неделю» with the streak. Everything opens by a tap.
+ * `student.home` — «Обзор» (docs/spec/02-student-study.md S1; layout: docs/design/glass-over-paper.md §8,
+ * the text diet of §1a): what is next and nothing else. One line for the nearest lesson («Урок · завтра
+ * 16:00»), the nearest homeworks as rows — a title, the deadline, «1/3» — and the week: one figure, the
+ * streak chip and a bar per day. No captions above the blocks; everything opens by a tap.
  *
  * Reads: the light deadline list, the shell's streak query (00 §3.2) and the lesson read of the «урок» tab
  * (the same cache entry). Freshness (00 §2.3): the realtime bridge invalidates them on the student's own
@@ -92,9 +88,9 @@ export function StudentHomeScreen() {
         lessonOn: m.student.home.lessonOn,
       }) : null;
 
-  const homeworkRows = (inset?: number) =>
+  const homeworkRows = () =>
     !upcoming ? null : upcoming.length === 0 ? (
-      <ListRow title={dict.student.upcoming.empty} inset={inset} testID="home-upcoming-empty" />
+      <ListRow title={dict.student.upcoming.empty} testID="home-upcoming-empty" />
     ) : (
       upcoming.map((item, index) => {
         const caption = deadlineCaption(item.deadlineAt, item.status === 'DONE', now, locale, m.common.deadline);
@@ -106,7 +102,6 @@ export function StudentHomeScreen() {
             subtitle={caption.text}
             subtitleTone={caption.attention ? 'attention' : 'muted'}
             meta={done}
-            inset={inset}
             divider={index < upcoming.length - 1}
             onPress={() => openHomework(item)}
             accessibilityLabel={format(m.studentWork.list.rowA11y, { title: item.label, caption: caption.text, done })}
@@ -124,45 +119,35 @@ export function StudentHomeScreen() {
     />
   ) : null;
 
-  // Tablet (docs/design/glass-over-paper.md §1 rule 7): the lesson card across the top, then three panels
+  // One line says when; the lesson's own title is on the «урок» tab and in the accessible name.
+  const lessonCard =
+    nextLesson && when ? (
+      <Card padded={false} testID="home-lesson">
+        <CardPressArea
+          onPress={() => navigation.open({ screen: 'student.lesson' })}
+          accessibilityLabel={format(m.student.home.lessonA11y, { when, title: nextLesson.title })}
+          style={styles.lesson}
+          testID="home-lesson-card"
+        >
+          <IconTile icon={navIcons.student.lesson} />
+          <Text variant="bodyBold" numberOfLines={1} style={styles.lessonText}>
+            {when}
+          </Text>
+          <Icon name="chevronRight" size={20} color="textMuted" />
+        </CardPressArea>
+      </Card>
+    ) : null;
+
+  // Tablet (docs/design/glass-over-paper.md §1 rule 7): the lesson line across the top, then three panels
   // down to the dock — the homeworks, the week, the month with its deadlines.
   if (theme.tablet && data && upcoming) {
     const month = chosenMonth ?? monthOfInstant(now);
     return (
       <Screen testID="student-home-screen" header={<ShellAppBar title={title} />} scroll={false} maxWidth="full">
         {deadlines.isError ? <RefreshError error={deadlines.error} testID="home-refresh-error" /> : null}
-        {nextLesson && when ? (
-          <Card testID="home-lesson">
-            <View style={styles.lessonWide}>
-              <IconTile icon={navIcons.student.lesson} />
-              <View style={styles.lessonTexts}>
-                <Text variant="sectionTitle" numberOfLines={1}>
-                  {nextLesson.title}
-                </Text>
-                <Text variant="body" color="textMuted" numberOfLines={1}>
-                  {when}
-                </Text>
-              </View>
-              <Button
-                label={dict.topics.lib.history.openLesson}
-                rightIcon="forward"
-                onPress={() => navigation.open({ screen: 'student.lesson' })}
-                testID="home-lesson-card"
-              />
-            </View>
-          </Card>
-        ) : null}
+        {lessonCard}
         <Panels>
-          <Panel
-            padded={false}
-            header={
-              <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelTitle}>
-                {dict.student.homeworks.kicker}
-              </Text>
-            }
-            contentStyle={styles.rowsPanel}
-            testID="home-upcoming"
-          >
+          <Panel padded={false} contentStyle={styles.rowsPanel} testID="home-upcoming">
             {homeworkRows()}
           </Panel>
           {streak.data ? <WeekCard streak={streak.data} today={streakToday} fill testID="home-streak" /> : <Panel>{streakFailure}</Panel>}
@@ -171,11 +156,13 @@ export function StudentHomeScreen() {
               bare
               items={toDeadlineItems(data.items, locale)}
               month={month}
-              today={mskToday(now)}
-              openDayKey={null}
+              now={now}
+              selectedDayKey={null}
               onChangeMonth={(delta) => setChosenMonth(shiftMonth(month, delta))}
               // The day's homeworks are one tap further, in the deadlines section.
-              onOpenDay={() => navigation.open({ screen: 'student.deadlines' })}
+              onSelectDay={(_day, dayItems) => {
+                if (dayItems.length > 0) navigation.open({ screen: 'student.deadlines' });
+              }}
             />
           </Panel>
         </Panels>
@@ -187,36 +174,11 @@ export function StudentHomeScreen() {
     <Screen testID="student-home-screen" header={<ShellAppBar title={title} />} refreshing={refreshing} onRefresh={refresh}>
       {deadlines.isError && data ? <RefreshError error={deadlines.error} testID="home-refresh-error" /> : null}
 
-      {nextLesson && when ? (
-        <Enter index={0}>
-          <Card padded={false} testID="home-lesson">
-            <CardPressArea
-              onPress={() => navigation.open({ screen: 'student.lesson' })}
-              accessibilityLabel={format(m.student.home.lessonA11y, { when, title: nextLesson.title })}
-              style={styles.lesson}
-              testID="home-lesson-card"
-            >
-              <IconTile icon={navIcons.student.lesson} />
-              <View style={styles.lessonTexts}>
-                <Text variant="bodyBold" numberOfLines={1}>
-                  {when}
-                </Text>
-                <Text variant="small" color="textMuted" numberOfLines={1}>
-                  {nextLesson.title}
-                </Text>
-              </View>
-              <Icon name="chevronRight" size={20} color="textMuted" />
-            </CardPressArea>
-          </Card>
-        </Enter>
-      ) : null}
+      {lessonCard ? <Enter index={0}>{lessonCard}</Enter> : null}
 
       {upcoming ? (
-        <Enter index={1} style={styles.block}>
-          <SectionCaption>{dict.student.homeworks.kicker}</SectionCaption>
-          <ListCard testID="home-upcoming">
-            {homeworkRows()}
-          </ListCard>
+        <Enter index={1}>
+          <ListCard testID="home-upcoming">{homeworkRows()}</ListCard>
         </Enter>
       ) : isLoadFailed(deadlines) ? (
         // No «На главную» here: this is the home screen. «Попробовать снова» re-reads the streak as well.
@@ -247,10 +209,7 @@ export function StudentHomeScreen() {
 }
 
 const useStyles = makeStyles((t) => ({
-  block: { gap: t.space.sm },
   lesson: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, padding: t.space.card },
-  lessonWide: { flexDirection: 'row', alignItems: 'center', gap: t.space.lg },
-  panelTitle: { paddingHorizontal: t.space.card, paddingTop: t.space.card },
-  rowsPanel: { gap: 0, paddingBottom: t.space.sm },
-  lessonTexts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  lessonText: { flex: 1, minWidth: 0 },
+  rowsPanel: { gap: 0, paddingVertical: t.space.sm },
 }));

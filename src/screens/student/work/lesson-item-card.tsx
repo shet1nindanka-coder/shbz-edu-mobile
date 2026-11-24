@@ -3,7 +3,6 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import type { LessonItemDto, LessonItemResult, SolutionVerdict } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { formatClockTime } from '@/domain/dates';
 import { checkErrorText } from '@/domain/solution-check-error-text';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
@@ -44,10 +43,10 @@ export type LessonItemCardProps = {
 
 /**
  * The card of the current problem of a live lesson (docs/spec/03-student-homework-lesson.md §1 L2 "Lesson
- * item card"; layout: docs/design/glass-over-paper.md §8): the number with the time left, one caption — the
- * outcome, the running check or the time of the last submission — the statement, the check's remark, and
- * the one main action of the screen: «Сдать решение». The control is visible only while the item can be
- * submitted.
+ * item card"; layout: docs/design/glass-over-paper.md §8, §1a): the number with the time left, at most one
+ * caption — the outcome in a word or the running check — the statement, the check's remark, and the one
+ * main action of the screen: «Сдать фото». The topic and the number in the button are said to a screen
+ * reader only. The control is visible only while the item can be submitted.
  */
 export function LessonItemCard({
   item,
@@ -66,7 +65,7 @@ export function LessonItemCard({
   style,
 }: LessonItemCardProps) {
   const styles = useStyles();
-  const { dict, m, locale } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.student.lessonView;
 
   const submission = item.submission;
@@ -76,9 +75,6 @@ export function LessonItemCard({
 
   const outcome = chip?.kind === 'result' ? t.results[chip.result] : chip?.kind === 'verdict' ? t.verdicts[chip.verdict] : null;
   const attention = chip?.kind === 'result' ? RESULT_ATTENTION[chip.result] : chip?.kind === 'verdict' ? VERDICT_ATTENTION[chip.verdict] : false;
-  const caption = [item.topicTitle, outcome ?? (submission && !checking ? format(t.submittedAt, { time: formatClockTime(submission.submittedAt, locale) }) : null)]
-    .filter(Boolean)
-    .join(' · ');
   const remark = submission && submission.status === 'DONE' ? submission.comment : null;
 
   return (
@@ -88,7 +84,7 @@ export function LessonItemCard({
           variant="sectionTitle"
           tabular
           accessibilityRole="header"
-          accessibilityLabel={format(m.studentWork.lesson.itemA11y, { index, number: item.number })}
+          accessibilityLabel={`${format(m.studentWork.lesson.itemA11y, { index, number: item.number })}, ${item.topicTitle}`}
           style={styles.title}
         >
           {item.number}
@@ -96,19 +92,18 @@ export function LessonItemCard({
         {aside}
       </View>
 
-      <View style={styles.meta}>
-        <Text variant="small" color={attention ? 'redText' : 'textMuted'} style={styles.caption} testID={`lesson-outcome-${item.number}`}>
-          {caption}
+      {checking ? (
+        <View style={[styles.meta, styles.checking]} accessible accessibilityLiveRegion="polite" accessibilityLabel={t.checking}>
+          <Spinner size={14} />
+          <Text variant="small" color="textMuted">
+            {t.checking}
+          </Text>
+        </View>
+      ) : outcome ? (
+        <Text variant="small" color={attention ? 'redText' : 'textMuted'} style={styles.meta} testID={`lesson-outcome-${item.number}`}>
+          {outcome}
         </Text>
-        {checking ? (
-          <View style={styles.checking} accessible accessibilityLiveRegion="polite" accessibilityLabel={t.checking}>
-            <Spinner size={14} />
-            <Text variant="small" color="textMuted">
-              {t.checking}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      ) : null}
 
       {item.conditionLatex ? <MathContent value={item.conditionLatex} testID={`lesson-condition-${item.number}`} /> : null}
 
@@ -147,9 +142,12 @@ export function LessonItemCard({
                 ? t.uploading
                 : preparing
                   ? m.common.photos.preparing
-                  : format(submission ? t.resubmit : t.submit, { number: item.number })
+                  : submission
+                    ? m.studentWork.lesson.resubmit
+                    : m.studentWork.lesson.submit
             }
-            accessibilityLabel={uploading || preparing ? undefined : format(t.submitAria, { number: item.number })}
+            // The card is of one number, so the button does not repeat it; a screen reader hears it.
+            accessibilityLabel={uploading || preparing ? undefined : format(submission ? t.resubmit : t.submitAria, { number: item.number })}
             size="lg"
             leftIcon="camera"
             loading={uploading || preparing}
@@ -179,8 +177,8 @@ const useStyles = makeStyles((t) => ({
   card: { gap: t.space.md },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
   title: { flexShrink: 1, minWidth: 0 },
-  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.sm, marginTop: -t.space.sm },
-  caption: { flexShrink: 1, minWidth: 0 },
+  // The one caption sits right under the number.
+  meta: { marginTop: -t.space.sm },
   checking: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxs },
   remark: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
   remarkText: { flex: 1, minWidth: 0 },

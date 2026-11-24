@@ -14,7 +14,8 @@ import type { CreateAccountForm } from './use-create-account-form';
 
 /**
  * The fields of "New account" (docs/spec/04-teacher-students.md S9a, §3.7): the role switch, the owner
- * teacher of a student, name, login and the password — checked against the policy as it is typed. The
+ * teacher of a student, name, login and the password — checked against the policy as it is typed (a field
+ * has one name: its label, no sample value inside). The
  * submit button is `CreateAccountSubmit`: the footer of the sheet on a phone, the end of the panel on a
  * tablet.
  */
@@ -58,7 +59,6 @@ export function CreateAccountFields({ form }: { form: CreateAccountForm }) {
         label={form.isStudent ? t.nameStudent : t.nameTeacher}
         value={form.name}
         onChangeText={form.changeName}
-        placeholder={fields.namePlaceholder}
         autoComplete="name"
         textContentType="name"
         autoCapitalize="words"
@@ -74,7 +74,6 @@ export function CreateAccountFields({ form }: { form: CreateAccountForm }) {
         label={form.isStudent ? t.loginStudent : t.loginTeacher}
         value={form.login}
         onChangeText={form.changeLogin}
-        placeholder={fields.loginPlaceholder}
         error={form.loginError}
         // Any string is a valid login; the e-mail keyboard only puts "@" and "." within reach.
         keyboardType="email-address"
@@ -97,7 +96,6 @@ export function CreateAccountFields({ form }: { form: CreateAccountForm }) {
           value={form.password}
           onChangeText={form.changePassword}
           onFocus={form.offerSuggestion}
-          placeholder={fields.passwordPlaceholder}
           // Plain text on purpose (it is dictated or sent on), and nothing may offer to save or fill it.
           autoCapitalize="none"
           autoCorrect={false}

@@ -13,8 +13,9 @@ export type GroupRowProps = {
 };
 
 /**
- * One group of the list (06 §1.1; docs/design/glass-over-paper.md §1 rule 2): the name and one caption —
- * «8 класс · 4 ученика». The whole row opens the group; composing a lesson is the group's own main action.
+ * One group of the list (06 §1.1; docs/design/glass-over-paper.md §1a): the name and, on the right, how
+ * many students it has. «8 класс · 4 ученика» is said, not shown. The whole row opens the group; composing
+ * a lesson is the group's own main action.
  */
 export function GroupRow({ group, selected = false, divider, onOpen }: GroupRowProps) {
   const { locale, dict, m } = useI18n();
@@ -24,7 +25,7 @@ export function GroupRow({ group, selected = false, divider, onOpen }: GroupRowP
       title={group.name}
       // Two lines: there is no tooltip on a phone to read a name the site cuts at one.
       titleLines={2}
-      subtitle={caption}
+      meta={String(group.membersCount)}
       selected={selected}
       divider={divider}
       onPress={() => onOpen(group)}

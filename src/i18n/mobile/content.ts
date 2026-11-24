@@ -1,34 +1,34 @@
 // Mobile-only strings of the content area (topics CRUD, numbers, files, LaTeX, JSON import).
 // Site texts stay in `dict.topics.*`.
 const ru = {
-  fileDrop: {
-    // replaces `dict.topics.widgets.fileDrop.helper` (no drag & drop on a phone)
-    helper: "Выберите файл на устройстве: PDF, DOCX, PNG или JPG."
-  },
   importPanel: {
+    // Spoken names of the two marks next to the slot and of the slot itself.
     pasteFromClipboard: "Вставить JSON из буфера",
     chooseJsonFile: "Выбрать JSON-файл",
     // The accessible name of the copy button starts with what it shows («Скопировано»).
     promptCopied: "Скопировано: промпт для ИИ",
-    // replaces `dict.topics.importPanel.dropTitle` (no drag & drop on a phone)
-    loadTitle: "Загрузите ответ ИИ",
-    textLoaded: "Текст вставлен — нажмите «Проверить файл»",
+    // The copy button: one word next to the copy glyph (the site's «Скопировать промпт для ИИ» is spoken).
+    prompt: "Промпт",
+    // The empty slot (replaces `dict.topics.importPanel.dropTitle`: no drag & drop on a phone) and a pasted text in it.
+    slot: "JSON-файл",
+    textLoaded: "Текст вставлен",
+    // The panel's one hint (replaces the two sentences of `dict.topics.importPanel.hintCreate` / `hintAdd`).
+    hint: "Промпт и задачник — в чат с ИИ, его ответ — сюда.",
+    // The switch; `dict.topics.importPanel.overwriteLabel` is its spoken name.
+    overwrite: "Перезаписать заполненные",
     sharePrompt: "Поделиться промптом",
     // replaces `dict.topics.importPrompt.clipboardDenied` ("the browser blocked…")
     clipboardDenied: "Не удалось получить доступ к буферу обмена.",
     clipboardEmpty: "В буфере обмена нет текста.",
     // iOS: the clipboard holds text but the read came back empty — the system paste prompt was refused
     pasteRefused: "Не удалось вставить текст из буфера обмена. Если система спрашивает разрешение — разрешите вставку.",
-    hideText: "скрыть поле"
+    hideText: "Скрыть поле"
   },
   reorder: {
-    action: "Порядок тем",
+    // The sheet's title and the spoken name of the header mark that opens it.
     title: "Порядок тем",
-    // replaces `dict.topics.reorder.hint` ("drag a card")
-    sheetHint: "Переставьте темы стрелками и сохраните — этот порядок видят и ученики.",
     moveUp: "Поднять тему «{title}» выше",
     moveDown: "Опустить тему «{title}» ниже",
-    save: "Сохранить порядок",
     saved: "Порядок тем сохранён."
   },
   list: {
@@ -36,6 +36,7 @@ const ru = {
     openA11y: "Открыть тему «{title}»"
   },
   deleteTopic: {
+    // Spoken while the spinner turns.
     loadingImpact: "Проверяем, что будет удалено…",
     impactFailed: "Не удалось проверить, что будет удалено."
   },
@@ -50,58 +51,58 @@ const ru = {
     // Accessible name of the «⋯» button of a topic (the editor and «Удалить тему» are behind it).
     actions: "Действия с темой",
     openEdit: "Открыть редактирование темы",
-    // Under a long grid of number tiles, next to «Показать ещё».
-    shownOf: "Показаны {shown} из {total}"
+    // The caption of an empty file slot (the site's sentence «Файл пока не загружен.» is spoken).
+    noFile: "Нет файла"
   },
   number: {
-    unsaved: "Есть несохранённые изменения",
     conditionSaved: "Условие сохранено.",
     conditionDeleted: "Условие удалено.",
     answerSaved: "Ответ сохранён.",
     answerDeleted: "Ответ удалён.",
-    resetDraft: "Вернуть сохранённое"
+    // Spoken name of the mark next to «Сохранить».
+    resetDraft: "Вернуть сохранённое",
+    // The screen's one hint (replaces `dict.topics.answerManager.latexHint*`).
+    latexHint: "Формулы: $...$ в строке, $$...$$ отдельным блоком."
   },
   edit: {
-    sections: { topic: "Тема", answers: "Условия и ответы", import: "Импорт" },
+    // `answersShort` is on the switch, `answers` is its spoken name.
+    sections: { topic: "Тема", answers: "Условия и ответы", answersShort: "Задачи", import: "Импорт" },
     sectionsAria: "Разделы редактирования темы",
-    unsaved: "Есть несохранённые изменения",
+    // Spoken name of the mark next to «Сохранить».
     reset: "Вернуть сохранённое",
     titleRequired: "Введите название темы.",
     numbersRequired: "Укажите хотя бы один номер.",
-    // the replacement is uploaded at once but attached only by «Сохранить изменения»
+    // the replacement is uploaded at once but attached only by «Сохранить»: `filePending` is the caption of
+    // its box, the two sentences are spoken
+    filePending: "Не сохранён",
     willReplace: "Файл заменит текущий, когда вы сохраните изменения.",
     willAttach: "Файл прикрепится к теме, когда вы сохраните изменения.",
     discardFile: "Убрать выбранный файл",
     waitUploads: "Дождитесь окончания загрузки файлов.",
-    openNumber: "Открыть номер {number}",
-    importTitle: "Импорт номеров из задачника",
-    importHint: "Импорт только добавляет номера и заполняет условия и ответы — ничего не удаляет."
+    openNumber: "Открыть номер {number}"
   }
 };
 
 const en: typeof ru = {
-  fileDrop: {
-    helper: "Choose a file on your device: PDF, DOCX, PNG or JPG."
-  },
   importPanel: {
     pasteFromClipboard: "Paste JSON from the clipboard",
     chooseJsonFile: "Choose a JSON file",
     promptCopied: "Copied: the AI prompt",
-    loadTitle: "Load the AI reply",
-    textLoaded: "Text pasted — tap “Check file”",
+    prompt: "Prompt",
+    slot: "JSON file",
+    textLoaded: "Text pasted",
+    hint: "Give the prompt and the problem book to an AI chat, then load its reply here.",
+    overwrite: "Overwrite filled",
     sharePrompt: "Share the prompt",
     clipboardDenied: "Could not access the clipboard.",
     clipboardEmpty: "The clipboard has no text.",
     pasteRefused: "Could not paste text from the clipboard. If the system asks for permission, allow pasting.",
-    hideText: "hide the field"
+    hideText: "Hide the field"
   },
   reorder: {
-    action: "Topic order",
     title: "Topic order",
-    sheetHint: "Move topics with the arrows and save — students see this order too.",
     moveUp: "Move topic “{title}” up",
     moveDown: "Move topic “{title}” down",
-    save: "Save order",
     saved: "Topic order saved."
   },
   list: {
@@ -122,30 +123,28 @@ const en: typeof ru = {
   topic: {
     actions: "Topic actions",
     openEdit: "Edit: open the topic editor",
-    shownOf: "Showing {shown} of {total}"
+    noFile: "No file"
   },
   number: {
-    unsaved: "There are unsaved changes",
     conditionSaved: "Statement saved.",
     conditionDeleted: "Statement deleted.",
     answerSaved: "Answer saved.",
     answerDeleted: "Answer deleted.",
-    resetDraft: "Restore the saved text"
+    resetDraft: "Restore the saved text",
+    latexHint: "Formulas: $...$ inline, $$...$$ as a block."
   },
   edit: {
-    sections: { topic: "Topic", answers: "Statements and answers", import: "Import" },
+    sections: { topic: "Topic", answers: "Statements and answers", answersShort: "Problems", import: "Import" },
     sectionsAria: "Topic editing sections",
-    unsaved: "There are unsaved changes",
     reset: "Restore the saved topic",
     titleRequired: "Enter the topic title.",
     numbersRequired: "Enter at least one problem.",
+    filePending: "Not saved",
     willReplace: "The file will replace the current one when you save the changes.",
     willAttach: "The file will be attached to the topic when you save the changes.",
     discardFile: "Remove the chosen file",
     waitUploads: "Wait for the files to finish uploading.",
-    openNumber: "Open problem {number}",
-    importTitle: "Import problems from a problem book",
-    importHint: "Import only adds problems and fills statements and answers — it never deletes anything."
+    openNumber: "Open problem {number}"
   }
 };
 

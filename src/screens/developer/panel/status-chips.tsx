@@ -5,12 +5,15 @@ import { Card, Text } from '@/ui';
 
 import type { PanelFigure } from './logic';
 
+/** A figure of the strip with the one or two words drawn under it; `caption` (the site's name) is read out. */
+export type StripFigure = PanelFigure & { short: string };
+
 /**
  * The strip above the service actions (07 §1.9 layout item 2): queue, AI runs in 24 h and storage as three
  * plain figures of one card — what the actions below change. Only a value that signals a problem is
  * coloured.
  */
-export function StatusChips({ figures }: { figures: readonly PanelFigure[] }) {
+export function StatusChips({ figures }: { figures: readonly StripFigure[] }) {
   const styles = useStyles();
   return (
     <Card testID="panel-chips">
@@ -26,8 +29,8 @@ export function StatusChips({ figures }: { figures: readonly PanelFigure[] }) {
             <Text variant="cardTitle" color={figure.attention ? 'redText' : 'textStrong'} tabular numberOfLines={1}>
               {figure.value}
             </Text>
-            <Text variant="small" color="textMuted" numberOfLines={2}>
-              {figure.caption}
+            <Text variant="small" color="textMuted" numberOfLines={1}>
+              {figure.short}
             </Text>
           </View>
         ))}

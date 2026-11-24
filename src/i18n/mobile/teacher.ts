@@ -1,25 +1,28 @@
 // Mobile-only strings of the teacher area (overview, students, homework review, assigning, reports).
-// Site texts stay in `dict.students.*` and `dict.teacherHome`.
+// Site texts stay in `dict.students.*` and `dict.teacherHome`. Most of what is here is spoken, not shown:
+// the screens follow the text diet (docs/design/glass-over-paper.md §1a) and keep the words they cut in
+// accessibility labels.
 const ru = {
   // Overview (`teacher.home`): the nearest lesson, who needs attention, everybody's progress.
   home: {
-    // The lesson card: when the nearest lesson is («Сегодня в 17:00 · 11А») over its title.
+    // The lesson card: when the nearest lesson is («Сегодня в 17:00») under / over its title.
     lessonNow: "Идёт сейчас",
     lessonToday: "Сегодня в {time}",
     lessonTomorrow: "Завтра в {time}",
     lessonOn: "{date} в {time}",
-    // «Сегодня в 17:00 · 11А»: the when-line with the group or the only student of the lesson.
+    // Spoken: «Сегодня в 17:00 · 11А» — the when-line with the group or the only student of the lesson.
     lessonWith: "{when} · {who}",
     openBoard: "Открыть доску",
     openBoardOf: "Открыть доску: {title}, {when}",
+    // Heading of the tablet's panel; a phone shows the list without a caption.
     attention: "Требуют внимания",
-    attentionEmpty: "Сейчас никто не требует внимания",
-    // One caption per student: how many numbers are marked «нужна помощь».
+    attentionEmpty: "Всё спокойно",
+    // Spoken name of the red number on a student's row: how many numbers are marked «нужна помощь».
     needHelpForms: ["{n} номер «нужна помощь»", "{n} номера «нужна помощь»", "{n} номеров «нужна помощь»"],
+    // Spoken parts of the «Звонки» row: «Пора позвонить: 2».
     callsLine: "{label}: {n}",
     upcoming: "Ближайшие занятия",
     progress: "Прогресс",
-    allStudents: "Все ученики",
     // Screen-reader name of a progress row: «Илья Смирнов. 31 решил сам · 6 исправил».
     progressA11y: "{name}. {breakdown}",
     progressEmptyA11y: "{name}. Пока нет отмеченных номеров"
@@ -28,34 +31,44 @@ const ru = {
   students: {
     // The site shows three buttons per row; a phone row has one "⋯" that opens them in a sheet.
     actionsFor: "Действия: {name}",
-    // The one fact on the right of a student row: how many numbers the student has closed.
+    // Spoken fact of a student row without red numbers: how many numbers the student has closed.
     solved: "решено {n}",
     copyHint: "Нажмите, чтобы скопировать",
-    suggestPickHint: "Нажмите, чтобы подставить"
+    // One word under a figure of the tablet summary (the yellow one is `m.common.statuses.YELLOW.label`).
+    figureAlone: "сам",
+    figureHelp: "помощь",
+    // Short banners above the list / on the card: the site's two-sentence notices are cut.
+    created: "Ученик добавлен",
+    deleted: "Ученик удалён",
+    passwordChanged: "Пароль обновлён",
+    // The one line of the credentials sheet: after «Готово» the password cannot be shown again.
+    passwordOnce: "Пароль виден только сейчас"
   },
   report: {
     // The PDF is generated for seconds; the site shows nothing meanwhile (the browser downloads it).
     preparing: "Готовим отчёт…",
-    // Title of the file viewer. The site's period buttons read «Отчёт: 7 дней» · «30 дней» · «Учебный год»
-    // (one row, the word «Отчёт» once); a viewer title stands alone, so every period names the report.
+    // Title of the file viewer and of a row of the card's "⋯" menu. The site's period buttons read «Отчёт:
+    // 7 дней» · «30 дней» · «Учебный год» (one row, the word «Отчёт» once); a viewer title and a menu row
+    // stand alone, so every period names the report.
     title7d: "Отчёт: 7 дней",
     title30d: "Отчёт: 30 дней",
     titleYear: "Отчёт: учебный год",
     // A report finished after the teacher left the card: it is not opened over the screen they went to,
     // it waits on the card until they open it (the same as the group screen's reports).
     ready: "Отчёт готов: {title}",
+    // Spoken name of the notice's «Открыть».
     open: "Открыть отчёт"
   },
   review: {
-    // Heading of the rows of a homework that wait for the teacher: «Нужно проверить · 5».
-    toCheck: "Нужно проверить",
-    nothingToCheck: "Проверять пока нечего",
-    // Part of a homework's caption: «до завтра, 23:59 · 5 номеров ждут проверки».
+    // «Принять вердикты ИИ» next to the sparkles icon.
+    accept: "Принять",
+    nothingToCheck: "Проверять нечего",
+    // Spoken name of the red counter of a homework: «5 номеров ждут проверки».
     toCheckForms: ["{n} номер ждёт проверки", "{n} номера ждут проверки", "{n} номеров ждут проверки"],
     // A status group has no visible caption on a phone; this is its accessible name.
     statusAria: "Статус номера {n}",
-    // The site's review tab hides the statement; on a phone it opens on demand under the number.
-    hideCondition: "Скрыть условие и ответ",
+    // The site's review tab hides the statement; on a phone it opens on demand under the number. Spoken
+    // in place of the dash shown for a missing statement / answer.
     noCondition: "Условие для этого номера не добавлено.",
     noAnswer: "Ответ для этого номера не добавлен.",
     // Accessible names of the per-number buttons: in a list of numbers each one names its number.
@@ -69,30 +82,27 @@ const ru = {
   },
   // Student card (`teacher.student.*`): chrome the site does not have.
   card: {
-    reports: "Отчёты в PDF",
-    reportsHint: "Отчёт формируется на сервере и открывается в просмотре файлов — оттуда им можно поделиться.",
     expand: "Развернуть: {title}",
     collapse: "Свернуть: {title}",
-    // «Открыть занятие» repeats on every lesson card: its accessible name says which lesson.
+    // «Открыть» repeats on every lesson card: its accessible name says which lesson.
     openLessonOf: "Открыть занятие: {title}, {meta}"
   },
   assign: {
-    // Touch wording of the site's "click the problems below" hint.
-    steps: "1. Нажмите на номера ниже, чтобы выбрать их · 2. Задайте дедлайн · 3. Нажмите «Выдать ДЗ».",
-    titleAction: "Название",
     titleSheet: "Название ДЗ",
-    // The title button shows the typed title instead of «Название»: its accessible name carries it too.
+    // The pencil button is lit once a title is typed: its accessible name carries the title.
     titleSheetOf: "Название ДЗ: {title}",
-    titleHint: "Если оставить поле пустым, ДЗ получит номер по порядку в теме, например «ДЗ 3».",
-    noNumbers: "В этой теме пока нет номеров.",
-    conditionsFailed: "Условия номеров не загрузились — выбирать номера можно и без них."
+    assigned: "ДЗ выдано",
+    // Footnote of a number that already sits in a homework with a deadline.
+    inHomework: "уже в ДЗ",
+    noNumbers: "Нет номеров",
+    conditionsFailed: "Условия не загрузились"
   },
   lessons: {
     bankLoading: "Загружаем номера…",
     bankFailed: "Не удалось загрузить номера. Попробуйте ещё раз.",
-    noFreeNumbers: "Все номера этой темы уже в наборе.",
-    noTopicNumbers: "В этой теме пока нет номеров.",
-    pickTopicFirst: "Сначала выберите тему"
+    noFreeNumbers: "Все уже в наборе",
+    pickTopicFirst: "Сначала выберите тему",
+    emptySet: "Набор пуст"
   }
 };
 
@@ -106,12 +116,11 @@ const en: typeof ru = {
     openBoard: "Open the board",
     openBoardOf: "Open the board: {title}, {when}",
     attention: "Needs attention",
-    attentionEmpty: "Nobody needs attention right now",
+    attentionEmpty: "All quiet",
     needHelpForms: ["{n} problem marked “needs help”", "{n} problems marked “needs help”"],
     callsLine: "{label}: {n}",
     upcoming: "Upcoming lessons",
     progress: "Progress",
-    allStudents: "All students",
     progressA11y: "{name}. {breakdown}",
     progressEmptyA11y: "{name}. No marked problems yet"
   },
@@ -119,7 +128,12 @@ const en: typeof ru = {
     actionsFor: "Actions: {name}",
     solved: "{n} solved",
     copyHint: "Tap to copy",
-    suggestPickHint: "Tap to use it"
+    figureAlone: "alone",
+    figureHelp: "help",
+    created: "Student added",
+    deleted: "Student deleted",
+    passwordChanged: "Password updated",
+    passwordOnce: "The password is shown only now"
   },
   report: {
     preparing: "Preparing the report…",
@@ -130,11 +144,10 @@ const en: typeof ru = {
     open: "Open the report"
   },
   review: {
-    toCheck: "To check",
-    nothingToCheck: "Nothing to check yet",
+    accept: "Accept",
+    nothingToCheck: "Nothing to check",
     toCheckForms: ["{n} problem to check", "{n} problems to check"],
     statusAria: "Status of problem {n}",
-    hideCondition: "Hide the statement and answer",
     noCondition: "No statement has been added for this problem.",
     noAnswer: "No answer has been added for this problem.",
     showConditionOf: "Statement and answer of problem {n}",
@@ -144,27 +157,24 @@ const en: typeof ru = {
     partlyUndone: "{done} of {total} undone."
   },
   card: {
-    reports: "PDF reports",
-    reportsHint: "The report is built on the server and opens in the file viewer — you can share it from there.",
     expand: "Expand: {title}",
     collapse: "Collapse: {title}",
     openLessonOf: "Open lesson: {title}, {meta}"
   },
   assign: {
-    steps: "1. Tap the problems below to select them · 2. Set a deadline · 3. Press “Assign homework”.",
-    titleAction: "Title",
     titleSheet: "Homework title",
     titleSheetOf: "Homework title: {title}",
-    titleHint: "If you leave it empty, the homework gets its number within the topic, for example “Homework 3”.",
-    noNumbers: "This topic has no problems yet.",
-    conditionsFailed: "The statements did not load — you can still select problems without them."
+    assigned: "Homework assigned",
+    inHomework: "already assigned",
+    noNumbers: "No problems",
+    conditionsFailed: "The statements did not load"
   },
   lessons: {
     bankLoading: "Loading problems…",
     bankFailed: "Could not load the problems. Please try again.",
-    noFreeNumbers: "Every problem of this topic is already in the set.",
-    noTopicNumbers: "This topic has no problems yet.",
-    pickTopicFirst: "Pick a topic first"
+    noFreeNumbers: "All are in the set already",
+    pickTopicFirst: "Pick a topic first",
+    emptySet: "The set is empty"
   }
 };
 

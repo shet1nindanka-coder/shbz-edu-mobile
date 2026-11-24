@@ -5,9 +5,8 @@ import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-nativ
 import type { TimelineEntry } from '@/api/types';
 import { buildProgressTimelineView, buildTimelineChartGeometry, type TimelinePeriod } from '@/domain/progress-timeline';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { Card, Icon, Segmented, Text } from '@/ui';
+import { Card, Icon, Segmented, Text, type IconName } from '@/ui';
 
 import { nearestPointIndex } from '../logic';
 import { ChartHitArea, ChartStepper } from './chart-selection';
@@ -25,18 +24,16 @@ const DOT_RADIUS = 5.5;
 export type TimelineChartProps = {
   /** 112 daily entries, oldest first. */
   entries: readonly TimelineEntry[];
-  /** Name of the student the timeline is filtered by; null = every student. */
-  selectedStudentName: string | null;
 };
 
 /**
- * «Динамика прогресса» (06 §1.6.a item 2, §4.5; mockup D-stats): period switch, the closed / red totals
- * as plain figures, the trend against the previous window and a line of closed numbers per day or week in
- * the accent gradient. The site shows a point's
- * value on hover; here the whole plot is one touch target (a tap selects the nearest point), the arrows
- * beside the caption step point by point, and the caption names the selected one.
+ * «Динамика прогресса» (06 §1.6.a item 2, §4.5; mockup D-stats; text diet §1a): period switch, the closed /
+ * red totals as plain figures — the trend against the previous window is an arrow next to «Закрыто», its
+ * sentence is read out — and a line of closed numbers per day or week in the accent gradient. The site
+ * shows a point's value on hover; here the whole plot is one touch target (a tap selects the nearest
+ * point), the arrows under it step point by point, and the caption between them names the selected one.
  */
-export function TimelineChart({ entries, selectedStudentName }: TimelineChartProps) {
+export function TimelineChart({ entries }: TimelineChartProps) {
   const styles = useStyles();
   const theme = useTheme();
   const gradientId = useId();
@@ -63,7 +60,7 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
     // The geometry is in a 0..100 box: scale every coordinate pair into the measured plot.
     d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_pair, x: string, y: string) => `${px(Number(x))} ${py(Number(y))}`);
 
-  const trendIcon = view.trend.direction === 'up' ? 'arrowUp' : view.trend.direction === 'down' ? 'arrowDown' : 'forward';
+  const trendIcon: IconName | undefined = view.trend.direction === 'up' ? 'arrowUp' : view.trend.direction === 'down' ? 'arrowDown' : undefined;
   const pointTitle = (index: number) => {
     const point = view.points[index];
     return format(t.pointTitle, { label: point?.label ?? '', n: point?.closedCount ?? 0 });
@@ -87,28 +84,11 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
       />
 
       <View style={styles.totals}>
-        <TotalBox label={t.closed} value={view.closedTotal} testID="stats-timeline-closed" />
+        <TotalBox label={t.closed} value={view.closedTotal} icon={trendIcon} spoken={view.trend.label} testID="stats-timeline-closed" />
         <TotalBox label={t.red} value={view.redTotal} attention testID="stats-timeline-red" />
       </View>
 
-      <View style={styles.trend} testID="stats-timeline-trend">
-        <Icon name={trendIcon} size={theme.sizes.icon.sm} color="textMuted" />
-        <Text variant="small" color="textMuted" style={styles.trendLabel}>
-          {view.trend.label}
-        </Text>
-      </View>
-
-      <Hint>
-        <Text variant="small" color="textMuted">
-          {selectedStudentName ? format(t.onlyStudent, { name: selectedStudentName }) : t.allStudents}
-        </Text>
-      </Hint>
-
-      <View style={styles.panel}>
-        <Text variant="smallStrong" color="textMuted" accessibilityRole="header">
-          {view.title}
-        </Text>
-
+      <View>
         {chart ? (
           <View onLayout={onLayout}>
             {width > 0 ? (
@@ -188,13 +168,7 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
                 <Text variant="smallStrong" align="center" accessibilityLiveRegion="polite" testID="stats-timeline-selected">
                   {pointTitle(selectedIndex)}
                 </Text>
-              ) : (
-                <Hint>
-                  <Text variant="small" color="textMuted" align="center">
-                    {m.stats.chart.pointHint}
-                  </Text>
-                </Hint>
-              )}
+              ) : null}
             </ChartStepper>
           </View>
         ) : (
@@ -209,18 +183,33 @@ export function TimelineChart({ entries, selectedStudentName }: TimelineChartPro
 
 const LABEL_WIDTH = 72;
 
+type TotalBoxProps = {
+  label: string;
+  value: number;
+  attention?: boolean;
+  /** A glyph after the figure: which way it moved against the previous window. */
+  icon?: IconName;
+  /** What the glyph means, for a screen reader («+25 закрыто (+179%) к прошлой неделе»). */
+  spoken?: string;
+  testID: string;
+};
+
 /** «Закрыто» / «Красных» of the period: a plain figure in a soft box; the red count is coloured only when there is one. */
-function TotalBox({ label, value, attention = false, testID }: { label: string; value: number; attention?: boolean; testID: string }) {
+function TotalBox({ label, value, attention = false, icon, spoken, testID }: TotalBoxProps) {
   const styles = useStyles();
+  const theme = useTheme();
   return (
-    <Card style={styles.total} accessibilityLabel={`${label} ${value}`} testID={testID}>
+    <Card style={styles.total} accessibilityLabel={[`${label} ${value}`, spoken].filter(Boolean).join('. ')} testID={testID}>
       <Text variant="small" color="textMuted" numberOfLines={1}>
         {/* The site writes «Закрыто: 12» in one line; a caption above its figure needs no colon. */}
         {label.replace(/:\s*$/, '')}
       </Text>
-      <Text variant="cardTitle" color={attention && value > 0 ? 'redText' : 'textStrong'} tabular>
-        {value}
-      </Text>
+      <View style={styles.totalValue}>
+        <Text variant="cardTitle" color={attention && value > 0 ? 'redText' : 'textStrong'} tabular>
+          {value}
+        </Text>
+        {icon ? <Icon name={icon} size={theme.sizes.icon.sm} color="textMuted" /> : null}
+      </View>
     </Card>
   );
 }
@@ -232,9 +221,7 @@ const useStyles = makeStyles((t) => {
     root: { gap: t.space.md },
     totals: { flexDirection: 'row', gap: t.space.sm },
     total: { flex: 1, minWidth: 0, gap: t.space.xxxs },
-    trend: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-    trendLabel: { flex: 1, minWidth: 0 },
-    panel: { gap: t.space.sm },
+    totalValue: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
     plot: { height: PLOT_HEIGHT + TOP * 2 },
     labels: { height: labelLine, marginBottom: t.space.sm },
     label: { position: 'absolute', top: 0, width: LABEL_WIDTH },

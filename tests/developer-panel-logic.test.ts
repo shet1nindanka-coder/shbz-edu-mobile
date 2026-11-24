@@ -20,6 +20,7 @@ import {
   filterRecipients,
   panelChips,
   pickedStudents,
+  shortDateTime,
   statTiles,
   toggleRecipient,
 } from "@/screens/developer/panel/logic";
@@ -69,7 +70,8 @@ test("panelChips: queue is always green, AI turns yellow at 80 %, storage above 
 });
 
 test("statTiles: the seven blocks in the site's order, the bar only on the 24-hour tile", () => {
-  const tiles = statTiles(stats(), settings, ru.status, "МСК");
+  const now = Date.parse("2026-11-16T09:00:00.000Z");
+  const tiles = statTiles(stats(), settings, ru.status, "ru", now);
   assert.deepEqual(
     tiles.map((tile) => tile.key),
     ["queue", "runs24h", "lessonQueue", "files", "students", "topics", "lastRetention"],
@@ -84,15 +86,28 @@ test("statTiles: the seven blocks in the site's order, the bar only on the 24-ho
     ["runs24h"],
   );
   assert.equal(tiles[3]?.hint, "12.0 MB");
+  assert.equal(tiles[3]?.valueSuffix, "12.0 MB");
   assert.equal(tiles[4]?.hint, undefined);
   assert.deepEqual(
     tiles.filter((tile) => tile.wide).map((tile) => tile.key),
     ["lastRetention"],
   );
-  // "Not run yet" is not a time: no zone mark. A date-time is Moscow time and says so.
+  // "Not run yet" keeps the server's words; a run is a short Moscow date-time without the year.
   assert.equal(tiles[6]?.value, "ещё не выполнялся");
-  const ran = statTiles(stats({ lastRetentionAt: "2026-11-11T08:10:00.000Z", lastRetentionLabel: "11.11.2026, 11:10" }), settings, ru.status, "МСК");
-  assert.equal(ran[6]?.value, "11.11.2026, 11:10 МСК");
+  const ran = statTiles(stats({ lastRetentionAt: "2026-11-11T08:10:00.000Z", lastRetentionLabel: "11.11.2026, 11:10" }), settings, ru.status, "ru", now);
+  assert.equal(ran[6]?.value, "11 нояб., 11:10");
+});
+
+test("shortDateTime: no year inside the current year, the time alone for today when asked", () => {
+  const now = Date.parse("2026-11-24T14:00:00.000Z");
+  assert.equal(shortDateTime("2026-11-23T16:33:00.000Z", now, "ru"), "23 нояб., 19:33");
+  assert.equal(shortDateTime("2026-11-23T16:33:00.000Z", now, "en"), "23 Nov, 19:33");
+  assert.equal(shortDateTime("2025-12-31T09:05:00.000Z", now, "ru"), "31 дек. 2025, 12:05");
+  // Today is the Moscow day: 21:30 UTC of the 23rd is already the 24th in Moscow.
+  assert.equal(shortDateTime("2026-11-23T21:30:00.000Z", now, "ru", true), "00:30");
+  assert.equal(shortDateTime("2026-11-23T21:30:00.000Z", now, "ru"), "24 нояб., 00:30");
+  assert.equal(shortDateTime("2026-11-23T16:33:00.000Z", now, "ru", true), "23 нояб., 19:33");
+  assert.equal(shortDateTime("not a date", now, "ru"), "");
 });
 
 test("budgetRows: bucket counters with their own state, in the server's order; an absent list gives none", () => {
@@ -191,7 +206,7 @@ test("against the mock: a blank title and an empty selection are refused by the 
 
   // The panel payload feeds the pure helpers as is.
   assert.equal(panelChips(panel.stats, panel.settings, ru).length, 3);
-  assert.equal(statTiles(panel.stats, panel.settings, ru.status, "МСК").length, 7);
+  assert.equal(statTiles(panel.stats, panel.settings, ru.status, "ru", Date.now()).length, 7);
   assert.deepEqual(
     budgetRows(panel.aiBudgets).map((row) => row.key),
     ["homework", "lesson", "plans"],

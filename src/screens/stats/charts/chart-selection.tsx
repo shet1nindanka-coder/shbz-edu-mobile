@@ -62,7 +62,7 @@ export type ChartStepperProps = {
   count: number;
   selected: number | null;
   onSelect: (index: number | null) => void;
-  /** The caption between the arrows: the selected mark's title, or the hint. */
+  /** The caption between the arrows: the selected mark's title; nothing while no mark is selected. */
   children?: ReactNode;
   testID?: string;
 };

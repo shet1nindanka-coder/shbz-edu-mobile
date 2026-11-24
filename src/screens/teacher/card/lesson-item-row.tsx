@@ -23,9 +23,9 @@ export type LessonItemRowProps = {
 };
 
 /**
- * One problem of the student's set in a lesson (docs/spec/04-teacher-students.md S6 "row"): the number
- * with its topic as the one caption, "remove from the set", and the "how did it go" marks under them —
- * four worded options do not fit next to a number on a phone.
+ * One problem of the student's set in a lesson (docs/spec/04-teacher-students.md S6 "row"): the number,
+ * "remove from the set", and the "how did it go" marks under them — four worded options do not fit next
+ * to a number on a phone. The number's topic is spoken with it, not shown: the row is its number.
  */
 export function LessonItemRow({ item, busy, saving, resultsBlocked, divider, onResult, onRemove }: LessonItemRowProps) {
   const styles = useStyles();
@@ -37,14 +37,9 @@ export function LessonItemRow({ item, busy, saving, resultsBlocked, divider, onR
   return (
     <View style={[styles.row, divider ? styles.divider : null]} testID={`lesson-item-${item.id}`}>
       <View style={styles.head}>
-        <View style={styles.titles}>
-          <Text variant="bodyBold" tabular>
-            {item.number}
-          </Text>
-          <Text variant="small" color="textMuted" numberOfLines={1}>
-            {item.topicTitle}
-          </Text>
-        </View>
+        <Text variant="bodyBold" tabular accessibilityLabel={`${numberSign}. ${item.topicTitle}`} style={styles.titles}>
+          {item.number}
+        </Text>
         <IconButton
           icon="trash"
           variant="ghost"
@@ -81,5 +76,5 @@ const useStyles = makeStyles((t) => ({
   row: { gap: t.space.xs, paddingVertical: t.space.md },
   divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
   head: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  titles: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  titles: { flex: 1, minWidth: 0 },
 }));

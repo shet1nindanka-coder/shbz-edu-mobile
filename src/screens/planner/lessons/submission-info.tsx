@@ -2,11 +2,11 @@ import { View } from 'react-native';
 
 import type { LessonBoardSubmission } from '@/api/types';
 import { PhotoThumb } from '@/components/files';
-import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Spinner, Text } from '@/ui';
+import { Icon, Spinner, Text } from '@/ui';
 
+import { rowDateTime } from '../shared/row-date';
 import { minutesAgo } from './board-logic';
 
 export type SubmissionInfoProps = {
@@ -26,10 +26,11 @@ export type SubmissionInfoProps = {
 
 /**
  * The latest submission of a lesson item (docs/spec/05-teacher-lessons-plans.md §1.3 "Submission info
- * line"; layout: mockup `T-board`): the photos, and next to them when it was sent and how long the problem
- * took, the check state and the teacher-only remarks. Correct / incorrect verdicts set the result
- * automatically, so only "not recognised" and the instruction-text flag are spelled out — in red, because
- * the number then waits for the teacher.
+ * line"; layout: mockup `T-board`): the photos, and next to them when it was sent, how long the problem
+ * took (a clock and the minutes), the check state and the teacher-only remarks. Correct / incorrect
+ * verdicts set the result automatically, so only "not recognised" and the instruction-text flag are spelled
+ * out — in red, because the number then waits for the teacher. The site's words around the figures («сдал
+ * …», «… на номер») stay in the accessible names.
  */
 export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhoto, numberLabel, testID }: SubmissionInfoProps) {
   const styles = useStyles();
@@ -41,8 +42,7 @@ export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhot
   // SPEC-GAP: the site always prints "N min ago" and keeps the absolute time in a hover tooltip. A phone
   // has no hover, and «сдал 4826 мин назад» on a lesson of last week says nothing — outside a running
   // lesson the line carries the tooltip's value (the moment of the submission, Moscow time).
-  const when = live ? (ago === 0 ? t.justNow : format(t.minutesAgo, { n: ago })) : formatDateTime(submission.submittedAt, locale);
-  const submitted = format(t.submittedAgo, { ago: when });
+  const when = live ? (ago === 0 ? t.justNow : format(t.minutesAgo, { n: ago })) : rowDateTime(submission.submittedAt, now, locale);
   const injection =
     submission.status === 'DONE' && submission.injectionSuspected
       ? `${t.injectionSuspected}${submission.injectionNote ? `: ${submission.injectionNote}` : ''} — ${t.injectionCheckYourself}`
@@ -67,16 +67,24 @@ export function SubmissionInfo({ submission, spentMinutes, now, live, onOpenPhot
       ) : null}
       <View style={styles.texts}>
         {checking ? (
-          <View accessibilityRole="progressbar" accessibilityLabel={t.checking} style={styles.checking}>
+          // The spinner next to the photo is the whole message; the word is for a screen reader.
+          <View accessible accessibilityRole="progressbar" accessibilityLabel={t.checking} style={styles.line}>
             <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
-            <Text variant="small" color="textMuted">
-              {t.checking}
-            </Text>
           </View>
         ) : (
-          <Text variant="small" color="textMuted" tabular>
-            {typeof spentMinutes === 'number' ? `${submitted} · ${format(t.minutesOnNumber, { n: spentMinutes })}` : submitted}
-          </Text>
+          <View style={styles.line}>
+            <Text variant="small" color="textMuted" tabular accessibilityLabel={format(t.submittedAgo, { ago: when })}>
+              {when}
+            </Text>
+            {typeof spentMinutes === 'number' ? (
+              <View accessible accessibilityLabel={format(t.minutesOnNumber, { n: spentMinutes })} style={styles.spent}>
+                <Icon name="clock" size={theme.sizes.icon.sm} color="textMuted" />
+                <Text variant="small" color="textMuted" tabular>
+                  {format(dict.planner.common.minutesShort, { n: spentMinutes })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         )}
         {submission.status === 'FAILED' ? (
           <Text variant="small" color="redText">
@@ -103,5 +111,6 @@ const useStyles = makeStyles((t) => ({
   block: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs, flexShrink: 0, maxWidth: '60%' },
   texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
-  checking: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+  line: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: t.space.md, rowGap: t.space.xxxs },
+  spent: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxs },
 }));

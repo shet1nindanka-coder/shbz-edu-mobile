@@ -8,7 +8,6 @@ import { PhotoGrid, PhotoSourceSheet, photoPlaceLabel, type PhotoGridItem } from
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Dialog, Notice, ProgressBar, Text, useEventAnnouncement } from '@/ui';
 
@@ -33,8 +32,8 @@ export type HomeworkPhotosBlockProps = {
 
 /**
  * «Фото решений» — the photo batch of a homework (docs/spec/03-student-homework-lesson.md §1 H2.a, H4):
- * a grid of thumbnails with an "add" tile (camera first, then the gallery), the real upload percentage,
- * and a confirmation before a photo is deleted. All photos of one upload are stored or none.
+ * a grid of thumbnails with an "add" tile (camera first, then the gallery), the counter «3/10», the real
+ * upload percentage, and a confirmation before a photo is deleted. No instructions under the grid. All photos of one upload are stored or none.
  */
 export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }: HomeworkPhotosBlockProps) {
   const styles = useStyles();
@@ -201,24 +200,17 @@ export function HomeworkPhotosBlock({ assignmentId, photos, maxPhotos, onGone }:
       ) : null}
 
       {atLimit ? (
-        // A state, not a hint: it explains why the add tile is switched off.
+        // The limit is said when it is reached: it is why the add tile is switched off.
         <Text variant="small" color="textMuted" testID="homework-photos-limit">
           {format(t.limitReached, { max: maxPhotos })}
         </Text>
-      ) : (
-        <Hint>
-          <View style={styles.hints}>
-            <Text variant="hint">{m.studentWork.photos.addHint}</Text>
-            <Text variant="hint">{format(t.upTo, { max: maxPhotos })}</Text>
-          </View>
-        </Hint>
-      )}
+      ) : null}
 
       <PhotoSourceSheet
         visible={source.sheetOpen}
         onClose={source.closeSheet}
         onSelect={source.select}
-        title={m.studentWork.photos.sourceTitle}
+        title={m.common.photos.add}
       />
 
       <Dialog
@@ -244,5 +236,4 @@ const useStyles = makeStyles((t) => ({
   block: { gap: t.space.sm },
   head: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   titles: { flex: 1, minWidth: 0 },
-  hints: { gap: t.space.xxxs },
 }));

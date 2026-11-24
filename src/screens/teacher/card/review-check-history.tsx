@@ -6,7 +6,7 @@ import { PhotoThumb } from '@/components/files';
 import { formatRunDateTime } from '@/domain/dates';
 import { format, plural, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { accessibilityLabelOf, Card, Chip, Icon, PressableScale, Text } from '@/ui';
+import { accessibilityLabelOf, Card, Chip, Icon, PressableScale, Spinner, Text, type IconName } from '@/ui';
 
 import { DisclosureRow } from './disclosure-row';
 import { checkMoment, countVerdicts } from './review-logic';
@@ -22,11 +22,16 @@ export type ReviewCheckHistoryProps = {
 
 const VERDICT_ORDER: readonly SolutionVerdict[] = ['CORRECT', 'INCORRECT', 'UNCERTAIN'];
 
+/** The glyph of a verdict count: the status marks' check and cross, a dashed circle for «на проверке». */
+const VERDICT_ICONS: Record<SolutionVerdict, IconName> = { CORRECT: 'check', INCORRECT: 'close', UNCERTAIN: 'circleDashed' };
+
 /**
  * "Check history" of one homework (docs/spec/04-teacher-students.md S4 item 4): every AI check run,
- * newest first, as rows — when, ONE caption with the verdict counts, and one mark on the right (the
- * current run; a failed one in red). A run that has results unfolds to the photos of that attempt and one
- * verdict per number.
+ * newest first, as rows — when, and on the right the verdict counts as glyphs with numbers (errors in
+ * red); a failed run carries the red «Сбой», a running one a spinner. The newest finished run is the
+ * current one by its place; «Текущая», «Выполняется» and the worded counts are spoken (docs/design/
+ * glass-over-paper.md §1a). A run that has results unfolds to the photos of that attempt and one verdict
+ * per number.
  */
 export function ReviewCheckHistory({ checks, currentId, onOpenPhoto, testID }: ReviewCheckHistoryProps) {
   const styles = useStyles();
@@ -46,7 +51,8 @@ export function ReviewCheckHistory({ checks, currentId, onOpenPhoto, testID }: R
     <View testID={testID}>
       <DisclosureRow
         label={t.historyTitle}
-        meta={`· ${plural(locale, checks.length, t.runForms)}`}
+        meta={`· ${checks.length}`}
+        accessibilityLabel={`${t.historyTitle} · ${plural(locale, checks.length, t.runForms)}`}
         expanded={open}
         onToggle={() => setOpen((value) => !value)}
         testID={testID ? `${testID}-toggle` : undefined}
@@ -64,24 +70,24 @@ export function ReviewCheckHistory({ checks, currentId, onOpenPhoto, testID }: R
             const state = check.id === currentId ? t.current : running ? t.running : null;
             const header = (
               <>
-                <View style={styles.runTexts}>
-                  <Text variant="bodyStrong" tabular numberOfLines={1}>
-                    {when}
-                  </Text>
-                  {countsLine ? (
-                    <Text variant="small" color="textMuted" numberOfLines={2}>
-                      {countsLine}
-                    </Text>
-                  ) : null}
-                </View>
-                {/* A colour only for what went wrong; «Текущая» and «Выполняется» are plain facts. */}
+                <Text variant="bodyStrong" tabular numberOfLines={1} style={styles.runTexts}>
+                  {when}
+                </Text>
+                {/* A colour only for what went wrong: the failed run and the count of errors. */}
                 {check.status === 'FAILED' ? (
                   <Chip tone="red" label={t.failed} />
-                ) : state ? (
-                  <Text variant="small" color="textMuted" numberOfLines={1}>
-                    {state}
-                  </Text>
-                ) : null}
+                ) : running ? (
+                  <Spinner size={theme.sizes.icon.sm} color="textMuted" />
+                ) : (
+                  VERDICT_ORDER.filter((verdict) => counts[verdict] > 0).map((verdict) => (
+                    <View key={verdict} style={styles.count}>
+                      <Icon name={VERDICT_ICONS[verdict]} size={theme.sizes.icon.sm} color={verdict === 'INCORRECT' ? 'redText' : 'textMuted'} />
+                      <Text variant="small" color={verdict === 'INCORRECT' ? 'redText' : 'textMuted'} tabular>
+                        {counts[verdict]}
+                      </Text>
+                    </View>
+                  ))
+                )}
                 {expandable ? <Icon name={expanded ? 'chevronUp' : 'chevronDown'} size={theme.sizes.icon.sm} color="textMuted" /> : null}
               </>
             );
@@ -102,27 +108,24 @@ export function ReviewCheckHistory({ checks, currentId, onOpenPhoto, testID }: R
                     {header}
                   </PressableScale>
                 ) : (
-                  <View style={styles.run}>{header}</View>
+                  <View accessibilityLabel={accessibilityLabelOf([when, check.status === 'FAILED' ? t.failed : state, countsLine])} style={styles.run}>
+                    {header}
+                  </View>
                 )}
                 {expanded ? (
                   <Card style={styles.details}>
                     {check.photos.length > 0 ? (
-                      <View style={styles.attempt}>
-                        <Text variant="kicker" color="textMuted">
-                          {t.attemptPhotos}
-                        </Text>
-                        <View style={styles.photos}>
-                          {check.photos.map((photo, photoIndex) => (
-                            <PhotoThumb
-                              key={photo.fileId}
-                              fileId={photo.fileId}
-                              name={photo.originalName}
-                              size={theme.sizes.control.lg}
-                              onPress={() => onOpenPhoto(check, photoIndex)}
-                              testID={`review-check-photo-${photo.fileId}`}
-                            />
-                          ))}
-                        </View>
+                      <View accessibilityLabel={t.attemptPhotos} style={styles.photos}>
+                        {check.photos.map((photo, photoIndex) => (
+                          <PhotoThumb
+                            key={photo.fileId}
+                            fileId={photo.fileId}
+                            name={photo.originalName}
+                            size={theme.sizes.control.lg}
+                            onPress={() => onOpenPhoto(check, photoIndex)}
+                            testID={`review-check-photo-${photo.fileId}`}
+                          />
+                        ))}
                       </View>
                     ) : null}
                     <View>
@@ -149,11 +152,11 @@ export function ReviewCheckHistory({ checks, currentId, onOpenPhoto, testID }: R
 
 const useStyles = makeStyles((t) => ({
   run: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
-  runTexts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  runTexts: { flex: 1, minWidth: 0 },
+  count: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxxs },
   divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.rowBorder },
   pressed: { opacity: 0.6 },
   details: { gap: t.space.md, marginBottom: t.space.md },
-  attempt: { gap: t.space.xs },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   verdict: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.md, paddingVertical: t.space.xxxs },
   verdictText: { flex: 1, minWidth: 0 },

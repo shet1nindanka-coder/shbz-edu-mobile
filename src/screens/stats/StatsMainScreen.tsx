@@ -32,7 +32,8 @@ export type StatsMainScreenProps = ScreenParams['stats.main'];
 /**
  * `stats.main` (docs/spec/06-teacher-groups-calls-stats.md §1.6; layout: docs/design/glass-over-paper.md
  * §7, mockup D-stats): the developer's statistics tab. Three views behind the segmented control of the
- * header — «Прогресс учеников», «По учителям», «Метрики платформы» — each a scroll of cards: plain summary
+ * header — «Ученики», «Учителя», «Платформа» (the site's «Прогресс учеников», «По учителям», «Метрики
+ * платформы») — each a scroll of cards: plain summary
  * figures first, then charts and rankings; a tablet puts the cards side by side. A view's data is
  * requested when the view is first opened and then kept, so switching back is instant. The screen is one
  * list: the cards of «По учителям» (one per teacher, no upper bound) are its rows — two columns of them on
@@ -178,6 +179,12 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
     (view === 'teacher' && filterError !== null) ||
     (current.isPlaceholderData && current.fetchStatus === 'paused');
 
+  const viewLabels: Record<StatsView, string> = {
+    teacher: t.students,
+    teachers: dict.students.directory.teachers,
+    developer: m.stats.short.platform,
+  };
+
   // A tablet lays the teacher cards out in two columns; a view that is one row keeps the whole width.
   const columns = theme.tablet && teacherCards ? 2 : 1;
 
@@ -189,12 +196,14 @@ export function StatsMainScreen({ view: routeView, studentId: routeStudentId }: 
           title={screenTitle('stats.main', m.shell.tabs)}
           aside={
             <Segmented
-              options={STATS_VIEWS.map((value) => ({ value, label: t.views[value] }))}
+              // One word per view; the site's names («Прогресс учеников», …) are the accessible ones.
+              options={STATS_VIEWS.map((value) => ({ value, label: viewLabels[value], accessibilityLabel: t.views[value] }))}
               value={view}
               onChange={selectView}
               accessibilityLabel={t.viewsAria}
-              // No label is cut: where the row is too narrow the bar scrolls, the selected view kept in sight.
-              scrollable={window.width < ROOMY_HEADER_FROM}
+              // A phone gives the three words the whole row; a narrow tablet header scrolls them.
+              fill={!theme.tablet}
+              scrollable={theme.tablet && window.width < ROOMY_HEADER_FROM}
               role="tab"
               testID="stats-views"
             />

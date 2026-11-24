@@ -7,7 +7,7 @@ import type { GroupMemberRow, GroupStatisticsResponse, ReportPeriod } from '@/ap
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
-import { makeStyles } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import {
   accessibilityLabelOf,
   Avatar,
@@ -16,18 +16,18 @@ import {
   Card,
   Chip,
   EmptyState,
+  Icon,
   ListCard,
   ListRow,
   LoadingState,
   Notice,
-  SectionCaption,
   Text,
   TextButton,
   useInsideSurface,
   useRowInset,
 } from '@/ui';
 
-import { RED_ALERT_THRESHOLD, activityLabel, attentionLabels, summaryTiles, type SummaryTile } from '../logic';
+import { RED_ALERT_THRESHOLD, activityLabel, attentionLabels, groupFigures } from '../logic';
 import { CountUp } from './count-up';
 import { ReportExportNotice, studentReportKey, type ReportExport } from './use-report-export';
 
@@ -37,10 +37,11 @@ export type StatisticsTabProps = {
 };
 
 /**
- * «Статистика группы» (06 §1.2 item 5, §4.2): four summary boxes and the members ranked by activity. A
- * member is one row — the name, what needs attention (or the last activity) and the week's count; the
- * numbers, the way to the student card and the PDF reports are in the sheet the row opens. The numbers
- * come ready from the server.
+ * «Статистика группы» (06 §1.2 item 5, §4.2; docs/design/glass-over-paper.md §1a): four figures of the
+ * group, each with one word, and the members ranked by activity — the site's «самый активный» is the
+ * first row. A member is one row: the name, the week's count on the right and, only when something needs
+ * attention, its first reason in red. The other reasons, the last activity, the numbers, the way to the
+ * student card and the PDF reports are in the sheet the row opens. The numbers come ready from the server.
  */
 export function StatisticsTab({ stats, report }: StatisticsTabProps) {
   const styles = useStyles();
@@ -62,20 +63,23 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
   }
 
   if (data.members.length === 0) {
-    return <EmptyState variant="plain" title={t.empty} testID="group-statistics-empty" />;
+    return <EmptyState variant="plain" title={dict.planner.groups.list.noStudents} testID="group-statistics-empty" />;
   }
 
-  const tiles = summaryTiles(data, t);
-  const grid = (
-    <View style={styles.tiles}>
-      <View style={styles.tileRow}>
-        <Tile tile={tiles[0]} />
-        <Tile tile={tiles[1]} />
-      </View>
-      <View style={styles.tileRow}>
-        <Tile tile={tiles[2]} />
-        <Tile tile={tiles[3]} />
-      </View>
+  const figures = (
+    <View style={styles.numbers}>
+      {groupFigures(data, t, { label: m.groups.statistics.attention, aria: m.groups.statistics.attentionAria }).map((figure) => (
+        <Stat
+          key={figure.key}
+          value={figure.value}
+          label={figure.label}
+          spoken={figure.spoken}
+          alert={figure.alert}
+          // On the page the card is the box of all four: a box each would leave «внимание» no room on a phone.
+          boxed={inside}
+          testID={`group-statistics-figure-${figure.key}`}
+        />
+      ))}
     </View>
   );
   const openedRow = data.members.find((row) => row.id === opened) ?? null;
@@ -86,8 +90,8 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
         <Notice tone="error" text={errorText(stats.error, m.common.errors.generic)} testID="group-statistics-refresh-error" />
       ) : null}
 
-      {/* On the page the four boxes share one card; inside a tablet panel they already stand on one. */}
-      {inside ? grid : <Card>{grid}</Card>}
+      {/* On the page the four figures share one card; inside a tablet panel they already stand on one. */}
+      {inside ? figures : <Card>{figures}</Card>}
 
       {/* While the member sheet is open it shows the outcome of a report itself. */}
       {sheetOpen ? null : <ReportExportNotice report={report} testID="group-statistics-report-error" />}
@@ -95,16 +99,17 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
       <ListCard>
         {data.members.map((row, index) => {
           const flags = attentionLabels(row.attention, dict.planner.groupStatistics);
-          const caption = flags.length > 0 ? flags.join(' · ') : activityLabel(row, t, locale);
+          // What the ear gets in full: every reason (or the last activity) and «18 за 7 дней».
+          const spoken = flags.length > 0 ? flags.join(' · ') : activityLabel(row, t, locale);
           const week = format(t.closedFor7, { n: row.closed7 });
           return (
             <ListRow
               key={row.id}
               title={row.name}
-              subtitle={caption}
-              subtitleTone={flags.length > 0 ? 'attention' : 'muted'}
-              subtitleLines={2}
-              meta={week}
+              // One caption, and only for attention: the first reason (the server orders them).
+              subtitle={flags[0]}
+              subtitleTone="attention"
+              meta={String(row.closed7)}
               left={<Avatar name={row.name} tone="neutral" />}
               inset={inset}
               divider={index < data.members.length - 1}
@@ -112,7 +117,7 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
                 setOpened(row.id);
                 setSheetOpen(true);
               }}
-              accessibilityLabel={accessibilityLabelOf([format(m.stats.ranking.placeAria, { n: row.rank }), row.name, caption, week])}
+              accessibilityLabel={accessibilityLabelOf([format(m.stats.ranking.placeAria, { n: row.rank }), row.name, spoken, week])}
               testID={`group-statistics-row-${row.id}`}
             />
           );
@@ -124,27 +129,6 @@ export function StatisticsTab({ stats, report }: StatisticsTabProps) {
   );
 }
 
-function Tile({ tile }: { tile: SummaryTile | undefined }) {
-  const styles = useStyles();
-  if (!tile) return null;
-  return (
-    <Card style={styles.tile} testID={`group-statistics-tile-${tile.key}`}>
-      <Text variant="small" color="textMuted">
-        {tile.label}
-      </Text>
-      {/* Two lines: a full name does not fit half a phone screen in one. */}
-      <Text variant="cardTitle" numberOfLines={2}>
-        {tile.value}
-      </Text>
-      {tile.hint ? (
-        <Text variant="small" color="textMuted">
-          {tile.hint}
-        </Text>
-      ) : null}
-    </Card>
-  );
-}
-
 type MemberStatsSheetProps = {
   row: GroupMemberRow | null;
   visible: boolean;
@@ -152,9 +136,13 @@ type MemberStatsSheetProps = {
   onClose: () => void;
 };
 
-/** One member of the ranking in full: the place, the four numbers, what needs attention, the card and the reports. */
+/**
+ * One member of the ranking in full: the last activity, what needs attention, the four numbers, the two
+ * PDF reports (the download glyph says what the periods are) and the way to the student card.
+ */
 function MemberStatsSheet({ row, visible, report, onClose }: MemberStatsSheetProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const navigation = useAppNavigation();
   const { locale, dict, m } = useI18n();
   const t = dict.planner.groups.statistics;
@@ -170,9 +158,13 @@ function MemberStatsSheet({ row, visible, report, onClose }: MemberStatsSheetPro
     const flags = attentionLabels(row.attention, dict.planner.groupStatistics);
     body = (
       <View style={styles.sheet}>
-        <Text variant="small" color="textMuted">
-          {`${format(m.stats.ranking.placeAria, { n: row.rank })} · ${activityLabel(row, t, locale)}`}
-        </Text>
+        {/* The clock stands for «последняя активность»: the line itself is just «вчера». */}
+        <View style={styles.activity}>
+          <Icon name="clock" size={theme.sizes.icon.sm} color="textMuted" />
+          <Text variant="small" color="textMuted" style={styles.activityText}>
+            {activityLabel(row, t, locale)}
+          </Text>
+        </View>
 
         {flags.length > 0 ? (
           <View style={styles.flags}>
@@ -191,24 +183,21 @@ function MemberStatsSheet({ row, visible, report, onClose }: MemberStatsSheetPro
 
         <ReportExportNotice report={report} testID="group-statistics-sheet-report-error" />
 
-        <View>
-          <SectionCaption>{t.colReport}</SectionCaption>
-          <View style={styles.reports}>
-            {periods.map(({ period, label }) => (
-              <Button
-                key={period}
-                label={label}
-                accessibilityLabel={format(m.groups.statistics.reportAria, { name: row.name, period: label })}
-                variant="outline"
-                leftIcon="download"
-                loading={report.pendingKey === studentReportKey(row.id, period)}
-                disabled={report.blocked}
-                onPress={() => report.exportStudentReport(row.id, period)}
-                style={styles.report}
-                testID={`group-statistics-report-${row.id}-${period}`}
-              />
-            ))}
-          </View>
+        <View style={styles.reports}>
+          {periods.map(({ period, label }) => (
+            <Button
+              key={period}
+              label={label}
+              accessibilityLabel={format(m.groups.statistics.reportAria, { name: row.name, period: label })}
+              variant="outline"
+              leftIcon="download"
+              loading={report.pendingKey === studentReportKey(row.id, period)}
+              disabled={report.blocked}
+              onPress={() => report.exportStudentReport(row.id, period)}
+              style={styles.report}
+              testID={`group-statistics-report-${row.id}-${period}`}
+            />
+          ))}
         </View>
 
         {/* A role that has no student card gets no link, never one that bounces home. */}
@@ -235,11 +224,34 @@ function MemberStatsSheet({ row, visible, report, onClose }: MemberStatsSheetPro
   );
 }
 
-function Stat({ value, label, alert = false }: { value: number; label: string; alert?: boolean }) {
+type StatProps = {
+  value: number;
+  /** One word under the number. */
+  label: string;
+  /** What a screen reader says instead of «number label». */
+  spoken?: string;
+  alert?: boolean;
+  /** A soft box around the figure (default); without it the figure is a bare column of its card. */
+  boxed?: boolean;
+  testID?: string;
+};
+
+/** A number over its one-word label. */
+function Stat({ value, label, spoken, alert = false, boxed = true, testID }: StatProps) {
   const styles = useStyles();
+  if (!boxed) {
+    return (
+      <View accessible accessibilityLabel={spoken ?? `${value} ${label}`} style={[styles.stat, styles.statBare]} testID={testID}>
+        <CountUp value={value} color={alert ? 'redText' : 'textStrong'} />
+        <Text variant="small" color="textMuted" numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    );
+  }
   return (
-    <Card padded={false} style={styles.stat}>
-      <View accessible accessibilityLabel={`${value} ${label}`} style={styles.statBody}>
+    <Card padded={false} style={styles.stat} testID={testID}>
+      <View accessible accessibilityLabel={spoken ?? `${value} ${label}`} style={styles.statBody}>
         <CountUp value={value} color={alert ? 'redText' : 'textStrong'} />
         <Text variant="small" color="textMuted" numberOfLines={1}>
           {label}
@@ -251,17 +263,17 @@ function Stat({ value, label, alert = false }: { value: number; label: string; a
 
 const useStyles = makeStyles((t) => ({
   tab: { gap: t.space.block },
-  tiles: { gap: t.space.sm },
-  tileRow: { flexDirection: 'row', alignItems: 'stretch', gap: t.space.sm },
-  tile: { flex: 1, minWidth: 0, gap: t.space.xxs },
   sheet: { gap: t.space.md },
+  activity: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxs },
+  activityText: { flex: 1, minWidth: 0 },
   flags: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
-  // Four equal boxes, the number over its label: side by side they do not fit a phone in one line.
+  // Four equal columns, the number over its label: side by side they would not fit a phone in one line.
   numbers: { flexDirection: 'row', gap: t.space.xs },
   stat: { flex: 1, minWidth: 0 },
   // Paddings sit on an inner view: on web a card's own `padding: 0` wins over longhand paddings.
   statBody: { paddingVertical: t.space.md, paddingHorizontal: t.space.xs, alignItems: 'center', gap: t.space.xxxs },
-  reports: { flexDirection: 'row', gap: t.space.sm, paddingTop: t.space.xs },
+  statBare: { alignItems: 'center', gap: t.space.xxxs },
+  reports: { flexDirection: 'row', gap: t.space.sm },
   report: { flex: 1 },
   link: { alignSelf: 'flex-start' },
 }));

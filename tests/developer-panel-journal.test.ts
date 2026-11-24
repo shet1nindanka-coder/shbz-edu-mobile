@@ -14,6 +14,7 @@ import {
   actorOptionLabel,
   categoryFilterLabel,
   costText,
+  entryCaption,
   initialJournalFilters,
   mergeJournalPages,
   metaJson,
@@ -64,6 +65,13 @@ test("period, category and actor labels come from the site's filter texts", () =
   assert.equal(categoryFilterLabel("AI", ru.filters), "ИИ и расходы");
   assert.equal(categoryFilterLabel("AUTH", en.filters), "Sign-ins");
   assert.equal(actorOptionLabel({ name: "Игорь Петров", role: "TEACHER" }, ru.roles), "Игорь Петров — учитель");
+});
+
+test("entryCaption: the name and a short when — the time alone today; no dash, no role, no zone mark", () => {
+  const now = Date.parse("2026-11-24T14:40:00.000Z");
+  assert.equal(entryCaption({ actorName: "Анна Петрова", createdAt: "2026-11-24T14:32:00.000Z" }, now, "ru"), "Анна Петрова · 17:32");
+  assert.equal(entryCaption({ actorName: "Анна Петрова", createdAt: "2026-11-23T16:33:00.000Z" }, now, "ru"), "Анна Петрова · 23 нояб., 19:33");
+  assert.equal(entryCaption({ actorName: null, createdAt: "2026-11-24T06:04:00.000Z" }, now, "en"), "09:04");
 });
 
 test("whoText: name snapshot, then the role; a dash for a row without an actor", () => {

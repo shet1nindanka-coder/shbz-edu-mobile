@@ -42,7 +42,7 @@ export function TopicFiles({ theoryFile, homeworkFile, onOpen }: TopicFilesProps
             inset={0}
             left={<IconTile icon={slot.icon} tone="quiet" />}
             title={slot.title}
-            subtitle={file ? undefined : facts}
+            subtitle={file ? undefined : m.content.topic.noFile}
             divider={index < slots.length - 1}
             onPress={file ? () => onOpen(file, slot.title) : undefined}
             accessibilityLabel={

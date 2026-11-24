@@ -5,11 +5,10 @@ import { View } from 'react-native';
 import { errorText, qk, useApi } from '@/api';
 import type { GroupCandidate, GroupDetail, GroupDetailResponse, GroupMember } from '@/api/types';
 import { statusBreakdown } from '@/components/numbers';
-import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Avatar, Button, Dialog, EmptyState, ListCard, ListRow, Notice, SectionCaption, useRowInset } from '@/ui';
+import { useI18n } from '@/i18n';
+import { makeStyles, useTheme } from '@/theme';
+import { Avatar, Dialog, EmptyState, Icon, ListCard, ListRow, Notice, StatusBar, accessibilityLabelOf, useRowInset } from '@/ui';
 
-import { speedLabel } from '../logic';
 import { invalidateGroupMembership } from '../shared/invalidate';
 import { useFlash } from '../shared/use-flash';
 import { AddMemberSheet } from './add-member-sheet';
@@ -26,13 +25,15 @@ export type MembersTabProps = {
 };
 
 /**
- * «Участники» (06 §1.2 item 4, §3.4, §3.5): the members as rows — the name and how the student stands in
- * the bank — with the add-student search behind the button of the caption row. A row opens the member
- * sheet: the AI profile and «Убрать из группы», which asks for a confirmation. Adding needs none, even
- * when it moves the student out of another group.
+ * «Участники» (06 §1.2 item 4, §3.4, §3.5; docs/design/glass-over-paper.md §1a): the first row of the
+ * card opens the add-student search, the others are the members — the name and, as a bar by status, how
+ * the student stands in the bank (the counts are said, not written). A row opens the member sheet: the AI
+ * profile and «Убрать», which asks for a confirmation. Adding needs none, even when it moves the student
+ * out of another group.
  */
 export function MembersTab({ group, onProfileError }: MembersTabProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict, m } = useI18n();
@@ -119,32 +120,8 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
 
   const opened = group.members.find((member) => member.id === openedId) ?? null;
 
-  /** The one caption of a member row: the progress over the bank; the AI speed until there is any. */
-  const captionOf = (member: GroupMember): string => {
-    const progress = statusBreakdown(
-      { green: member.progress.greenCount, yellow: member.progress.yellowCount, red: member.progress.redCount, none: 0 },
-      m.common.statuses,
-    );
-    return progress !== '' ? progress : format(m.groups.members.speed, { speed: speedLabel(member.speed, t.memberEditor) });
-  };
-
   return (
     <View style={styles.tab} testID="group-members-tab">
-      <View style={styles.headRow}>
-        <SectionCaption style={styles.title}>{format(t.membersManager.participants, { n: group.members.length })}</SectionCaption>
-        <FlashText state={flash.state} testID="group-members-flash" />
-        <Button
-          label={dict.students.list.addStudent}
-          accessibilityLabel={t.membersManager.addAria}
-          variant="outline"
-          size="sm"
-          leftIcon="userPlus"
-          disabled={busy}
-          onPress={() => setAddOpen(true)}
-          testID="group-member-add"
-        />
-      </View>
-
       {error ? (
         <Notice
           tone="error"
@@ -155,29 +132,47 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
         />
       ) : null}
 
-      {group.members.length === 0 ? (
-        <EmptyState variant="plain" title={m.groups.members.empty} testID="group-members-empty" />
-      ) : (
-        <ListCard testID="group-members-list">
-          {group.members.map((member, index) => (
+      <ListCard testID="group-members-list">
+        {/* The list starts with the way to add to it; the outcome of an add or a removal flashes here. */}
+        <ListRow
+          title={dict.students.list.addStudent}
+          left={
+            <View style={styles.addMark}>
+              <Icon name="userPlus" size={theme.sizes.icon.md} color="textStrong" />
+            </View>
+          }
+          right={<FlashText state={flash.state} testID="group-members-flash" />}
+          inset={inset}
+          disabled={busy}
+          onPress={() => setAddOpen(true)}
+          accessibilityLabel={t.membersManager.addAria}
+          testID="group-member-add"
+        />
+        {group.members.map((member, index) => {
+          const counts = { green: member.progress.greenCount, yellow: member.progress.yellowCount, red: member.progress.redCount, none: 0 };
+          const marked = counts.green + counts.yellow + counts.red > 0;
+          return (
             <ListRow
               key={member.id}
               title={member.name}
-              subtitle={captionOf(member)}
-              subtitleLines={2}
               left={<Avatar name={member.name} tone="neutral" />}
+              // Status is colour and shape: the bar by status; nothing until the student has marked a number.
+              right={marked ? <StatusBar counts={counts} style={styles.bar} /> : undefined}
               inset={inset}
               divider={index < group.members.length - 1}
               onPress={() => {
                 setOpenedId(member.id);
                 setSheetOpen(true);
               }}
+              accessibilityLabel={accessibilityLabelOf([member.name, statusBreakdown(counts, m.common.statuses)])}
               // The id the folded AI-profile row had: the row is what opens the profile now.
               testID={`member-ai-toggle-${member.id}`}
             />
-          ))}
-        </ListCard>
-      )}
+          );
+        })}
+      </ListCard>
+
+      {group.members.length === 0 ? <EmptyState variant="plain" title={t.list.noStudents} testID="group-members-empty" /> : null}
 
       <MemberSheet
         groupId={group.id}
@@ -238,7 +233,16 @@ export function MembersTab({ group, onProfileError }: MembersTabProps) {
 
 const useStyles = makeStyles((t) => ({
   tab: { gap: t.space.md },
-  // The caption and the button share a row; the button keeps the width of its label.
-  headRow: { minHeight: t.sizes.control.sm, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  title: { flex: 1, minWidth: 0, paddingTop: 0 },
+  // The mark of the «add» row stands where the avatars of the members do, and is as big.
+  addMark: {
+    width: t.sizes.avatarSm,
+    height: t.sizes.avatarSm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radii.full,
+    backgroundColor: t.colors.soft2,
+  },
+  // A short bar at the end of the row: the proportions are read at a glance, the counts are in the sheet.
+  // (The bar stretches by default: in a row it has to be centred explicitly.)
+  bar: { width: t.space.xxl * 3, alignSelf: 'center' },
 }));

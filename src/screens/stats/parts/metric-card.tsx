@@ -6,32 +6,35 @@ import { Card, Text } from '@/ui';
 import type { MetricCardModel } from '../logic';
 
 /**
- * A summary figure of the statistics views (`DevMetricCard` on the site; mockup D-stats): a caption, a big
- * figure and one muted note. The figure is red only where the number asks for attention — an overdue or
- * "needs help" count that is not zero; every other figure is plain.
+ * A summary figure of the statistics views (`DevMetricCard` on the site; mockup D-stats; text diet §1a): a
+ * caption and a big figure. The site's note under the figure is only read out. The figure is red only
+ * where the number asks for attention — an overdue or "needs help" count that is not zero.
  */
-export function MetricCard({ card }: { card: MetricCardModel }) {
+export function MetricCard({ card, caption }: { card: MetricCardModel; caption?: string }) {
   const styles = useStyles();
   const attention = card.tone === 'red' && card.value !== '0';
   return (
     <Card style={styles.card} testID={`stats-metric-${card.key}`}>
       <View style={styles.body} accessible accessibilityLabel={`${card.label}: ${card.value}. ${card.note}`}>
-        <Text variant="small" color="textMuted" numberOfLines={2}>
-          {card.label}
+        <Text variant="small" color="textMuted" numberOfLines={1}>
+          {caption ?? card.label}
         </Text>
         <Text variant="metric" color={attention ? 'redText' : 'textStrong'} tabular numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
           {card.value}
-        </Text>
-        <Text variant="small" color="textMuted">
-          {card.note}
         </Text>
       </View>
     </Card>
   );
 }
 
+export type MetricGridProps = {
+  cards: readonly MetricCardModel[];
+  /** Shorter captions by card key, where the site's label is a phrase; the label itself is still read out. */
+  captions?: Readonly<Record<string, string>>;
+};
+
 /** The cards of a view: two per row on a phone (06 §1.6 "Mobile translation"), all four in one row on a tablet. */
-export function MetricGrid({ cards }: { cards: readonly MetricCardModel[] }) {
+export function MetricGrid({ cards, captions }: MetricGridProps) {
   const styles = useStyles();
   const theme = useTheme();
   const perRow = theme.tablet ? 4 : 2;
@@ -42,7 +45,7 @@ export function MetricGrid({ cards }: { cards: readonly MetricCardModel[] }) {
       {rows.map((row) => (
         <View key={row.map((card) => card.key).join('|')} style={styles.row}>
           {row.map((card) => (
-            <MetricCard key={card.key} card={card} />
+            <MetricCard key={card.key} card={card} caption={captions?.[card.key]} />
           ))}
         </View>
       ))}

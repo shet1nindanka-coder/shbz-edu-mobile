@@ -19,9 +19,9 @@ import { GROUPS_LIST_NOTICE, groupNoticeChannel, postGroupNotice, useGroupNotice
 
 /**
  * `groups.list` (docs/spec/06-teacher-groups-calls-stats.md §1.1; layout: docs/design/glass-over-paper.md
- * §7, mockup `T-groups`): the teacher's groups in creation order, each a row — the name and «8 класс · 4
- * ученика». «Создать группу» is folded behind a button (hidden when the server says the viewer cannot
- * create, i.e. a developer).
+ * §7, §1a, mockup `T-groups`): the teacher's groups in creation order, each a row — the name and the
+ * number of its students. «Создать» is folded behind a button (hidden when the server says the viewer
+ * cannot create, i.e. a developer).
  *
  * Phone: a row opens the group's own screen; a new group opens straight away, as the site does after the
  * redirect. Tablet: the list is the left panel and the selected group — the first one until another is
@@ -69,7 +69,7 @@ export function GroupsListScreen() {
       {notice ? (
         <Notice
           tone={notice === 'deleted' ? 'success' : 'error'}
-          text={notice === 'deleted' ? t.notices.deleted : t.notices.missing}
+          text={notice === 'deleted' ? m.groups.notices.deleted : t.notices.missing}
           onDismiss={dismissNotice}
           dismissLabel={m.common.actions.close}
           testID="groups-notice"
@@ -93,7 +93,7 @@ export function GroupsListScreen() {
       onCreated={(group) => {
         setCreateOpen(false);
         dismissNotice();
-        // The site redirects to the new group with «Группа создана. Добавьте в неё учеников.»
+        // The site redirects to the new group with its «Группа создана» banner.
         postGroupNotice(groupNoticeChannel(group.id), 'created');
         if (theme.tablet) setPickedId(group.id);
         // Only from the list itself: a teacher who has moved on meanwhile finds the group in the list.
@@ -116,7 +116,15 @@ export function GroupsListScreen() {
             // Next to an open group the gradient belongs to the group's «Составить урок».
             footer={
               canCreate ? (
-                <Button label={t.create} variant="outline" leftIcon="plus" fullWidth onPress={() => setCreateOpen(true)} testID="groups-create" />
+                <Button
+                  label={m.groups.list.create}
+                  accessibilityLabel={t.create}
+                  variant="outline"
+                  leftIcon="plus"
+                  fullWidth
+                  onPress={() => setCreateOpen(true)}
+                  testID="groups-create"
+                />
               ) : undefined
             }
             testID="groups-list"
@@ -149,7 +157,15 @@ export function GroupsListScreen() {
         <ShellAppBar
           title={title}
           aside={
-            canCreate ? <Button label={t.create} leftIcon="plus" onPress={() => setCreateOpen(true)} testID="groups-create" /> : undefined
+            canCreate ? (
+              <Button
+                label={m.groups.list.create}
+                accessibilityLabel={t.create}
+                leftIcon="plus"
+                onPress={() => setCreateOpen(true)}
+                testID="groups-create"
+              />
+            ) : undefined
           }
         />
       }
@@ -159,7 +175,7 @@ export function GroupsListScreen() {
       {notices}
       {listed ? (
         listed.length === 0 ? (
-          <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="groups-empty" />
+          <EmptyState title={t.emptyTitle} testID="groups-empty" />
         ) : (
           <ListCard testID="groups-list">{rows}</ListCard>
         )

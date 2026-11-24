@@ -25,11 +25,11 @@ const FILTER_FROM = 6;
 
 /**
  * `student.theory` — «Теория» (docs/spec/02-student-study.md S2; layout: docs/design/glass-over-paper.md
- * §8): the topics that have a theory file as rows of one card, and a field that narrows the list by title.
- * A PDF or an image opens in the full-screen viewer titled with the topic; a DOCX is downloaded and handed
- * to another app. Nothing is fetched from the file service until a row is pressed.
+ * §8, §1a): the topics that have a theory file as rows of one card — titles only — and a field that narrows
+ * the list by title. A PDF or an image opens in the full-screen viewer titled with the topic; a DOCX is
+ * downloaded and handed to another app. Nothing is fetched from the file service until a row is pressed.
  *
- * A tablet shows the list in the left panel and the selected topic — its description and its file — in the
+ * A tablet shows the list in the left panel and the selected topic — its title and its file — in the
  * right one.
  */
 export function StudentTheoryScreen() {
@@ -90,7 +90,7 @@ export function StudentTheoryScreen() {
             testID="theory-list"
           >
             {shown.length === 0 ? (
-              <EmptyState variant="plain" title={m.student.theory.filterEmpty} testID="theory-filter-empty" />
+              <EmptyState variant="plain" title={dict.planner.common.nothingFound} testID="theory-filter-empty" />
             ) : (
               shown.map((topic, index) => (
                 <TheoryCard
@@ -111,11 +111,6 @@ export function StudentTheoryScreen() {
                 <Text variant="sectionTitle" accessibilityRole="header">
                   {selected.title}
                 </Text>
-                {selected.description ? (
-                  <Text variant="body" color="textMuted">
-                    {selected.description}
-                  </Text>
-                ) : null}
                 <FileCard title={dict.topics.view.theory} file={viewerFileOf(selected)} onOpen={() => open(selected)} testID="theory-file" />
               </>
             ) : null}
@@ -140,12 +135,12 @@ export function StudentTheoryScreen() {
             />
           ) : null}
           {topics.length === 0 ? (
-            <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="theory-empty" />
+            <EmptyState title={t.emptyTitle} testID="theory-empty" />
           ) : (
             <>
               {topics.length >= FILTER_FROM ? filterField : null}
               {shown.length === 0 ? (
-                <EmptyState variant="plain" title={m.student.theory.filterEmpty} testID="theory-filter-empty" />
+                <EmptyState variant="plain" title={dict.planner.common.nothingFound} testID="theory-filter-empty" />
               ) : (
                 <ListCard testID="theory-list">
                   {shown.map((topic, index) => (

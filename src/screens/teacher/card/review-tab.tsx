@@ -16,7 +16,7 @@ import { useAppNavigation } from '@/navigation';
 import { useNowTick } from '@/services/clock';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, EmptyState, ListRow, LoadingState, Notice, Panel, Panels } from '@/ui';
+import { EmptyState, IconButton, ListRow, LoadingState, Notice, Panel, Panels } from '@/ui';
 
 import { useLatched } from '../students/use-latched';
 import { usePanelRow } from '../students/use-panel-row';
@@ -24,6 +24,7 @@ import { useNoticeScroll } from '../students/use-notice-scroll';
 import { CancelHomeworkDialog } from './cancel-homework-dialog';
 import { CardScreen, type CardChrome } from './card-screen';
 import { DisclosureRow } from './disclosure-row';
+import { HomeworkFact } from './homework-fact';
 import { ReviewAssignmentCard } from './review-assignment-card';
 import { ReviewAssignmentPanel } from './review-assignment-panel';
 import { buildReviewRows, completedAssignmentIds, hasDiagnostics, reviewRowIndex, type ReviewRow } from './review-logic';
@@ -58,10 +59,10 @@ type NumbersTarget = { assignmentId: string; numberId: string | null; viaAll: bo
  * `teacher.student.review` (docs/spec/04-teacher-students.md S4; layout: the `PT-student` / `T-student`
  * mockups): every homework issued to the student. A phone lists them as cards — a summary with the bar by
  * status that unfolds into the review; a tablet lists them on the left and shows the selected one on the
- * right. The review of a homework is «Нужно проверить» — rows of numbers with the three status marks —
- * with the photos, "accept AI verdicts" and its 10-second undo, the check history and cancelling; every
+ * right. The review of a homework is the rows of numbers that wait for the teacher, with the three status
+ * marks, the photos, "accept AI verdicts" and its 10-second undo, the check history and cancelling; every
  * number, with its verdict, diagnostics and statement, opens in one sheet. Completed homework is folded
- * under one disclosure.
+ * under one disclosure. "Hide diagnostics for the lesson" is an eye button of the header, next to "⋯".
  */
 export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const styles = useStyles();
@@ -167,6 +168,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   const shownNumbers = useLatched(numbersFor);
   const numbersAssignment = shownNumbers ? (assignments?.find((assignment) => assignment.id === shownNumbers.assignmentId) ?? null) : null;
 
+  const hasNotices = notice !== null || (homeworks.isError && data !== undefined) || (data !== undefined && !data.assignmentsEnabled);
   const notices = (
     <>
       {notice ? (
@@ -178,22 +180,20 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
     </>
   );
 
+  // An icon button of the header: the site's long caption is its accessible name (§1a).
   const lessonModeButton = showLessonMode ? (
-    <Button
-      label={lessonMode ? t.showDiagnostics : t.hideDiagnostics}
-      variant="outline"
-      size="sm"
-      leftIcon={lessonMode ? 'eye' : 'eyeOff'}
+    <IconButton
+      icon={lessonMode ? 'eye' : 'eyeOff'}
+      accessibilityLabel={lessonMode ? t.showDiagnostics : t.hideDiagnostics}
+      active={lessonMode}
       onPress={() => setLessonMode((value) => !value)}
-      wrapLabel
       testID="review-lesson-mode"
-      style={styles.lessonMode}
     />
   ) : null;
 
   const placeholder = data ? (
     data.assignmentsEnabled ? (
-      <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="review-empty" />
+      <EmptyState title={t.emptyTitle} testID="review-empty" />
     ) : null
   ) : homeworksFailure ? (
     <LoadFailure query={homeworks} testID="review-error" />
@@ -260,12 +260,8 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
         // Everything a card shows besides its homework: expansion, lesson mode, the clock, the request states
         // and the number whose sheet is open.
         extraData={[expandedIds, lessonMode, now, flashId, review.savingIds, review.numberErrors, review.assignmentErrors, review.wait.seconds, review.acceptingId, numbersFor]}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            {notices}
-            {lessonModeButton}
-          </View>
-        }
+        // No banner — no header: an empty one would still add its padding above the first card.
+        ListHeaderComponent={hasNotices ? <View style={styles.header}>{notices}</View> : null}
         ListEmptyComponent={placeholder}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -294,7 +290,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
           placeholder
         ) : (
           <Panels testID="review-panels">
-            <Panel weight={2} padded={false} contentStyle={styles.listPanel} footer={lessonModeButton ? <View style={styles.panelFooter}>{lessonModeButton}</View> : undefined} testID="review-list">
+            <Panel weight={2} padded={false} contentStyle={styles.listPanel} testID="review-list">
               {rows.map((row) => {
                 if (row.kind === 'completedToggle') {
                   return (
@@ -311,11 +307,11 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
                     titleLines={2}
                     subtitle={summary.caption}
                     subtitleTone={summary.attention ? 'attention' : 'muted'}
-                    meta={summary.done}
+                    right={<HomeworkFact waiting={summary.waiting} done={summary.done} />}
                     selected={row.assignment.id === selectedAssignment?.id}
                     {...panelRow(row.assignment.id === selectedAssignment?.id, true)}
                     onPress={() => setPickedId(row.assignment.id)}
-                    accessibilityLabel={`${summary.title}. ${summary.caption}. ${summary.done}`}
+                    accessibilityLabel={[summary.title, summary.caption, summary.waitingLabel, summary.done].filter(Boolean).join('. ')}
                     testID={`review-assignment-toggle-${row.assignment.id}`}
                   />
                 );
@@ -334,7 +330,7 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
   }
 
   return (
-    <CardScreen chrome={chrome} panels={tablet}>
+    <CardScreen chrome={chrome} headerActions={lessonModeButton} panels={tablet}>
       {content}
 
       {review.undo ? <UndoToast text={review.undo.label} undoLabel={t.undo} onUndo={review.undoAccept} testID="review-undo-toast" /> : null}
@@ -391,12 +387,9 @@ export function ReviewTab({ studentId, assignmentId, chrome }: ReviewTabProps) {
 const useStyles = makeStyles((t) => ({
   listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
   header: { gap: t.space.md, paddingBottom: t.space.md },
-  // Never wider than the row: on a 320 pt phone the label takes a second line instead of running off the edge.
-  lessonMode: { alignSelf: 'flex-end', maxWidth: '100%' },
   item: { paddingBottom: t.space.block },
   completed: { paddingHorizontal: t.space.xxs, paddingBottom: t.space.sm },
   // Rows bring their own height and hairlines; the panel adds the card's top and bottom room.
   listPanel: { gap: 0, paddingVertical: t.space.sm },
   panelToggle: { paddingHorizontal: t.space.card },
-  panelFooter: { paddingHorizontal: t.space.card, paddingBottom: t.space.card },
 }));

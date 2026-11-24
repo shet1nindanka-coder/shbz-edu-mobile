@@ -1,7 +1,7 @@
 import type { TheoryLibraryResponse } from '@/api/types';
 import { isImageMime, isPdfMime } from '@/domain/files';
 import { format, useI18n } from '@/i18n';
-import { ListRow, Spinner } from '@/ui';
+import { Icon, ListRow, Spinner } from '@/ui';
 
 export type TheoryTopic = TheoryLibraryResponse['topics'][number];
 
@@ -25,9 +25,10 @@ export function isPreviewableTheory(mimeType: string): boolean {
 }
 
 /**
- * A topic of the theory list (02 S2; layout: docs/design/glass-over-paper.md §8): one row, pressed as a
- * whole — there is no «Открыть» button. A PDF or an image opens in the viewer; a file the app cannot show
- * (Word) says so in its caption and is handed to another app.
+ * A topic of the theory list (02 S2; layout: docs/design/glass-over-paper.md §8, §1a): one row — the title
+ * and nothing else — pressed as a whole. A PDF or an image opens in the viewer; a file the app cannot show
+ * (Word) carries the "leaves the app" glyph on the right (a spinner while it downloads) and is handed to
+ * another app; a screen reader hears «Скачать файл теории…».
  * SPEC-GAP: 02 S2a leaves the DOCX strategy open (Q3); the file is downloaded and handed to another app,
  * as 09 §5.2 proposes — there is nothing to preview in a viewer.
  */
@@ -38,8 +39,7 @@ export function TheoryCard({ topic, onOpen, onDownload, downloading, divider, se
     <ListRow
       title={topic.title}
       titleLines={2}
-      subtitle={previewable ? undefined : downloading ? m.student.theory.downloading : m.student.theory.external}
-      right={downloading ? <Spinner size={16} /> : undefined}
+      right={downloading ? <Spinner size={16} /> : previewable ? undefined : <Icon name="externalLink" size={16} color="textMuted" />}
       divider={divider}
       selected={selected}
       disabled={downloading}

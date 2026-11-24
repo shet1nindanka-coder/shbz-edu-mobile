@@ -17,16 +17,17 @@ export type StudentRowProps = {
 };
 
 /**
- * A student of the directory: the name and «login · teacher». A student without an owner is invisible to
- * every teacher — the caption says so in red until a teacher is picked; an unsaved pick is marked on the
- * right until the save bar sends it.
+ * A student of the directory: the name and the teacher's name as the one caption. A student without an
+ * owner is invisible to every teacher — the caption is a red «Без учителя» until a teacher is picked (the
+ * site's whole warning is in the sheet the row opens); an unsaved pick is marked on the right until the
+ * save bar sends it.
  */
 export function StudentRow({ student, ownerName, dirty, divider, onPress }: StudentRowProps) {
   const { dict, m } = useI18n();
   const t = dict.students.studentsManager;
   // A picked (still unsaved) teacher replaces the warning: the row then names where the student goes.
   const orphan = student.teacherId === null && ownerName === null;
-  const caption = orphan ? t.noOwner : ownerName !== null ? `${student.email} · ${ownerName}` : student.email;
+  const caption = orphan ? m.accounts.row.noOwner : (ownerName ?? undefined);
   const spoken = [student.name, `${t.loginLabel}: ${student.email}`, orphan ? t.noOwner : ownerName, dirty ? t.dirty : null];
 
   return (

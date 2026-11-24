@@ -2,14 +2,14 @@ import { View } from 'react-native';
 
 import type { StudentNumberDetailResponse } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { statusLabel } from '@/components/numbers';
 import { homeworkStatusLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Card, StatusBadge, Text } from '@/ui';
+import { Card, Text } from '@/ui';
 
 import { NoteField } from './note-field';
+import { NumberStatusMark } from './number-status-mark';
 
 export type NumberCardProps = {
   detail: StudentNumberDetailResponse;
@@ -18,13 +18,13 @@ export type NumberCardProps = {
 };
 
 /**
- * The card of one problem (site: `StudentSingleNumberCard`, 02 S3): the number with the student's own
- * traffic-light status (read-only — it is set by the AI check or the teacher), the statement, and the
- * personal note. No status picker, no answer, no deadline.
+ * The card of one problem (site: `StudentSingleNumberCard`, 02 S3): the number with the mark of the
+ * student's own traffic-light status (read-only — it is set by the AI check or the teacher; a label only
+ * for «нужна помощь»), the statement, and the personal note. No status picker, no answer, no deadline.
  */
 export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
   const styles = useStyles();
-  const { dict, m } = useI18n();
+  const { dict } = useI18n();
   const t = dict.student.numberCard;
   const { number } = detail;
   const hasCondition = Boolean(number.conditionLatex && number.conditionLatex.trim());
@@ -38,17 +38,13 @@ export function NumberCard({ detail, onNoteFocus }: NumberCardProps) {
               variant="sectionTitle"
               tabular
               accessibilityRole="header"
-              accessibilityLabel={format(dict.topics.widgets.numberLabel, { number: number.number })}
+              accessibilityLabel={`${format(dict.topics.widgets.numberLabel, { number: number.number })}, ${homeworkStatusLabel(number.status, dict)}`}
               style={styles.title}
               testID="number-card-title"
             >
               {number.number}
             </Text>
-            <StatusBadge
-              status={number.status}
-              label={statusLabel(number.status, m.common.statuses)}
-              accessibilityLabel={homeworkStatusLabel(number.status, dict)}
-            />
+            <NumberStatusMark status={number.status} />
           </View>
           <Hint>
             <Text variant="hint">{t.statusHint}</Text>

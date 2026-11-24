@@ -11,6 +11,7 @@ import { PICKER_SEARCH_FROM, filterPickerOptions } from '../logic';
 export type PickerOption = { value: string; label: string };
 
 export type PickerFieldProps = {
+  /** What is picked: the accessible name of the trigger and the title of its sheet — never drawn above the field (the value says it). */
   label: string;
   options: readonly PickerOption[];
   value: string;
@@ -41,7 +42,8 @@ export function PickerField({ label, options, value, onChange, disabled = false,
   if (options.length < PICKER_SEARCH_FROM) {
     return (
       <Select
-        label={label}
+        accessibilityLabel={label}
+        sheetTitle={label}
         options={options}
         value={value}
         onChange={onChange}
@@ -61,8 +63,7 @@ export function PickerField({ label, options, value, onChange, disabled = false,
   const listHeight = Math.min(contentHeight ?? filtered.length * rowStride, Math.round(window.height * LIST_MAX_SHARE));
 
   return (
-    <View style={styles.field}>
-      <Text variant="label">{label}</Text>
+    <View>
       <PressableScale
         accessibilityRole="combobox"
         accessibilityLabel={label}
@@ -162,7 +163,6 @@ export function PickerField({ label, options, value, onChange, disabled = false,
 }
 
 const useStyles = makeStyles((t) => ({
-  field: { gap: t.space.xxs },
   // The kit's `Select` trigger.
   trigger: {
     flexDirection: 'row',

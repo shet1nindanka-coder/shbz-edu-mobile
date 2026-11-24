@@ -1,35 +1,35 @@
 import { View } from 'react-native';
 
 import type { LessonListItem } from '@/api/types';
-import { formatDateTime } from '@/domain/dates';
-import { format, plural, useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Text, accessibilityLabelOf } from '@/ui';
+import { Chip, MetricPill, Text, accessibilityLabelOf } from '@/ui';
 
-import { lessonAudience, lessonChips, lessonDateOf } from './lessons-list-logic';
+import { rowDateTime } from '../shared/row-date';
+import { lessonChips, lessonDateOf } from './lessons-list-logic';
 
 export type LessonDetailProps = {
   lesson: LessonListItem;
+  /** The list's server-corrected clock: the year of the date is left out within the current one. */
+  now: number;
 };
 
 /**
  * The selected lesson in the panel next to the list (tablet; layout: mockup `T-lessons`): its title, when
- * and for whom it is, and what the list knows about its state — the AI selection, failed plans, how many
- * results are marked. Only facts of the list item: the sets themselves live on the board.
+ * it is and how long, and what the list knows about its state as figures with a one-word name — students,
+ * marked results, the AI selection, failed plans (red). Only facts of the list item: the sets themselves
+ * live on the board.
  */
-export function LessonDetail({ lesson }: LessonDetailProps) {
+export function LessonDetail({ lesson, now }: LessonDetailProps) {
   const styles = useStyles();
   const { dict, m, locale } = useI18n();
   const common = dict.planner.common;
+  const names = m.planner.lessonsList;
   const chips = lessonChips(lesson);
+  const doneOf = m.common.numbers.doneOf;
 
   const meta = accessibilityLabelOf(
-    [
-      formatDateTime(lessonDateOf(lesson), locale),
-      format(common.minutesShort, { n: lesson.durationMinutes }),
-      lessonAudience(lesson),
-      plural(locale, lesson.participantsCount, common.studentForms),
-    ],
+    [rowDateTime(lessonDateOf(lesson), now, locale), format(common.minutesShort, { n: lesson.durationMinutes })],
     ' · ',
   );
 
@@ -39,27 +39,20 @@ export function LessonDetail({ lesson }: LessonDetailProps) {
         <Text variant="sectionTitle" accessibilityRole="header">
           {lesson.title}
         </Text>
-        <Text variant="small" color="textMuted" tabular>
-          {meta}
-        </Text>
+        <View style={styles.meta}>
+          <Text variant="small" color="textMuted" tabular>
+            {meta}
+          </Text>
+          {lesson.status === 'ACTIVE' ? <Chip tone="accent" label={dict.planner.lessonStatus.ACTIVE} /> : null}
+        </View>
       </View>
-      <View style={styles.facts}>
-        <Text variant="bodyStrong">{dict.planner.lessonStatus[lesson.status]}</Text>
-        {chips.selecting ? (
-          <Text variant="small" color="textMuted" tabular>
-            {format(dict.planner.lessonsList.selectionInProgress, chips.selecting)}
-          </Text>
-        ) : null}
-        {chips.errors !== null ? (
-          <Text variant="small" color="redText" tabular>
-            {format(common.errorsCount, { n: chips.errors })}
-          </Text>
-        ) : null}
+      <View style={styles.figures}>
+        <MetricPill label={dict.planner.homeworkPlans.createForm.studentsLabel} value={lesson.participantsCount} />
         {lesson.resultsTotal > 0 ? (
-          <Text variant="small" color="textMuted" tabular>
-            {format(m.planner.lessonsList.resultsOf, { done: lesson.resultsMarked, total: lesson.resultsTotal })}
-          </Text>
+          <MetricPill label={names.results} value={format(doneOf, { done: lesson.resultsMarked, total: lesson.resultsTotal })} />
         ) : null}
+        {chips.selecting ? <MetricPill label={names.selecting} value={format(doneOf, { done: chips.selecting.ready, total: chips.selecting.total })} /> : null}
+        {chips.errors !== null ? <MetricPill label={names.errors} value={chips.errors} tone="danger" /> : null}
       </View>
     </View>
   );
@@ -67,6 +60,7 @@ export function LessonDetail({ lesson }: LessonDetailProps) {
 
 const useStyles = makeStyles((t) => ({
   block: { gap: t.space.lg },
-  titles: { gap: t.space.xxs },
-  facts: { gap: t.space.xxs },
+  titles: { gap: t.space.xs },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.xs },
+  figures: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
 }));

@@ -13,7 +13,9 @@ export type ReviewInjectionBannerProps = {
 
 /**
  * "The photo contains an instruction aimed at the AI" (docs/spec/04-teacher-students.md S4): a security
- * signal, not a grade — an ink outline on the soft tone, never the red of an incorrect answer.
+ * signal, not a grade — an ink outline on the soft tone, never the red of an incorrect answer. The warning
+ * is its title and the quoted writing; «Вердикты этой проверки могут быть недостоверны» follows from it
+ * and is spoken with the title (docs/design/glass-over-paper.md §1a).
  */
 export function ReviewInjectionBanner({ results, testID }: ReviewInjectionBannerProps) {
   const styles = useStyles();
@@ -24,7 +26,7 @@ export function ReviewInjectionBanner({ results, testID }: ReviewInjectionBanner
     <View accessibilityRole="alert" style={styles.banner} testID={testID}>
       <View style={styles.title}>
         <Icon name="alert" size={theme.sizes.icon.sm} color="textStrong" />
-        <Text variant="smallBold" style={styles.titleText}>
+        <Text variant="smallBold" accessibilityLabel={`${t.injectionTitle}. ${t.injectionUnreliable}`} style={styles.titleText}>
           {t.injectionTitle}
         </Text>
       </View>
@@ -37,9 +39,6 @@ export function ReviewInjectionBanner({ results, testID }: ReviewInjectionBanner
           </View>
         ) : null,
       )}
-      <Text variant="small" color="textMuted">
-        {t.injectionUnreliable}
-      </Text>
     </View>
   );
 }

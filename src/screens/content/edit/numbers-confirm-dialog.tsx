@@ -22,9 +22,10 @@ export type NumbersConfirmDialogProps = {
 
 /**
  * "Problems with student work will be removed" (site: the confirm dialog of `TopicEditSubmitButton`,
- * docs/spec/07-developer-content.md §1.3.1 step 5, §4.3): every removed number that carries work with the
- * server's consequence line, what is added and kept, and — when a removed number sits in an issued
- * homework — the acknowledgement that gates the destructive button.
+ * docs/spec/07-developer-content.md §1.3.1 step 5, §4.3; text: docs/design/glass-over-paper.md §1a): what
+ * cannot be undone, said once — every removed number that carries work with the server's consequence
+ * line, and — when a removed number sits in an issued homework — the acknowledgement that gates the
+ * destructive button. What is added and kept is not a consequence and is not listed.
  */
 export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssignedChange, saving, onConfirm, onCancel }: NumbersConfirmDialogProps) {
   const styles = useStyles();
@@ -37,9 +38,8 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
   const numberLabel = (number: string) => format(dict.topics.widgets.numberLabel, { number });
 
   return (
-    // The kit's `Dialog` puts its two buttons side by side, which cuts «Да, удалить эти номера» on a
-    // phone; this confirmation has the same anatomy on a sheet of its own, with the buttons stacked and
-    // pinned under the (possibly long) list.
+    // The kit's `Dialog` scrolls its buttons away with a long list; this confirmation has the same anatomy
+    // on a sheet of its own, with the buttons stacked and pinned under the (possibly long) list.
     <BottomSheet
       visible={plan !== null}
       onClose={onCancel}
@@ -49,7 +49,8 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
       footer={
         <View style={styles.actions}>
           <Button
-            label={saving ? t.pending : t.confirm}
+            label={saving ? t.pending : dict.topics.widgets.confirm.confirm}
+            accessibilityLabel={saving ? undefined : t.confirm}
             variant="dangerSolid"
             loading={saving}
             disabled={!shown || !canConfirmRemoval(shown, allowAssigned)}
@@ -68,9 +69,6 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
       testID="numbers-confirm-dialog"
     >
       <View style={styles.content} accessibilityRole="alert">
-        <Text variant="kicker" color="dangerText">
-          {dict.topics.widgets.confirm.kicker}
-        </Text>
         <Text variant="dialogTitle" accessibilityRole="header">
           {t.dialogTitle}
         </Text>
@@ -90,15 +88,6 @@ export function NumbersConfirmDialog({ plan, error, allowAssigned, onAllowAssign
                 </Text>
               ))}
             </View>
-
-            {shown.added.length > 0 ? (
-              <Text variant="small" color="label" testID="numbers-confirm-added">
-                {format(t.added, { numbers: shown.added.join(', ') })}
-              </Text>
-            ) : null}
-            <Text variant="small" color="label" testID="numbers-confirm-kept">
-              {format(t.kept, { count: shown.keptCount })}
-            </Text>
 
             {shown.requiresAssignedConfirmation ? (
               <Checkbox

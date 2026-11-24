@@ -6,14 +6,12 @@ import { errorText, qk, useApi } from '@/api';
 import { loadFailureOf } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, LoadingState, Notice, Select, Text } from '@/ui';
+import { BottomSheet, Button, LoadingState, Notice, Select } from '@/ui';
 
 import { bankNumbersGap, freeBankNumbers } from './lessons-logic';
 
 export type LessonAddSheetProps = {
   visible: boolean;
-  /** Title of the lesson whose set gets the number (shown under the sheet title). */
-  lessonTitle: string;
   /** Numbers already in the set: they are not offered. */
   existingIds: readonly string[];
   onClose: () => void;
@@ -25,9 +23,10 @@ const BANK_STALE_MS = 10 * 60 * 1000;
 
 /**
  * "Add a problem" of the lessons segment (`LessonManualAdd`, docs/spec/04-teacher-students.md S6): topic
- * → number (only the topic's numbers that are not in the set yet) → to the main or to the extra part.
+ * → number (only the topic's numbers that are not in the set yet) → to the main or to the extra part. The
+ * two selects are named by what they hold (a topic's title, «Выберите номер»), without captions.
  */
-export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onAdd }: LessonAddSheetProps) {
+export function LessonAddSheet({ visible, existingIds, onClose, onAdd }: LessonAddSheetProps) {
   const styles = useStyles();
   const api = useApi();
   const { dict, m } = useI18n();
@@ -82,13 +81,11 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
       testID="student-lesson-add-sheet"
     >
       <View style={styles.content}>
-        <Text variant="small" color="textMuted">
-          {lessonTitle}
-        </Text>
         {topics ? (
           <>
             <Select
-              label={common.topic}
+              accessibilityLabel={common.topic}
+              sheetTitle={common.topic}
               options={topics.map((entry) => ({ value: entry.topicId, label: entry.topicTitle }))}
               value={topicId}
               onChange={(next) => {
@@ -100,14 +97,15 @@ export function LessonAddSheet({ visible, lessonTitle, existingIds, onClose, onA
               testID="student-lesson-add-topic"
             />
             <Select
-              label={common.number}
+              accessibilityLabel={common.number}
+              sheetTitle={common.number}
               options={free.map((number) => ({ value: number.id, label: format(common.numberSign, { n: number.number }) }))}
               value={picked}
               onChange={setNumberId}
               placeholder={topic ? common.pickNumber : m.teacher.lessons.pickTopicFirst}
               closeLabel={m.common.actions.close}
               disabled={free.length === 0}
-              helper={gap === 'topicEmpty' ? m.teacher.lessons.noTopicNumbers : gap === 'allInSet' ? m.teacher.lessons.noFreeNumbers : undefined}
+              helper={gap === 'topicEmpty' ? m.teacher.assign.noNumbers : gap === 'allInSet' ? m.teacher.lessons.noFreeNumbers : undefined}
               testID="student-lesson-add-number"
             />
           </>

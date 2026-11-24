@@ -6,11 +6,13 @@ import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import { MathPreview } from '@/components/math';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
-import { makeStyles } from '@/theme';
-import { Button, Card, Dialog, Notice, Text, TextArea, TextButton } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, Dialog, IconButton, Notice, TextArea } from '@/ui';
 
 import { canSaveLatexDraft, hasLatex } from '../shared/number-fill-status';
+
+/** What an unnamed empty field takes — a format name, the same in every language. */
+const FORMAT_PLACEHOLDER = 'LaTeX';
 
 export type LatexEditorBlockProps = {
   /** Which value of the number this block edits. */
@@ -27,17 +29,25 @@ export type LatexEditorBlockProps = {
    * button then — a screen has one gradient action.
    */
   secondary?: boolean;
+  /**
+   * Name the field («Условие» / «Ответ»). A phone shows one editor under the switch that already names
+   * it; a tablet shows the two side by side and each needs its name.
+   */
+  named?: boolean;
 };
 
 /**
  * LaTeX editor of one value of a number (site: one panel of `TeacherSingleNumberCard`,
- * docs/spec/07-developer-content.md §1.4b, §4.9): a saved value and a draft. «Сохранить» is offered when
- * the draft is non-blank and differs from the saved value; «Удалить» only when a saved value exists.
- * Unlike the site's card the preview follows the DRAFT — the spec's phone mapping asks for it.
+ * docs/spec/07-developer-content.md §1.4b, §4.9; text: docs/design/glass-over-paper.md §1a): a saved
+ * value and a draft. «Сохранить» is offered when the draft is non-blank and differs from the saved
+ * value; the trash mark only when a saved value exists; the «вернуть» mark only while the draft differs.
+ * Unlike the site's card the preview follows the DRAFT — the spec's phone mapping asks for it — and it
+ * needs no caption: it is the rendered card right under the field.
  * Rendered inside a card (a `Panel` of the number screen): the block brings no surface of its own.
  */
-export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChanged, secondary = false }: LatexEditorBlockProps) {
+export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChanged, secondary = false, named = false }: LatexEditorBlockProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const api = useApi();
   const queryClient = useQueryClient();
   const { dict, m } = useI18n();
@@ -46,9 +56,8 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
   const isCondition = kind === 'condition';
   const texts = isCondition
     ? {
+        name: dict.topics.viewNumbers.condition,
         label: single.conditionLabel,
-        placeholder: single.conditionPlaceholder,
-        empty: manager.conditionEmpty,
         save: manager.saveCondition,
         remove: manager.deleteCondition,
         removeTitle: manager.deleteConditionTitle,
@@ -59,9 +68,8 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
         removedNotice: m.content.number.conditionDeleted,
       }
     : {
+        name: dict.topics.viewNumbers.answer,
         label: single.answerLabel,
-        placeholder: single.answerPlaceholder,
-        empty: manager.answerEmpty,
         save: manager.saveAnswer,
         remove: manager.deleteAnswer,
         removeTitle: manager.deleteAnswerTitle,
@@ -136,13 +144,15 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
   return (
     <View style={styles.root}>
       <TextArea
-        label={texts.label}
+        // One name per field: the label on a tablet, the format on a phone (the switch above names the value).
+        label={named ? texts.name : undefined}
+        placeholder={named ? undefined : FORMAT_PLACEHOLDER}
+        accessibilityLabel={texts.label}
         value={draft}
         onChangeText={(value) => {
           setDraft(value);
           if (success) setSuccess(null);
         }}
-        placeholder={texts.placeholder}
         numberOfLines={4}
         autoCapitalize="none"
         autoCorrect={false}
@@ -151,40 +161,10 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
         inputStyle={styles.mono}
         testID={`latex-${kind}-input`}
       />
-      <Hint>
-        <Text variant="hint">{`${manager.latexHintBefore}$...$${manager.latexHintMiddle}$$...$$${manager.latexHintAfter}`}</Text>
-      </Hint>
 
       {hasLatex(draft) ? (
-        <View style={styles.preview}>
-          <Text variant="small" color="textMuted">
-            {single.preview}
-          </Text>
+        <View accessibilityLabel={single.preview}>
           <MathPreview value={draft} testID={`latex-${kind}-preview`} />
-        </View>
-      ) : (
-        // A hint on the site (`ui-hint`): with hints off a blank draft simply has no preview.
-        <Hint>
-          <Card dashed testID={`latex-${kind}-empty`}>
-            <Text variant="small" color="textMuted">
-              {texts.empty}
-            </Text>
-          </Card>
-        </Hint>
-      )}
-
-      {dirty && !busy ? (
-        <View style={styles.dirty}>
-          <Text variant="small" color="textMuted" style={styles.grow}>
-            {m.content.number.unsaved}
-          </Text>
-          <TextButton
-            label={m.content.number.resetDraft}
-            tone="muted"
-            onPress={() => setDraft(saved ?? '')}
-            style={styles.reset}
-            testID={`latex-${kind}-reset`}
-          />
         </View>
       ) : null}
 
@@ -200,9 +180,19 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
         />
       ) : null}
 
+      {/* One line: back to the saved text (only while the draft differs), save, delete. The marks are named for a screen reader. */}
       <View style={styles.actions}>
+        {dirty && !busy ? (
+          <IconButton
+            icon="rotateCcw"
+            accessibilityLabel={m.content.number.resetDraft}
+            onPress={() => setDraft(saved ?? '')}
+            testID={`latex-${kind}-reset`}
+          />
+        ) : null}
         <Button
-          label={save.isPending ? manager.saving : texts.save}
+          label={save.isPending ? manager.saving : dict.common.save}
+          accessibilityLabel={save.isPending ? undefined : texts.save}
           variant={secondary ? 'outline' : 'primary'}
           loading={save.isPending}
           disabled={!canSave}
@@ -210,13 +200,14 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
             setError(null);
             save.mutate(draft);
           }}
+          style={styles.grow}
           testID={`latex-${kind}-save`}
         />
         {hasSaved ? (
-          <Button
-            label={texts.remove}
-            variant="danger"
-            leftIcon="trash"
+          <IconButton
+            icon="trash"
+            tint={theme.colors.dangerText}
+            accessibilityLabel={texts.remove}
             disabled={busy || wait.waiting}
             onPress={() => setConfirmOpen(true)}
             testID={`latex-${kind}-delete`}
@@ -226,7 +217,6 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
 
       <Dialog
         visible={confirmOpen}
-        kicker={dict.topics.widgets.confirm.kicker}
         title={format(texts.removeTitle, { number })}
         description={texts.removeDescription}
         confirmLabel={dict.topics.widgets.confirm.confirm}
@@ -247,10 +237,6 @@ export function LatexEditorBlock({ kind, homeworkNumberId, number, saved, onChan
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.md },
   mono: { ...t.typography.mono },
-  preview: { gap: t.space.xs },
-  dirty: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   grow: { flex: 1 },
-  reset: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
-  // Stacked: «Сохранить условие» / «Удалить условие» do not fit side by side on a phone.
-  actions: { gap: t.space.md },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
 }));

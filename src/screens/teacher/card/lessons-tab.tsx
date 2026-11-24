@@ -9,11 +9,11 @@ import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { formatMsk } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
-import { Hint } from '@/providers';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import { ListRow, LoadingState, Notice, Panel, Panels, Text } from '@/ui';
 
+import { shortWhen } from '../students/short-when';
 import { usePanelRow } from '../students/use-panel-row';
 import { CardScreen, type CardChrome } from './card-screen';
 import { LessonAddSheet } from './lesson-add-sheet';
@@ -33,6 +33,8 @@ const NO_LESSONS: readonly TeacherStudentLesson[] = [];
  * under the "compose a lesson" invitation — results per problem, set editing, "Retry" of the AI selection,
  * and the ways out to the lesson board, the handout and a homework from the results. A phone lists the
  * lessons as cards that unfold; a tablet lists them on the left and shows the selected one on the right.
+ * A lesson is its title and when it is («24 ноя, 16:00», «Идёт» while it runs); the group, the duration
+ * and the status are spoken, not shown (docs/design/glass-over-paper.md §1a).
  */
 export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
   const styles = useStyles();
@@ -61,7 +63,11 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
 
   const toggle = (id: string) => setExpandedIds((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
 
-  /** The one caption of a lesson: when, the group, the duration and the status. */
+  /** The one caption of a lesson: when it is — or that it is running now. */
+  const whenOf = (lesson: TeacherStudentLesson) =>
+    lesson.status === 'ACTIVE' ? t.status.ACTIVE : shortWhen(lesson.startsAt ?? lesson.createdAt, controller.now, locale);
+
+  /** For screen readers: when, the group, the duration and the status. */
   const metaOf = (lesson: TeacherStudentLesson) =>
     [formatMsk(lesson.startsAt ?? lesson.createdAt, 'dateTime', locale), lesson.groupName, format(t.minutes, { n: lesson.durationMinutes }), t.status[lesson.status]]
       .filter(Boolean)
@@ -70,6 +76,7 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
   /** What every view of a lesson needs besides the lesson itself. */
   const detailProps = (lesson: TeacherStudentLesson) => ({
     lesson,
+    when: whenOf(lesson),
     meta: metaOf(lesson),
     planState: controller.planStateOf(lesson),
     busy: controller.busy[lesson.id],
@@ -92,17 +99,9 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
     onDownloadPdf: () => handout.open({ lessonId: lesson.id, createdAt: lesson.createdAt, studentId }),
   });
 
-  const intro = (
-    <>
-      <Hint>
-        <Text variant="hint" color="textMuted">
-          {t.description}
-        </Text>
-      </Hint>
-      {/* Cached lessons stay on screen when a refresh fails (offline): say so instead of replacing them. */}
-      {list.isError && lessons ? <Notice tone="error" text={errorText(list.error, m.common.errors.generic)} testID="student-lessons-refresh-error" /> : null}
-    </>
-  );
+  // Cached lessons stay on screen when a refresh fails (offline): say so instead of replacing them.
+  const intro =
+    list.isError && lessons ? <Notice tone="error" text={errorText(list.error, m.common.errors.generic)} testID="student-lessons-refresh-error" /> : null;
 
   const compose = lessons ? (
     <LessonComposeCard
@@ -166,8 +165,8 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
                   key={lesson.id}
                   title={lesson.title}
                   titleLines={2}
-                  subtitle={metaOf(lesson)}
-                  subtitleLines={2}
+                  subtitle={whenOf(lesson)}
+                  accessibilityLabel={`${lesson.title}. ${metaOf(lesson)}`}
                   selected={lesson.id === selected?.id}
                   {...panelRow(lesson.id === selected?.id, index < lessons.length - 1)}
                   onPress={() => setPickedId(lesson.id)}
@@ -182,8 +181,8 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
                     <Text variant="sectionTitle" accessibilityRole="header" numberOfLines={2}>
                       {selected.title}
                     </Text>
-                    <Text variant="small" color="textMuted" tabular>
-                      {metaOf(selected)}
+                    <Text variant="small" color="textMuted" tabular accessibilityLabel={metaOf(selected)}>
+                      {whenOf(selected)}
                     </Text>
                   </View>
                   <LessonDetail {...detailProps(selected)} />
@@ -204,7 +203,6 @@ export function LessonsTab({ studentId, chrome }: LessonsTabProps) {
 
       <LessonAddSheet
         visible={addLesson !== null}
-        lessonTitle={addLesson?.title ?? ''}
         existingIds={addLesson?.items.map((item) => item.homeworkNumberId) ?? []}
         onClose={() => setAddFor(null)}
         onAdd={(homeworkNumberId, toExtra) => {

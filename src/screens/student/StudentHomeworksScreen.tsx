@@ -23,7 +23,7 @@ type Segment = 'active' | 'done';
 /**
  * `student.homeworks` (docs/spec/03-student-homework-lesson.md §1 H1; layout: docs/design/
  * glass-over-paper.md §8): every homework issued to the student as rows of one card — a title, the
- * deadline and «37 из 50» — in the server's "needs attention" order. «Активные» is what is still to do,
+ * deadline and «37/50» — in the server's "needs attention" order. «Активные» is what is still to do,
  * «Выполненные» what is closed. Number search lives in the header (shell action).
  *
  * A tablet shows both halves in the left panel and the selected homework in the right one, so a row
@@ -157,7 +157,7 @@ export function StudentHomeworksScreen() {
           // The homework tables are missing on the server: the section is unavailable, not broken.
           <Notice tone="warning" text={t.migrationNotice} testID="homeworks-unavailable" />
         ) : data.assignments.length === 0 ? (
-          <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="homeworks-empty" />
+          <EmptyState title={t.emptyTitle} testID="homeworks-empty" />
         ) : shown.length === 0 ? (
           segment === 'active' ? (
             <Notice tone="success" text={dict.student.submissions.allDone} testID="homeworks-all-done" />

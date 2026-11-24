@@ -3,11 +3,9 @@ import { View } from 'react-native';
 
 import type { HomeworkNumberStatus, TeacherHomeworkCheckResult, TeacherHomeworkNumber } from '@/api/types';
 import { MathContent } from '@/components/math';
-import { statusLabel } from '@/components/numbers';
-import { homeworkStatusLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Card, Chip, PressableScale, StatusBadge, Text, TextButton, useStatusAnnouncement } from '@/ui';
+import { Card, Chip, PressableScale, Text, TextButton, useStatusAnnouncement } from '@/ui';
 
 import { DisclosureRow } from './disclosure-row';
 import { hasResultDiagnostics, shortenRecognizedAnswer } from './review-logic';
@@ -30,11 +28,15 @@ export type ReviewNumberCardProps = {
   onHistory: () => void;
 };
 
+/** Shown in place of a statement or an answer that was not added; the reason is spoken. */
+const NONE = '—';
+
 /**
  * Everything about one number of a homework in the review (docs/spec/04-teacher-students.md S4 "number
- * card"), shown in the sheet a number row opens: the current status and the AI verdict of the latest
- * finished check, what the model recognised and said, the staff-only diagnostics, the student's note, the
- * statement with the reference answer on demand, the three status marks and the way to the status history.
+ * card"), shown in the sheet a number row opens: the AI verdict of the latest finished check, what the
+ * model recognised and said, the student's note, the three status marks — the filled one IS the current
+ * status, so there is no status label next to them (docs/design/glass-over-paper.md §1a) — the staff-only
+ * diagnostics, the statement with the reference answer on demand and the way to the status history.
  */
 export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, error, onStatus, onHistory }: ReviewNumberCardProps) {
   const styles = useStyles();
@@ -53,19 +55,16 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
 
   return (
     <View style={styles.card} testID={`review-number-${number.homeworkNumberId}`}>
-      <View style={styles.head}>
-        <StatusBadge status={number.status} label={statusLabel(number.status, m.common.statuses)} accessibilityLabel={homeworkStatusLabel(number.status, dict)} />
-        {/* A colour only where the verdict asks for attention; «Верно» is a plain fact. */}
-        {result ? (
-          result.verdict === 'INCORRECT' ? (
-            <Chip tone="red" label={t.verdict.INCORRECT.chip} />
-          ) : (
-            <Text variant="small" color="textMuted">
-              {t.verdict[result.verdict].chip}
-            </Text>
-          )
-        ) : null}
-      </View>
+      {/* A colour only where the verdict asks for attention; «Верно» is a plain fact. */}
+      {result ? (
+        result.verdict === 'INCORRECT' ? (
+          <Chip tone="red" label={t.verdict.INCORRECT.chip} style={styles.verdict} />
+        ) : (
+          <Text variant="small" color="textMuted">
+            {t.verdict[result.verdict].chip}
+          </Text>
+        )
+      ) : null}
 
       {shortRecognized ? (
         shortRecognized === recognized ? (
@@ -147,7 +146,8 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
       {/* PROPOSAL of the spec (04 S4, §7 item 15): the statement and the reference answer on demand. */}
       <View>
         <DisclosureRow
-          label={conditionOpen ? m.teacher.review.hideCondition : dict.topics.singleNumber.sectionTitle}
+          // The chevron says whether it is open; the label stays.
+          label={dict.topics.singleNumber.sectionTitle}
           accessibilityLabel={format(conditionOpen ? m.teacher.review.hideConditionOf : m.teacher.review.showConditionOf, { n: number.number })}
           expanded={conditionOpen}
           onToggle={() => setConditionOpen((open) => !open)}
@@ -161,8 +161,8 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
             {number.conditionLatex ? (
               <MathContent value={number.conditionLatex} variant="bare" />
             ) : (
-              <Text variant="small" color="textMuted">
-                {m.teacher.review.noCondition}
+              <Text variant="small" color="textMuted" accessibilityLabel={m.teacher.review.noCondition}>
+                {NONE}
               </Text>
             )}
             <Text variant="kicker" color="textMuted">
@@ -171,8 +171,8 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
             {number.answerLatex ? (
               <MathContent value={number.answerLatex} variant="bare" />
             ) : (
-              <Text variant="small" color="textMuted">
-                {m.teacher.review.noAnswer}
+              <Text variant="small" color="textMuted" accessibilityLabel={m.teacher.review.noAnswer}>
+                {NONE}
               </Text>
             )}
           </Card>
@@ -192,7 +192,7 @@ export function ReviewNumberCard({ number, result, lessonMode, saving, blocked, 
 
 const useStyles = makeStyles((t) => ({
   card: { gap: t.space.md, paddingBottom: t.space.sm },
-  head: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: t.space.md, rowGap: t.space.xs },
+  verdict: { alignSelf: 'flex-start' },
   diagnostics: { gap: t.space.xxs, paddingLeft: t.sizes.icon.sm + t.space.sm, paddingBottom: t.space.xs },
   note: { gap: t.space.xxs },
   condition: { gap: t.space.xs },

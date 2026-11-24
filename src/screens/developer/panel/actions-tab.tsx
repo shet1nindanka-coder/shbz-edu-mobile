@@ -6,6 +6,7 @@ import { errorText, qk, useApi } from '@/api';
 import type { PanelAction } from '@/api/types';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { useI18n } from '@/i18n';
+import { useHintsEnabled } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Chip, Dialog, Icon, ListCard, ListRow, Panel, Panels, Spinner, useStatusAnnouncement } from '@/ui';
 
@@ -15,11 +16,12 @@ import type { PanelResult } from './result-line';
 import { useRetryLock } from './use-retry-lock';
 
 /**
- * Actions tab (07 §1.9; layout: docs/design/glass-over-paper.md §7): the five service actions as rows of
- * one card — the name, and one caption that is the hint, then «Действие выполняется…», then the action's
- * message (red when it failed). The whole row runs the action. The panel data is refreshed after every
- * action, as the site refreshes its page. A tablet shows the AI budgets next to the list: two of the
- * actions change them.
+ * Actions tab (07 §1.9; layout: docs/design/glass-over-paper.md §7, §1a): the five service actions as rows
+ * of one card. A row is the action's name; what it does is a hint (shown only with hints on), and the
+ * outcome is a glyph on the right — a spinner while it runs, a tick when it is done, a red «Ошибка» with
+ * the server's message under the name when it failed. The whole row runs the action. The panel data is
+ * refreshed after every action, as the site refreshes its page. A tablet shows the AI budgets next to the
+ * list: two of the actions change them.
  */
 export function ActionsTab({ budgets }: { budgets: readonly BudgetRow[] }) {
   const styles = useStyles();
@@ -63,6 +65,7 @@ function ActionRow({ row, divider, onSettled }: { row: PanelActionRow; divider: 
   const [result, setResult] = useState<PanelResult | null>(null);
   const [confirming, setConfirming] = useState(false);
   const lock = useRetryLock();
+  const hints = useHintsEnabled();
 
   const run = useMutation({
     mutationFn: () => api.developer.runAction(row.action),
@@ -77,7 +80,8 @@ function ActionRow({ row, divider, onSettled }: { row: PanelActionRow; divider: 
     },
     onSettled: () => onSettled(row.action),
   });
-  // The outcome replaces the caption without moving the focus: it is spoken on both platforms.
+  // The outcome is a glyph (and, for a failure, a line) that appears without moving the focus: its
+  // message is spoken on both platforms.
   useStatusAnnouncement(run.isPending ? null : result?.message);
 
   const start = () => {
@@ -86,10 +90,13 @@ function ActionRow({ row, divider, onSettled }: { row: PanelActionRow; divider: 
   };
   const confirm = row.confirm ? confirmTexts(row.confirm, m.developer.actions) : null;
   const title = t.actions[row.label];
-  // Not a hideable hint: the site shows this line whatever the "hints" preference is — it is the only
-  // description of what the action does.
-  const caption = run.isPending ? t.actionRunning : (result?.message ?? t.actions[row.hint]);
+  const description = t.actions[row.hint];
   const failed = !run.isPending && result !== null && !result.ok;
+  const done = !run.isPending && result !== null && result.ok;
+  // An error message always stays on screen; the description of the action is a hint.
+  const caption = failed ? result.message : hints && !run.isPending ? description : undefined;
+  // Everything the row says or stands for, for a screen reader: the name, what it does, how it went.
+  const spoken = [title, description, run.isPending ? t.actionRunning : result?.message].filter(Boolean).join('. ');
 
   return (
     <View style={[styles.block, divider ? styles.divider : null]}>
@@ -107,13 +114,13 @@ function ActionRow({ row, divider, onSettled }: { row: PanelActionRow; divider: 
             <Spinner />
           ) : failed ? (
             <Chip label={dict.planner.common.error} tone="red" />
-          ) : result ? (
-            <Icon name="check" size={theme.sizes.icon.md} color="textMuted" />
+          ) : done ? (
+            <Icon name="check" size={theme.sizes.icon.md} color="textStrong" />
           ) : undefined
         }
         divider={false}
         disabled={run.isPending || lock.seconds > 0}
-        accessibilityLabel={`${title}. ${caption}`}
+        accessibilityLabel={spoken}
         // SPEC-GAP: the site runs all five without asking. On a phone a stray tap is likelier, so the two
         // actions the spec names — reset budget and unfreeze — ask first (07 §1.9 phone mapping, §7 item 12).
         // The other three start on tap, as on the site.

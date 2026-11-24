@@ -16,10 +16,11 @@ export type JournalDetailBodyProps = {
 };
 
 /**
- * Everything the journal knows about one row (07 §1.10): every column of the site's table, the system
+ * Everything the journal knows about one row (07 §1.10): the columns of the site's table, the system
  * action name, the whole error, `meta` as pretty-printed JSON («Детали записи») and, for a
- * `progress.status` row that still names its student and number, the way into the status history. A phone
- * shows it in a sheet, a tablet in the panel next to the list.
+ * `progress.status` row that still names its student and number, the way into the status history. A field
+ * that has nothing to say is left out: «Что» when it only repeats the title above, tokens and cost of an
+ * entry that spent none. A phone shows it in a sheet, a tablet in the panel next to the list.
  */
 export function JournalDetailBody({ entry, onOpenHistory }: JournalDetailBodyProps) {
   const styles = useStyles();
@@ -28,6 +29,10 @@ export function JournalDetailBody({ entry, onOpenHistory }: JournalDetailBodyPro
   const t = dict.planner.journal;
   const mono = { fontFamily: theme.fonts.mono };
   const failed = entry.outcome === 'failed';
+  // The summary of most entries is the action's label again — the title of the sheet / panel.
+  const summary = entry.summary && entry.summary !== (entry.actionLabel ?? entry.action) ? entry.summary : null;
+  const tokens = tokensText(entry);
+  const cost = costText(entry.costRub);
 
   return (
     <View style={styles.content}>
@@ -53,24 +58,30 @@ export function JournalDetailBody({ entry, onOpenHistory }: JournalDetailBodyPro
       <Field label={t.colWho}>
         <Text variant="body">{whoText(entry, t.roles)}</Text>
       </Field>
-      <Field label={t.colWhat}>
-        {entry.progressTarget ? <Text variant="bodyStrong">{entry.progressTarget}</Text> : null}
-        <Text variant="body" selectable>
-          {entry.summary ?? (entry.progressTarget ? '' : '—')}
-        </Text>
-      </Field>
-      <View style={styles.pair}>
-        <Field label={t.colTokens} style={styles.half}>
-          <Text variant="body" tabular>
-            {tokensText(entry) ?? '—'}
-          </Text>
+      {entry.progressTarget || summary ? (
+        <Field label={t.colWhat}>
+          {entry.progressTarget ? <Text variant="bodyStrong">{entry.progressTarget}</Text> : null}
+          {summary ? (
+            <Text variant="body" selectable>
+              {summary}
+            </Text>
+          ) : null}
         </Field>
-        <Field label={t.colCost} style={styles.half}>
-          <Text variant="body" tabular>
-            {costText(entry.costRub) ?? '—'}
-          </Text>
-        </Field>
-      </View>
+      ) : null}
+      {tokens !== null || cost !== null ? (
+        <View style={styles.pair}>
+          <Field label={t.colTokens} style={styles.half}>
+            <Text variant="body" tabular>
+              {tokens ?? '—'}
+            </Text>
+          </Field>
+          <Field label={t.colCost} style={styles.half}>
+            <Text variant="body" tabular>
+              {cost ?? '—'}
+            </Text>
+          </Field>
+        </View>
+      ) : null}
 
       {entry.progressRef ? (
         <Button

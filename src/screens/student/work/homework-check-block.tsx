@@ -2,10 +2,8 @@ import { View } from 'react-native';
 
 import type { StudentCheckDto, StudentCheckResultDto } from '@/api/types';
 import { RetryWaitLine } from '@/components/retry-wait';
-import { formatDateTime } from '@/domain/dates';
 import { checkErrorText } from '@/domain/solution-check-error-text';
-import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
+import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Button, Notice, Text, TextButton } from '@/ui';
 
@@ -24,12 +22,13 @@ export type HomeworkCheckBlockProps = {
 
 /**
  * «Автоматическая проверка» (docs/spec/03-student-homework-lesson.md §1 H2.b): the start button with its
- * states, the running hint, the failure text of the check's error class and the verdicts of a finished
- * check. A finished result stays until a new check is started.
+ * states — it is off without photos (a screen reader hears why) and spins while the check runs — the
+ * failure text of the check's error class and the verdicts of a finished check. No lines explain the
+ * button. A finished result stays until a new check is started.
  */
 export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo }: HomeworkCheckBlockProps) {
   const styles = useStyles();
-  const { dict, m, locale } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.student.check;
 
   const { running, starting, pollBroken, limit } = state;
@@ -64,22 +63,6 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
       {/* Next to the locked button for as long as it is locked (the daily budget can last hours), whether or
           not the error notice above was dismissed (90-addendum-1 A.3 rule 3). */}
       <RetryWaitLine wait={limit} testID="homework-check-wait" />
-      {/* The site explains the disabled button in a tooltip; a phone has none. */}
-      {!hasPhotos && !running ? (
-        <Text variant="caption" testID="homework-check-need-photos">
-          {t.needPhotos}
-        </Text>
-      ) : (
-        <Hint>
-          <Text variant="hint">{t.subtitle}</Text>
-        </Hint>
-      )}
-
-      {running ? (
-        <Text variant="small" color="textMuted" testID="homework-check-running">
-          {m.studentWork.check.runningHint}
-        </Text>
-      ) : null}
 
       {pollBroken ? (
         <Notice
@@ -103,11 +86,6 @@ export function HomeworkCheckBlock({ check, hasPhotos, available, state, onRedo 
           </Text>
         ) : (
           <View style={styles.results} testID="homework-check-results">
-            {check.checkedAt ? (
-              <Text variant="kicker" color="textMuted">
-                {format(t.checkedAt, { date: formatDateTime(check.checkedAt, locale) })}
-              </Text>
-            ) : null}
             {check.results.map((result, index) => (
               <CheckResultRow key={result.homeworkNumberId} result={result} onRedo={onRedo} divider={index < check.results.length - 1} />
             ))}

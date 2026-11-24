@@ -49,9 +49,13 @@ export const MAX_GAPS_SHOWN = 6;
 
 // ───────────────────────────── metric cards ─────────────────────────────
 
-/** Colour of a card's note line: what the number says about the school. */
+/** What the number says about the school; only `red` is drawn (a non-zero count that needs attention). */
 export type NoteTone = "green" | "red" | "accent" | "muted";
 
+/**
+ * A summary figure: the label and the figure are drawn; `note` (the site's line under the figure) is only
+ * read out by a screen reader. A ratio that matters is part of the figure itself («26/65»).
+ */
 export type MetricCardModel = { key: string; label: string; value: string; note: string; tone: NoteTone };
 
 /** View "Student progress": four cards about the issued homework. */
@@ -61,14 +65,14 @@ export function progressMetricCards(homework: Homework, t: StatsDict): MetricCar
     {
       key: "solvedOfIssued",
       label: t.solvedOfIssued,
-      value: `${homework.issuedNumbersSolved} / ${issuedTotal}`,
+      value: `${homework.issuedNumbersSolved}/${issuedTotal}`,
       note: format(t.percentIssuedNumbers, { n: completionPercent(homework.issuedNumbersSolved, issuedTotal) }),
       tone: "green",
     },
     {
       key: "homeworkDone",
       label: t.homeworkDone,
-      value: String(homework.completedCount),
+      value: `${homework.completedCount}/${homework.total}`,
       note: format(t.ofIssuedHomework, { n: homework.total }),
       tone: "green",
     },
@@ -309,7 +313,8 @@ export function platformMetricCards(overview: TeacherTopicsOverview, homework: H
     {
       key: "students",
       label: t.students,
-      value: `${summary.activeStudents} / ${overview.stats.totalStudents}`,
+      // The share in work is the «Ученики в работе» row below; the card is the head count.
+      value: String(overview.stats.totalStudents),
       note: format(t.studentsNote, { n: summary.activeStudentsPercent }),
       tone: "accent",
     },
@@ -321,23 +326,23 @@ export type ProgressRowModel = { key: string; label: string; value: string; perc
 export function bankUsageRows(overview: TeacherTopicsOverview, t: StatsDict): ProgressRowModel[] {
   const summary = platformSummary(overview);
   return [
-    { key: "solvedOfBank", label: t.solvedOfBank, value: `${summary.totalSolved} / ${summary.totalStatusSlots}`, percent: summary.solvedPercent },
+    { key: "solvedOfBank", label: t.solvedOfBank, value: `${summary.totalSolved}/${summary.totalStatusSlots}`, percent: summary.solvedPercent },
     {
       key: "redInBank",
       label: t.redInBank,
-      value: `${summary.totalRed} / ${summary.totalStatusSlots}`,
+      value: `${summary.totalRed}/${summary.totalStatusSlots}`,
       percent: completionPercent(summary.totalRed, summary.totalStatusSlots),
     },
     {
       key: "topicsWithActivity",
       label: t.topicsWithActivity,
-      value: `${summary.activeTopics} / ${overview.stats.totalTopics}`,
+      value: `${summary.activeTopics}/${overview.stats.totalTopics}`,
       percent: summary.activeTopicsPercent,
     },
     {
       key: "studentsInWork",
       label: t.studentsInWork,
-      value: `${summary.activeStudents} / ${overview.stats.totalStudents}`,
+      value: `${summary.activeStudents}/${overview.stats.totalStudents}`,
       percent: summary.activeStudentsPercent,
     },
   ];
@@ -354,7 +359,7 @@ export function contentRows(content: Content, t: StatsDict): ProgressRowModel[] 
   const row = (key: string, label: string, done: number, total: number): ProgressRowModel => ({
     key,
     label,
-    value: `${done} / ${total}`,
+    value: `${done}/${total}`,
     percent: completionPercent(done, total),
   });
   return [
@@ -365,7 +370,7 @@ export function contentRows(content: Content, t: StatsDict): ProgressRowModel[] 
   ];
 }
 
-/** «нет файла теории · без условия: 3» — what a topic lacks. */
+/** «нет файла теории, без условия: 3» — the one fact of a gap row: what the topic lacks. */
 export function gapLine(gap: Content["gaps"][number], t: StatsDict): string {
   return [
     gap.noTheoryFile ? t.gapNoTheoryFile : null,
@@ -374,7 +379,7 @@ export function gapLine(gap: Content["gaps"][number], t: StatsDict): string {
     gap.missingAnswers > 0 ? format(t.gapNoAnswer, { n: gap.missingAnswers }) : null,
   ]
     .filter((part): part is string => part !== null)
-    .join(" · ");
+    .join(", ");
 }
 
 /** «И ещё 2 темы с пробелами.» — null when every gap is listed. */
@@ -539,17 +544,27 @@ export function weekChartSummary(bars: readonly WeekBar[], t: TeacherStatsDict):
   return format(t.chartAria, { items: bars.map((bar) => `${bar.weekLabel} — ${bar.count}`).join(", ") });
 }
 
-export type RecentLessonLine = { when: string; details: string; status: string };
+export type RecentLessonLine = {
+  /** The row's title: the topic, or the lesson's own title when it has no topic. */
+  title: string;
+  /** The row's one caption: «5 нояб., 18:30» (Moscow time). */
+  when: string;
+  /** Group or head count — only read out. */
+  who: string;
+  /** The status in words — drawn as a glyph, read out as text. */
+  status: string;
+};
 
 /**
  * A row of «Последние занятия». `status` is the STORED lesson status — the only place in the app where
  * it is not derived from the schedule (06 §4.8, §7 Q15): a lesson that ended but was never finalised
- * still reads «запланировано».
+ * still reads «запланировано». A lesson without a schedule shows when it was created, and says so.
  */
 export function recentLessonLine(lesson: TeacherLessonEntry, t: TeacherStatsDict, common: PlannerCommon, locale: Locale): RecentLessonLine {
-  const when = `${formatMsk(lesson.startsAt ?? lesson.createdAt, "dayMonthTime", locale) ?? ""}${lesson.startsAt ? "" : t.created}`;
+  const at = lesson.startsAt ?? lesson.createdAt;
+  const when = `${formatMsk(at, "dayMonthShort", locale) ?? ""}, ${formatMsk(at, "time", locale) ?? ""}${lesson.startsAt ? "" : t.created}`;
   const who = lesson.groupName ? format(t.group, { name: lesson.groupName }) : plural(locale, lesson.participantsCount, common.studentForms);
-  return { when, details: `${lesson.topicTitle ?? lesson.title} · ${who}`, status: t.lessonStatus[lesson.status] };
+  return { title: lesson.topicTitle ?? lesson.title, when, who, status: t.lessonStatus[lesson.status] };
 }
 
 /** «Вне карточек учителей: учеников без учителя — 1, ДЗ — 1.» — null when every row has a teacher. */

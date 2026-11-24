@@ -5,10 +5,11 @@ import type { HomeworkPlanItem, HomeworkPlanParticipant } from '@/api/types';
 import { MathContent } from '@/components/math';
 import { statusLabel } from '@/components/numbers';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Button, Card, NumberTile, Text, TextButton, accessibilityLabelOf } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Button, Card, EmptyState, IconButton, NumberTile, Text, accessibilityLabelOf } from '@/ui';
 
 import type { CaptionText } from '../lessons/use-participant-caption';
+import { CollapsedText } from '../shared/collapsed-text';
 import type { PlanState } from '../shared/plan-state';
 import { PlanStatusBlock } from '../shared/plan-status-block';
 import { isIssued } from './drafts-logic';
@@ -19,7 +20,7 @@ export type DraftParticipantDetailProps = {
   /** The number whose card is shown (picked in the grid, else the first of the set). */
   current: HomeworkPlanItem | null;
   planState: PlanState;
-  /** The same caption the student's row carries: the state line under the title. */
+  /** The student's state: its `detail` is the line under the title («Выдано», the time of the set). */
   caption: CaptionText;
   aiAvailable: boolean;
   busy: DraftParticipantBusy | undefined;
@@ -39,10 +40,11 @@ export type DraftParticipantDetailProps = {
 
 /**
  * One student of a homework draft (docs/spec/05-teacher-lessons-plans.md §1.7 "Participant card"; layout:
- * mockup `T-hwplan`, «Что подобрано»): the state line, the AI-plan state, the AI's summary, the set as
- * number tiles coloured by the student's current status of each number, and ONE card — of the picked
- * number: why it was selected, the AI comment, the statement, "remove". A set the homework was issued from
- * is frozen: nothing is removed or added. The buttons (rebuild, assign) are the footer.
+ * mockup `T-hwplan`, «Что подобрано»): a state line («Выдано» / the minutes of the set), the AI-plan state,
+ * the AI's summary folded to a line, the set as number tiles coloured by the student's current status of
+ * each number, and ONE card — of the picked number: the number with the one word why it was selected and
+ * the "remove" icon, the AI comment folded to a line, the statement. A set the homework was issued from is
+ * frozen: nothing is removed or added. The buttons (rebuild, assign) are the footer.
  */
 export function DraftParticipantDetail({
   participant,
@@ -61,6 +63,7 @@ export function DraftParticipantDetail({
   onRemove,
 }: DraftParticipantDetailProps) {
   const styles = useStyles();
+  const theme = useTheme();
   const { dict, m } = useI18n();
   const t = dict.planner.homeworkPlans.board;
   const common = dict.planner.common;
@@ -73,9 +76,11 @@ export function DraftParticipantDetail({
     <View style={styles.body} testID={`draft-participant-${participant.id}`}>
       {top}
 
-      <Text variant="small" color={caption.attention ? 'redText' : 'textMuted'} tabular>
-        {caption.text}
-      </Text>
+      {caption.detail ? (
+        <Text variant="small" color="textMuted" tabular>
+          {caption.detail}
+        </Text>
+      ) : null}
 
       <PlanStatusBlock
         state={planState}
@@ -89,7 +94,7 @@ export function DraftParticipantDetail({
         testID={`draft-plan-${participant.id}`}
       />
 
-      {participant.planSummary ? <Text variant="body">{participant.planSummary}</Text> : null}
+      {participant.planSummary ? <CollapsedText text={participant.planSummary} testID={`draft-plan-summary-${participant.id}`} /> : null}
 
       {!empty ? (
         <View style={styles.grid}>
@@ -108,41 +113,45 @@ export function DraftParticipantDetail({
           ))}
         </View>
       ) : !planState.pending ? (
-        <Card dashed testID={`draft-participant-empty-${participant.id}`}>
-          <Text variant="small" color="textMuted">
-            {common.noTasksYet}
-          </Text>
-        </Card>
+        <EmptyState variant="plain" title={m.planner.lessonBoard.noTasks} testID={`draft-participant-empty-${participant.id}`} />
       ) : null}
 
       {current ? (
         <View style={styles.item}>
-          <Text variant="small" color="textMuted">
-            {/* Why the number was selected and the student's current status of it: plain facts, one line. */}
-            {accessibilityLabelOf(
-              [
+          <View style={styles.head}>
+            {/* The number and why it was selected; the student's status of it is the colour of its tile. */}
+            <View
+              accessible
+              accessibilityLabel={accessibilityLabelOf([
                 format(common.numberSign, { n: current.number }),
                 reasons[current.reason] ?? dict.planner.reasons.NEW,
                 current.studentStatus ? statusLabel(current.studentStatus, m.common.statuses) : null,
-              ],
-              ' · ',
-            )}
-          </Text>
-          {current.comment ? <Text variant="small">{current.comment}</Text> : null}
+              ])}
+              style={styles.titles}
+            >
+              <Text variant="bodyBold" tabular numberOfLines={1}>
+                {format(common.numberSign, { n: current.number })}
+              </Text>
+              <Text variant="small" color="textMuted" numberOfLines={1}>
+                {reasons[current.reason] ?? dict.planner.reasons.NEW}
+              </Text>
+            </View>
+            {!issued ? (
+              <IconButton
+                icon="trash"
+                tint={theme.colors.dangerText}
+                accessibilityLabel={format(common.removeNumber, { n: current.number })}
+                disabled={working || itemsBlocked}
+                onPress={() => onRemove(current)}
+                testID={`draft-item-remove-${current.id}`}
+              />
+            ) : null}
+          </View>
+          {current.comment ? <CollapsedText text={current.comment} testID={`draft-item-comment-${current.id}`} /> : null}
           {current.conditionLatex ? (
             <Card>
               <MathContent value={current.conditionLatex} variant="bare" />
             </Card>
-          ) : null}
-          {!issued ? (
-            <TextButton
-              label={format(common.removeNumber, { n: current.number })}
-              tone="danger"
-              disabled={working || itemsBlocked}
-              onPress={() => onRemove(current)}
-              testID={`draft-item-remove-${current.id}`}
-              style={styles.link}
-            />
           ) : null}
         </View>
       ) : null}
@@ -168,6 +177,8 @@ const useStyles = makeStyles((t) => ({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
   // Three tiles in a row: a six-digit number with its mark fits a third of a phone sheet.
   tile: { flexGrow: 1, flexBasis: '30%', maxWidth: '31.5%' },
-  item: { gap: t.space.xs },
+  item: { gap: t.space.md },
+  head: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs, minHeight: t.sizes.control.md },
+  titles: { flex: 1, minWidth: 0 },
   link: { alignSelf: 'flex-start' },
 }));

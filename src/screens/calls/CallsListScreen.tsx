@@ -14,7 +14,6 @@ import { makeStyles, useTheme } from '@/theme';
 import { Button, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen } from '@/ui';
 
 import { CallRow } from './list/call-row';
-import { summaryLine } from './logic';
 import { CallJournalPanel } from './panels/call-journal-panel';
 import { RecordCallPanel } from './panels/record-call-panel';
 import { HistorySheet } from './sheets/history-sheet';
@@ -34,8 +33,9 @@ type Overlay = { kind: 'record'; target: RecordCallTarget } | { kind: 'history';
  * student with the teacher's name and only reads. The server sorts the rows (overdue → due → ok) and
  * counts the days in Moscow time.
  *
- * The screen is its list (docs/design/glass-over-paper.md §1a): the site's summary sentence is the spoken
- * name of the list, the eye has the order of the rows and their chips.
+ * The screen is its list (docs/design/glass-over-paper.md §1a): the site's summary sentence («Просрочено:
+ * 1 · Пора позвонить: 2 · …») is not shown — the rows come sorted, the due ones carry a chip, and every
+ * row says its state to a screen reader.
  *
  * Phone: one card of rows; a row opens a sheet — the record form with the earlier calls under it for a
  * teacher, the history alone for a developer. Tablet: the list is the left panel; the right one is the
@@ -209,8 +209,6 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
     </>
   );
 
-  // The site's summary sentence is not shown: the rows come sorted and carry the chips. It names the list.
-  const summary = data ? summaryLine(data.counts, t) : undefined;
   const hasNotices = notice !== null || (overview.isError && data !== undefined);
 
   const rows = students?.map((student, index) => (
@@ -253,7 +251,6 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
           <Panel edges weight={3} padded={false} scrollRef={scrollRef} refreshing={refreshing} onRefresh={refresh} testID="calls-list">
             {hasNotices ? <View style={styles.panelHead}>{notices}</View> : null}
             <View
-              accessibilityLabel={summary}
               onLayout={(event) => {
                 layout.current.header = 0;
                 layout.current.list = event.nativeEvent.layout.y;
@@ -311,7 +308,6 @@ export function CallsListScreen({ studentId }: CallsListScreenProps) {
           />
         ) : (
           <View
-            accessibilityLabel={summary}
             onLayout={(event) => {
               layout.current.list = event.nativeEvent.layout.y;
             }}

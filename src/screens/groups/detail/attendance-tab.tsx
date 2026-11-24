@@ -7,14 +7,14 @@ import type { AttendanceStatus, GroupAttendanceLesson, GroupAttendanceResponse, 
 import { LoadFailure, isLoadFailed } from '@/components/load-failure';
 import { RetryWaitLine, type RetryWait } from '@/components/retry-wait';
 import { nextAttendance } from '@/domain/attendance';
-import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation } from '@/navigation';
 import { Hint } from '@/providers';
+import { useNowTick } from '@/services/clock';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, EmptyState, ListRow, LoadingState, Notice, Segmented, Text } from '@/ui';
+import { BottomSheet, EmptyState, IconButton, ListRow, LoadingState, Notice, Segmented, Spinner, Text } from '@/ui';
 
-import { applyAttendanceMark, applyPendingMarks, type AttendanceCell } from '../logic';
+import { applyAttendanceMark, applyPendingMarks, shortDateTime, type AttendanceCell } from '../logic';
 import { AttendanceLessonList } from './attendance-lesson-list';
 import { AttendanceMarkSheet, type AttendanceMarkTarget } from './attendance-mark-sheet';
 import { AttendanceTable } from './attendance-table';
@@ -35,10 +35,15 @@ export type AttendanceTabProps = {
   wait: RetryWait;
 };
 
+/** Only the year of «now» matters to a lesson's date (see `shortDateTime`): a coarse tick. */
+const NOW_TICK_MS = 3_600_000;
+
 /**
  * «Посещаемость» (06 §1.2 item 6, §3.7, §4.3): the marks of the group's past lessons of the academic
  * year, as a table or lesson by lesson. A mark is applied at once and sent; if the server refuses it the
- * mark goes back and the reason is shown.
+ * mark goes back and the reason is shown. The PDF reports are a download button; how a tap works is a
+ * one-line hint, and the table has no legend — every cell says what it is to a screen reader, and the
+ * long-press sheet names every mark.
  */
 export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceTabProps) {
   const styles = useStyles();
@@ -56,6 +61,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
   // Marks in flight (participant id → mark): shown over every read of the table until they settle.
   const [pending, setPending] = useState<Readonly<Record<string, AttendanceStatus>>>({});
   const [reportsOpen, setReportsOpen] = useState(false);
+  const now = useNowTick(NOW_TICK_MS);
 
   const key = qk('groups', 'getGroupAttendance', groupId, ATTENDANCE_PERIOD);
   const patch = (participantId: string, value: AttendanceStatus) =>
@@ -131,14 +137,16 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
     { period: '30d', label: common.forThirtyDays },
     { period: 'year', label: common.academicYear },
   ];
-  // The three PDF periods are folded behind one button; it spins while any of them is being built.
-  const reportButton = (
-    <Button
-      label={m.groups.attendance.pdf}
+  // The three PDF periods are folded behind one download button; while any of them is being built a
+  // spinner stands in its place.
+  const reportButton = periods.some(({ period }) => report.pendingKey === attendanceReportKey(period)) ? (
+    <View style={styles.reportBusy} testID="group-attendance-pdf-busy">
+      <Spinner accessibilityLabel={m.groups.attendance.pdfTitle} />
+    </View>
+  ) : (
+    <IconButton
+      icon="download"
       accessibilityLabel={m.groups.attendance.pdfTitle}
-      variant="outline"
-      leftIcon="download"
-      loading={periods.some(({ period }) => report.pendingKey === attendanceReportKey(period))}
       disabled={report.blocked}
       onPress={() => setReportsOpen(true)}
       testID="group-attendance-pdf"
@@ -149,7 +157,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
       visible={reportsOpen}
       onClose={() => setReportsOpen(false)}
       closeLabel={m.common.actions.close}
-      title={m.groups.attendance.pdfTitle}
+      title={common.pdf}
       testID="group-attendance-pdf-sheet"
     >
       {periods.map(({ period, label }, index) => (
@@ -175,7 +183,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
       <View style={styles.tab} testID="group-attendance-tab">
         <EmptyState
           variant="plain"
-          title={data.members.length === 0 ? t.emptyMembers : t.emptyLessons}
+          title={data.members.length === 0 ? dict.planner.groups.list.noStudents : m.groups.attendance.noPastLessons}
           testID="group-attendance-empty"
         />
         {/* The group had lessons but has no members now: the reports still have something to show. */}
@@ -221,11 +229,13 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
         {reportButton}
       </View>
 
-      <Hint>
-        <Text variant="hint" color="textMuted">
-          {mode === 'table' ? m.groups.attendance.tapHint : m.groups.attendance.listHint}
-        </Text>
-      </Hint>
+      {mode === 'table' ? (
+        <Hint>
+          <Text variant="hint" color="textMuted">
+            {m.groups.attendance.tapHint}
+          </Text>
+        </Hint>
+      ) : null}
 
       {error || wait.waiting ? (
         <View style={styles.errorBox}>
@@ -244,8 +254,7 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
       ) : null}
 
       {mode === 'table' ? (
-        <>
-          <AttendanceTable
+        <AttendanceTable
             members={data.members}
             lessons={data.lessons}
             busy={busy}
@@ -257,24 +266,20 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
                 participantId: cell.participantId,
                 studentName: member.name,
                 lessonTitle: lesson.title,
-                lessonDate: formatDateTime(lesson.startsAt, locale),
+                lessonDate: shortDateTime(lesson.startsAt, now, locale),
                 attendance: cell.attendance,
               });
               setMarkOpen(true);
             }}
             onOpenLesson={openLesson}
           />
-          {/* Not a hint: it decodes a symbol of the table (the site's cell tooltip), so it never hides. */}
-          <Text variant="hint" color="textMuted" testID="group-attendance-legend">
-            {format(m.groups.attendance.notParticipatedLegend, { text: t.notParticipated })}
-          </Text>
-        </>
       ) : (
         <AttendanceLessonList
           members={data.members}
           lessons={data.lessons}
           busy={busy}
           disabled={wait.waiting}
+          now={now}
           onSet={(lesson, cell, value) => send(lesson.id, cell, value)}
           onOpenLesson={openLesson}
         />
@@ -295,9 +300,10 @@ export function AttendanceTab({ groupId, attendance, report, wait }: AttendanceT
 
 const useStyles = makeStyles((t) => ({
   tab: { gap: t.space.md },
-  // The view switch takes the row; the PDF button keeps the width of its label.
+  // The view switch takes the row; the download button is a 44 square at its end.
   head: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   mode: { flex: 1, minWidth: 0 },
+  reportBusy: { width: t.sizes.iconCircle, height: t.sizes.iconCircle, alignItems: 'center', justifyContent: 'center' },
   emptyReport: { alignItems: 'flex-start' },
   errorBox: { gap: t.space.xs },
 }));

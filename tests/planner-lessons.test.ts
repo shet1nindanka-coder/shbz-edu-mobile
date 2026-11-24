@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { LessonListItem } from "@/api/types";
 import { mskDate } from "@/domain/moscow-time";
+import { rowDateTime, rowDay } from "@/screens/planner/shared/row-date";
 import {
   groupLessons,
   hasScheduleAdvanced,
@@ -204,4 +205,23 @@ test("currentSpeeds: the current profile speed unless the teacher picked one for
   assert.deepEqual(currentSpeeds(fresh, {}), { s1: 7, s2: 3, s3: 9 });
   // A pick wins, including an explicit "not set"; picks of students no longer listed are dropped.
   assert.deepEqual(currentSpeeds(fresh, { s1: 2, s2: null, gone: 5 }), { s1: 2, s2: null, s3: 9 });
+});
+
+// The text diet (glass-over-paper §1a "Dates are short"): «17 ноя, 12:00», no year inside the current one.
+test("rowDateTime: a short day with a three-letter month inside the current Moscow year, the full date outside it", () => {
+  const now = Date.parse("2026-11-24T09:00:00.000Z");
+  assert.equal(rowDateTime("2026-11-17T09:00:00.000Z", now, "ru"), "17 ноя, 12:00");
+  assert.equal(rowDateTime("2026-09-03T14:30:00.000Z", now, "ru"), "3 сен, 17:30");
+  assert.equal(rowDateTime("2026-05-05T06:00:00.000Z", now, "ru"), "5 мая, 09:00");
+  assert.equal(rowDateTime("2026-11-17T09:00:00.000Z", now, "en"), "17 Nov, 12:00");
+  // Another year: the caption keeps it.
+  assert.equal(rowDateTime("2025-11-17T09:00:00.000Z", now, "ru"), "17.11.2025, 12:00");
+  // 31 December 22:30 UTC is already 1 January in Moscow.
+  assert.equal(rowDateTime("2026-12-31T22:30:00.000Z", now, "ru"), "01.01.2027, 01:30");
+});
+
+test("rowDay: no full stop and no fourth letter in the month, null for a missing date", () => {
+  assert.equal(rowDay("2026-02-07T09:00:00.000Z", "ru"), "7 фев");
+  assert.equal(rowDay("2026-06-30T09:00:00.000Z", "ru"), "30 июн");
+  assert.equal(rowDay("", "ru"), null);
 });

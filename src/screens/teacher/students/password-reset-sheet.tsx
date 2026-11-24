@@ -18,7 +18,7 @@ export type ResetPasswordTarget = { id: string; name: string };
 export type PasswordResetSheetProps = {
   /** The account whose password is replaced; `null` closes the sheet. */
   target: ResetPasswordTarget | null;
-  /** Whose account it is: picks the "what happens next" paragraph of `dict.students.passwordReset`. */
+  /** Whose account it is: picks the "what happens next" text of `dict.students.passwordReset` (spoken only). */
   audience: 'student' | 'teacher';
   /** The request that replaces the password. */
   reset: (id: string, password: string) => Promise<unknown>;
@@ -41,9 +41,11 @@ export type PasswordResetSheetProps = {
 
 /**
  * "Reset password" of an account (docs/spec/04-teacher-students.md D2, §3.3, §3.9): one visible field with
- * the live policy check. The site redirects to the list with a banner; here the sheet closes in place and
- * the caller shows the notice. A failure that can be retried (invalid, rate limit, save, no connection)
- * stays inside the sheet with the typed password kept.
+ * the live policy check, named by the heading «Новый пароль для …» alone — no label, no placeholder; the
+ * site's "what happens next" paragraph is the field's accessibility hint (docs/design/glass-over-paper.md
+ * §1a). The site redirects to the list with a banner; here the sheet closes in place and the caller shows
+ * the notice. A failure that can be retried (invalid, rate limit, save, no connection) stays inside the
+ * sheet with the typed password kept.
  *
  * One sheet for both targets: `ResetPasswordSheet` (a teacher's or the developer's student) and the
  * developer's `ResetTeacherPasswordSheet` only bind the request, the texts and the "gone" code.
@@ -137,20 +139,15 @@ export function PasswordResetSheet({
       }
     >
       <View style={styles.content}>
-        <View style={styles.intro}>
-          <Text variant="dialogTitle" accessibilityRole="header">
-            {format(t.heading, { name: shown?.name ?? '' })}
-          </Text>
-          <Text variant="small" color="label">
-            {t[audience].consequences}
-          </Text>
-        </View>
+        <Text variant="dialogTitle" accessibilityRole="header">
+          {format(t.heading, { name: shown?.name ?? '' })}
+        </Text>
         <View style={styles.field}>
           <TextField
-            label={t.newPassword}
+            accessibilityLabel={t.newPassword}
+            accessibilityHint={t[audience].consequences}
             value={password}
             onChangeText={setPassword}
-            placeholder={t.newPasswordPlaceholder}
             // Plain text on purpose: it is written down and passed on to the account's owner.
             autoFocus
             autoCapitalize="none"
@@ -177,7 +174,6 @@ export function PasswordResetSheet({
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.field, paddingTop: t.space.xxs, paddingBottom: t.space.md },
-  intro: { gap: t.space.xs },
   field: { gap: t.space.sm },
   actions: { flexDirection: 'row', gap: t.space.md },
   submit: { flex: 1 },

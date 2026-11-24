@@ -5,7 +5,7 @@ import { ProgressBar, Text } from '@/ui';
 
 import type { ProgressRowModel } from '../logic';
 
-/** A share of a whole (`DevProgressRow` on the site): the label, «12 / 40» as a plain figure and a bar. */
+/** A share of a whole (`DevProgressRow` on the site): the label, «12/40» as a plain figure and a bar. */
 export function ProgressRow({ row }: { row: Omit<ProgressRowModel, 'key'> }) {
   const styles = useStyles();
   return (

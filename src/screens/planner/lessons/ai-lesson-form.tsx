@@ -41,12 +41,16 @@ export type AiLessonFormProps = {
 };
 
 const SPEED = META_LIMITS.speed;
+/** Share of a text limit from which its counter is shown. */
+const COUNTER_FROM = 0.8;
 /** "Not set" in the speed picker (the wire value is `null`). */
 const NO_SPEED = 0;
 
 /**
  * The AI create form (`TeacherLessonCreateForm`, docs/spec/05-teacher-lessons-plans.md §1.2.d): title,
- * duration, start, topics and a note for AI in one card, the students with their speed in another.
+ * duration, start, topics and a note for AI in one card, the students with their speed in another. Every
+ * field has one name and no helper line (docs/design/glass-over-paper.md §1a); the note's counter appears
+ * when the limit is near.
  * Submitting — the one main button: under the form on a phone, in the header on a tablet, where the two
  * cards stand side by side — creates the lesson and opens its board, where the plan of every student is
  * built.
@@ -122,26 +126,23 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
         label={t.titleLabel}
         value={title}
         onChangeText={setTitle}
-        placeholder={t.titlePlaceholder}
         maxLength={META_LIMITS.maxTitleLength}
         returnKeyType="done"
         testID="lesson-new-title"
       />
 
-      <View style={styles.field}>
-        <Text variant="label">{t.durationLabel}</Text>
-        <DurationStepper value={durationMinutes} onChange={setDurationMinutes} accessibilityLabel={t.durationLabel} testID="lesson-new-duration" />
-      </View>
+      {/* «60 мин» between the two marks names itself. */}
+      <DurationStepper value={durationMinutes} onChange={setDurationMinutes} accessibilityLabel={t.durationLabel} testID="lesson-new-duration" />
 
       <DateTimeField
-        label={t.dateTimeLabel}
+        // The zone is said where a time is entered: it is part of the field's one name.
+        label={`${t.dateTimeLabel}, ${m.common.dateTime.msk}`}
         value={startsAt}
         onChange={setStartsAt}
         today={mskToday()}
-        placeholder={t.dateTimePlaceholder}
+        placeholder=""
         labels={dateTimeLabels}
         locale={locale}
-        helper={m.common.dateTime.moscowTime}
         testID="lesson-new-starts-at"
       />
 
@@ -150,13 +151,14 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
       <TextArea
         label={t.noteLabel}
         labelAside={
-          <Text variant="small" color="textMuted" tabular>
-            {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
-          </Text>
+          teacherNote.length >= META_LIMITS.maxTeacherNoteLength * COUNTER_FROM ? (
+            <Text variant="small" color="textMuted" tabular>
+              {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
+            </Text>
+          ) : undefined
         }
         value={teacherNote}
         onChangeText={setTeacherNote}
-        placeholder={t.notePlaceholder}
         maxLength={META_LIMITS.maxTeacherNoteLength}
         testID="lesson-new-note"
       />
@@ -246,7 +248,6 @@ export function AiLessonForm({ form, header, top }: AiLessonFormProps) {
 
 const useStyles = makeStyles((t) => ({
   fields: { gap: t.space.lg },
-  field: { gap: t.space.xs },
   section: { gap: t.space.xs },
   students: { gap: t.space.xs },
   student: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, minHeight: t.sizes.control.md },

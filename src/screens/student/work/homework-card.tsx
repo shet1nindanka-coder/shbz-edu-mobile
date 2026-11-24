@@ -19,7 +19,7 @@ export type HomeworkCardProps = {
 /**
  * Row of the homework list (docs/spec/03-student-homework-lesson.md §1 H1; layout: docs/design/
  * glass-over-paper.md §7, principles 2 – 3): «label · topic», ONE caption — the deadline, in red only when
- * it has passed, or the running check — and the neutral fact «37 из 50» on the right. The whole row opens
+ * it has passed, or the running check — and the neutral fact «37/50» on the right. The whole row opens
  * the homework; the numbers and their statuses live inside it.
  */
 export function HomeworkCard({ homework, nowMs, onOpen, divider, selected }: HomeworkCardProps) {

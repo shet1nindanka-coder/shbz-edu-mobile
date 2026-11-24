@@ -14,7 +14,7 @@ import { PlannerSegments, ShellAppBar, screenTitle } from '@/screens/shell';
 import { useNowTick } from '@/services/clock';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, Dialog, ListCard, LoadingState, Notice, Panel, Panels, Screen, SectionCaption, Text, TextButton } from '@/ui';
+import { Button, Dialog, EmptyState, ListCard, LoadingState, Notice, Panel, Panels, Screen, SectionCaption, Text, TextButton } from '@/ui';
 
 import { LessonDetail } from './lessons/lesson-detail';
 import { LessonRow } from './lessons/lesson-row';
@@ -26,9 +26,9 @@ const PAST_PAGE = 20;
 
 /**
  * `planner.lessons` (docs/spec/05-teacher-lessons-plans.md §1.1; layout: mockup `T-lessons`): root of the
- * teacher's «занятия» section — the lesson plans as rows grouped into Today / Upcoming / Past. «Составить
- * занятие» is the button of the header. A phone opens the board on a tap; a tablet shows the tapped lesson
- * in the panel next to the list, with its actions (board, handout, delete).
+ * teacher's «занятия» section — the lesson plans as rows grouped into Today / Upcoming / Past. «Составить»
+ * is the button of the header. A phone opens the board on a tap; a tablet shows the tapped lesson in the
+ * panel next to the list, with its actions (open, handout, delete).
  */
 export function PlannerLessonsScreen() {
   const styles = useStyles();
@@ -107,7 +107,14 @@ export function PlannerLessonsScreen() {
       aside={
         <View style={styles.aside}>
           <PlannerSegments active="lessons" />
-          <Button label={dict.planner.lessonComposeCard.title} leftIcon="plus" onPress={compose} testID="lessons-compose" />
+          <Button
+            label={m.planner.lessonsList.compose}
+            // The site's full name of the action stays the spoken one.
+            accessibilityLabel={dict.planner.lessonComposeCard.title}
+            leftIcon="plus"
+            onPress={compose}
+            testID="lessons-compose"
+          />
         </View>
       }
     />
@@ -152,14 +159,8 @@ export function PlannerLessonsScreen() {
     );
   };
 
-  const emptyCard = (
-    // The empty state of the list: an invitation with the site's own text.
-    <Card dashed testID="lessons-empty">
-      <Text variant="small" color="textMuted">
-        {t.hintEmpty}
-      </Text>
-    </Card>
-  );
+  // One line: the way out of an empty list is the header's «Составить».
+  const emptyCard = <EmptyState title={m.planner.lessonsList.empty} testID="lessons-empty" />;
 
   const body = !data ? (
     lessons.isError || isWaitingForNetwork(lessons) ? (
@@ -174,7 +175,7 @@ export function PlannerLessonsScreen() {
       <Panel weight={3} padded={false} contentStyle={styles.listPanel}>
         {sections.map((section) => (
           <View key={section.key}>
-            <SectionCaption style={styles.panelCaption}>{`${sectionTitle[section.key]} · ${section.lessons.length}`}</SectionCaption>
+            <SectionCaption style={styles.panelCaption}>{sectionTitle[section.key]}</SectionCaption>
             {sectionRows(section.key, section.lessons)}
           </View>
         ))}
@@ -184,9 +185,9 @@ export function PlannerLessonsScreen() {
         footer={
           selected ? (
             <View style={styles.actions}>
-              <Button label={m.planner.lessonsList.openBoard} rightIcon="forward" fullWidth onPress={() => open(selected)} testID="lesson-detail-open" />
+              <Button label={dict.planner.common.open} rightIcon="forward" fullWidth onPress={() => open(selected)} testID="lesson-detail-open" />
               <Button
-                label={m.planner.lessonBoard.handout}
+                label={m.planner.handout.title}
                 variant="outline"
                 leftIcon="download"
                 fullWidth
@@ -209,14 +210,14 @@ export function PlannerLessonsScreen() {
           ) : undefined
         }
       >
-        {selected ? <LessonDetail lesson={selected} /> : null}
+        {selected ? <LessonDetail lesson={selected} now={now} /> : null}
       </Panel>
     </Panels>
   ) : (
     <View style={styles.sections} testID="lessons-list">
       {sections.map((section) => (
         <View key={section.key} style={styles.section}>
-          <SectionCaption>{`${sectionTitle[section.key]} · ${section.lessons.length}`}</SectionCaption>
+          <SectionCaption>{sectionTitle[section.key]}</SectionCaption>
           <ListCard>{sectionRows(section.key, section.lessons)}</ListCard>
         </View>
       ))}
@@ -238,7 +239,6 @@ export function PlannerLessonsScreen() {
 
       <Dialog
         visible={deleting !== null}
-        kicker={dict.topics.widgets.confirm.kicker}
         title={del.title}
         description={del.description}
         confirmLabel={dict.topics.widgets.confirm.confirm}

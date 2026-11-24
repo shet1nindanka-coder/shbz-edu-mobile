@@ -2,8 +2,8 @@ import { View } from 'react-native';
 
 import type { TeacherStatsEntry } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { Card, Text } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Card, Icon, Text, type IconName } from '@/ui';
 
 import { WeekBars } from '../charts/week-bars';
 import { recentLessonLine, topicBarRatios } from '../logic';
@@ -11,32 +11,50 @@ import { StatsCard } from './stats-card';
 
 export type TeacherCardProps = { entry: TeacherStatsEntry; weekStarts: readonly string[] };
 
+/** The STORED status of a recent lesson as a glyph; the word is read out. */
+const LESSON_STATUS_ICON: Record<TeacherStatsEntry['recentLessons'][number]['status'], IconName> = {
+  PLANNED: 'clock',
+  ACTIVE: 'playCircle',
+  FINISHED: 'check',
+};
+
 /**
- * One teacher of the view «По учителям» (06 §1.6.b, §4.8; layout: mockup D-stats): a card titled with the
- * name — four plain figures (students, issued homework, parent calls — counts only: comments are personal
- * data and never appear here — and lessons), lessons by week, lesson topics and the recent lessons with
- * their STORED status as rows.
+ * One teacher of the view «По учителям» (06 §1.6.b, §4.8; layout: mockup D-stats; text diet §1a): a card
+ * titled with the name — four figures with a caption each (students, issued homework, parent calls —
+ * counts only: comments are personal data and never appear here — and lessons as «проведено/всего»),
+ * lessons by week, lesson topics and the recent lessons as rows: the topic, when, and the STORED status as
+ * a glyph. The login and the site's notes under the figures are read out, not drawn.
  */
 export function TeacherCard({ entry, weekStarts }: TeacherCardProps) {
   const styles = useStyles();
-  const { locale, dict } = useI18n();
+  const theme = useTheme();
+  const { locale, dict, m } = useI18n();
   const t = dict.planner.teacherStats;
   const ratios = topicBarRatios(entry.topTopics);
 
   return (
-    <StatsCard title={entry.teacherName} subtitle={entry.teacherEmail} testID={`stats-teacher-${entry.teacherId}`}>
+    <StatsCard
+      title={entry.teacherName}
+      titleAccessibilityLabel={`${entry.teacherName}, ${entry.teacherEmail}`}
+      testID={`stats-teacher-${entry.teacherId}`}
+    >
       <View style={styles.tiles}>
         <View style={styles.tileRow}>
-          <StatTile label={t.students} value={entry.studentsCount} />
-          <StatTile label={t.issuedHomework} value={entry.homeworkTotal} note={format(t.for30Days, { n: entry.homework30d })} />
+          <StatTile label={t.students} value={String(entry.studentsCount)} />
+          <StatTile label={t.issuedHomework} value={String(entry.homeworkTotal)} spoken={format(t.for30Days, { n: entry.homework30d })} />
         </View>
         <View style={styles.tileRow}>
           <StatTile
-            label={t.parentCalls}
-            value={entry.callsReached}
-            note={entry.callsNoAnswer > 0 ? format(t.noAnswers, { n: entry.callsNoAnswer }) : undefined}
+            label={m.stats.short.calls}
+            spokenLabel={t.parentCalls}
+            value={String(entry.callsReached)}
+            spoken={entry.callsNoAnswer > 0 ? format(t.noAnswers, { n: entry.callsNoAnswer }) : undefined}
           />
-          <StatTile label={t.lessons} value={entry.lessonsTotal} note={format(t.finished, { n: entry.lessonsFinished })} />
+          <StatTile
+            label={t.lessons}
+            value={format(m.common.numbers.doneOf, { done: entry.lessonsFinished, total: entry.lessonsTotal })}
+            spoken={format(t.finished, { n: entry.lessonsFinished })}
+          />
         </View>
       </View>
 
@@ -89,19 +107,19 @@ export function TeacherCard({ entry, weekStarts }: TeacherCardProps) {
               <View
                 key={lesson.id}
                 accessible
-                accessibilityLabel={`${line.when}. ${line.details}. ${line.status}`}
+                accessibilityLabel={`${line.title}. ${line.when}. ${line.who}. ${line.status}`}
                 style={[styles.lesson, index > 0 ? styles.divider : null]}
                 testID={`stats-teacher-lesson-${lesson.id}`}
               >
                 <View style={styles.lessonTexts}>
-                  <Text variant="bodyStrong">{line.when}</Text>
-                  <Text variant="small" color="textMuted" numberOfLines={2}>
-                    {line.details}
+                  <Text variant="bodyStrong" numberOfLines={1}>
+                    {line.title}
+                  </Text>
+                  <Text variant="small" color="textMuted" numberOfLines={1}>
+                    {line.when}
                   </Text>
                 </View>
-                <Text variant="small" color="textMuted">
-                  {line.status}
-                </Text>
+                <Icon name={LESSON_STATUS_ICON[lesson.status]} size={theme.sizes.icon.md} color={lesson.status === 'ACTIVE' ? 'accentSolid' : 'textMuted'} />
               </View>
             );
           })}
@@ -111,22 +129,28 @@ export function TeacherCard({ entry, weekStarts }: TeacherCardProps) {
   );
 }
 
-/** A plain figure of the card in a soft box: a caption, the number and at most one note. */
-function StatTile({ label, value, note }: { label: string; value: number; note?: string }) {
+type StatTileProps = {
+  /** The caption: one or two words. */
+  label: string;
+  /** The site's full caption, when the visible one is shortened. */
+  spokenLabel?: string;
+  value: string;
+  /** The site's note under the figure — only read out. */
+  spoken?: string;
+};
+
+/** A plain figure of the card in a soft box: a caption and the number. */
+function StatTile({ label, spokenLabel, value, spoken }: StatTileProps) {
   const styles = useStyles();
+  const name = spokenLabel ?? label;
   return (
-    <Card style={styles.tile} accessibilityLabel={note ? `${label}: ${value}, ${note}` : `${label}: ${value}`}>
-      <Text variant="small" color="textMuted" numberOfLines={2}>
+    <Card style={styles.tile} accessibilityLabel={spoken ? `${name}: ${value}, ${spoken}` : `${name}: ${value}`}>
+      <Text variant="small" color="textMuted" numberOfLines={1}>
         {label}
       </Text>
-      <Text variant="metric" tabular>
+      <Text variant="metric" tabular numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
         {value}
       </Text>
-      {note ? (
-        <Text variant="small" color="textMuted">
-          {note}
-        </Text>
-      ) : null}
     </Card>
   );
 }
@@ -147,7 +171,7 @@ const useStyles = makeStyles((t) => ({
     overflow: 'hidden',
   },
   topicFill: { height: '100%', borderRadius: t.radii.full, backgroundColor: t.colors.textMuted },
-  lesson: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
+  lesson: { minHeight: t.sizes.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
   lessonTexts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
   divider: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
 }));

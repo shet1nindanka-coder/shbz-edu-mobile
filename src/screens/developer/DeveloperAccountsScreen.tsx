@@ -8,7 +8,6 @@ import type { ManagedStudent, ManagedTeacher, OwnerChange } from '@/api/types';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { format, useI18n } from '@/i18n';
 import { useRefetchOnFocus } from '@/navigation';
-import { Hint } from '@/providers';
 import { ShellAppBar, screenTitle } from '@/screens/shell';
 import {
   CredentialsSheet,
@@ -75,11 +74,12 @@ const NO_DRAFTS: OwnerDrafts = {};
 
 /**
  * `developer.accounts` (docs/spec/04-teacher-students.md S9; layout: docs/design/glass-over-paper.md §7,
- * mockup D-accounts): every teacher and student of the school as rows of one card per section — a neutral
- * avatar, the name and one caption. The header switches between «Все / Учителя / Ученики». A row opens a
- * sheet with its actions: the login, a password reset, deletion (with transfer of a teacher's students)
- * and, for a student, the owner picker. Owner changes are drafts until the bar at the bottom saves them
- * all at once. «Новый аккаунт» is folded behind the header button on a phone and is the panel next to the
+ * mockup D-accounts; text diet §1a): every teacher and student of the school as rows of one card per
+ * section — a neutral avatar and the name; a teacher has the number of students on the right, a student
+ * the teacher's name as the one caption. The header switches between «Все / Учителя / Ученики»; the two
+ * lists of «Все» are captioned, a single list is not (the switch names it). A row opens a sheet with its
+ * actions: the login, a password reset, deletion (with transfer of a teacher's students) and, for a
+ * student, the owner picker. Owner changes are drafts until the bar at the bottom saves them all at once. «Новый аккаунт» is folded behind the header button on a phone and is the panel next to the
  * directory on a tablet. Results appear as a banner above the list — the app's form of the site's
  * redirect notices.
  */
@@ -207,14 +207,16 @@ export function DeveloperAccountsScreen() {
   const visibleStudents = tab === 'teachers' ? [] : filterAccounts(students, query);
   const caption = (label: string, count: number) => format(tabs.tabWithCount, { label, n: count });
   const rows: Row[] = [];
+  // A caption only where the screen shows two lists; on a single one it would repeat the header switch.
+  const captioned = tab === 'all';
   if (visibleTeachers.length > 0) {
-    rows.push({ kind: 'caption', section: 'teachers', title: caption(tabs.teachers, teachers.length) });
+    if (captioned) rows.push({ kind: 'caption', section: 'teachers', title: caption(tabs.teachers, teachers.length) });
     visibleTeachers.forEach((teacher, index) =>
       rows.push({ kind: 'teacher', teacher, first: index === 0, last: index === visibleTeachers.length - 1 }),
     );
   }
   if (visibleStudents.length > 0) {
-    rows.push({ kind: 'caption', section: 'students', title: caption(tabs.students, students.length) });
+    if (captioned) rows.push({ kind: 'caption', section: 'students', title: caption(tabs.students, students.length) });
     visibleStudents.forEach((student, index) =>
       rows.push({ kind: 'student', student, first: index === 0, last: index === visibleStudents.length - 1 }),
     );
@@ -245,16 +247,9 @@ export function DeveloperAccountsScreen() {
 
   // The head of the list: on a phone the banners scroll with it, on a tablet they stand above the panels.
   const listHeader = (
-    <View style={[styles.listHeader, theme.tablet ? styles.listHeaderPanel : null]}>
+    <View style={[styles.listHeader, captioned ? null : styles.listHeaderBare, theme.tablet ? styles.listHeaderPanel : null]}>
       {theme.tablet ? null : notices}
       <DirectorySearch tab={tab} value={query} onChange={setQuery} />
-      {tab !== 'teachers' && students.length > 0 && changes.length === 0 ? (
-        <Hint>
-          <Text variant="small" color="textMuted" testID="accounts-owner-hint">
-            {dict.students.studentsManager.pickHint}
-          </Text>
-        </Hint>
-      ) : null}
     </View>
   );
 
@@ -269,13 +264,7 @@ export function DeveloperAccountsScreen() {
         total === 0 ? (
           <EmptyState variant={theme.tablet ? 'plain' : 'panel'} title={manager.empty} testID="accounts-empty" />
         ) : (
-          <EmptyState
-            variant={theme.tablet ? 'plain' : 'panel'}
-            title={manager.notFound}
-            // «Все» searches both lists: the hint of one list would name only its own accounts.
-            hint={tab === 'all' ? undefined : manager.notFoundHint}
-            testID="accounts-no-matches"
-          />
+          <EmptyState variant={theme.tablet ? 'plain' : 'panel'} title={manager.notFound} testID="accounts-no-matches" />
         )
       ) : directoryFailure ? (
         <LoadFailure query={directory} testID="accounts-error" />
@@ -416,11 +405,6 @@ export function DeveloperAccountsScreen() {
               </Text>
               <CreateAccountFields form={createForm} />
               <CreateAccountSubmit form={createForm} />
-              <Hint>
-                <Text variant="small" color="textMuted">
-                  {m.accounts.create.onceHint}
-                </Text>
-              </Hint>
             </Panel>
           </Panels>
         </>
@@ -534,6 +518,8 @@ const useStyles = makeStyles((t) => ({
   // Phone: the list is the page.
   listContent: { paddingHorizontal: t.space.gutter, paddingBottom: t.space.pageBottom },
   listHeader: { gap: t.space.md, paddingBottom: t.space.xxs },
+  // Without a section caption under it the search needs its own distance to the first card.
+  listHeaderBare: { paddingBottom: t.space.md },
   sectionCaption: { paddingTop: t.space.md, paddingBottom: t.space.sm },
   // Tablet: the list is the content of the left panel, a card that runs down to the dock.
   listPanel: { flex: 3, minWidth: 0, minHeight: 0, overflow: 'hidden' },

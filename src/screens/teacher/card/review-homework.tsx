@@ -6,7 +6,6 @@ import { PhotoThumb } from '@/components/files';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { formatMsk } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, Icon, Notice, PressableScale, Text, TextButton } from '@/ui';
 
@@ -49,9 +48,13 @@ const ROWS_COLLAPSED = 8;
 
 /**
  * The review of one homework (docs/spec/04-teacher-students.md S4; layout: the `PT-student` / `T-student`
- * mockups): «Нужно проверить · N» with a row per number that waits for the teacher — the number, what the
- * AI said and the three status marks — and the way to «Все номера»; below, the photos that wait for a
- * check, "accept AI verdicts" and the check history. The phone card and the tablet panel both render it.
+ * mockups; texts: docs/design/glass-over-paper.md §1a): a row per number that waits for the teacher — the
+ * number, the AI's verdict in a word and the three status marks — under one line with «Принять» ("accept
+ * AI verdicts") and the way to «Все номера»; below, the photos that wait for a check and the check
+ * history. The phone card and the tablet panel both render it. How many numbers wait is the red counter of
+ * the homework's head, so the list has no «Нужно проверить · N» heading; the notes of the site («Ученик
+ * пока не прикрепил фото», the caption of the photos, the "what accept does" line) are accessibility
+ * labels and hints only.
  */
 export function ReviewHomework({
   assignment,
@@ -106,9 +109,29 @@ export function ReviewHomework({
 
       <View>
         <View style={styles.listHead}>
-          <Text variant="bodyBold" accessibilityRole="header" style={styles.listTitle} testID={`review-to-check-${assignment.id}`}>
-            {waiting.length > 0 ? format(m.common.statuses.groupCount, { label: m.teacher.review.toCheck, n: waiting.length }) : m.teacher.review.nothingToCheck}
-          </Text>
+          {/* Rows the teacher has just marked stay listed (`kept`): the line is for a list with no rows. */}
+          {listed.length === 0 ? (
+            <Text variant="small" color="textMuted" style={styles.listTitle} testID={`review-to-check-${assignment.id}`}>
+              {m.teacher.review.nothingToCheck}
+            </Text>
+          ) : canAcceptVerdicts(latestDone) ? (
+            <Button
+              label={m.teacher.review.accept}
+              accessibilityLabel={t.acceptVerdicts}
+              // What "accept" does to the colours: the site's hint line, heard on demand.
+              accessibilityHint={t.acceptVerdictsHint}
+              variant="outline"
+              size="sm"
+              leftIcon="sparkles"
+              loading={accepting}
+              // Nothing to change: every definite verdict already matches the number's colour.
+              disabled={pendingChanges === 0 || busy || blocked}
+              onPress={onAccept}
+              testID={`review-accept-${assignment.id}`}
+            />
+          ) : (
+            <View />
+          )}
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel={m.common.numbers.all}
@@ -144,50 +167,24 @@ export function ReviewHomework({
         ) : null}
       </View>
 
-      {canAcceptVerdicts(latestDone) ? (
-        <View style={styles.block}>
-          <Button
-            label={t.acceptVerdicts}
-            variant="outline"
-            leftIcon="sparkles"
-            loading={accepting}
-            // Nothing to change: every definite verdict already matches the number's colour.
-            disabled={pendingChanges === 0 || busy || blocked}
-            onPress={onAccept}
-            testID={`review-accept-${assignment.id}`}
-          />
-          <Hint>
-            <Text variant="hint" color="textMuted">
-              {t.acceptVerdictsHint}
-            </Text>
-          </Hint>
+      {assignment.photos.length > 0 ? (
+        // The photos speak for themselves; what they are («ещё не отправленные на проверку») is spoken.
+        <View
+          accessibilityLabel={`${format(t.photosTitle, { n: assignment.photos.length })}${lastChecked ? format(t.lastAutoCheck, { date: lastChecked }) : ''}`}
+          style={styles.photos}
+        >
+          {assignment.photos.map((photo, index) => (
+            <PhotoThumb
+              key={photo.id}
+              fileId={photo.fileId}
+              name={photo.originalName}
+              size={theme.sizes.control.lg}
+              onPress={() => onOpenPending(index)}
+              testID={`review-photo-${photo.id}`}
+            />
+          ))}
         </View>
       ) : null}
-
-      {assignment.photos.length > 0 ? (
-        <View style={styles.block}>
-          <View style={styles.photos}>
-            {assignment.photos.map((photo, index) => (
-              <PhotoThumb
-                key={photo.id}
-                fileId={photo.fileId}
-                name={photo.originalName}
-                size={theme.sizes.control.lg}
-                onPress={() => onOpenPending(index)}
-                testID={`review-photo-${photo.id}`}
-              />
-            ))}
-          </View>
-          <Text variant="small" color="textMuted">
-            {format(t.photosTitle, { n: assignment.photos.length })}
-            {lastChecked ? format(t.lastAutoCheck, { date: lastChecked }) : ''}
-          </Text>
-        </View>
-      ) : (
-        <Text variant="small" color="textMuted">
-          {t.noPhotos}
-        </Text>
-      )}
 
       <ReviewCheckHistory checks={assignment.checks} currentId={latestDone?.id ?? null} onOpenPhoto={onOpenCheckPhoto} testID={`review-history-${assignment.id}`} />
 
@@ -204,7 +201,6 @@ const useStyles = makeStyles((t) => ({
   listTitle: { flexShrink: 1 },
   all: { flexDirection: 'row', alignItems: 'center', gap: t.space.xxs, minHeight: t.sizes.control.sm },
   pressed: { opacity: 0.6 },
-  block: { gap: t.space.sm },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   link: { alignSelf: 'flex-start' },
 }));

@@ -24,7 +24,7 @@ export type CreateTopicSheetProps = {
 };
 
 /**
- * «Создать новую тему» (docs/spec/07-developer-content.md §1.1 item 3, §1.4, §1.5) — DEVELOPER only.
+ * «Новая тема» (the site's «Создать новую тему»; docs/spec/07-developer-content.md §1.1 item 3, §1.4, §1.5) — DEVELOPER only.
  * The site's inline block becomes a sheet opened from the list. Two ways, AI import (default) and the
  * manual form; both keep their state while the other is shown and while the sheet is closed, because
  * the state hooks live here and this component stays mounted.
@@ -43,7 +43,7 @@ export function CreateTopicSheet({ visible, onClose, onCreated, onImported }: Cr
       visible={visible}
       onClose={onClose}
       closeLabel={m.common.actions.close}
-      title={dict.topics.list.createSection}
+      title={m.content.list.createAction}
       dismissible={!busy}
       maxHeightRatio={0.94}
       testID="create-topic-sheet"
@@ -51,7 +51,8 @@ export function CreateTopicSheet({ visible, onClose, onCreated, onImported }: Cr
       <View style={styles.root}>
         <Segmented
           options={[
-            { value: 'ai', label: t.ai },
+            // «Импорт»: what the AI way is here — loading the model's reply; «С помощью ИИ» is spoken.
+            { value: 'ai', label: m.content.edit.sections.import, accessibilityLabel: t.ai },
             { value: 'manual', label: t.manual },
           ]}
           value={mode}

@@ -10,9 +10,6 @@ import { freeTopicNumbers, numberGridColumns } from './drafts-logic';
 
 export type DraftAddSheetProps = {
   visible: boolean;
-  /** Whose set gets the number (shown under the title). */
-  studentName: string;
-  topicTitle: string;
   /** Every number of the draft's topic, in the topic's order. */
   topicNumbers: readonly { id: string; number: string }[];
   /** Numbers already in the participant's set: they are not offered. */
@@ -25,7 +22,7 @@ export type DraftAddSheetProps = {
 
 /** Narrowest tile: «051001» in the tabular bold face with its padding. */
 const TILE_MIN_WIDTH = 84;
-/** Share of the window the grid may take; the title, the student and the footer need the rest. */
+/** Share of the window the grid may take; the title and the footer need the rest. */
 const GRID_MAX_SHARE = 0.5;
 
 type FreeNumber = { id: string; number: string };
@@ -33,13 +30,14 @@ type FreeNumber = { id: string; number: string };
 /**
  * "Add a problem" of a draft (docs/spec/05-teacher-lessons-plans.md §1.7 "Manual add"): only numbers of the
  * draft's single topic that are not in the set yet. The site's select + «Добавить» become a grid of number
- * tiles in one sheet: pick a tile (it turns ink, like the current number everywhere else), then add. The student's status is not checked here — a solved number
- * surfaces as a conflict when the homework is assigned.
+ * tiles in one sheet: pick a tile (it turns ink, like the current number everywhere else), then add. The
+ * sheet says nothing but its title — the grid is the instruction. The student's status is not checked here
+ * — a solved number surfaces as a conflict when the homework is assigned.
  *
  * A topic may hold up to 2000 numbers (the `parseNumbersInput` limit), so the grid is virtualised
  * (FlashList in a box of bounded height): mounting every tile at once froze the sheet for seconds.
  */
-export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, existingIds, onClose, onClosed, onAdd }: DraftAddSheetProps) {
+export function DraftAddSheet({ visible, topicNumbers, existingIds, onClose, onClosed, onAdd }: DraftAddSheetProps) {
   const styles = useStyles();
   const theme = useTheme();
   const window = useWindowDimensions();
@@ -100,7 +98,7 @@ export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, 
         onClosed?.();
       }}
       closeLabel={m.common.actions.close}
-      title={format(dict.planner.homeworkPlans.board.addNumber, { topic: topicTitle })}
+      title={dict.planner.lessonManualAdd.label}
       footer={<Button label={common.add} fullWidth disabled={!picked} onPress={add} testID="draft-add-submit" />}
       // The grid scrolls by itself (FlashList), not the sheet.
       scroll={false}
@@ -109,12 +107,8 @@ export function DraftAddSheet({ visible, studentName, topicTitle, topicNumbers, 
       testID="draft-add-sheet"
     >
       <View style={styles.content}>
-        <Text variant="small" color="textMuted">
-          {studentName}
-        </Text>
         {free.length > 0 ? (
           <>
-            <Text variant="label">{common.pickNumber}</Text>
             <View
               accessibilityRole="radiogroup"
               accessibilityLabel={m.planner.draftBoard.numbersAria}

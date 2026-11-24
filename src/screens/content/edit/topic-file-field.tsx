@@ -4,11 +4,11 @@ import { View } from 'react-native';
 
 import { errorText, hasErrorCode, qk, useApi } from '@/api';
 import type { StoredFileRef, TopicDetail } from '@/api/types';
-import { fileTypeLabel, type ViewerFile } from '@/components/files';
+import { fileIconName, fileTypeLabel, viewerFileKind, type ViewerFile } from '@/components/files';
 import { formatFileSize } from '@/domain/files';
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { BottomSheet, Button, Card, Dialog, Icon, Notice, Text, TextButton } from '@/ui';
+import { BottomSheet, Button, Card, Dialog, Icon, IconButton, IconTile, ListRow, Notice, Text } from '@/ui';
 
 import { UploadSlotField } from '../browse/upload-slot-field';
 import type { UploadSlot } from '../browse/use-upload-slot';
@@ -34,9 +34,9 @@ export type TopicFileFieldProps = {
 
 /**
  * One file of the «Файлы» block (docs/spec/07-developer-content.md §1.3 item 4, §3.3; layout: the
- * `D-topic-edit` mockup): a box that names the slot and says what is in it. The box opens a sheet with
- * everything that can be done to the file — open it, pick the one that replaces it, and «Удалить файл …»,
- * an immediate action of its own, independent of the form.
+ * `D-topic-edit` mockup; text: docs/design/glass-over-paper.md §1a): a box that names the slot. The box
+ * opens a sheet with everything that can be done to the file — open it, pick the one that replaces it,
+ * and «Удалить», an immediate action of its own, independent of the form.
  */
 export function TopicFileField({ kind, topicId, file, slot, disabled, uploadsLimited, onOpen, onNotice }: TopicFileFieldProps) {
   const styles = useStyles();
@@ -47,6 +47,7 @@ export function TopicFileField({ kind, topicId, file, slot, disabled, uploadsLim
   const t = dict.topics.edit;
   const texts = kind === 'theory' ? t.deleteTheory : t.deleteHomework;
   const title = kind === 'theory' ? dict.topics.view.theory : dict.topics.view.homework;
+  const drop = dict.topics.widgets.fileDrop;
   const [sheetOpen, setSheetOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,39 +88,48 @@ export function TopicFileField({ kind, topicId, file, slot, disabled, uploadsLim
     setSheetOpen(false);
   };
 
-  const describe = (target: Pick<StoredFileRef, 'originalName' | 'mimeType' | 'size'>) =>
-    typeof target.size === 'number' ? `${target.originalName} · ${formatFileSize(target.size, locale)}` : target.originalName;
-  // The one caption of the box: the running upload, its failure, the replacement that waits for the save,
-  // the attached file, or the empty slot — in this order of importance.
+  // The box shows a state only where one needs attention (§1a): the running upload, its failure, the
+  // replacement that waits for the save, the empty slot. An attached file is the box alone — its name is
+  // in the sheet. The spoken name keeps every fact.
   const { status } = slot;
-  const caption =
+  const pendingNote = file ? m.content.edit.willReplace : m.content.edit.willAttach;
+  const facts = (target: Pick<StoredFileRef, 'originalName' | 'mimeType' | 'size'>) =>
+    typeof target.size === 'number'
+      ? `${target.originalName} · ${fileTypeLabel(target)} · ${formatFileSize(target.size, locale)}`
+      : `${target.originalName} · ${fileTypeLabel(target)}`;
+  const state: { shown: string | null; spoken: string } =
     status.kind === 'uploading'
-      ? `${dict.topics.createForm.uploading} ${format(m.content.upload.progress, { percent: status.progress })}`
+      ? {
+          shown: format(m.content.upload.progress, { percent: status.progress }),
+          spoken: `${dict.topics.createForm.uploading} ${format(m.content.upload.progress, { percent: status.progress })}`,
+        }
       : status.kind === 'error'
-        ? status.message
+        ? { shown: status.message, spoken: status.message }
         : slot.file
-          ? file
-            ? m.content.edit.willReplace
-            : m.content.edit.willAttach
+          ? { shown: m.content.edit.filePending, spoken: pendingNote }
           : file
-            ? describe(file)
-            : dict.student.fileCard.notUploaded;
+            ? { shown: null, spoken: facts(file) }
+            : { shown: m.content.topic.noFile, spoken: dict.student.fileCard.notUploaded };
 
   return (
     <>
       <Card
         onPress={() => setSheetOpen(true)}
         accessibilityLabel={title}
-        accessibilityParts={[caption]}
+        accessibilityParts={[state.spoken]}
         style={styles.box}
         testID={`edit-${kind}-file`}
       >
         <Icon name={kind === 'theory' ? 'bookOpen' : 'file'} size={theme.sizes.icon.md} color="textMuted" />
         <View style={styles.texts}>
-          <Text variant="bodyStrong">{title}</Text>
-          <Text variant="small" color={status.kind === 'error' ? 'redText' : 'textMuted'} tabular numberOfLines={2}>
-            {caption}
+          <Text variant="bodyStrong" numberOfLines={1}>
+            {title}
           </Text>
+          {state.shown ? (
+            <Text variant="small" color={status.kind === 'error' ? 'redText' : 'textMuted'} tabular numberOfLines={2}>
+              {state.shown}
+            </Text>
+          ) : null}
         </View>
       </Card>
 
@@ -143,56 +153,45 @@ export function TopicFileField({ kind, topicId, file, slot, disabled, uploadsLim
         <View style={styles.sheet}>
           {/* SPEC-GAP: the site adds «Предпросмотр скрыт…» under the name; the app never embeds a
               document preview here (09 §5.2), so there is nothing to call hidden. */}
+          {/* The attached file is a row pressed as a whole: its name, its type on the right. */}
           {file ? (
-            <View style={styles.current}>
-              <View style={styles.texts}>
-                <Text variant="bodyStrong" numberOfLines={2}>
-                  {file.originalName}
-                </Text>
-                <Text variant="small" color="textMuted" tabular>
-                  {typeof file.size === 'number' ? `${fileTypeLabel(file)} · ${formatFileSize(file.size, locale)}` : fileTypeLabel(file)}
-                </Text>
-              </View>
-              <Button
-                label={dict.student.fullscreen.open}
-                accessibilityLabel={format(m.common.files.actionOf, { action: dict.student.fullscreen.open, slot: title })}
-                variant="outline"
-                size="sm"
-                onPress={() => leaveSheetFor('open')}
-                testID={`edit-${kind}-file-open`}
-              />
-            </View>
-          ) : (
-            <Text variant="small" color="textMuted">
-              {dict.student.fileCard.notUploaded}
-            </Text>
-          )}
+            <ListRow
+              inset={0}
+              left={<IconTile icon={fileIconName(viewerFileKind(file))} tone="quiet" />}
+              title={file.originalName}
+              titleLines={2}
+              meta={fileTypeLabel(file)}
+              divider={false}
+              onPress={() => leaveSheetFor('open')}
+              accessibilityLabel={`${format(m.common.files.actionOf, { action: dict.student.fullscreen.open, slot: title })}. ${facts(file)}`}
+              testID={`edit-${kind}-file-open`}
+            />
+          ) : null}
 
           <UploadSlotField
-            label={kind === 'theory' ? t.replaceTheory : t.replaceHomework}
+            label={file ? drop.replace : drop.choose}
             slot={slot}
             disabled={disabled || uploadsLimited}
+            trailing={
+              // The picked file waits for the form's save; until then it can be taken back.
+              slot.file ? (
+                <IconButton
+                  icon="close"
+                  accessibilityLabel={m.content.edit.discardFile}
+                  accessibilityHint={pendingNote}
+                  disabled={disabled}
+                  onPress={slot.reset}
+                  testID={`edit-${kind}-discard`}
+                />
+              ) : undefined
+            }
             testID={`edit-${kind}-slot`}
           />
-          {slot.file ? (
-            <View style={styles.pending} testID={`edit-${kind}-pending`}>
-              <Text variant="small" color="label" style={styles.grow}>
-                {file ? m.content.edit.willReplace : m.content.edit.willAttach}
-              </Text>
-              <TextButton
-                label={m.content.edit.discardFile}
-                tone="muted"
-                disabled={disabled}
-                onPress={slot.reset}
-                style={styles.touch}
-                testID={`edit-${kind}-discard`}
-              />
-            </View>
-          ) : null}
 
           {file ? (
             <Button
-              label={texts.label}
+              label={dict.topics.widgets.delete}
+              accessibilityLabel={texts.label}
               variant="danger"
               leftIcon="trash"
               disabled={disabled}
@@ -205,7 +204,6 @@ export function TopicFileField({ kind, topicId, file, slot, disabled, uploadsLim
 
       <Dialog
         visible={confirmOpen}
-        kicker={dict.topics.widgets.confirm.kicker}
         title={texts.title}
         description={texts.description}
         confirmLabel={dict.topics.widgets.confirm.confirm}
@@ -230,8 +228,4 @@ const useStyles = makeStyles((t) => ({
   box: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, flexGrow: 1, flexBasis: t.tablet ? '45%' : '100%' },
   texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
   sheet: { gap: t.space.lg },
-  current: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  pending: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: t.space.md },
-  grow: { flex: 1, minWidth: 0 },
-  touch: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
 }));

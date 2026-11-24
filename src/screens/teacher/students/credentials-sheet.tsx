@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { AccessibilityInfo, Platform, Share, View } from 'react-native';
+import { Platform, Share, View } from 'react-native';
 
 import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { announceOnIOS, BottomSheet, Button, Enter, Icon, isOverlayCovered, PressableScale, Text, useCopyFeedback } from '@/ui';
+import { BottomSheet, Button, Enter, Icon, isOverlayCovered, PressableScale, Text, useCopyFeedback, useEventAnnouncement } from '@/ui';
 
 import { buildCredentialLines, credentialsMessage, type CredentialLine } from './credentials-message';
 import { SITE_HOST } from './site-host';
@@ -39,7 +38,9 @@ function canShare(): boolean {
  * Shown once after an account is created (docs/spec/04-teacher-students.md D1): site, login and password
  * as the message the teacher passes on. Each line copies its own value; «Скопировать» copies the whole
  * message; «Поделиться» hands it to a messenger. After «Готово» the password cannot be shown again —
- * only replaced — so the sheet ignores the backdrop, the drag and the back button.
+ * only replaced — so the sheet ignores the backdrop, the drag and the back button, and says so in one line
+ * (the site's paragraph and the «Сообщение для передачи» caption are cut, docs/design/glass-over-paper.md
+ * §1a).
  */
 export function CredentialsSheet({ credentials, title, onDone }: CredentialsSheetProps) {
   const styles = useStyles();
@@ -47,7 +48,8 @@ export function CredentialsSheet({ credentials, title, onDone }: CredentialsShee
   const t = dict.students.credentials;
   const shown = useLatched(credentials);
   const { copied, copy } = useCopyFeedback();
-  const [feedback, setFeedback] = useState<string | null>(null);
+  // What was copied is shown by the tick and the «Скопировано» pill; the site's sentence is spoken only.
+  const announce = useEventAnnouncement();
   const shareable = canShare();
 
   const lines = shown
@@ -57,15 +59,6 @@ export function CredentialsSheet({ credentials, title, onDone }: CredentialsShee
       )
     : [];
   const message = credentialsMessage(lines);
-
-  const announce = (text: string) => {
-    // On Android the feedback line below is a live region and speaks a new text by itself. The same text set
-    // again (the same line copied twice) does not change the node, so the live region stays silent: that
-    // repeat is spoken directly.
-    if (Platform.OS === 'android' && text === feedback) AccessibilityInfo.announceForAccessibility(text);
-    setFeedback(text);
-    announceOnIOS(text);
-  };
 
   const copyLine = async (line: CredentialLine) => {
     if (await copy(line.id, line.value)) announce(format(t.copiedLine, { label: line.label }));
@@ -80,11 +73,6 @@ export function CredentialsSheet({ credentials, title, onDone }: CredentialsShee
   // Never presented while the app lock covers the sheet: the system sheet would open above the cover with
   // the password in it (iOS hand-off).
   const share = () => (isOverlayCovered() ? Promise.resolve(undefined) : Share.share({ message }).catch(() => undefined));
-
-  const close = () => {
-    setFeedback(null);
-    onDone();
-  };
 
   return (
     <BottomSheet
@@ -121,7 +109,7 @@ export function CredentialsSheet({ credentials, title, onDone }: CredentialsShee
               testID="credentials-share"
             />
           ) : null}
-          <Button label={t.done} variant="outline" size="lg" onPress={close} style={styles.action} testID="credentials-done" />
+          <Button label={t.done} variant="outline" size="lg" onPress={onDone} style={styles.action} testID="credentials-done" />
         </View>
       }
     >
@@ -131,32 +119,24 @@ export function CredentialsSheet({ credentials, title, onDone }: CredentialsShee
             <Text variant="dialogTitle" accessibilityRole="header">
               {title}
             </Text>
-            <Text variant="small" color="textMuted">
-              {format(t.intro, { name: shown.name })}
+            {/* The one thing that cannot be undone here: said once, in one line. */}
+            <Text variant="small" color="textMuted" accessibilityLabel={format(t.intro, { name: shown.name })}>
+              {m.teacher.students.passwordOnce}
             </Text>
           </View>
 
-          <View style={styles.block}>
-            <Text variant="kicker" color="textMuted">
-              {t.messageTitle}
-            </Text>
-            <View style={styles.message}>
-              {lines.map((line) => (
-                <CredentialRow
-                  key={line.id}
-                  line={line}
-                  copied={copied === line.id || copied === WHOLE_MESSAGE}
-                  showPill={copied === line.id}
-                  copiedLabel={t.copied}
-                  hint={m.teacher.students.copyHint}
-                  onCopy={copyLine}
-                />
-              ))}
-            </View>
-            {/* The site keeps this line for screen readers only; on a phone it also tells what to do next. */}
-            <Text variant="captionMedium" color="greenText" accessibilityLiveRegion="polite" style={styles.feedback} testID="credentials-feedback">
-              {feedback ?? ' '}
-            </Text>
+          <View style={styles.message} accessibilityLabel={t.messageTitle}>
+            {lines.map((line) => (
+              <CredentialRow
+                key={line.id}
+                line={line}
+                copied={copied === line.id || copied === WHOLE_MESSAGE}
+                showPill={copied === line.id}
+                copiedLabel={t.copied}
+                hint={m.teacher.students.copyHint}
+                onCopy={copyLine}
+              />
+            ))}
           </View>
         </View>
       ) : null}
@@ -215,7 +195,6 @@ function CredentialRow({ line, copied, showPill, copiedLabel, hint, onCopy }: Cr
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.lg, paddingTop: t.space.xxs },
   intro: { gap: t.space.xs },
-  block: { gap: t.space.sm },
   message: {
     // A soft panel inside the sheet.
     borderRadius: t.radii.lg,
@@ -245,7 +224,6 @@ const useStyles = makeStyles((t) => ({
     backgroundColor: t.colors.tabActiveBg,
     pointerEvents: 'none',
   },
-  feedback: { minHeight: t.typography.small.lineHeight },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.md },
   action: { flexGrow: 1, flexBasis: '30%' },
   actionWide: { flexBasis: '100%' },

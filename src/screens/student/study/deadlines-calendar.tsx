@@ -77,16 +77,16 @@ export function DeadlinesCalendar({ items, month, now, selectedDayKey, onChangeM
     const parts = [formatDayKey(cell.key, 'dayMonth', locale) ?? String(cell.day)];
     if (cell.isToday) parts.push(t.legendToday);
     if (cell.items.length > 0) {
-      const tones = new Set([...cell.marks, ...cell.items.slice(cell.marks.length).map(() => 'done' as const)]);
+      // The marks are sorted, the most urgent first: the first one is the state of the day.
+      const worst = cell.marks[0];
       parts.push(plural(locale, cell.items.length, m.student.calendar.deadlineForms));
-      parts.push(tones.has('late') ? dict.student.deadlineList.overdueBadge : tones.has('due') ? t.legendIncomplete : m.student.calendar.allDone);
+      parts.push(worst === 'late' ? dict.student.deadlineList.overdueBadge : worst === 'due' ? t.legendIncomplete : m.student.calendar.allDone);
     }
     return parts.join(', ');
   };
 
-  const Frame = bare ? View : Card;
-  return (
-    <Frame {...(bare ? {} : { padded: false })} testID="deadlines-calendar" style={[styles.frame, bare ? null : styles.card]}>
+  const content = (
+    <>
       <View style={[styles.header, bare ? null : styles.inset]}>
         <Text
           variant="calendarMonth"
@@ -129,7 +129,16 @@ export function DeadlinesCalendar({ items, month, now, selectedDayKey, onChangeM
           ))}
         </Enter>
       </View>
-    </Frame>
+    </>
+  );
+  return bare ? (
+    <View testID="deadlines-calendar" style={styles.frame}>
+      {content}
+    </View>
+  ) : (
+    <Card padded={false} testID="deadlines-calendar" style={[styles.frame, styles.card]}>
+      {content}
+    </Card>
   );
 }
 

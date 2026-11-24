@@ -1,7 +1,9 @@
 // Pure decisions of the developer panel (docs/spec/07-developer-content.md §1.9, §4.5 "Derived UI rules";
 // 90-addendum-3 §6, §10.2): header chips, status tiles, the real AI budgets, the service actions and the
 // broadcast form. No React, no RN — covered by tests/developer-panel-logic.test.ts.
-import type { AiBudgetScope, AiBudgetUsage, BroadcastRequest, DeveloperPanelStats, PanelAction, SiteSettings } from '@/api/types';
+import type { AiBudgetScope, AiBudgetUsage, BroadcastRequest, DeveloperPanelStats, Locale, PanelAction, SiteSettings } from '@/api/types';
+import { formatMsk } from '@/domain/dates';
+import { isSameMskDay, mskParts } from '@/domain/moscow-time';
 import type { Dictionary } from '@/lib/i18n/dictionary';
 import { format } from '@/lib/i18n/format';
 
@@ -15,6 +17,22 @@ export const BUDGET_WARN_SHARE = 0.8;
 /** `min(100, round(used / max(1, limit) × 100))` — the bar of the "runs in 24 hours" tile. */
 export function budgetPercent(used: number, limit: number): number {
   return Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
+}
+
+// ───────────────────────────── short dates ─────────────────────────────
+
+/**
+ * «24 нояб., 16:00» — the short Moscow date-time of the panel and the journal rows (docs/design/
+ * glass-over-paper.md §1a): no year inside the current year, no seconds, no zone mark. With `timeOnlyToday`
+ * an instant of today's Moscow day is the time alone («17:32»). The full date is in the entry's detail.
+ */
+export function shortDateTime(value: string, now: number, locale: Locale, timeOnlyToday = false): string {
+  const day = formatMsk(value, 'dayMonthShort', locale);
+  const time = formatMsk(value, 'time', locale);
+  if (day === null || time === null) return '';
+  if (timeOnlyToday && isSameMskDay(value, now)) return time;
+  const year = mskParts(value).year;
+  return year === mskParts(now).year ? `${day}, ${time}` : `${day} ${year}, ${time}`;
 }
 
 // ───────────────────────────── header chips ─────────────────────────────
@@ -53,7 +71,7 @@ export type PanelFigure = {
 export function panelFigures(stats: DeveloperPanelStats, settings: SiteSettings, t: DevPanelDict): PanelFigure[] {
   const values: Record<PanelChip['key'], { caption: string; value: string }> = {
     queue: { caption: t.status.queue, value: String(stats.queueLength) },
-    ai: { caption: t.status.runs24h, value: `${stats.checksLastDay} / ${settings.aiDailyLimit}` },
+    ai: { caption: t.status.runs24h, value: `${stats.checksLastDay}/${settings.aiDailyLimit}` },
     storage: { caption: t.status.files, value: stats.filesSizeLabel },
   };
   return panelChips(stats, settings, t).map((chip) => ({ key: chip.key, ...values[chip.key], attention: chip.tone === 'yellow' }));
@@ -67,8 +85,9 @@ export type StatTile = {
   key: StatTileKey;
   label: string;
   value: string;
-  /** Muted continuation of the value («/ 300» of the runs tile). */
+  /** Muted continuation of the value («/ 300» of the runs tile, the size after the number of files). */
   valueSuffix?: string;
+  /** The site's line under the value: read out by a screen reader, not drawn. */
   hint?: string;
   /** Progress bar under the value (the 24-hour runs tile only). */
   percent?: number;
@@ -79,10 +98,10 @@ export type StatTile = {
 };
 
 /**
- * The seven stat blocks of the Status tab, in the site's order. `mskMark` («МСК») follows the date-time of
- * the last retention run: the server prints it in Moscow time whatever the device zone is (07 §7 item 14).
+ * The seven stat blocks of the Status tab, in the site's order. The last retention run is a short Moscow
+ * date-time («11 нояб., 11:10»); a run that never happened keeps the server's words.
  */
-export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t: DevPanelDict['status'], mskMark: string): StatTile[] {
+export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t: DevPanelDict['status'], locale: Locale, now: number): StatTile[] {
   return [
     { key: 'queue', label: t.queue, value: String(stats.queueLength), hint: t.queueHint, wide: false },
     {
@@ -96,13 +115,13 @@ export function statTiles(stats: DeveloperPanelStats, settings: SiteSettings, t:
       attention: stats.checksLastDay >= settings.aiDailyLimit * BUDGET_WARN_SHARE,
     },
     { key: 'lessonQueue', label: t.lessonQueue, value: String(stats.lessonQueueLength), hint: t.lessonQueueHint, wide: false },
-    { key: 'files', label: t.files, value: String(stats.filesCount), hint: stats.filesSizeLabel, wide: false },
+    { key: 'files', label: t.files, value: String(stats.filesCount), valueSuffix: stats.filesSizeLabel, hint: stats.filesSizeLabel, wide: false },
     { key: 'students', label: t.students, value: String(stats.studentsCount), wide: false },
     { key: 'topics', label: t.topics, value: String(stats.topicsCount), wide: false },
     {
       key: 'lastRetention',
       label: t.lastRetention,
-      value: stats.lastRetentionAt ? `${stats.lastRetentionLabel} ${mskMark}` : stats.lastRetentionLabel,
+      value: stats.lastRetentionAt ? shortDateTime(stats.lastRetentionAt, now, locale) : stats.lastRetentionLabel,
       wide: true,
     },
   ];

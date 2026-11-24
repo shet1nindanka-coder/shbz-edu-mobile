@@ -110,8 +110,8 @@ test("progressMetricCards: values, notes and tones of the four cards", () => {
   assert.deepEqual(
     cards.map((card) => [card.key, card.value, card.note, card.tone]),
     [
-      ["solvedOfIssued", "22 / 40", "55% выданных номеров", "green"],
-      ["homeworkDone", "4", "из 10 выданных ДЗ", "green"],
+      ["solvedOfIssued", "22/40", "55% выданных номеров", "green"],
+      ["homeworkDone", "4/10", "из 10 выданных ДЗ", "green"],
       ["homeworkOverdue", "3", "30% выданных ДЗ", "red"],
       ["needHelp", "6", "15% выданных номеров", "red"],
     ],
@@ -123,7 +123,7 @@ test("progressMetricCards: nothing issued → zero percents, no division by zero
     homework({ total: 0, completedCount: 0, overdueCount: 0, issuedNumbersTotal: 0, issuedNumbersSolved: 0, issuedNumbersRed: 0 }),
     en.statistics,
   );
-  assert.equal(cards[0]?.value, "0 / 0");
+  assert.equal(cards[0]?.value, "0/0");
   assert.equal(cards[0]?.note, "0% of assigned problems");
   assert.equal(cards[2]?.note, "0% of assigned homework");
 });
@@ -254,7 +254,7 @@ test("platformMetricCards: four cards", () => {
       ["topics", "4", "3 с активностью (75%)", "accent"],
       ["bankNumbers", "25", "32% банка решено", "green"],
       ["issuedHomework", "10", "фото решений: 17", "muted"],
-      ["students", "3 / 4", "75% активны", "accent"],
+      ["students", "4", "75% активны", "accent"],
     ],
   );
 });
@@ -264,10 +264,10 @@ test("bankUsageRows and bankInsight", () => {
   assert.deepEqual(
     rows.map((row) => [row.key, row.value, row.percent]),
     [
-      ["solvedOfBank", "32 / 100", 32],
-      ["redInBank", "5 / 100", 5],
-      ["topicsWithActivity", "3 / 4", 75],
-      ["studentsInWork", "3 / 4", 75],
+      ["solvedOfBank", "32/100", 32],
+      ["redInBank", "5/100", 5],
+      ["topicsWithActivity", "3/4", 75],
+      ["studentsInWork", "3/4", 75],
     ],
   );
   const t = ru.statistics;
@@ -295,20 +295,20 @@ test("contentRows: done / total and the percent", () => {
   assert.deepEqual(
     contentRows(content, ru.statistics).map((row) => [row.key, row.value, row.percent]),
     [
-      ["numbersWithCondition", "15 / 20", 75],
-      ["numbersWithAnswer", "10 / 20", 50],
-      ["topicsWithTheory", "3 / 4", 75],
-      ["topicsWithHomeworkFile", "2 / 4", 50],
+      ["numbersWithCondition", "15/20", 75],
+      ["numbersWithAnswer", "10/20", 50],
+      ["topicsWithTheory", "3/4", 75],
+      ["topicsWithHomeworkFile", "2/4", 50],
     ],
   );
 });
 
 test("gapLine: only what is missing, in the site's order", () => {
   const gap = { topicId: "t1", title: "Тема", noTheoryFile: true, noHomeworkFile: false, missingConditions: 3, missingAnswers: 0 };
-  assert.equal(gapLine(gap, ru.statistics), "нет файла теории · без условия: 3");
+  assert.equal(gapLine(gap, ru.statistics), "нет файла теории, без условия: 3");
   assert.equal(
     gapLine({ ...gap, noHomeworkFile: true, missingAnswers: 2 }, ru.statistics),
-    "нет файла теории · нет файла заданий · без условия: 3 · без ответа: 2",
+    "нет файла теории, нет файла заданий, без условия: 3, без ответа: 2",
   );
 });
 
@@ -450,8 +450,9 @@ function lesson(patch: Partial<TeacherLessonEntry> = {}): TeacherLessonEntry {
 
 test("recentLessonLine: scheduled group lesson", () => {
   assert.deepEqual(recentLessonLine(lesson(), ru.teacherStats, ru.common, "ru"), {
-    when: "5 ноября в 18:30",
-    details: "Логарифмы · группа «8А»",
+    title: "Логарифмы",
+    when: "5 нояб., 18:30",
+    who: "группа «8А»",
     status: "проведено",
   });
 });
@@ -459,7 +460,7 @@ test("recentLessonLine: scheduled group lesson", () => {
 test("recentLessonLine: no schedule → creation time with the suffix; no topic → the title; no group → the head count", () => {
   assert.deepEqual(
     recentLessonLine(lesson({ startsAt: null, topicTitle: null, groupName: null, participantsCount: 1, status: "PLANNED" }), ru.teacherStats, ru.common, "ru"),
-    { when: "1 ноября в 12:00 (создано)", details: "Занятие от 5 ноября · 1 ученик", status: "запланировано" },
+    { title: "Занятие от 5 ноября", when: "1 нояб., 12:00 (создано)", who: "1 ученик", status: "запланировано" },
   );
   assert.equal(recentLessonLine(lesson({ groupName: null, participantsCount: 3, status: "ACTIVE" }), en.teacherStats, en.common, "en").status, "in progress");
 });

@@ -31,7 +31,9 @@ export type CreateStudentSheetProps = {
 /**
  * "Add a student" (docs/spec/04-teacher-students.md S2a, §3.1): name, login and a password in plain text —
  * the teacher dictates it aloud. The password is checked against the policy as it is typed, and a
- * readable one built from the surname is offered when the empty field gets focus.
+ * readable one built from the surname is offered when the empty field gets focus. Each field has one name —
+ * its label; the site's example placeholders and the "at least 8 characters" line are not shown: a limit
+ * is said when it is broken (docs/design/glass-over-paper.md §1a).
  *
  * The typed values survive closing the sheet by accident; they are cleared only after a success.
  */
@@ -111,7 +113,9 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
       testID="create-student-sheet"
       footer={
         <Button
-          label={create.isPending ? t.creating : t.submit}
+          // The sheet's title already says «Добавить ученика»: the button is the verb.
+          label={create.isPending ? t.creating : dict.planner.common.add}
+          accessibilityLabel={create.isPending ? t.creating : t.submit}
           size="lg"
           fullWidth
           loading={create.isPending}
@@ -123,7 +127,8 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
     >
       <View style={styles.form}>
         <TextField
-          label={t.name}
+          label={dict.settings.name}
+          accessibilityLabel={t.name}
           value={name}
           onChangeText={(value) => {
             setName(value);
@@ -131,7 +136,6 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
             setSuggestion(null);
             setSuggestOpen(false);
           }}
-          placeholder={t.namePlaceholder}
           autoComplete="name"
           textContentType="name"
           autoCapitalize="words"
@@ -144,13 +148,13 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
         />
         <TextField
           ref={loginRef}
-          label={t.login}
+          label={dict.students.list.loginLabel}
+          accessibilityLabel={t.login}
           value={login}
           onChangeText={(value) => {
             setLogin(value);
             setLoginError(null);
           }}
-          placeholder={t.loginPlaceholder}
           error={loginError}
           // Any string is a valid login; the e-mail keyboard only puts "@" and "." within reach.
           keyboardType="email-address"
@@ -180,7 +184,6 @@ export function CreateStudentSheet({ visible, onClose, onCreated, onClosed }: Cr
               setSuggestion((current) => current ?? generatePasswordFromName(name, secureRandomInt));
               setSuggestOpen(true);
             }}
-            placeholder={t.passwordPlaceholder}
             // Plain text on purpose (the teacher dictates it), and nothing may offer to save or fill it.
             autoCapitalize="none"
             autoCorrect={false}

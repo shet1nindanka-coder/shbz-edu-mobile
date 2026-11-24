@@ -3,13 +3,13 @@ import { View } from 'react-native';
 import type { StudentHomeworkNumberDto } from '@/api/types';
 import { MathContent } from '@/components/math';
 import { RetryWaitLine } from '@/components/retry-wait';
-import { statusLabel } from '@/components/numbers';
 import { homeworkStatusLabel } from '@/domain/statuses';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Card, Notice, StatusBadge, Text, TextArea, TextButton } from '@/ui';
+import { Card, Notice, Text, TextArea, TextButton } from '@/ui';
 
+import { NumberStatusMark } from '../study/number-status-mark';
 import { useNoteEditor } from '../study/use-note-editor';
 
 export type HomeworkNumberCardProps = {
@@ -23,8 +23,9 @@ export type HomeworkNumberCardProps = {
 };
 
 /**
- * One problem of a homework (docs/spec/03-student-homework-lesson.md §1 H2.c): title with the read-only
- * status badge, the statement and the student's own note with autosave. The reference answer is never
+ * One problem of a homework (docs/spec/03-student-homework-lesson.md §1 H2.c): the number with its
+ * read-only status mark (a label only for «нужна помощь»), the statement and the student's own note with
+ * autosave — a field with one name, no placeholder. The reference answer is never
  * sent to a student. The note uses the same editor as the number screen (the site renders both with one
  * component): a refused save stays unsaved and is sent again on blur, on «Повторить» and when the card
  * goes away; saves are sent one at a time.
@@ -75,15 +76,17 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
       {note.error ? <RetryWaitLine seconds={wait} testID={`number-note-wait-${number.number}`} /> : null}
 
       <View style={styles.head}>
-        <Text variant="sectionTitle" tabular accessibilityRole="header" accessibilityLabel={format(t.title, { number: number.number })} style={styles.title}>
+        <Text
+          variant="sectionTitle"
+          tabular
+          accessibilityRole="header"
+          accessibilityLabel={`${format(t.title, { number: number.number })}, ${homeworkStatusLabel(number.status, dict)}`}
+          style={styles.title}
+        >
           {number.number}
         </Text>
         {/* The status is read-only for a student: it is set by the check or by the teacher. */}
-        <StatusBadge
-          status={number.status}
-          label={statusLabel(number.status, m.common.statuses)}
-          accessibilityLabel={homeworkStatusLabel(number.status, dict)}
-        />
+        <NumberStatusMark status={number.status} />
       </View>
       <Hint>
         <Text variant="hint">{t.statusHint}</Text>
@@ -109,7 +112,6 @@ export function HomeworkNumberCard({ number, notesEnabled, noteMaxLength, highli
           onChangeText={note.onChangeText}
           onBlur={note.flush}
           maxLength={noteMaxLength}
-          placeholder={t.notePlaceholder}
           accessibilityLabel={format(t.noteAria, { number: number.number })}
           testID={`number-note-${number.number}`}
         />

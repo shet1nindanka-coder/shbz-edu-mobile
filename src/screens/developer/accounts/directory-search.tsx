@@ -24,8 +24,9 @@ export function DirectorySearch({ tab, value, onChange }: DirectorySearchProps) 
     <TextField
       value={value}
       onChangeText={onChange}
-      placeholder={tab === 'teachers' ? t.searchTeachers : tab === 'students' ? t.searchStudents : t.searchAria}
-      accessibilityLabel={t.searchAria}
+      // One word in the field; what is searched («Имя или логин учителя») is its accessible name.
+      placeholder={m.accounts.search.placeholder}
+      accessibilityLabel={tab === 'teachers' ? t.searchTeachers : tab === 'students' ? t.searchStudents : t.searchAria}
       autoCapitalize="none"
       autoCorrect={false}
       spellCheck={false}

@@ -85,7 +85,8 @@ export function ImportPromptButton({ testID = 'import-prompt-copy' }: { testID?:
     <View style={styles.root}>
       <View style={styles.row}>
         <Button
-          label={copied ? t.copied : t.copy}
+          // One word: «Промпт» with the copy glyph; the site's «Скопировать промпт для ИИ» is spoken.
+          label={copied ? t.copied : m.content.importPanel.prompt}
           accessibilityLabel={copied ? m.content.importPanel.promptCopied : t.copy}
           variant="outline"
           size="md"

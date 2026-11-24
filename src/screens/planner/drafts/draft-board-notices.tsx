@@ -21,7 +21,7 @@ export type DraftBoardNoticesProps = {
  * What the homework-draft board says above its students (docs/spec/05-teacher-lessons-plans.md §1.7
  * banners), in the site's order: a failed refresh, AI unavailable, the answer to the last action with the
  * cool-down line, the students the homework could not be assigned to, a handout that did not open — then
- * the generation counter. Each line appears only while it has something to say.
+ * the generation counter («1/3» next to a spinner). Each line appears only while it has something to say.
  */
 export function DraftBoardNotices({ plan, controller, handout }: DraftBoardNoticesProps) {
   const styles = useStyles();
@@ -36,7 +36,8 @@ export function DraftBoardNotices({ plan, controller, handout }: DraftBoardNotic
       {/* Cached data stays on screen when a refresh fails (offline): say so instead of replacing it. */}
       {board.isError ? <Notice tone="error" text={errorText(board.error, m.common.errors.generic)} testID="draft-refresh-error" /> : null}
 
-      {!plan.aiAvailable ? <Notice tone="warning" text={t.aiUnavailable} testID="draft-ai-unavailable" /> : null}
+      {/* The short site wording; what to do instead («добавляйте номера…») is the board itself. */}
+      {!plan.aiAvailable ? <Notice tone="warning" text={dict.planner.lessonCompose.aiUnavailable} testID="draft-ai-unavailable" /> : null}
 
       {notice ? (
         <Notice tone={notice.tone} text={notice.text} onDismiss={controller.dismissNotice} dismissLabel={m.common.actions.close} testID="draft-notice" />
@@ -62,10 +63,17 @@ export function DraftBoardNotices({ plan, controller, handout }: DraftBoardNotic
       <HandoutNotice handout={handout} testID="draft-handout-error" />
 
       {controller.pendingCount > 0 ? (
-        <View accessibilityRole="progressbar" accessibilityLiveRegion="polite" style={styles.progress} testID="draft-ready-of">
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={format(dict.planner.common.readyOf, { ready: controller.readyCount, total: plan.participants.length })}
+          accessibilityLiveRegion="polite"
+          style={styles.progress}
+          testID="draft-ready-of"
+        >
           <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
           <Text variant="small" color="textMuted" tabular>
-            {format(dict.planner.common.readyOf, { ready: controller.readyCount, total: plan.participants.length })}
+            {format(m.common.numbers.doneOf, { done: controller.readyCount, total: plan.participants.length })}
           </Text>
         </View>
       ) : null}

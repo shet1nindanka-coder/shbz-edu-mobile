@@ -1,5 +1,5 @@
-// Pure rules of the student study screens (02 S1, S3, S4): upcoming homeworks, deadline card texts, the
-// month grid in Moscow days, the streak texts and the note editor's decisions.
+// Pure rules of the student study screens (02 S1, S3, S4): upcoming homeworks, the month grid in Moscow
+// days with a mark per homework, the day a tablet opens on, the streak texts and the note editor's decisions.
 /// <reference path="../node_modules/@types/node/assert.d.ts" />
 /// <reference path="../node_modules/@types/node/assert/strict.d.ts" />
 /// <reference path="../node_modules/@types/node/test.d.ts" />
@@ -10,9 +10,12 @@ import type { HomeworkDeadlineSummary, StudentStreak } from "../src/api/types";
 import { getDictionary } from "../src/i18n/get-dictionary";
 import {
   buildCalendarCells,
-  describeDeadline,
+  dayMarks,
+  dayTitle,
   groupByMskDay,
   monthOfInstant,
+  monthTitle,
+  nearestDeadlineDay,
   selectUpcoming,
   shiftMonth,
   toDeadlineItems,
@@ -66,47 +69,7 @@ describe("upcoming homeworks (S1)", () => {
   });
 });
 
-describe("deadline card texts", () => {
-  const now = new Date("2026-11-16T09:00:00.000Z").getTime();
-  const [started, untouched, done] = toDeadlineItems(
-    [
-      homework({ id: "started", deadlineAt: "2026-11-20T20:59:00.000Z", solvedCount: 3 }),
-      homework({ id: "untouched", deadlineAt: "2026-11-21T20:59:00.000Z" }),
-      homework({ id: "done", deadlineAt: "2026-11-22T20:59:00.000Z", solvedCount: 8 }),
-    ],
-    "ru",
-  );
-
-  it("prints the meta line, the progress label and the fraction", () => {
-    assert.ok(started && untouched && done);
-    const texts = describeDeadline(started, ru.student.deadlineList, "ru", now);
-    assert.equal(texts.meta, "ДЗ до 20 ноября 2026 г. · Выполнено 3 из 8");
-    assert.equal(texts.percent, 38);
-    assert.equal(texts.progress, "Прогресс ДЗ: 38%");
-    assert.equal(texts.fraction, "3/8");
-    assert.equal(texts.done, false);
-    assert.equal(texts.overdue, false);
-    assert.equal(describeDeadline(untouched, ru.student.deadlineList, "ru", now).progress, "ДЗ ещё не начато");
-    assert.equal(describeDeadline(done, ru.student.deadlineList, "ru", now).progress, "ДЗ выполнено полностью");
-    assert.equal(describeDeadline(started, en.student.deadlineList, "en", now).meta, "Due 20 November 2026 · 3 of 8 done");
-  });
-
-  it("formats the deadline as a Moscow date whatever the instant's UTC day is", () => {
-    // 21:30 UTC on the 20th is already the 21st in Moscow.
-    const [item] = toDeadlineItems([homework({ id: "x", deadlineAt: "2026-11-20T21:30:00.000Z" })], "ru");
-    assert.ok(item);
-    assert.match(describeDeadline(item, ru.student.deadlineList, "ru", now).meta, /^ДЗ до 21 ноября 2026 г\./);
-  });
-
-  it("marks an unfinished homework overdue once the deadline has passed; a done one never", () => {
-    assert.ok(started && done);
-    const later = new Date("2026-11-23T00:00:00.000Z").getTime();
-    assert.equal(describeDeadline(started, ru.student.deadlineList, "ru", later).overdue, true);
-    const doneTexts = describeDeadline(done, ru.student.deadlineList, "ru", later);
-    assert.equal(doneTexts.overdue, false);
-    assert.equal(doneTexts.done, true);
-  });
-
+describe("server clock", () => {
   it("corrects the device clock by the server's", () => {
     const received = 1_000_000;
     // The device is 5 minutes behind the server.
@@ -144,7 +107,9 @@ describe("calendar (S4)", () => {
     "ru",
   );
   const byDay = groupByMskDay(items);
-  const november = buildCalendarCells({ year: 2026, month: 11 }, byDay, "2026-11-16");
+  // Monday 16 November 2026, noon in Moscow.
+  const now = new Date("2026-11-16T09:00:00.000Z").getTime();
+  const november = buildCalendarCells({ year: 2026, month: 11 }, byDay, now);
 
   it("buckets deadlines by their Moscow day", () => {
     assert.deepEqual(byDay.get("2026-11-20")?.map((item) => item.id).sort(), ["late", "same-day-done"]);
@@ -163,26 +128,57 @@ describe("calendar (S4)", () => {
     assert.equal(november[41]?.key, "2026-12-06");
   });
 
-  it("marks a day red when something is unfinished and amber when everything is done", () => {
+  it("gives every homework of a day its mark: due before done, nothing on a free day", () => {
     const cell = (key: string) => november.find((entry) => entry.key === key);
-    assert.equal(cell("2026-11-20")?.state, "late");
+    assert.deepEqual(cell("2026-11-20")?.marks, ["due", "done"]);
     assert.equal(cell("2026-11-20")?.items.length, 2);
-    assert.equal(cell("2026-11-10")?.state, "done");
-    assert.equal(cell("2026-11-30")?.state, "late");
-    assert.equal(cell("2026-11-17")?.state, "plain");
+    assert.deepEqual(cell("2026-11-10")?.marks, ["done", "done"]);
+    assert.deepEqual(cell("2026-11-30")?.marks, ["due"]);
+    assert.deepEqual(cell("2026-11-17")?.marks, []);
     assert.deepEqual(cell("2026-11-17")?.items, []);
+    assert.equal(cell("2026-11-20")?.more, 0);
+  });
+
+  it("turns an unfinished homework red at the instant its deadline passes; a done one never", () => {
+    // 20 November, 23:59 Moscow time is the deadline of «late»: a minute later it is overdue, the same day.
+    const after = new Date("2026-11-20T21:00:00.000Z").getTime();
+    const cells = buildCalendarCells({ year: 2026, month: 11 }, byDay, after);
+    assert.deepEqual(cells.find((entry) => entry.key === "2026-11-20")?.marks, ["late", "done"]);
+    assert.deepEqual(cells.find((entry) => entry.key === "2026-11-10")?.marks, ["done", "done"]);
+    assert.deepEqual(cells.find((entry) => entry.key === "2026-11-30")?.marks, ["due"]);
+  });
+
+  it("draws at most three marks: a busier day keeps the two most urgent and counts the rest", () => {
+    const busy = toDeadlineItems(
+      [
+        homework({ id: "a", deadlineAt: "2026-11-18T10:00:00.000Z", solvedCount: 8 }),
+        homework({ id: "b", deadlineAt: "2026-11-18T11:00:00.000Z" }),
+        homework({ id: "c", deadlineAt: "2026-11-18T12:00:00.000Z", solvedCount: 8 }),
+        homework({ id: "d", deadlineAt: "2026-11-18T13:00:00.000Z" }),
+        homework({ id: "e", deadlineAt: "2026-11-18T14:00:00.000Z" }),
+      ],
+      "ru",
+    );
+    assert.deepEqual(dayMarks(busy.slice(0, 3), now), { marks: ["due", "done", "done"], more: 0 });
+    assert.deepEqual(dayMarks(busy.slice(0, 4), now), { marks: ["due", "due"], more: 2 });
+    // «b» is overdue at 11:30 UTC on the 18th, «d» and «e» are still ahead.
+    const midday = new Date("2026-11-18T11:30:00.000Z").getTime();
+    assert.deepEqual(dayMarks(busy, midday), { marks: ["late", "due"], more: 3 });
+    assert.deepEqual(dayMarks([], now), { marks: [], more: 0 });
   });
 
   it("never marks a day of a neighbouring month, even with deadlines on it", () => {
     const overflow = november.find((entry) => entry.key === "2026-12-01");
-    assert.equal(overflow?.state, "out");
+    assert.equal(overflow?.inMonth, false);
     assert.deepEqual(overflow?.items, []);
+    assert.deepEqual(overflow?.marks, []);
     assert.equal(overflow?.day, 1);
     // The same day is marked once its own month is displayed.
-    const december = buildCalendarCells({ year: 2026, month: 12 }, byDay, "2026-11-16");
-    assert.equal(december.find((entry) => entry.key === "2026-12-01")?.state, "late");
+    const december = buildCalendarCells({ year: 2026, month: 12 }, byDay, now);
+    assert.deepEqual(december.find((entry) => entry.key === "2026-12-01")?.marks, ["due"]);
     // …and November's last day is an unmarked overflow cell there.
-    assert.equal(december.find((entry) => entry.key === "2026-11-30")?.state, "out");
+    assert.equal(december.find((entry) => entry.key === "2026-11-30")?.inMonth, false);
+    assert.deepEqual(december.find((entry) => entry.key === "2026-11-30")?.marks, []);
   });
 
   it("rings today only inside the displayed month", () => {
@@ -190,10 +186,35 @@ describe("calendar (S4)", () => {
       november.filter((entry) => entry.isToday).map((entry) => entry.key),
       ["2026-11-16"],
     );
-    const october = buildCalendarCells({ year: 2026, month: 10 }, byDay, "2026-11-01");
     // 1 November is an overflow cell of October's grid.
+    const october = buildCalendarCells({ year: 2026, month: 10 }, byDay, new Date("2026-11-01T09:00:00.000Z").getTime());
     assert.equal(october.some((entry) => entry.key === "2026-11-01"), true);
     assert.equal(october.some((entry) => entry.isToday), false);
+  });
+
+  it("opens a tablet on today when something is due, else on the nearest day with a homework", () => {
+    assert.equal(nearestDeadlineDay(items, "2026-11-20"), "2026-11-20");
+    // The 10th is six days back, the 20th four days ahead.
+    assert.equal(nearestDeadlineDay(items, "2026-11-16"), "2026-11-20");
+    assert.equal(nearestDeadlineDay(items, "2026-11-12"), "2026-11-10");
+    // Five days either way: the day ahead wins.
+    assert.equal(nearestDeadlineDay(items, "2026-11-15"), "2026-11-20");
+    assert.equal(nearestDeadlineDay(items, "2027-03-01"), "2026-12-01");
+    assert.equal(nearestDeadlineDay([], "2026-11-16"), "2026-11-16");
+  });
+
+  it("names the month without the year inside the current year", () => {
+    assert.equal(monthTitle({ year: 2026, month: 11 }, now, "ru"), "Ноябрь");
+    assert.equal(monthTitle({ year: 2027, month: 1 }, now, "ru"), "Январь 2027");
+    assert.equal(monthTitle({ year: 2026, month: 11 }, now, "en"), "November");
+    assert.equal(monthTitle({ year: 2025, month: 12 }, now, "en"), "December 2025");
+  });
+
+  it("titles a day with its weekday", () => {
+    const weekdays = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
+    assert.equal(dayTitle("2026-11-26", weekdays, "ru"), "четверг, 26 ноября");
+    assert.equal(dayTitle("2026-11-01", weekdays, "ru"), "воскресенье, 1 ноября");
+    assert.equal(dayTitle("2026-11-26", [], "en"), "26 November");
   });
 });
 

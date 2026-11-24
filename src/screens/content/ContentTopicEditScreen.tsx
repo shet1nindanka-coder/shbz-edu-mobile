@@ -8,11 +8,11 @@ import type { ViewerFile } from '@/components/files';
 import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus, useStillHere, type ScreenParams } from '@/navigation';
-import { Hint, useCurrentUser } from '@/providers';
+import { useCurrentUser } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, IconButton, LoadingState, Notice, Panel, Panels, Screen, Segmented, Text, TextButton } from '@/ui';
+import { Button, IconButton, LoadingState, Notice, Panel, Panels, Screen, Segmented } from '@/ui';
 
 import { AnswersSection } from './edit/answers-section';
 import { NumbersConfirmDialog } from './edit/numbers-confirm-dialog';
@@ -45,9 +45,10 @@ type FocusScroll = { header: number | null; panels: number | null; row: number |
  * (with the destructive-change preview), the two files — the statements-and-answers list, the import of
  * numbers into this topic, and «Удалить тему» with its real impact.
  *
- * A phone shows one of the three at a time (the switch is in the header), with «Сохранить изменения» as
- * the sticky action of the form. A tablet keeps the form in the left panel and the import or the
- * statements-and-answers list in the right one; saving and deleting sit in the header.
+ * A phone shows one of the three at a time (the switch is in the header), with «Сохранить» as the sticky
+ * action of the form. A tablet keeps the form in the left panel and the import or the
+ * statements-and-answers list in the right one; saving and deleting sit in the header. Unsaved changes
+ * are shown by the live save button and the «вернуть» mark next to it, not by a sentence (§1a).
  */
 export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps) {
   const styles = useStyles();
@@ -131,17 +132,31 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
   const formBusy = form.phase !== 'idle';
   const side: SideSection = section === 'answers' ? 'answers' : 'import';
 
+  // One word on the buttons (§1a); why «Сохранить» is not offered while a file is still uploading is spoken.
   const saveButton = (
     <Button
-      label={form.phase === 'saving' ? s.saving : form.phase === 'checking' ? s.checking : s.save}
+      label={form.phase === 'saving' ? m.common.states.saving : form.phase === 'checking' ? dict.topics.importPanel.checking : dict.common.save}
+      accessibilityLabel={form.phase === 'idle' ? s.save : undefined}
+      accessibilityHint={form.dirty && uploading ? m.content.edit.waitUploads : undefined}
       loading={formBusy}
       // Nothing to send while the form equals the saved topic; a running upload has no file id yet.
       disabled={!form.dirty || uploading}
       onPress={form.save}
+      style={styles.save}
       testID="edit-save"
     />
   );
-  const deleteButton = (
+  // The last thing of the form on a phone — two words; in the tablet header — the trash mark.
+  const deleteButton = theme.tablet ? (
+    <IconButton
+      icon="trash"
+      tint={theme.colors.dangerText}
+      accessibilityLabel={dict.topics.deleteTopic.label}
+      disabled={formBusy}
+      onPress={() => setDeleteOpen(true)}
+      testID="edit-delete-topic"
+    />
+  ) : (
     <Button
       label={dict.topics.deleteTopic.label}
       variant="danger"
@@ -151,29 +166,17 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
       testID="edit-delete-topic"
     />
   );
-  const unsaved =
+  // Unsaved changes are shown by the save button coming alive; next to it — the way back to the saved topic.
+  const resetButton =
     form.dirty && !formBusy ? (
-      <View style={styles.unsaved}>
-        <Text variant="small" color="textMuted" style={styles.grow} testID="edit-unsaved">
-          {uploading ? m.content.edit.waitUploads : m.content.edit.unsaved}
-        </Text>
-        <TextButton label={m.content.edit.reset} tone="muted" onPress={form.reset} style={styles.touch} testID="edit-reset" />
-      </View>
-    ) : null;
-  const pendingHint =
-    form.phase === 'saving' ? (
-      <Hint>
-        <Text variant="hint" testID="edit-pending-hint">
-          {s.pendingHint}
-        </Text>
-      </Hint>
+      <IconButton icon="rotateCcw" accessibilityLabel={m.content.edit.reset} onPress={form.reset} testID="edit-reset" />
     ) : null;
 
   const sections = (
     <Segmented<EditSection>
       options={[
         { value: 'topic', label: m.content.edit.sections.topic },
-        { value: 'answers', label: m.content.edit.sections.answers },
+        { value: 'answers', label: m.content.edit.sections.answersShort, accessibilityLabel: m.content.edit.sections.answers },
         { value: 'import', label: m.content.edit.sections.import },
       ]}
       value={section}
@@ -183,7 +186,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
       }}
       accessibilityLabel={m.content.edit.sectionsAria}
       role="tab"
-      scrollable
+      fill
       testID="edit-sections"
     />
   );
@@ -191,7 +194,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
     <Segmented<SideSection>
       options={[
         { value: 'import', label: m.content.edit.sections.import },
-        { value: 'answers', label: m.content.edit.sections.answers },
+        { value: 'answers', label: m.content.edit.sections.answersShort, accessibilityLabel: m.content.edit.sections.answers },
       ]}
       value={side}
       onChange={setSection}
@@ -220,26 +223,18 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
     />
   ) : null;
   const importer = (
-    <View style={styles.section} testID="edit-import">
-      <View style={styles.sectionHead}>
-        <Text variant="sectionTitle" accessibilityRole="header">
-          {m.content.edit.importTitle}
-        </Text>
-        <Hint>
-          <Text variant="hint">{m.content.edit.importHint}</Text>
-        </Hint>
-      </View>
-      {/* On a tablet the header's «Сохранить изменения» is the screen's gradient action. */}
+    // No title of its own: the section switch names it.
+    <View testID="edit-import">
+      {/* On a tablet the header's «Сохранить» is the screen's gradient action. */}
       <ImportPanelView state={importState} secondary={theme.tablet} />
     </View>
   );
 
   const footer =
     topic && !theme.tablet && section === 'topic' ? (
-      <View style={styles.footer} testID="edit-save-bar">
-        {unsaved}
+      <View style={styles.saveBar} testID="edit-save-bar">
+        {resetButton}
         {saveButton}
-        {pendingHint}
       </View>
     ) : undefined;
 
@@ -249,9 +244,8 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
       header={
         <View onLayout={(event) => placeFocus('header', event.nativeEvent.layout.height)}>
           <DetailAppBar
-            // The topic is the title; the line under it says this is its editor.
+            // The topic is the title; the section switch and the fields say this is its editor.
             title={topic?.title ?? t.sectionTitle}
-            subtitle={topic ? t.sectionTitle : undefined}
             backTitle={m.shell.tabs.topics}
             right={
               topic ? (
@@ -266,10 +260,11 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
             aside={
               topic ? (
                 theme.tablet ? (
-                  <>
+                  <View style={styles.saveBar}>
                     {deleteButton}
+                    {resetButton}
                     {saveButton}
-                  </>
+                  </View>
                 ) : (
                   sections
                 )
@@ -301,17 +296,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
           <View style={theme.tablet ? styles.fill : undefined} onLayout={(event) => placeFocus('panels', event.nativeEvent.layout.y)}>
             <Panels>
               {theme.tablet || section === 'topic' ? (
-                <Panel
-                  weight={2}
-                  footer={
-                    theme.tablet && (unsaved || pendingHint) ? (
-                      <View style={styles.footer}>
-                        {unsaved}
-                        {pendingHint}
-                      </View>
-                    ) : undefined
-                  }
-                >
+                <Panel weight={2}>
                   <TopicFormSection topic={topic} form={form} onOpenFile={openFile} onNotice={setNotice} />
                 </Panel>
               ) : null}
@@ -365,10 +350,7 @@ export function ContentTopicEditScreen({ topicId }: ContentTopicEditScreenProps)
 const useStyles = makeStyles((t) => ({
   // Tablet: the wrapper that reports where the panels start passes the page height on to them.
   fill: { flex: 1, minHeight: 0 },
-  section: { gap: t.space.md },
-  sectionHead: { gap: t.space.xxs },
-  footer: { gap: t.space.sm },
-  unsaved: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  grow: { flex: 1, minWidth: 0 },
-  touch: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
+  // «Сохранить» takes the bar on a phone; the marks next to it stay square.
+  saveBar: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  save: t.tablet ? {} : { flex: 1 },
 }));

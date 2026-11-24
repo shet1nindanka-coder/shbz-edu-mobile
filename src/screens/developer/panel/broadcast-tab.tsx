@@ -22,11 +22,16 @@ import { RecipientsSheet } from './recipients-sheet';
 import { ResultLine, type PanelResult } from './result-line';
 import { useRetryLock } from './use-retry-lock';
 
+/** Share of a field's limit from which its counter is shown (docs/design/glass-over-paper.md §1a). */
+const COUNTER_FROM_SHARE = 0.8;
+
 /**
- * Broadcast tab (07 §1.9; layout: docs/design/glass-over-paper.md §7): a notification for all students or
- * for the chosen ones — students only, shown to them as typed. Two cards: the message, and «Получатели»
- * with the send button — stacked on a phone, side by side on a tablet. On success the form and the picked
- * list are reset (the mode returns to "all").
+ * Broadcast tab (07 §1.9; layout: docs/design/glass-over-paper.md §7, §1a): a notification for all
+ * students or for the chosen ones — students only, shown to them as typed. Two cards: the message (two
+ * fields with one name each; a counter appears when 80 % of a limit is used), and the recipients — the
+ * «Всем ученикам / Выбранным» switch, the picked students, and the send button that carries the number of
+ * recipients («Отправить · 10») — stacked on a phone, side by side on a tablet. On success the form and
+ * the picked list are reset (the mode returns to "all").
  */
 export function BroadcastTab({ students }: { students: readonly BroadcastStudent[] }) {
   const styles = useStyles();
@@ -47,6 +52,7 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
   const bodyRef = useRef<TextInputInstance>(null);
 
   const picked = pickedStudents(students, pickedIds);
+  const recipients = mode === 'all' ? students.length : picked.length;
 
   const send = useMutation({
     mutationFn: () => api.developer.broadcast(broadcastRequest({ title, body, mode, pickedIds: picked.map((student) => student.id) })),
@@ -81,7 +87,6 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
             value={title}
             onChangeText={setTitle}
             maxLength={BROADCAST_TITLE_MAX}
-            placeholder={t.titlePlaceholder}
             disabled={send.isPending}
             returnKeyType="next"
             submitBehavior="submit"
@@ -95,24 +100,14 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
             value={body}
             onChangeText={setBody}
             maxLength={BROADCAST_BODY_MAX}
-            placeholder={t.bodyPlaceholder}
             disabled={send.isPending}
-            helper={t.bodyHint}
             labelAside={<Counter length={body.length} max={BROADCAST_BODY_MAX} />}
             testID="broadcast-body"
           />
         </Panel>
 
         <Panel weight={2}>
-          <View style={styles.recipientsLabel}>
-            <Text variant="sectionTitle" accessibilityRole="header">
-              {t.recipientsLabel}
-            </Text>
-            {/* Field sub-labels of the panel are always shown on the site (not hideable hints). */}
-            <Text variant="small" color="textMuted">
-              {t.recipientsHint}
-            </Text>
-          </View>
+          {/* The switch names itself («Всем ученикам / Выбранным»): no «Получатели» title above it. */}
           <Segmented<BroadcastMode>
             options={[
               { value: 'all', label: t.all },
@@ -126,11 +121,7 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
             testID="broadcast-mode"
           />
 
-          {mode === 'all' ? (
-            <Text variant="small" color="textMuted" testID="broadcast-all-hint">
-              {format(t.allHint, { n: students.length })}
-            </Text>
-          ) : (
+          {mode === 'all' ? null : (
             <View style={styles.selected}>
               {picked.length > 0 ? (
                 <View style={styles.chips} accessibilityRole="list">
@@ -151,9 +142,6 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
                   ))}
                 </View>
               ) : null}
-              <Text variant="small" color="textMuted" testID="broadcast-picked-count">
-                {picked.length > 0 ? format(t.picked, { n: picked.length }) : t.nonePicked}
-              </Text>
               <Button
                 label={m.developer.broadcast.pickStudents}
                 variant="outline"
@@ -167,7 +155,9 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
 
           <View style={styles.submit}>
             <Button
-              label={send.isPending ? t.sending : t.send}
+              label={send.isPending ? t.sending : format(m.developer.broadcast.sendCount, { n: recipients })}
+              // The site's full name, then who gets it: «Отправить уведомление. Уведомление получат все ученики: 10.»
+              accessibilityLabel={`${t.send}. ${mode === 'all' ? format(t.allHint, { n: students.length }) : format(t.picked, { n: picked.length })}`}
               size="lg"
               loading={send.isPending}
               disabled={!canSubmitBroadcast(title) || lock.seconds > 0}
@@ -206,18 +196,18 @@ export function BroadcastTab({ students }: { students: readonly BroadcastStudent
   );
 }
 
-/** «37 / 120» on the label row: the limit is otherwise invisible until the keyboard stops typing. */
+/** «100/120» on the label row, from 80 % of the limit on: until then the limit is not the user's concern. */
 function Counter({ length, max }: { length: number; max: number }) {
   const { m } = useI18n();
+  if (length < max * COUNTER_FROM_SHARE) return null;
   return (
     <Text variant="small" tabular color={length >= max ? 'redText' : 'textMuted'}>
-      {format(m.developer.broadcast.counter, { n: length, max })}
+      {format(m.common.numbers.doneOf, { done: length, total: max })}
     </Text>
   );
 }
 
 const useStyles = makeStyles((t) => ({
-  recipientsLabel: { gap: t.space.xxxs },
   selected: { gap: t.space.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.xs },
   // A picked student: a neutral 36-high mark with its remove cross.

@@ -12,9 +12,10 @@ import { useRefetchOnFocus } from '@/navigation';
 import type { ScreenParams } from '@/navigation';
 import { Hint } from '@/providers';
 import { DetailAppBar } from '@/screens/shell';
+import { useNowTick } from '@/services/clock';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, EmptyState, LoadingState, Notice, Panel, Panels, Screen, Spinner, Text } from '@/ui';
+import { Button, Card, EmptyState, IconButton, LoadingState, Notice, Panel, Panels, Screen, Spinner, Text } from '@/ui';
 
 import { ListSlice } from './list-slice';
 import { JournalDetailBody } from './panel/journal-detail-body';
@@ -23,8 +24,6 @@ import { JournalEntryCard } from './panel/journal-entry-card';
 import { JournalFiltersSheet } from './panel/journal-filters-sheet';
 import {
   activeFilterCount,
-  actorOptionLabel,
-  categoryFilterLabel,
   initialJournalFilters,
   mergeJournalPages,
   nextJournalPage,
@@ -40,11 +39,12 @@ type ProgressRef = NonNullable<JournalEntry['progressRef']>;
 
 /**
  * `developer.journal` (docs/spec/07-developer-content.md §1.10; layout: docs/design/glass-over-paper.md
- * §7): who called what on the platform — the audit log, newest first, 50 rows per page. The site's 880-px
- * table becomes rows of one card («what happened», one caption «who · when», a red mark only on a failed
- * entry); its filter row a bottom sheet behind the header button; its pager "show more" (the next page is
- * also loaded when the list reaches its end). A row opens the entry's details: a sheet on a phone, the
- * panel next to the list on a tablet.
+ * §7, §1a): who called what on the platform — the audit log, newest first, 50 rows per page. The site's
+ * 880-px table becomes rows of one card («what happened», one caption «who · when», a red mark only on a
+ * failed entry); its filter row a bottom sheet behind the filter button of the header (the number on it
+ * counts the filters in force); its pager "show more" (the next page is also loaded when the list reaches
+ * its end). Above the list stand the period in force and the number of entries. A row opens the entry's
+ * details: a sheet on a phone, the panel next to the list on a tablet.
  *
  * `outcome` / `days` come from a `dev_errors` notification (00 §3.3): they are the initial filter and stay
  * editable. No realtime, no polling (07 §5): the query runs on entry, on every filter change, on return
@@ -66,6 +66,8 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
     setFilters(initialJournalFilters({ outcome, days }));
   }
 
+  // "Today" of the rows' captions; a minute is as fine as they show.
+  const now = useNowTick(60_000);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [detail, setDetail] = useState<JournalEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -135,17 +137,9 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
     setHistoryOpen(true);
   };
 
-  const actor = filters.actor ? first?.actors.find((candidate) => candidate.id === filters.actor) : undefined;
-  // The selection in force, as one line of plain text: neutral facts are not labels.
-  const summary = [
-    periodLabel(filters.days, t.filters) ?? plural(locale, filters.days, m.developer.journal.periodForms),
-    filters.category ? categoryFilterLabel(filters.category, t.filters) : null,
-    actor ? actorOptionLabel(actor, t.roles) : null,
-    filters.action.trim() ? format(m.developer.journal.actionQuoted, { text: filters.action.trim() }) : null,
-    filters.onlyFailed ? t.filters.onlyFailed : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // The period is the one filter that is always in force: it is named above the list. The others are
+  // counted on the filter button and listed in its sheet.
+  const period = periodLabel(filters.days, t.filters) ?? plural(locale, filters.days, m.developer.journal.periodForms);
 
   // The entry of the tablet panel: the tapped one while it is still in the list, else the newest.
   const shownEntry = theme.tablet ? (entries.find((entry) => entry.id === detail?.id) ?? entries[0] ?? null) : null;
@@ -155,19 +149,25 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
       {first ? (
         <Hint>
           <Text variant="small" color="textMuted" testID="journal-intro">
-            {format(t.intro, { days: first.retentionDays })}
+            {format(m.developer.journal.retentionHint, { period: plural(locale, first.retentionDays, m.developer.journal.periodForms) })}
           </Text>
         </Hint>
       ) : null}
       <View style={styles.summaryRow}>
         <Text variant="small" color="textMuted" style={styles.summary} testID="journal-filter-summary">
-          {summary}
+          {period}
         </Text>
         <View style={styles.total}>
           {switching && !stalled ? <Spinner color="accentSolid" /> : null}
           {first ? (
-            <Text variant="small" color="textMuted" tabular testID="journal-total">
-              {plural(locale, first.total, m.developer.journal.entryForms)}
+            <Text
+              variant="small"
+              color="textMuted"
+              tabular
+              accessibilityLabel={plural(locale, first.total, m.developer.journal.entryForms)}
+              testID="journal-total"
+            >
+              {first.total}
             </Text>
           ) : null}
         </View>
@@ -191,14 +191,11 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
             testID="journal-more-error"
           />
         ) : null}
-        {first.pageCount > 1 ? (
-          <Text variant="small" color="textMuted" align="center" tabular testID="journal-page-of">
-            {format(t.pageOf, { page: pages?.length ?? 1, total: first.pageCount })}
-          </Text>
-        ) : null}
         {journal.hasNextPage ? (
           <Button
             label={m.common.actions.showMore}
+            // «Показать ещё. Страница 1 из 3»: where the list is, for a screen reader.
+            accessibilityLabel={`${m.common.actions.showMore}. ${format(t.pageOf, { page: pages?.length ?? 1, total: first.pageCount })}`}
             variant="outline"
             loading={journal.isFetchingNextPage}
             onPress={() => void journal.fetchNextPage()}
@@ -217,6 +214,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           <ListSlice first={index === 0} last={index === entries.length - 1} inCard={theme.tablet}>
             <JournalEntryCard
               entry={item}
+              now={now}
               divider={index < entries.length - 1}
               selected={shownEntry?.id === item.id}
               onOpen={openDetail}
@@ -225,7 +223,7 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
         </View>
       )}
       // The selected row and the dimming live outside the entries.
-      extraData={[switching, shownEntry?.id, entries.length]}
+      extraData={[switching, shownEntry?.id, entries.length, now]}
       // On a phone the head of the page scrolls with the list; on a tablet it stands above the panels.
       ListHeaderComponent={theme.tablet ? null : header}
       ListFooterComponent={footer}
@@ -236,7 +234,8 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           action={
             filterCount > 0 ? (
               <Button
-                label={m.developer.journal.resetFilters}
+                label={m.developer.short.reset}
+                accessibilityLabel={m.developer.journal.resetFilters}
                 variant="outline"
                 onPress={() => setFilters(initialJournalFilters({}))}
                 testID="journal-empty-reset"
@@ -272,10 +271,10 @@ export function DeveloperJournalScreen({ outcome, days }: DeveloperJournalScreen
           title={t.tab}
           backTitle={m.shell.tabs.panel}
           right={
-            <Button
-              label={filterCount > 0 ? format(m.developer.journal.filtersCount, { n: filterCount }) : m.developer.journal.filters}
-              variant="outline"
-              leftIcon="filter"
+            <IconButton
+              icon="filter"
+              badge={filterCount}
+              accessibilityLabel={filterCount > 0 ? format(m.developer.journal.filtersCount, { n: filterCount }) : m.developer.journal.filters}
               onPress={() => setFiltersOpen(true)}
               testID="journal-filters-open"
             />

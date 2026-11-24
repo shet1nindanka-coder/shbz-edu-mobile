@@ -15,7 +15,7 @@ import { LoadingState, Notice, Panel, Panels, Screen, Segmented, Text, TextButto
 
 import { LatexEditorBlock } from './browse/latex-editor-block';
 import { clearOpenedFromEditor, peekOpenedFromEditor, requestEditorFocus } from './shared/editor-links';
-import { hasLatex, numberFillStatus } from './shared/number-fill-status';
+import { hasLatex } from './shared/number-fill-status';
 import { isTopicLeaving } from './shared/topics-flash';
 
 /** Route params of `content.number` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
@@ -81,12 +81,8 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
     }
   };
 
-  // Under the title: the topic, and for a developer how much of the number is filled (a neutral fact).
-  const subtitle = data
-    ? isDeveloper
-      ? `${data.topic.title} · ${dict.topics.answerManager.status[numberFillStatus(data.number.conditionLatex, data.number.answerLatex)]}`
-      : data.topic.title
-    : undefined;
+  // Under the title: the topic the number belongs to. How much of it is filled shows in the editors.
+  const subtitle = data?.topic.title;
   const toTopic = <TextButton label={t.back} onPress={openTopic} style={styles.toTopic} testID="number-open-topic" />;
   // A phone has room for one editor: the switch sits in the header; a tablet shows both panels.
   const parts =
@@ -128,8 +124,9 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
 
           {isDeveloper ? (
             <>
+              {/* The screen's one hint: how formulas are written. */}
               <Hint>
-                <Text variant="hint">{t.sectionDescription}</Text>
+                <Text variant="hint">{m.content.number.latexHint}</Text>
               </Hint>
               <Panels>
                 {/* Both editors stay mounted: a draft typed in one survives a look at the other. */}
@@ -142,6 +139,7 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
                     number={recorded}
                     saved={data.number.conditionLatex}
                     onChanged={(value) => applyChange({ conditionLatex: value })}
+                    named={theme.tablet}
                   />
                 </Panel>
                 <Panel style={!theme.tablet && part !== 'answer' ? styles.hidden : undefined} testID="latex-answer">
@@ -153,6 +151,7 @@ export function ContentNumberScreen({ topicId, number }: ContentNumberScreenProp
                     saved={data.number.answerLatex}
                     onChanged={(value) => applyChange({ answerLatex: value })}
                     secondary={theme.tablet}
+                    named={theme.tablet}
                   />
                 </Panel>
               </Panels>

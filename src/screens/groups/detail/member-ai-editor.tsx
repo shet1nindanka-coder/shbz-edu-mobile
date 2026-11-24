@@ -339,7 +339,6 @@ export function MemberAiEditor({ groupId, member, onDetachedError }: MemberAiEdi
         onChangeText={changeNote}
         onBlur={commitNote}
         onSubmitEditing={commitNote}
-        placeholder={t.aiNotePlaceholder}
         maxLength={AI_NOTE_MAX_LENGTH}
         returnKeyType="done"
         testID={`member-note-${member.id}`}

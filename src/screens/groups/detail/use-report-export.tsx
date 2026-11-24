@@ -136,7 +136,7 @@ export function useReportExport(): ReportExport {
 /** The error of the last report request and, while a limit cools down, when it may be repeated. */
 export function ReportExportNotice({ report, testID }: { report: ReportExport; testID?: string }) {
   const styles = useStyles();
-  const { m } = useI18n();
+  const { dict, m } = useI18n();
   const focused = useScreenFocused();
   // The wait outlives a dismissed notice: the buttons stay disabled, so the reason stays on screen.
   if (!report.error && report.waitSeconds <= 0 && !report.ready) return null;
@@ -151,7 +151,7 @@ export function ReportExportNotice({ report, testID }: { report: ReportExport; t
           announcement={focused ? format(m.groups.report.ready, { title: report.ready.title }) : null}
           onDismiss={report.dismissReady}
           dismissLabel={m.common.actions.close}
-          action={<Button label={m.groups.report.open} size="sm" variant="outline" onPress={report.openReady} testID={testID ? `${testID}-ready-open` : undefined} />}
+          action={<Button label={dict.planner.common.open} size="sm" variant="outline" onPress={report.openReady} testID={testID ? `${testID}-ready-open` : undefined} />}
           testID={testID ? `${testID}-ready` : undefined}
         />
       ) : null}

@@ -3,9 +3,8 @@ import { View } from 'react-native';
 import type { PhotoUpload } from '@/api/types';
 import { PhotoGrid } from '@/components/files';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, Text } from '@/ui';
+import { BottomSheet, Button } from '@/ui';
 
 import { PickProblemNotice, type PickProblem } from './use-photo-source';
 
@@ -29,8 +28,8 @@ export type LessonSubmitSheetProps = {
 
 /**
  * "Look before you send" step of a lesson submission (docs/spec/03-student-homework-lesson.md §1 L2
- * "Mobile translation", §7 Q15): the taken photos, a way to retake or add up to the limit, and one button
- * that sends them. On the site picking files submits at once; with a camera a blurred shot would burn one
+ * "Mobile translation", §7 Q15): the taken photos, a way to retake or add up to the limit (the add buttons
+ * go away at the limit — no line explains it), and one button that sends them. On the site picking files submits at once; with a camera a blurred shot would burn one
  * of the hourly checks.
  */
 export function LessonSubmitSheet({
@@ -72,11 +71,6 @@ export function LessonSubmitSheet({
       testID="lesson-preview"
     >
       <View style={styles.content}>
-        <Hint>
-          <Text variant="small" color="textMuted">
-            {format(t.hint, { max: maxPhotos })}
-          </Text>
-        </Hint>
         {problem ? <PickProblemNotice problem={problem} onDismiss={onDismissProblem} /> : null}
         <PhotoGrid
           photos={photos.map((photo, index) => ({ key: `${index}-${photo.uri}`, fileId: photo.uri, name: photo.name, localUri: photo.uri }))}

@@ -5,9 +5,9 @@ import { View } from 'react-native';
 import { errorText, qk, retryAfterOf, useApi } from '@/api';
 import type { HomeworkNumberStatus } from '@/api/types';
 import { RetryWaitLine, useWaitClock, useWaitText } from '@/components/retry-wait';
-import { useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Card, Select, StatusBar, Text, TextButton } from '@/ui';
+import { Select, Spinner, StatusBar, Text, TextButton } from '@/ui';
 
 import {
   EMPTY_DRILLDOWN_METRICS,
@@ -18,9 +18,7 @@ import {
   resolveHomeworkSelection,
   type DrilldownMetrics,
 } from '../logic';
-import { InsightBox } from './insight-box';
 import { PickerField } from './picker-field';
-import { ProgressRow } from './progress-row';
 
 export type DrilldownProps = {
   topics: readonly { id: string; title: string }[];
@@ -34,10 +32,12 @@ const STATUS_CARDS: readonly { status: HomeworkNumberStatus; label: 'green' | 'y
 ];
 
 /**
- * «Срез по теме и ученику» (06 §1.6.a item 6, §3.12, §4.6): one student's statuses in one topic, loaded
- * on demand for the selected pair — the pickers, two shares, the bar by status with the three counts and
- * the sentence «Сейчас». A tablet puts the pickers next to the numbers. The "homework" options are
- * inferred from equal deadlines.
+ * «Срез по теме и ученику» (06 §1.6.a item 6, §3.12, §4.6; text diet §1a): one student's statuses in one
+ * topic, loaded on demand for the selected pair — three pickers without captions (their values name
+ * them), «решено/всего», the bar by status and the three counts next to their colour dots. The site's
+ * second share («Отмечено вообще») is the bar itself, and its sentence «Сейчас» is read out with the bar,
+ * not drawn; a failed load is the one line of text. A tablet puts the pickers next to the numbers. The
+ * "homework" options are inferred from equal deadlines.
  */
 export function Drilldown({ topics, students }: DrilldownProps) {
   const styles = useStyles();
@@ -118,7 +118,8 @@ export function Drilldown({ topics, students }: DrilldownProps) {
           testID="stats-drilldown-student"
         />
         <Select
-          label={t.homework}
+          accessibilityLabel={t.homework}
+          sheetTitle={t.homework}
           options={[
             { value: WHOLE_TOPIC, label: t.wholeTopic },
             ...options.map((option) => ({ value: option.id, label: `${option.label} · ${option.deadlineLabel}` })),
@@ -133,36 +134,49 @@ export function Drilldown({ topics, students }: DrilldownProps) {
       </View>
 
       <View style={styles.numbers}>
-        <ProgressRow row={{ label: t.solvedInTopic, value: `${metrics.solvedCount} / ${metrics.totalNumbers}`, percent: metrics.solvedPercent }} />
-        <ProgressRow row={{ label: t.markedAtAll, value: `${metrics.markedCount} / ${metrics.totalNumbers}`, percent: metrics.markedPercent }} />
+        <View style={styles.head}>
+          <Text variant="small" color="textMuted" style={styles.headLabel}>
+            {t.solvedInTopic}
+          </Text>
+          {loading ? <Spinner /> : null}
+          <Text
+            variant="cardTitle"
+            tabular
+            accessibilityLabel={`${t.solvedInTopic}: ${metrics.solvedCount} / ${metrics.totalNumbers}. ${t.markedAtAll}: ${metrics.markedCount} / ${metrics.totalNumbers}`}
+            testID="stats-drilldown-solved"
+          >
+            {format(m.common.numbers.doneOf, { done: metrics.solvedCount, total: metrics.totalNumbers })}
+          </Text>
+        </View>
 
-        {/* Status data: the one place of the block where the status colours belong. */}
+        {/* Status data: the one place of the block where the status colours belong. The site's sentence
+            «Сейчас» is said with the bar it sums up. */}
         <StatusBar
           counts={{ green: metrics.greenCount, yellow: metrics.yellowCount, red: metrics.redCount, none: metrics.unmarkedCount }}
-          accessibilityLabel={STATUS_CARDS.map((card) => `${t[card.label]}: ${metrics[card.count]}`).join(', ')}
+          accessibilityLabel={`${STATUS_CARDS.map((card) => `${t[card.label]}: ${metrics[card.count]}`).join(', ')}. ${insight}`}
         />
         <View style={styles.statuses}>
           {STATUS_CARDS.map((card) => (
-            <Card
+            <View
               key={card.status}
-              style={styles.status}
+              accessible
               accessibilityLabel={`${t[card.label]}: ${metrics[card.count]}`}
+              style={styles.status}
               testID={`stats-drilldown-${card.label}`}
             >
-              <View style={styles.statusHead}>
-                <View style={[styles.dot, { backgroundColor: theme.status[card.status].solid }]} />
-                <Text variant="small" color="textMuted" numberOfLines={1} style={styles.statusLabel}>
-                  {t[card.label]}
-                </Text>
-              </View>
-              <Text variant="metric" tabular>
+              <View style={[styles.dot, { backgroundColor: theme.status[card.status].solid }]} />
+              <Text variant="bodyStrong" tabular>
                 {metrics[card.count]}
               </Text>
-            </Card>
+            </View>
           ))}
         </View>
 
-        <InsightBox caption={t.now} text={insight} testID="stats-drilldown-insight" />
+        {loadError ? (
+          <Text variant="small" color="redText" accessibilityRole="alert" testID="stats-drilldown-error">
+            {loadError}
+          </Text>
+        ) : null}
 
         {/* SPEC-GAP: the site has no retry here (changing a select refetches); a phone needs an explicit one. */}
         {loadError ? (
@@ -187,13 +201,12 @@ export function Drilldown({ topics, students }: DrilldownProps) {
 const useStyles = makeStyles((t) => ({
   root: t.tablet ? { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.xl } : { gap: t.space.lg },
   pickers: { gap: t.space.md, ...(t.tablet ? { flex: 2, minWidth: 0 } : null) },
-  numbers: { gap: t.space.lg, ...(t.tablet ? { flex: 3, minWidth: 0 } : null) },
+  numbers: { gap: t.space.md, ...(t.tablet ? { flex: 3, minWidth: 0 } : null) },
   notEnough: { paddingVertical: t.space.lg },
-  statuses: { flexDirection: 'row', gap: t.space.sm },
-  // Narrow side paddings: three boxes share a 320 pt phone, and «Зелёные» / «Красные» must stay whole.
-  status: { flex: 1, minWidth: 0, gap: t.space.xxs, paddingHorizontal: t.space.md },
-  statusHead: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-  statusLabel: { flexShrink: 1 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  headLabel: { flex: 1, minWidth: 0 },
+  statuses: { flexDirection: 'row', gap: t.space.xl },
+  status: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
   dot: { width: t.space.sm, height: t.space.sm, borderRadius: t.radii.full },
   retry: { alignItems: 'flex-start', gap: t.space.xs },
 }));

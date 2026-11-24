@@ -19,7 +19,6 @@ import {
 } from '../logic';
 import { Columns } from '../parts/columns';
 import { Drilldown } from '../parts/drilldown';
-import { InsightBox } from '../parts/insight-box';
 import { MetricGrid } from '../parts/metric-card';
 import { PickerField } from '../parts/picker-field';
 import { RankingCard } from '../parts/ranking-card';
@@ -36,9 +35,11 @@ export type ProgressViewProps = {
 };
 
 /**
- * View «Прогресс учеников» (06 §1.6.a; layout: mockup D-stats): the summary figures, then cards — the
- * progress timeline, how the issued homework is solved, the rankings by student and by topic, and the
- * per-student slice of one topic. A tablet puts the cards two in a row.
+ * View «Прогресс учеников» (06 §1.6.a; layout: mockup D-stats; text diet §1a): the summary figures, then
+ * cards — the progress timeline, how the issued homework is solved, the rankings by student and by topic,
+ * and the per-student slice of one topic. A card is a short title and its chart or rows: the site's notes,
+ * legend descriptions and «Ключевой вывод» are read out by a screen reader, not drawn. A tablet puts the
+ * cards two in a row.
  */
 export function ProgressView({ data, filterPending, onTimelineStudentChange }: ProgressViewProps) {
   const styles = useStyles();
@@ -50,15 +51,18 @@ export function ProgressView({ data, filterPending, onTimelineStudentChange }: P
   const segments = issuedSegments(homework, t);
   const students = studentRankings(overview, t);
   const topics = topicRankings(overview, t);
+  const segmentsSpoken = segments
+    .map((segment) => format(m.stats.chart.segmentValue, { label: segment.label, value: segment.value, percent: segment.percent }))
+    .join(', ');
 
   return (
     <View style={styles.view} testID="stats-view-teacher">
-      <MetricGrid cards={progressMetricCards(homework, t)} />
+      <MetricGrid cards={progressMetricCards(homework, t)} captions={{ solvedOfIssued: m.stats.short.solved }} />
 
       <Columns weights={[3, 2]}>
         <StatsCard title={t.progressDynamics}>
           <PickerField
-            label={dict.students.timelineFilter.label}
+            label={dict.students.timelineFilter.aria}
             options={[
               { value: ALL_STUDENTS, label: dict.students.timelineFilter.all },
               ...overview.students.map((student) => ({ value: student.id, label: student.name })),
@@ -68,42 +72,34 @@ export function ProgressView({ data, filterPending, onTimelineStudentChange }: P
             disabled={filterPending}
             testID="stats-timeline-student"
           />
-          <TimelineChart entries={data.timeline} selectedStudentName={timelineStudent?.name ?? null} />
+          <TimelineChart entries={data.timeline} />
         </StatsCard>
 
-        <StatsCard title={t.howIssuedSolved}>
+        <StatsCard title={m.stats.short.issued} titleAccessibilityLabel={t.howIssuedSolved}>
           <DonutChart
             segments={segments}
             total={homework.issuedNumbersTotal}
             centerValue={`${issuedSolvedPercent(homework)}%`}
             centerLabel={t.solved}
-            accessibilityLabel={segments
-              .map((segment) => format(m.stats.chart.segmentValue, { label: segment.label, value: segment.value, percent: segment.percent }))
-              .join(', ')}
+            // The conclusion the site prints under the chart is said with it.
+            accessibilityLabel={`${segmentsSpoken}. ${issuedInsight(homework, t)}`}
           />
-          <View>
-            {segments.map((segment, index) => (
-              <LegendRow key={segment.key} segment={segment} divider={index > 0} />
+          <View style={styles.legend}>
+            {segments.map((segment) => (
+              <LegendItem key={segment.key} segment={segment} />
             ))}
           </View>
-          <InsightBox caption={t.keyInsight} text={issuedInsight(homework, t)} testID="stats-issued-insight" />
         </StatsCard>
       </Columns>
 
       <Columns>
-        <RankingCard
-          title={t.mostEngaged}
-          subtitle={t.byStudents}
-          emptyMessage={t.mostEngagedEmpty}
-          items={students.engaged}
-          testID="stats-ranking-engaged"
-        />
-        <RankingCard title={t.needReview} subtitle={t.byStudents} emptyMessage={t.needReviewEmpty} items={students.review} testID="stats-ranking-review" />
+        <RankingCard title={t.mostEngaged} emptyMessage={t.mostEngagedEmpty} items={students.engaged} testID="stats-ranking-engaged" />
+        <RankingCard title={t.needReview} emptyMessage={t.needReviewEmpty} items={students.review} testID="stats-ranking-review" />
       </Columns>
 
       <Columns>
-        <RankingCard title={t.bestMastery} subtitle={t.byTopics} emptyMessage={t.bestMasteryEmpty} items={topics.mastery} testID="stats-ranking-mastery" />
-        <RankingCard title={t.helpOften} subtitle={t.byTopics} emptyMessage={t.helpOftenEmpty} items={topics.help} testID="stats-ranking-help" />
+        <RankingCard title={t.bestMastery} emptyMessage={t.bestMasteryEmpty} items={topics.mastery} testID="stats-ranking-mastery" />
+        <RankingCard title={t.helpOften} emptyMessage={t.helpOftenEmpty} items={topics.help} testID="stats-ranking-help" />
       </Columns>
 
       <StatsCard title={t.drilldownTitle}>
@@ -116,27 +112,27 @@ export function ProgressView({ data, filterPending, onTimelineStudentChange }: P
   );
 }
 
-/** A segment of the donut as a row: the status dot, the name with its note, and «value · percent» as a plain fact. */
-function LegendRow({ segment, divider }: { segment: DistributionSegment; divider: boolean }) {
+/**
+ * A segment of the donut in the legend: the status dot, one word and the count. The site's description
+ * («Уверенно решены») and the share are read out, not drawn.
+ */
+function LegendItem({ segment }: { segment: DistributionSegment }) {
   const styles = useStyles();
   const theme = useTheme();
   const { m } = useI18n();
   return (
     <View
-      style={[styles.legendRow, divider ? styles.divider : null]}
+      style={styles.legendItem}
       accessible
       accessibilityLabel={`${format(m.stats.chart.segmentValue, { label: segment.label, value: segment.value, percent: segment.percent })}. ${segment.note}`}
       testID={`stats-segment-${segment.key}`}
     >
       <View style={[styles.dot, { backgroundColor: segmentColor(segment.key, theme) }]} />
-      <View style={styles.legendText}>
-        <Text variant="bodyStrong">{segment.label}</Text>
-        <Text variant="small" color="textMuted">
-          {segment.note}
-        </Text>
-      </View>
-      <Text variant="small" color="textMuted" tabular>
-        {`${segment.value} · ${segment.percent}%`}
+      <Text variant="small" color="textMuted" numberOfLines={1} style={styles.legendLabel}>
+        {segment.label}
+      </Text>
+      <Text variant="bodyStrong" tabular>
+        {segment.value}
       </Text>
     </View>
   );
@@ -144,8 +140,9 @@ function LegendRow({ segment, divider }: { segment: DistributionSegment; divider
 
 const useStyles = makeStyles((t) => ({
   view: { gap: t.space.block },
-  legendRow: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
-  divider: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.rowBorder },
-  dot: { width: t.space.md, height: t.space.md, borderRadius: t.radii.full },
-  legendText: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  // Two columns of «dot · word · count»: the four statuses take two short lines under the donut.
+  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: t.space.xl, rowGap: t.space.xs },
+  legendItem: { flexBasis: '40%', flexGrow: 1, minWidth: 0, minHeight: t.sizes.control.xs, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  legendLabel: { flex: 1, minWidth: 0 },
+  dot: { width: t.space.sm, height: t.space.sm, borderRadius: t.radii.full },
 }));

@@ -9,7 +9,6 @@ import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
 import { format, plural, useI18n } from '@/i18n';
 import { useAppNavigation, useStillHere } from '@/navigation';
-import { useHintsEnabled } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Button, Card, Checkbox, DateTimeField, Notice, Panel, Panels, Screen, SectionCaption, Select, Text, TextArea, useStatusAnnouncement } from '@/ui';
 
@@ -30,7 +29,9 @@ export type DraftFormProps = {
 /**
  * The homework-draft create form (`TeacherHomeworkPlanCreateForm`, docs/spec/05-teacher-lessons-plans.md
  * §1.6): exactly one topic, the date of the next lesson (it becomes the deadline), minutes per day, a note
- * for AI in one card, the students in another. There is no title field. Submitting — the one main button:
+ * for AI in one card, the students in another. There is no title field. Every field has one name and no
+ * helper line (docs/design/glass-over-paper.md §1a): the volume the AI gets is a formula next to the
+ * minutes, the note's counter appears when the limit is near. Submitting — the one main button:
  * under the form on a phone, in the header on a tablet, where the two cards stand side by side — creates
  * the draft and opens its board for EVERY `plan` outcome: the draft exists even when AI selection was
  * refused.
@@ -44,7 +45,6 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
   const stillHere = useStillHere();
   const { dict, m, locale } = useI18n();
   const t = dict.planner.homeworkPlans.createForm;
-  const hints = useHintsEnabled();
   const dateTimeLabels = useDateTimeLabels();
   const scrollRef = useRef<ScrollViewInstance>(null);
 
@@ -128,26 +128,25 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
           setPickedTopicId(next);
           if (problem === 'pickTopic') setProblem(null);
         }}
-        placeholder={dict.topics.widgets.selectPlaceholder}
+        placeholder=""
         closeLabel={m.common.actions.close}
         error={problem === 'pickTopic' ? t.pickTopic : null}
-        helper={hints ? t.topicHint : undefined}
         testID="draft-new-topic"
       />
 
       <DateTimeField
-        label={t.nextLessonLabel}
+        // The zone is said where a time is entered: it is part of the field's one name.
+        label={`${t.nextLessonLabel}, ${m.common.dateTime.msk}`}
         value={deadlineAt}
         onChange={(next) => {
           setDeadlineAt(next);
           if (problem === 'pickDeadline' && next) setProblem(null);
         }}
         today={mskToday()}
-        placeholder={t.dateTimePlaceholder}
+        placeholder=""
         labels={dateTimeLabels}
         locale={locale}
         error={problem === 'pickDeadline' ? t.pickDeadline : null}
-        helper={hints ? `${t.nextLessonHint} · ${m.common.dateTime.moscowTime}` : m.common.dateTime.moscowTime}
         disabled={create.isPending}
         testID="draft-new-deadline"
       />
@@ -155,28 +154,28 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
       <View style={styles.field}>
         <Text variant="label">{t.dailyMinutesLabel}</Text>
         {/* Same range and step as a lesson's duration: 15…240 minutes in steps of 5. */}
-        <DurationStepper value={dailyMinutes} onChange={setDailyMinutes} accessibilityLabel={t.dailyMinutesLabel} testID="draft-new-daily-minutes" />
-        {budget ? (
-          <Text variant="small" color="textMuted" tabular testID="draft-new-budget">
-            {format(plural(locale, budget.days, m.planner.draftNew.budgetForms), { minutes: budget.minutes, total: budget.total })}
-          </Text>
-        ) : hints ? (
-          <Text variant="small" color="textMuted">
-            {t.dailyMinutesHint}
-          </Text>
-        ) : null}
+        <View style={styles.minutes}>
+          <DurationStepper value={dailyMinutes} onChange={setDailyMinutes} accessibilityLabel={t.dailyMinutesLabel} testID="draft-new-daily-minutes" />
+          {/* «× 5 дней = 300 мин»: the volume the AI is given, once a deadline in the future is picked. */}
+          {budget ? (
+            <Text variant="small" color="textMuted" tabular numberOfLines={2} style={styles.budget} testID="draft-new-budget">
+              {format(plural(locale, budget.days, m.planner.draftNew.budgetForms), { total: budget.total })}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
       <TextArea
         label={t.noteLabel}
         labelAside={
-          <Text variant="small" color="textMuted" tabular>
-            {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
-          </Text>
+          teacherNote.length >= META_LIMITS.maxTeacherNoteLength * COUNTER_FROM ? (
+            <Text variant="small" color="textMuted" tabular>
+              {`${teacherNote.length} / ${META_LIMITS.maxTeacherNoteLength}`}
+            </Text>
+          ) : undefined
         }
         value={teacherNote}
         onChangeText={setTeacherNote}
-        placeholder={t.notePlaceholder}
         maxLength={META_LIMITS.maxTeacherNoteLength}
         testID="draft-new-note"
       />
@@ -251,9 +250,14 @@ export function DraftForm({ form, header, top }: DraftFormProps) {
   );
 }
 
+/** Share of a text limit from which its counter is shown. */
+const COUNTER_FROM = 0.8;
+
 const useStyles = makeStyles((t) => ({
   fields: { gap: t.space.lg },
   field: { gap: t.space.xs },
+  minutes: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  budget: { flex: 1, minWidth: 0 },
   section: { gap: t.space.xs },
   students: { gap: t.space.xs },
   // The same rows as in the lesson form: a check box and a name, 44 high.

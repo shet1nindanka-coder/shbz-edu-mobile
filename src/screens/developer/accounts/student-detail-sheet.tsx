@@ -5,7 +5,7 @@ import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { useLatched } from '@/screens/teacher/students';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, CopyRow, Select, Text } from '@/ui';
+import { BottomSheet, Button, CopyRow, Select, Text, useStatusAnnouncement } from '@/ui';
 
 import { teacherOptions } from './accounts-logic';
 
@@ -32,7 +32,9 @@ export type StudentDetailSheetProps = {
 /**
  * Detail sheet of one student row (docs/spec/04-teacher-students.md S9b; layout: docs/design/
  * glass-over-paper.md §7 "a row that needs actions"): the login to copy, the owner picker ("move") and the
- * site's two row buttons — reset password, delete.
+ * site's two row buttons — reset password, delete. The warning of a student nobody owns is written here in
+ * full (the row shows two words of it). An unsaved pick needs no sentence: «Готово» appears, and the save
+ * bar is under the sheet.
  */
 export function StudentDetailSheet({
   student,
@@ -51,6 +53,8 @@ export function StudentDetailSheet({
   const copy = dict.topics.widgets.copy;
   const shown = useLatched(student);
   const hasTeachers = teachers.length > 0;
+  // «Изменено — не забудьте сохранить.» is not drawn (the save bar says it): a screen reader still hears it.
+  useStatusAnnouncement(student !== null && dirty ? t.dirty : null);
 
   return (
     <BottomSheet
@@ -89,11 +93,6 @@ export function StudentDetailSheet({
               disabled={!hasTeachers || saving}
               testID="student-detail-owner"
             />
-            {dirty ? (
-              <Text variant="small" color="accentSolid" accessibilityLiveRegion="polite" testID="student-detail-dirty">
-                {t.dirty}
-              </Text>
-            ) : null}
             <Hint>
               <Text variant="small" color="textMuted">
                 {m.accounts.owner.saveHint}

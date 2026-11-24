@@ -9,9 +9,10 @@ import { ProgressBar, Text } from '@/ui';
 import type { BudgetRow } from './logic';
 
 /**
- * «Бюджеты ИИ на сегодня» (90-addendum-3 §10.2): the three bucket counters that really decide a refusal —
- * a name, «used из limit» and a bar each. The counter is plain text; it turns red only when the budget is
- * used up. The caller puts the block into a card or a panel.
+ * «Бюджеты ИИ» (90-addendum-3 §10.2; text diet §1a): the three bucket counters that really decide a
+ * refusal — a name, a bar and «used/limit» each. The counter is plain text; it turns red — without a word —
+ * when the budget is used up. When the counters reset is the one hint of the block. The caller puts the
+ * block into a card or a panel.
  */
 export function BudgetsBlock({ budgets }: { budgets: readonly BudgetRow[] }) {
   const styles = useStyles();
@@ -34,7 +35,7 @@ export function BudgetsBlock({ budgets }: { budgets: readonly BudgetRow[] }) {
       </View>
       {budgets.map((budget) => {
         const name = t.budgetScopes[budget.key];
-        const used = format(t.budgetUsed, { used: budget.used, limit: budget.limit });
+        const used = format(m.common.numbers.doneOf, { done: budget.used, total: budget.limit });
         return (
           <View
             key={budget.key}
@@ -48,7 +49,7 @@ export function BudgetsBlock({ budgets }: { budgets: readonly BudgetRow[] }) {
                 {name}
               </Text>
               <Text variant="small" tabular numberOfLines={1} color={budget.state === 'out' ? 'redText' : 'textMuted'} style={styles.value}>
-                {budget.state === 'out' ? `${used} · ${t.budgetOut}` : used}
+                {used}
               </Text>
             </View>
             <ProgressBar value={budget.percent} />

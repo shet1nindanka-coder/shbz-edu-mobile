@@ -26,7 +26,7 @@ export function GroupNotices({ state }: { state: GroupDetailState }) {
       {createdNotice === 'created' ? (
         <Notice
           tone="success"
-          text={t.notices.created}
+          text={m.groups.notices.created}
           onDismiss={state.dismissCreated}
           dismissLabel={m.common.actions.close}
           testID="group-notice-created"
@@ -55,8 +55,9 @@ export function hasGroupNotices(state: GroupDetailState): boolean {
 }
 
 /**
- * What a teacher does with a group: «Составить урок» — the screen's one gradient button — and «Выдать ДЗ
- * группе». A role that cannot open one of them does not get its button.
+ * What a teacher does with a group: «Составить урок» — the screen's one gradient button — and «Выдать ДЗ»
+ * (the site's «… группе» is its spoken name: the screen is the group). A role that cannot open one of
+ * them does not get its button.
  */
 export function GroupActions({ groupId, stretch = false }: { groupId: string; stretch?: boolean }) {
   const styles = useStyles();
@@ -80,7 +81,8 @@ export function GroupActions({ groupId, stretch = false }: { groupId: string; st
       ) : null}
       {canIssue ? (
         <Button
-          label={t.issueHomework}
+          label={dict.students.assign.assign}
+          accessibilityLabel={t.issueHomework}
           variant="outline"
           onPress={() => navigation.open(homeworkLink)}
           style={stretch ? styles.action : null}

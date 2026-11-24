@@ -16,8 +16,9 @@ type ExamKind = 'ege' | 'oge';
 
 /**
  * `student.info` — «Баллы» (docs/spec/02-student-study.md S5): the points per task and the raw → scaled
- * table for the EGE (profile maths), the points per task and the grade ranges for the OGE. Fully static:
- * the tables and texts are bundled, nothing is requested. The chosen exam is not remembered.
+ * table for the EGE (profile maths), the points per task and the grade ranges for the OGE — figures under
+ * a two-word title each, the site's sentences left to screen readers. Fully static: the tables and texts
+ * are bundled, nothing is requested. The chosen exam is not remembered.
  *
  * A tablet has it in the dock («инфа»); a phone opens it from the profile, so its "back" leads there.
  */
@@ -61,7 +62,7 @@ export function StudentInfoScreen() {
       <Enter key={exam} duration={180} style={theme.tablet ? styles.fill : undefined}>
         {exam === 'ege' ? (
           <Panels testID="exam-panel-ege">
-            <ExamSection title={t.tasksTitle} testID="exam-section-tasks">
+            <ExamSection title={m.student.info.tasksTitle} testID="exam-section-tasks">
               <TaskScoringList items={getEgeProfileTasks(t)} />
             </ExamSection>
             <ExamSection title={t.scaleTitle} testID="exam-section-scale">
@@ -70,7 +71,7 @@ export function StudentInfoScreen() {
           </Panels>
         ) : (
           <Panels testID="exam-panel-oge">
-            <ExamSection title={t.tasksTitle} testID="exam-section-tasks">
+            <ExamSection title={m.student.info.tasksTitle} testID="exam-section-tasks">
               <TaskScoringList items={getOgeTasks(t)} />
             </ExamSection>
             <ExamSection title={t.gradesTitle} testID="exam-section-grades">

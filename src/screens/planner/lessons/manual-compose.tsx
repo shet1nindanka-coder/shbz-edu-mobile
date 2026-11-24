@@ -8,10 +8,9 @@ import type { ComposeBoardTopic } from '@/api/types';
 import { META_LIMITS } from '@/api/types/limits';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
-import { format, plural, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
+import { format, useI18n } from '@/i18n';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, DateTimeField, EmptyState, Notice, Screen, Select, Spinner, Text, TextButton } from '@/ui';
+import { Button, Card, DateTimeField, EmptyState, IconButton, Notice, Screen, Select, Spinner, accessibilityLabelOf } from '@/ui';
 
 import { useDateTimeLabels } from '@/components/date-time';
 import { DurationStepper } from './duration-stepper';
@@ -31,8 +30,9 @@ export type ManualComposeProps = {
 /**
  * Manual composition of an individual lesson (`TeacherLessonComposeBoard`,
  * docs/spec/05-teacher-lessons-plans.md §1.2.e): numbers of one topic are ticked in the order they will
- * have in the lesson; duration, start, «Выбрано: n» and the one main button stay in the bottom bar. A tablet
- * lays the numbers out in two columns.
+ * have in the lesson; duration, start and the one main button — «Составить · 3», the count of ticked
+ * numbers on it, with a cross that clears the ticks next to it — stay in the bottom bar. A tablet lays the
+ * numbers out in two columns.
  */
 export function ManualCompose({ studentId, topics, header, top }: ManualComposeProps) {
   const styles = useStyles();
@@ -64,10 +64,8 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
     retry: false,
   });
 
-  const topicOptions = useMemo(
-    () => topics.map((entry) => ({ value: entry.id, label: format(plural(locale, entry.totalNumbers, t.topicOptionForms), { title: entry.title }) })),
-    [topics, locale, t.topicOptionForms],
-  );
+  // The topic's name only: how many numbers it has is the list under the select.
+  const topicOptions = useMemo(() => topics.map((entry) => ({ value: entry.id, label: entry.title })), [topics]);
 
   const submit = () => {
     if (selectedIds.length === 0) {
@@ -88,7 +86,8 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
       {top}
       <Card style={styles.topicCard}>
         <Select
-          label={dict.planner.common.topic}
+          accessibilityLabel={dict.planner.common.topic}
+          sheetTitle={dict.planner.common.topic}
           options={topicOptions}
           value={topicId}
           onChange={(next) => {
@@ -97,21 +96,13 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
             setSelectedIds([]);
             setError(null);
           }}
-          placeholder={dict.topics.widgets.selectPlaceholder}
+          placeholder={dict.planner.common.topic}
           closeLabel={m.common.actions.close}
           testID="lesson-compose-topic"
         />
-        <Hint>
-          <Text variant="small" color="textMuted">
-            {m.planner.lessonNew.composeSteps}
-          </Text>
-        </Hint>
         {needsStatements && statements.isFetching ? (
-          <View accessibilityRole="progressbar" accessibilityLabel={m.planner.lessonNew.statementsLoading} style={styles.loading}>
+          <View accessible accessibilityRole="progressbar" accessibilityLabel={m.planner.lessonNew.statementsLoading} style={styles.loading}>
             <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
-            <Text variant="small" color="textMuted">
-              {m.planner.lessonNew.statementsLoading}
-            </Text>
           </View>
         ) : null}
       </Card>
@@ -157,9 +148,10 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
                 onChange={setStartsAt}
                 today={mskToday()}
                 // The compact trigger shares its row with the stepper: «Lesson date and time» does not fit
-                // there at 390 pt, so the trigger shows the short site label and is announced by the full one.
-                placeholder={dict.planner.homeworkPlans.createForm.dateTimePlaceholder}
-                accessibilityLabel={t.dateTimePlaceholder}
+                // there at 390 pt, so the trigger shows the short site label — with the zone, said where a
+                // time is entered — and is announced by the full one.
+                placeholder={`${dict.planner.homeworkPlans.createForm.dateTimePlaceholder}, ${m.common.dateTime.msk}`}
+                accessibilityLabel={`${t.dateTimePlaceholder}, ${m.common.dateTime.msk}`}
                 labels={dateTimeLabels}
                 locale={locale}
                 testID="lesson-compose-starts-at"
@@ -167,12 +159,19 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
               />
             </View>
             <View style={styles.footerRow}>
-              {/* A plain fact, not a label: how many numbers the lesson will have. */}
-              <Text variant="bodyStrong" color="textMuted" tabular style={styles.selected} testID="lesson-compose-selected">
-                {format(t.selected, { n: selectedIds.length })}
-              </Text>
+              {selectedIds.length > 0 ? (
+                <IconButton icon="close" accessibilityLabel={t.clearSelection} onPress={() => setSelectedIds([])} testID="lesson-compose-clear" />
+              ) : null}
               <Button
-                label={create.isPending ? t.composing : t.compose}
+                // How many numbers the lesson will have is on its button.
+                label={
+                  create.isPending
+                    ? t.composing
+                    : selectedIds.length > 0
+                      ? format(m.planner.lessonNew.composeCount, { n: selectedIds.length })
+                      : m.planner.lessonsList.compose
+                }
+                accessibilityLabel={create.isPending ? t.composing : accessibilityLabelOf([t.compose, format(t.selected, { n: selectedIds.length })])}
                 loading={create.isPending}
                 disabled={selectedIds.length === 0 || wait.waiting}
                 onPress={submit}
@@ -180,13 +179,6 @@ export function ManualCompose({ studentId, topics, header, top }: ManualComposeP
                 style={styles.footerSubmit}
               />
             </View>
-          </View>
-          <View style={styles.footerNotes}>
-            {/* The compact trigger has no helper line of its own; the other start pickers name the zone too. */}
-            <Text variant="small" color="textMuted" testID="lesson-compose-time-zone">
-              {m.common.dateTime.moscowTime}
-            </Text>
-            {selectedIds.length > 0 ? <TextButton label={t.clearSelection} tone="muted" onPress={() => setSelectedIds([])} testID="lesson-compose-clear" /> : null}
           </View>
         </View>
       }
@@ -216,14 +208,12 @@ const useStyles = makeStyles((t) => ({
   listContent: { paddingHorizontal: t.space.gutter - t.space.xxs, paddingBottom: t.space.lg },
   header: { gap: t.space.block, paddingBottom: t.space.block, paddingHorizontal: t.space.xxs },
   topicCard: { gap: t.space.md },
-  loading: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+  loading: { alignSelf: 'flex-start' },
   item: { flex: 1, paddingBottom: t.space.block, paddingHorizontal: t.space.xxs },
   footer: { gap: t.space.xs },
   // Phone: the controls in two rows; tablet: all four in one.
   footerRows: t.tablet ? { flexDirection: 'row', alignItems: 'center', gap: t.space.lg } : { gap: t.space.xs },
   footerRow: { flex: t.tablet ? 1 : undefined, flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   footerDate: { flex: 1, minWidth: 0 },
-  selected: { flex: 1, minWidth: 0 },
   footerSubmit: { flex: 1 },
-  footerNotes: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md, minHeight: t.sizes.icon.lg },
 }));

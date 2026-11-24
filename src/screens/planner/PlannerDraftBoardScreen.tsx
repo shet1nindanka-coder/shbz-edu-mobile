@@ -7,10 +7,8 @@ import { ActionSheet, type SheetAction } from '@/components/action-sheet';
 import { planRequestedAtOf, useHandout } from '@/components/lessons';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { RetryWaitLine } from '@/components/retry-wait';
-import { formatDateTime } from '@/domain/dates';
-import { format, plural, useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
-import { Hint } from '@/providers';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
@@ -20,6 +18,7 @@ import {
   Card,
   Dialog,
   IconButton,
+  IconTile,
   ListCard,
   ListRow,
   LoadingState,
@@ -37,7 +36,7 @@ import { DraftBoardNotices } from './drafts/draft-board-notices';
 import { DraftParticipantActions } from './drafts/draft-participant-actions';
 import { DraftParticipantDetail } from './drafts/draft-participant-detail';
 import { DraftParticipantRow } from './drafts/draft-participant-row';
-import { draftCreatedAt } from './drafts/drafts-logic';
+import { draftCreatedAt, draftDeadlineCaption } from './drafts/drafts-logic';
 import { useDraftBoard } from './drafts/use-draft-board';
 import { useDraftCaptionText } from './drafts/use-draft-caption';
 import { planStateOf } from './shared/plan-state';
@@ -51,7 +50,8 @@ export type PlannerDraftBoardScreenProps = ScreenParams['planner.draftBoard'];
  * students of a homework draft as rows, and one student's set — the numbers the AI selected, edited,
  * rebuilt and assigned — in a sheet on a phone, in the panel next to the list on a tablet (a draft for one
  * student shows it right on the page). «Выдать всем» is the main button of the header; the answer sheet
- * and "delete" sit behind "⋯".
+ * and "delete" sit behind "⋯". One caption says what the draft is about — the topic and the deadline;
+ * nothing is explained in sentences (docs/design/glass-over-paper.md §1a).
  */
 export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps) {
   const styles = useStyles();
@@ -120,14 +120,17 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
   const sourceLink = sourceLesson ? ({ screen: 'planner.lessonBoard', lessonId: sourceLesson.id } as const) : null;
   const canOpenSource = sourceLink !== null && navigation.canOpen(sourceLink);
 
-  // The site's kicker (topic · group) and the deadline line, with «выдано 1 из 4» once somebody has it.
-  const kicker = accessibilityLabelOf([plan.topicTitle, plan.group?.name], ' · ');
-  const deadlineLabel =
-    plan.deadlineAt && plan.daysUntilDeadline !== null
-      ? format(plural(locale, plan.daysUntilDeadline, detail.deadlineForms), { date: formatDateTime(plan.deadlineAt, locale) })
-      : detail.noDeadline;
-  const issuedLabel = controller.issuedCount > 0 ? format(t.issuedOf, { issued: controller.issuedCount, total: participants.length }) : null;
-  const facts = accessibilityLabelOf([deadlineLabel, issuedLabel], ' · ');
+  // The one caption of the board: the topic (unless the title names it) and the deadline, worded like a
+  // homework row's — «Логарифмические уравнения · до пятницы». Who has the homework is the rows' check marks.
+  const deadline = draftDeadlineCaption(
+    { deadlineAt: plan.deadlineAt, issuedCount: controller.issuedCount, participantsCount: participants.length },
+    now,
+    locale,
+    m.common.deadline,
+  );
+  const topic = plan.topicTitle && !plan.title.includes(plan.topicTitle) ? plan.topicTitle : null;
+  // On a tablet the group is the title of the list panel, right above this line.
+  const kicker = accessibilityLabelOf([topic, theme.tablet ? null : plan.group?.name, deadline.text], ' · ');
 
   const views = new Map(
     participants.map((participant) => {
@@ -221,31 +224,26 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
     );
   });
 
-  // A transition to the lesson the homework reinforces: a navigation row, not a button.
+  // A transition to the lesson the homework reinforces: a navigation row with the lesson's own title; «По
+  // итогам занятия …» is its accessible name.
   const sourceRow =
     sourceLesson && sourceLink && canOpenSource ? (
       <ListRow
-        title={format(detail.afterLesson, { title: sourceLesson.title })}
+        left={<IconTile icon="presentation" tone="quiet" />}
+        title={sourceLesson.title}
         titleLines={2}
         chevron
         divider={false}
         onPress={() => navigation.open(sourceLink)}
+        accessibilityLabel={format(detail.afterLesson, { title: sourceLesson.title })}
         testID="draft-source-lesson"
       />
     ) : null;
 
-  const issueHint = (
-    <Hint>
-      <Text variant="small" color="textMuted" style={styles.hint}>
-        {m.planner.draftBoard.issueHint}
-      </Text>
-    </Hint>
-  );
-
   const menuActions: SheetAction[] = [
     {
       key: 'answers',
-      label: t.answersPdf,
+      label: m.planner.handout.answersTitle,
       icon: 'check',
       disabled: handout.wait.waiting,
       // A draft has no printable handout — only the answer sheet.
@@ -253,7 +251,7 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
     },
     {
       key: 'delete',
-      label: t.delete,
+      label: dict.planner.lessonDelete.label,
       icon: 'trash',
       tone: 'danger',
       disabled: controller.waits.draft.waiting,
@@ -318,17 +316,13 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
             header={
               <View style={styles.panelHead}>
                 <Text variant="sectionTitle" accessibilityRole="header">
-                  {format(dict.planner.groups.membersManager.participants, { n: participants.length })}
+                  {plan.group?.name ?? dict.planner.groups.detail.participants}
                 </Text>
-                <Text variant="small" color="textMuted" testID="draft-board-kicker">
+                <Text variant="small" color={deadline.attention ? 'redText' : 'textMuted'} tabular testID="draft-board-kicker">
                   {kicker}
-                </Text>
-                <Text variant="small" color="textMuted" tabular testID="draft-board-deadline">
-                  {facts}
                 </Text>
               </View>
             }
-            footer={<View style={styles.panelFoot}>{issueHint}</View>}
           >
             {rows}
             {sourceRow ? <View style={styles.sourceInPanel}>{sourceRow}</View> : null}
@@ -350,12 +344,7 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
       ) : (
         <>
           <View style={styles.section}>
-            <View>
-              <SectionCaption testID="draft-board-kicker">{kicker}</SectionCaption>
-              <Text variant="small" color="textMuted" tabular style={styles.facts} testID="draft-board-deadline">
-                {facts}
-              </Text>
-            </View>
+            <SectionCaption testID="draft-board-kicker">{kicker}</SectionCaption>
             {single && participants[0] ? (
               // A draft for one student: no list to pick from, the set is right on the page.
               <Card style={styles.singleCard}>
@@ -370,7 +359,6 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
             )}
           </View>
           {sourceRow ? <ListCard>{sourceRow}</ListCard> : null}
-          {issueHint}
         </>
       )}
 
@@ -396,8 +384,6 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
 
       <DraftAddSheet
         visible={addParticipant !== null}
-        studentName={addParticipant?.studentName ?? ''}
-        topicTitle={plan.topicTitle}
         topicNumbers={plan.topicNumbers}
         existingIds={addParticipant?.items.map((item) => item.homeworkNumberId) ?? []}
         onClose={() => setAddFor(null)}
@@ -413,7 +399,6 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
 
       <Dialog
         visible={deleting}
-        kicker={confirm.kicker}
         title={t.deleteTitle}
         description={t.deleteDescription}
         confirmLabel={confirm.confirm}
@@ -430,12 +415,9 @@ export function PlannerDraftBoardScreen({ planId }: PlannerDraftBoardScreenProps
 
 const useStyles = makeStyles((t) => ({
   section: { gap: t.space.xs },
-  facts: { paddingHorizontal: t.space.xxs },
-  hint: { paddingHorizontal: t.space.xxs },
   singleCard: { gap: t.space.md },
-  // The rows bring their own padding; the head and the foot of the list panel line up with them.
+  // The rows bring their own padding; the head of the list panel lines up with them.
   panelHead: { gap: t.space.xxs, paddingHorizontal: t.space.card, paddingTop: t.space.card },
-  panelFoot: { paddingHorizontal: t.space.card, paddingBottom: t.space.card },
   listPanel: { gap: 0, paddingTop: t.space.xs, paddingBottom: t.space.sm },
   sourceInPanel: { borderTopWidth: t.borders.hairline, borderTopColor: t.colors.line },
 }));

@@ -9,7 +9,11 @@ export type GradeListProps = {
   items: readonly GradeRow[];
 };
 
-/** «Оценка по первичным»: one row per grade — the grade, its condition when there is one, and the raw-score range on the right. */
+/**
+ * «Оценка по первичным»: one row per grade — the grade as a figure, the raw-score range on the right, and
+ * under the grade the one condition the exam attaches to it (geometry points for a «3»). «Оценка 5,
+ * 22–31 баллов» is what a screen reader hears.
+ */
 export function GradeList({ items }: GradeListProps) {
   const styles = useStyles();
   const { dict } = useI18n();
@@ -17,17 +21,25 @@ export function GradeList({ items }: GradeListProps) {
   return (
     <View>
       {items.map((item, index) => (
-        <View key={item.grade} style={[styles.row, index < items.length - 1 ? styles.divider : null]} testID={`exam-grade-${item.grade}`}>
+        <View
+          key={item.grade}
+          accessible
+          accessibilityLabel={[`${format(t.grade, { grade: item.grade })}, ${item.range} ${t.points}`, item.note].filter(Boolean).join(', ')}
+          style={[styles.row, index < items.length - 1 ? styles.divider : null]}
+          testID={`exam-grade-${item.grade}`}
+        >
           <View style={styles.texts}>
-            <Text variant="bodyStrong">{format(t.grade, { grade: item.grade })}</Text>
+            <Text variant="sectionTitle" tabular>
+              {item.grade}
+            </Text>
             {item.note ? (
               <Text variant="small" color="textMuted">
                 {item.note}
               </Text>
             ) : null}
           </View>
-          <Text variant="small" color="textMuted" tabular>
-            {item.range} {t.points}
+          <Text variant="bodyStrong" tabular>
+            {item.range}
           </Text>
         </View>
       ))}
@@ -36,7 +48,7 @@ export function GradeList({ items }: GradeListProps) {
 }
 
 const useStyles = makeStyles((t) => ({
-  row: { minHeight: t.sizes.row, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
+  row: { minHeight: t.sizes.control.lg, flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.sm },
   divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.line },
   texts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
 }));

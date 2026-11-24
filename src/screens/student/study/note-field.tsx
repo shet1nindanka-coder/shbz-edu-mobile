@@ -2,7 +2,6 @@ import { View } from 'react-native';
 
 import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Notice, Text, TextArea, TextButton } from '@/ui';
 
@@ -21,7 +20,8 @@ export type NoteFieldProps = {
 
 /**
  * The student's personal note (02 S3, §4.7): a two-line sticker, 240 characters at most, saved by itself —
- * on a typing pause, on blur and when the screen goes away. Clearing the text deletes the note.
+ * on a typing pause, on blur and when the screen goes away. Clearing the text deletes the note. The field
+ * has one name («Заметка») and the save state beside it; no placeholder and no explanation under it.
  * Mount it with `key={homeworkNumberId}`: the draft belongs to one problem.
  */
 export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: NoteFieldProps) {
@@ -76,15 +76,9 @@ export function NoteField({ homeworkNumberId, number, serverNote, onFocus }: Not
         onFocus={onFocus}
         maxLength={NOTE_MAX_LENGTH}
         numberOfLines={2}
-        placeholder={t.notePlaceholder}
         accessibilityLabel={format(t.noteAria, { number })}
         testID="number-note-input"
       />
-      {editor.status === 'queued' || editor.status === 'retrying' ? (
-        <Hint>
-          <Text variant="hint">{editor.status === 'queued' ? m.student.note.queuedHint : m.student.note.retryingHint}</Text>
-        </Hint>
-      ) : null}
     </View>
   );
 }

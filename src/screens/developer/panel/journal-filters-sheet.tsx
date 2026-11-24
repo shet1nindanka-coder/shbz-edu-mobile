@@ -80,7 +80,8 @@ export function JournalFiltersSheet({ visible, filters, actors, onChange, onClos
       footer={
         <View style={styles.footer}>
           <TextButton
-            label={m.developer.journal.resetFilters}
+            label={m.developer.short.reset}
+            accessibilityLabel={m.developer.journal.resetFilters}
             tone="muted"
             disabled={activeFilterCount(filters) === 0 && actionText === ''}
             onPress={() => {
@@ -121,8 +122,6 @@ export function JournalFiltersSheet({ visible, filters, actors, onChange, onClos
           value={actionText}
           onChangeText={setActionText}
           maxLength={JOURNAL_ACTION_MAX_LENGTH}
-          // The site's placeholder is this system-name fragment, in both languages.
-          placeholder="lesson_plan"
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}

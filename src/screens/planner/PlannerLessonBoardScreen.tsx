@@ -8,7 +8,6 @@ import { planRequestedAtOf, useHandout } from '@/components/lessons';
 import { LoadFailure, isWaitingForNetwork } from '@/components/load-failure';
 import { ProgressHistorySheet } from '@/components/progress-history';
 import { RetryWaitLine } from '@/components/retry-wait';
-import { formatDateTime } from '@/domain/dates';
 import { format, useI18n } from '@/i18n';
 import { useAppNavigation, type ScreenParams } from '@/navigation';
 import { DetailAppBar, NotFoundScreen } from '@/screens/shell';
@@ -42,6 +41,7 @@ import { ParticipantRow } from './lessons/participant-row';
 import { useLessonBoard } from './lessons/use-lesson-board';
 import { useParticipantCaptionText } from './lessons/use-participant-caption';
 import { planStateOf } from './shared/plan-state';
+import { rowDateTime } from './shared/row-date';
 import { useLatched } from './shared/use-latched';
 
 /** Route params of `planner.lessonBoard` (docs/spec/00-unified-contract.md §3; `ScreenParams` in src/navigation/routes.ts). */
@@ -52,10 +52,11 @@ const REOPEN_MARGIN_MS = 140;
 
 /**
  * `planner.lessonBoard` (docs/spec/05-teacher-lessons-plans.md §1.3, §1.4; layout: mockups `PT-board`,
- * `T-board`): the class as rows — who needs the teacher, who is at what, «2/7» — and one student's numbers
- * with the result buttons: a sheet on a phone, the panel next to the class on a tablet (a lesson for one
- * student shows them right on the page). «Завершить урок» is the dark button; the secondary actions
- * (handout PDF, print version, answers, homework from results, delete) sit behind "⋯" in the header.
+ * `T-board`): the class as rows — a name, «2/7», and a caption only for who needs the teacher — and one
+ * student's numbers with the result buttons: a sheet on a phone, the panel next to the class on a tablet (a
+ * lesson for one student shows them right on the page). «Завершить урок» is the dark button; the secondary
+ * actions (handout, print version, answers, homework from results, delete) sit behind "⋯" in the header.
+ * The board explains nothing in sentences (docs/design/glass-over-paper.md §1a).
  */
 export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenProps) {
   const styles = useStyles();
@@ -137,17 +138,19 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   const sheetMode = !theme.tablet && !single;
 
   // The one caption of the board (the site's page kicker): whose lesson it is and when — or, while it
-  // runs, how long it still lasts.
+  // runs, how long it still lasts. The status is not spelled out: a running lesson counts down and has its
+  // «Завершить урок», an unscheduled one starts with the date field.
   const left = minutesLeft(lesson, now);
-  const duration = format(dict.planner.common.minutesShort, { n: lesson.durationMinutes });
   // On a tablet the group is the title of the class panel, right above this line.
   const groupName = theme.tablet ? null : lesson.group?.name;
-  const kicker = accessibilityLabelOf(
-    isLive
-      ? [groupName, dict.planner.lessonStatus.ACTIVE, left !== null ? format(m.planner.lessonBoard.timeLeft, { n: left }) : duration]
-      : [groupName, formatDateTime(lesson.startsAt ?? lesson.createdAt, locale), duration, dict.planner.lessonStatus[lesson.status]],
-    ' · ',
-  );
+  const when = isLive
+    ? left !== null
+      ? format(m.planner.lessonBoard.timeLeft, { n: left })
+      : dict.planner.lessonStatus.ACTIVE
+    : lesson.startsAt
+      ? rowDateTime(lesson.startsAt, now, locale)
+      : null;
+  const kicker = accessibilityLabelOf([groupName, when], ' · ');
 
   const views = new Map(
     participants.map((participant) => {
@@ -213,8 +216,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
     // Only on the board itself: a teacher who has left it meanwhile (a link of the history) is not followed.
     if (id && focusedRef.current) setOpenId(id);
   };
-
-  const titleOf = (participant: LessonBoardParticipant) => accessibilityLabelOf([participant.studentName, currentOf(participant)?.number], ' · ');
 
   const detailOf = (participant: LessonBoardParticipant, slots: { top?: ReactNode; results?: ReactNode } = {}) => {
     const view = views.get(participant.id);
@@ -304,7 +305,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
   const menuActions: SheetAction[] = [
     {
       key: 'handout',
-      label: m.planner.lessonBoard.handout,
+      label: m.planner.handout.title,
       icon: 'file',
       disabled: handout.wait.waiting,
       onPress: () => handout.open({ lessonId: lesson.id, createdAt: lesson.createdAt }),
@@ -312,27 +313,27 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
     {
       // The HTML handout (the site's «Для печати»): the system prints it or saves it as a PDF.
       key: 'print',
-      label: m.planner.lessonBoard.print,
+      label: t.print,
       icon: 'printer',
       disabled: handout.wait.waiting,
       onPress: () => handout.open({ lessonId: lesson.id, createdAt: lesson.createdAt, format: 'html' }),
     },
     {
       key: 'answers',
-      label: t.answersPdf,
+      label: m.planner.handout.answersTitle,
       icon: 'check',
       disabled: handout.wait.waiting,
       onPress: () => handout.open({ lessonId: lesson.id, createdAt: lesson.createdAt, answers: true }),
     },
     {
       key: 'homework',
-      label: t.issueHomework,
+      label: dict.students.detail.tabAssign,
       icon: 'send',
       onPress: () => navigation.open({ screen: 'planner.draftNew', lessonId: lesson.id }),
     },
     {
       key: 'delete',
-      label: t.delete,
+      label: dict.planner.lessonDelete.label,
       icon: 'trash',
       tone: 'danger',
       disabled: controller.waits.lesson.waiting,
@@ -391,13 +392,13 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
             header={
               <View style={styles.panelHead}>
                 <Text variant="sectionTitle" accessibilityRole="header">
-                  {lesson.group
-                    ? `${lesson.group.name} · ${participants.length}`
-                    : format(dict.planner.groups.membersManager.participants, { n: participants.length })}
+                  {lesson.group?.name ?? dict.planner.groups.detail.participants}
                 </Text>
-                <Text variant="small" color="textMuted" tabular testID="lesson-board-kicker">
-                  {kicker}
-                </Text>
+                {kicker ? (
+                  <Text variant="small" color="textMuted" tabular testID="lesson-board-kicker">
+                    {kicker}
+                  </Text>
+                ) : null}
               </View>
             }
           >
@@ -408,7 +409,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
             header={
               panelParticipant ? (
                 <Text variant="sectionTitle" accessibilityRole="header" numberOfLines={2}>
-                  {titleOf(panelParticipant)}
+                  {panelParticipant.studentName}
                 </Text>
               ) : undefined
             }
@@ -420,12 +421,12 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
       ) : (
         <>
           <View style={styles.section}>
-            <SectionCaption testID="lesson-board-kicker">{kicker}</SectionCaption>
+            {kicker ? <SectionCaption testID="lesson-board-kicker">{kicker}</SectionCaption> : null}
             {single && participants[0] ? (
               // A lesson for one student: no list to pick from, the numbers are right on the page.
               <Card style={styles.singleCard}>
                 <Text variant="sectionTitle" accessibilityRole="header">
-                  {titleOf(participants[0])}
+                  {participants[0].studentName}
                 </Text>
                 {detailOf(participants[0], { results: resultBarOf(participants[0]) })}
               </Card>
@@ -447,7 +448,7 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
             next?.();
           }}
           closeLabel={m.common.actions.close}
-          title={sheetParticipant ? titleOf(sheetParticipant) : undefined}
+          title={sheetParticipant?.studentName}
           footer={sheetParticipant ? resultBarOf(sheetParticipant) : undefined}
           testID="lesson-participant-sheet"
         >
@@ -459,7 +460,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
 
       <ManualAddSheet
         visible={addParticipant !== null}
-        studentName={addParticipant?.studentName ?? ''}
         existingIds={addParticipant?.items.map((item) => item.homeworkNumberId) ?? []}
         onClose={() => setAddFor(null)}
         onClosed={reopenSheet}
@@ -487,10 +487,9 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
       <Dialog
         visible={confirming === 'finish'}
         tone="default"
-        kicker={confirm.kicker}
         title={m.planner.lessonBoard.finishTitle}
         description={m.planner.lessonBoard.finishDescription}
-        confirmLabel={m.planner.lessonBoard.finishConfirm}
+        confirmLabel={t.finish}
         pendingLabel={t.finishing}
         cancelLabel={confirm.cancel}
         pending={controller.finish.isPending}
@@ -501,7 +500,6 @@ export function PlannerLessonBoardScreen({ lessonId }: PlannerLessonBoardScreenP
 
       <Dialog
         visible={confirming === 'delete'}
-        kicker={confirm.kicker}
         title={t.deleteTitle}
         description={t.deleteDescription}
         confirmLabel={confirm.confirm}

@@ -1,5 +1,5 @@
-// Pure decisions of the parent-calls screen (src/screens/calls/logic.ts): the texts of a student row and the
-// paging of the history sheet.
+// Pure decisions of the parent-calls screen (src/screens/calls/logic.ts): the chip, the caption and the
+// spoken texts of a student row, the day of a history entry and the paging of the history sheet.
 /// <reference path="../node_modules/@types/node/assert.d.ts" />
 /// <reference path="../node_modules/@types/node/assert/strict.d.ts" />
 /// <reference path="../node_modules/@types/node/test.d.ts" />
@@ -11,13 +11,14 @@ import { getDictionary } from "@/i18n/get-dictionary";
 import {
   HISTORY_PAGE_SIZE,
   agoLabel,
+  attentionChip,
   callMetaLine,
   callMetaParts,
+  callRowCaption,
   earlierHistoryCursor,
+  historyEntryDay,
   historyEntryTime,
   mergeHistory,
-  reminderChip,
-  summaryLine,
   teacherLine,
 } from "@/screens/calls/logic";
 
@@ -92,14 +93,32 @@ test("teacherLine: a student without a teacher gets a dash", () => {
   assert.equal(teacherLine({ teacherName: null }, en), "Teacher: —");
 });
 
-test("reminderChip: tone and label per state", () => {
-  assert.deepEqual(reminderChip("overdue", ru), { tone: "red", label: "Просрочено" });
-  assert.deepEqual(reminderChip("due", ru), { tone: "yellow", label: "Пора позвонить" });
-  assert.deepEqual(reminderChip("ok", en), { tone: "muted", label: "Called recently" });
+const shortChips = { due: "пора", overdue: "просрочено" };
+
+test("attentionChip: one word for the eye, the site's label for the ear, nothing for a recent call", () => {
+  assert.deepEqual(attentionChip("overdue", ru, shortChips), { tone: "red", label: "просрочено", full: "Просрочено" });
+  assert.deepEqual(attentionChip("due", ru, shortChips), { tone: "yellow", label: "пора", full: "Пора позвонить" });
+  assert.equal(attentionChip("ok", en, shortChips), null);
 });
 
-test("summaryLine: the site's sentence", () => {
-  assert.equal(summaryLine({ overdue: 1, due: 2, total: 7 }, ru), "Просрочено: 1 · Пора позвонить: 2 · Всего учеников: 7");
+test("callRowCaption: the days since the parents were reached, only while a call is due", () => {
+  const due = student({
+    lastReachedAt: "2026-10-25T09:00:00.000Z",
+    reminder: { state: "due", daysSinceAnchor: 30, daysUntilDue: 0, hasReachedCall: true },
+    // The unanswered attempt is not the caption: it is in the history behind the row.
+    attemptAfterLastReached: true,
+    attemptDaysAgo: 3,
+  });
+  assert.equal(callRowCaption(due, ru, "не звонили", false), "30 дн. назад");
+  const never = student({ reminder: { state: "overdue", daysSinceAnchor: 50, daysUntilDue: 0, hasReachedCall: false } });
+  assert.equal(callRowCaption(never, ru, "не звонили", false), "не звонили");
+  assert.equal(callRowCaption(student({ lastReachedAt: "2026-11-05T10:00:00.000Z" }), ru, "не звонили", false), undefined);
+});
+
+test("callRowCaption: a developer reads the owning teacher's name and nothing else", () => {
+  const due = student({ reminder: { state: "due", daysSinceAnchor: 30, daysUntilDue: 0, hasReachedCall: false } });
+  assert.equal(callRowCaption(due, ru, "не звонили", true), "Анна Петрова");
+  assert.equal(callRowCaption(student({ teacherName: null }), ru, "не звонили", true), undefined);
 });
 
 // ───────────────────────────── history ─────────────────────────────
@@ -124,6 +143,12 @@ test("mergeHistory: overview entries, then earlier pages, each call once", () =>
 
 test("mergeHistory: nothing loaded yet", () => {
   assert.deepEqual(mergeHistory([entry("c1")], []).map((item) => item.id), ["c1"]);
+});
+
+test("historyEntryDay: the day alone, with the year only for a call of another year", () => {
+  assert.equal(historyEntryDay(entry("c1"), "2026-11-24T09:00:00.000Z", "ru"), "5 нояб.");
+  assert.equal(historyEntryDay(entry("c1"), "2026-11-24T09:00:00.000Z", "en"), "5 Nov");
+  assert.equal(historyEntryDay(entry("c1"), "2027-01-10T09:00:00.000Z", "ru"), "5 ноября 2026");
 });
 
 test("historyEntryTime: Moscow wall clock", () => {

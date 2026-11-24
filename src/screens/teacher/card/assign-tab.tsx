@@ -10,9 +10,8 @@ import { LoadFailure, loadFailureOf } from '@/components/load-failure';
 import { NumberSelectCard } from '@/components/number-select-card';
 import { RetryWaitLine, useRetryWait } from '@/components/retry-wait';
 import { mskToday } from '@/domain/moscow-time';
-import { format, plural, useI18n } from '@/i18n';
+import { format, useI18n } from '@/i18n';
 import { useAppNavigation, useRefetchOnFocus } from '@/navigation';
-import { Hint } from '@/providers';
 import { usePullRefresh } from '@/services/query';
 import { makeStyles, useTheme } from '@/theme';
 import {
@@ -20,6 +19,7 @@ import {
   Button,
   DateTimeField,
   EmptyState,
+  IconButton,
   LoadingState,
   Notice,
   Select,
@@ -52,8 +52,10 @@ const NO_NUMBERS: readonly AssignNumber[] = [];
 /**
  * `teacher.student.assign` (docs/spec/04-teacher-students.md S5): one homework = numbers of one topic +
  * a deadline + an optional title. The topic is picked in a sheet, the numbers are a list of selectable
- * cards with their statements (two columns on a tablet), and "selected · deadline · assign" stay in a bar
- * under the list.
+ * cards with their statements (two columns on a tablet), and the deadline, the title (a pencil button)
+ * and «Выдать · N» — the button carries the count of selected numbers — stay in a bar under the list.
+ * The site's three-step instruction, the field captions and «Время московское (МСК)» are not shown: the
+ * bar is the instruction (docs/design/glass-over-paper.md §1a).
  */
 export function AssignTab({ studentId, chrome }: AssignTabProps) {
   const styles = useStyles();
@@ -120,7 +122,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
       setSelected([]);
       setDeadline('');
       setTitle('');
-      announce({ tone: 'success', text: t.assigned });
+      announce({ tone: 'success', text: m.teacher.assign.assigned });
       invalidateStudentData(queryClient);
     },
     onError: (error) => {
@@ -160,14 +162,13 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
       {topic && topics ? (
         <>
           <Select
-            label={t.topic}
-            options={topics.map((entry) => ({
-              value: entry.id,
-              label: format(t.topicOption, { title: entry.title, count: plural(locale, entry.totalNumbers, t.numberForms) }),
-            }))}
+            // The value is a topic's title: the field needs no caption; the sheet and screen readers name it.
+            accessibilityLabel={t.topic}
+            sheetTitle={t.topic}
+            options={topics.map((entry) => ({ value: entry.id, label: entry.title }))}
             value={topic.id}
             onChange={changeTopic}
-            placeholder={dict.topics.widgets.selectPlaceholder}
+            placeholder={t.topic}
             closeLabel={m.common.actions.close}
             disabled={issue.isPending}
             testID="assign-topic"
@@ -178,11 +179,6 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
               <TextButton label={t.clearSelection} tone="danger" disabled={issue.isPending} onPress={() => setSelected([])} testID="assign-clear" />
             ) : null}
           </View>
-          <Hint>
-            <Text variant="hint" color="textMuted">
-              {m.teacher.assign.steps}
-            </Text>
-          </Hint>
           {needsConditions && conditions.isError ? (
             <Notice
               tone="warning"
@@ -220,54 +216,50 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
     <LoadingState variant="cards" count={4} cardHeight={120} accessibilityLabel={m.common.a11y.loading} testID="assign-loading" />
   );
 
+  const typedTitle = title.trim();
   const footer = topic ? (
     <View style={styles.bar} testID="assign-bar">
-      <View style={[styles.barRow, styles.barRowTop]}>
-        {/* A neutral fact: plain text, not a chip. It lines up with the field, not with field + helper. */}
-        <View style={styles.selected}>
-          <Text variant="bodyStrong" color={picked.length > 0 ? 'textStrong' : 'textMuted'} tabular testID="assign-selected">
-            {format(t.selected, { n: picked.length })}
-          </Text>
-        </View>
+      <View style={styles.barRow}>
         <DateTimeField
           value={deadline}
           today={mskToday()}
           onChange={setDeadline}
-          placeholder={t.deadlinePlaceholder}
+          // The zone is said where the time is entered, in three letters.
+          placeholder={`${t.deadlinePlaceholder}, ${m.common.dateTime.msk}`}
           labels={dateTimeLabels}
           locale={locale}
-          accessibilityLabel={t.deadlinePlaceholder}
-          // Which zone the deadline is in is not a hint: it stays when hints are off (as on the draft form).
-          helper={m.common.dateTime.moscowTime}
+          accessibilityLabel={`${t.deadlinePlaceholder}. ${m.common.dateTime.moscowTime}`}
           disabled={issue.isPending}
           testID="assign-deadline"
           style={styles.grow}
         />
-      </View>
-      <View style={styles.barRow}>
-        <Button
-          label={title.trim() || m.teacher.assign.titleAction}
-          accessibilityLabel={title.trim() ? format(m.teacher.assign.titleSheetOf, { title: title.trim() }) : m.teacher.assign.titleSheet}
-          variant="outline"
-          size="lg"
-          leftIcon="edit"
+        {/* The optional title: a pencil, lit once a title is typed. */}
+        <IconButton
+          icon="edit"
+          accessibilityLabel={typedTitle ? format(m.teacher.assign.titleSheetOf, { title: typedTitle }) : m.teacher.assign.titleSheet}
+          active={typedTitle !== ''}
           disabled={issue.isPending}
           onPress={() => setTitleOpen(true)}
           testID="assign-title-open"
-          // The cap keeps a long typed title from squeezing «Выдать»; the short default label never needs it,
-          // and capped it was cut to «Назван…» from text size 1.15.
-          style={title.trim() ? styles.titleButton : null}
-        />
-        <Button
-          label={issue.isPending ? t.assigning : t.assign}
-          size="lg"
-          loading={issue.isPending}
-          disabled={!canAssign(picked.length, deadline) || wait.waiting}
-          onPress={submit}
-          testID="assign-submit"
-          style={styles.grow}
         />
       </View>
+      <Button
+        // «Выдать · 3»: the count of selected numbers lives in the button it unlocks.
+        label={
+          issue.isPending
+            ? t.assigning
+            : picked.length > 0
+              ? format(m.common.statuses.groupCount, { label: dict.students.detail.tabAssignShort, n: picked.length })
+              : dict.students.detail.tabAssignShort
+        }
+        accessibilityLabel={issue.isPending ? t.assigning : `${t.assign}. ${format(t.selected, { n: picked.length })}`}
+        size="lg"
+        fullWidth
+        loading={issue.isPending}
+        disabled={!canAssign(picked.length, deadline) || wait.waiting}
+        onPress={submit}
+        testID="assign-submit"
+      />
       {/* Under the locked button, not in the notice: closing the notice or changing the topic keeps the lock. */}
       <RetryWaitLine wait={wait} testID="assign-wait" />
     </View>
@@ -289,7 +281,7 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
               selected={picked.includes(item.id)}
               conditionLatex={item.conditionLatex}
               // The number already sits in a homework with a deadline.
-              footnote={item.deadlineAt !== null ? t.alreadyAssigned : null}
+              footnote={item.deadlineAt !== null ? m.teacher.assign.inHomework : null}
               disabled={issue.isPending}
               onToggle={() => setSelected((current) => toggleSelection(current, item.id))}
               testID={`assign-number-${item.number}`}
@@ -323,21 +315,16 @@ export function AssignTab({ studentId, chrome }: AssignTabProps) {
         testID="assign-title-sheet"
       >
         <View style={styles.sheet}>
+          {/* The sheet's title names the field; an empty title gets «ДЗ N» by itself, so nothing is asked. */}
           <TextField
             value={title}
             onChangeText={setTitle}
-            placeholder={t.titlePlaceholder}
-            accessibilityLabel={m.teacher.assign.titleSheet}
+            accessibilityLabel={t.titlePlaceholder}
             maxLength={ASSIGN_TITLE_MAX}
             returnKeyType="done"
             onSubmitEditing={() => setTitleOpen(false)}
             testID="assign-title-input"
           />
-          <Hint>
-            <Text variant="hint" color="textMuted">
-              {m.teacher.assign.titleHint}
-            </Text>
-          </Hint>
         </View>
       </BottomSheet>
     </CardScreen>
@@ -352,11 +339,7 @@ const useStyles = makeStyles((t) => ({
   itemLeft: { paddingRight: t.space.xs },
   itemRight: { paddingLeft: t.space.xs },
   bar: { gap: t.space.sm },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
-  // The deadline field carries a helper line: the counter lines up with the field, not with field + helper.
-  barRowTop: { alignItems: 'flex-start' },
-  selected: { minHeight: t.sizes.field, justifyContent: 'center' },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   grow: { flex: 1, minWidth: 0 },
-  titleButton: { maxWidth: '45%' },
-  sheet: { gap: t.space.sm },
+  sheet: { paddingBottom: t.space.sm },
 }));

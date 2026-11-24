@@ -44,8 +44,8 @@ type Overlay = 'menu' | 'reset' | 'delete';
 /**
  * The student card: the header with the student's name, the "⋯" menu (the login, PDF reports, reset
  * password, delete student) and the three segments — homework review (default), assigning a homework,
- * lessons. Results of the menu's actions appear as a banner under the header: the site redirects to the
- * students list with a notice, a phone stays where the teacher is.
+ * lessons. Results of the menu's actions appear as a short banner under the header: the site redirects to
+ * the students list with a notice, a phone stays where the teacher is.
  */
 export function TeacherStudentScreen({ studentId, segment, assignmentId }: TeacherStudentScreenProps) {
   const styles = useStyles();
@@ -56,7 +56,6 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
   const focused = useScreenFocused();
   const { dict, m } = useI18n();
   const t = dict.students.detail;
-  const notices = dict.students.list.notices;
 
   const card = useQuery({
     queryKey: qk('teacherStudents', 'getStudentCard', studentId),
@@ -112,17 +111,20 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
   const hasBanners = notice !== null || report.ready !== null || Boolean(report.error) || report.waitSeconds > 0 || card.isError;
 
   const chrome: CardChrome = {
-    header: (
+    header: (actions) => (
       <DetailAppBar
         title={student.name}
         backTitle={m.shell.tabs.students}
         right={
-          <IconButton
-            icon="more"
-            accessibilityLabel={format(m.teacher.students.actionsFor, { name: student.name })}
-            onPress={() => setOverlay('menu')}
-            testID="student-card-menu"
-          />
+          <>
+            {actions}
+            <IconButton
+              icon="more"
+              accessibilityLabel={format(m.teacher.students.actionsFor, { name: student.name })}
+              onPress={() => setOverlay('menu')}
+              testID="student-card-menu"
+            />
+          </>
         }
         aside={
           <Segmented<TeacherStudentSegment>
@@ -169,7 +171,16 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
             announcement={focused ? format(m.teacher.report.ready, { title: report.ready.title }) : null}
             onDismiss={report.dismissReady}
             dismissLabel={m.common.actions.close}
-            action={<Button label={m.teacher.report.open} size="sm" variant="outline" onPress={report.openReady} testID="student-report-ready-open" />}
+            action={
+              <Button
+                label={dict.planner.common.open}
+                accessibilityLabel={m.teacher.report.open}
+                size="sm"
+                variant="outline"
+                onPress={report.openReady}
+                testID="student-report-ready-open"
+              />
+            }
             testID="student-report-ready"
           />
         ) : null}
@@ -230,7 +241,7 @@ export function TeacherStudentScreen({ studentId, segment, assignmentId }: Teach
         onClose={() => setOverlay(null)}
         onDone={() => {
           setOverlay(null);
-          setNotice({ tone: 'success', text: notices.passwordReset });
+          setNotice({ tone: 'success', text: m.teacher.students.passwordChanged });
         }}
         // `404`: the sheet has re-read the card, which now answers "not found" — the shell above takes over.
         onMissing={() => setOverlay(null)}

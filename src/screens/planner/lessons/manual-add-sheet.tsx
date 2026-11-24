@@ -5,14 +5,12 @@ import { View } from 'react-native';
 import { errorText, qk, useApi } from '@/api';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, LoadingState, Notice, Select, Text } from '@/ui';
+import { BottomSheet, Button, LoadingState, Notice, Select } from '@/ui';
 
 import { availableNumbers } from './board-logic';
 
 export type ManualAddSheetProps = {
   visible: boolean;
-  /** Whose set gets the number (shown under the title). */
-  studentName: string;
   /** Numbers already in the participant's set: they are not offered. */
   existingIds: readonly string[];
   onClose: () => void;
@@ -26,9 +24,10 @@ const BANK_STALE_MS = 10 * 60 * 1000;
 
 /**
  * "Add a problem" (`LessonManualAdd`, docs/spec/05-teacher-lessons-plans.md §1.3 item 8): topic → number
- * (only numbers that are not in the set yet) → to the main or to the extra part.
+ * (only numbers that are not in the set yet) → to the main or to the extra part. The two selects carry
+ * their names inside («Тема» is replaced by the chosen topic, «Номер» by the chosen number).
  */
-export function ManualAddSheet({ visible, studentName, existingIds, onClose, onClosed, onAdd }: ManualAddSheetProps) {
+export function ManualAddSheet({ visible, existingIds, onClose, onClosed, onAdd }: ManualAddSheetProps) {
   const styles = useStyles();
   const api = useApi();
   const { dict, m } = useI18n();
@@ -85,29 +84,28 @@ export function ManualAddSheet({ visible, studentName, existingIds, onClose, onC
       testID="lesson-add-sheet"
     >
       <View style={styles.content}>
-        <Text variant="small" color="textMuted">
-          {studentName}
-        </Text>
         {topics ? (
           <>
             <Select
-              label={common.topic}
+              accessibilityLabel={common.topic}
+              sheetTitle={common.topic}
               options={topics.map((entry) => ({ value: entry.topicId, label: entry.topicTitle }))}
               value={topicId}
               onChange={(next) => {
                 setPickedTopicId(next);
                 setNumberId(null);
               }}
-              placeholder={dict.topics.widgets.selectPlaceholder}
+              placeholder={common.topic}
               closeLabel={m.common.actions.close}
               testID="lesson-add-topic"
             />
             <Select
-              label={common.number}
+              accessibilityLabel={common.number}
+              sheetTitle={common.number}
               options={free.map((number) => ({ value: number.id, label: format(common.numberSign, { n: number.number }) }))}
               value={picked}
               onChange={setNumberId}
-              placeholder={topic ? common.pickNumber : m.planner.lessonBoard.numberPlaceholder}
+              placeholder={common.number}
               closeLabel={m.common.actions.close}
               disabled={free.length === 0}
               helper={

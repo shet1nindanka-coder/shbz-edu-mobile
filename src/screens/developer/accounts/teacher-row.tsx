@@ -11,7 +11,7 @@ export type TeacherRowProps = {
   onPress: (teacher: ManagedTeacher) => void;
 };
 
-/** A teacher of the directory: the name and «login · N учеников». */
+/** A teacher of the directory: the name and, on the right, how many students they have. */
 export function TeacherRow({ teacher, divider, onPress }: TeacherRowProps) {
   const { dict, m, locale } = useI18n();
   const t = dict.students.teachersManager;
@@ -20,7 +20,7 @@ export function TeacherRow({ teacher, divider, onPress }: TeacherRowProps) {
   return (
     <AccountRow
       name={teacher.name}
-      caption={`${teacher.email} · ${students}`}
+      meta={String(teacher.studentCount)}
       divider={divider}
       accessibilityLabel={`${teacher.name}. ${t.loginLabel}: ${teacher.email}. ${students}`}
       accessibilityHint={m.accounts.row.teacherActions}

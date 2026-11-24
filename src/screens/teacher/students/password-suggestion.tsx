@@ -1,8 +1,8 @@
 import { View } from 'react-native';
 
 import { useI18n } from '@/i18n';
-import { makeStyles } from '@/theme';
-import { PressableScale, Text, TextButton } from '@/ui';
+import { makeStyles, useTheme } from '@/theme';
+import { Icon, IconButton, PressableScale, Text } from '@/ui';
 
 export type PasswordSuggestionProps = {
   suggestion: string;
@@ -16,41 +16,36 @@ export type PasswordSuggestionProps = {
 
 /**
  * Suggested password (docs/spec/04-teacher-students.md S2a, `PasswordSuggestMenu`). The site floats it as
- * a menu above the field; on a phone it is an inline panel under the field, so the keyboard never covers
- * it and nothing has to be positioned.
+ * a menu above the field; on a phone it is one row under the field, so the keyboard never covers it and
+ * nothing has to be positioned: the key mark and the password — a tap puts it into the field — then
+ * "another one" and "my own" as icon buttons. The site's captions are the accessible names (docs/design/
+ * glass-over-paper.md §1a).
  */
 export function PasswordSuggestion({ suggestion, onPick, onAnother, onCustom }: PasswordSuggestionProps) {
   const styles = useStyles();
-  const { dict, m } = useI18n();
+  const theme = useTheme();
+  const { dict } = useI18n();
   const t = dict.students.passwordSuggest;
 
   return (
     <View style={styles.panel} accessibilityLabel={t.aria} testID="password-suggestion">
-      <Text variant="kicker" color="textMuted" style={styles.title}>
-        {t.title}
-      </Text>
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={`${t.title}: ${suggestion}`}
-        accessibilityHint={m.teacher.students.suggestPickHint}
+        accessibilityHint={t.pickHint}
         onPress={() => onPick(suggestion)}
         scaleTo={1}
         pressedStyle={styles.pressed}
         style={styles.pick}
         testID="password-suggestion-pick"
       >
-        <Text variant="bodyStrong" color="textStrong" selectable={false}>
+        <Icon name="key" size={theme.sizes.icon.sm} color="textMuted" />
+        <Text variant="bodyStrong" color="textStrong" selectable={false} numberOfLines={1} style={styles.value}>
           {suggestion}
         </Text>
-        {/* Part of the suggestion on the site, not a `.ui-hint`: shown whatever the hints preference is. */}
-        <Text variant="small" color="textMuted">
-          {m.teacher.students.suggestPickHint}
-        </Text>
       </PressableScale>
-      <View style={styles.links}>
-        <TextButton label={t.another} onPress={onAnother} testID="password-suggestion-another" />
-        <TextButton label={t.custom} tone="muted" onPress={onCustom} testID="password-suggestion-custom" />
-      </View>
+      <IconButton icon="refresh" variant="ghost" accessibilityLabel={t.another} onPress={onAnother} testID="password-suggestion-another" />
+      <IconButton icon="close" variant="ghost" accessibilityLabel={t.custom} onPress={onCustom} testID="password-suggestion-custom" />
     </View>
   );
 }
@@ -58,27 +53,22 @@ export function PasswordSuggestion({ suggestion, onPick, onAnother, onCustom }: 
 const useStyles = makeStyles((t) => ({
   panel: {
     // A soft panel inside the sheet.
-    borderRadius: t.radii.lg,
-    backgroundColor: t.colors.softBg,
-    paddingHorizontal: t.space.xs,
-    paddingTop: t.space.md,
-    paddingBottom: t.space.md,
-  },
-  title: { paddingHorizontal: t.space.sm },
-  pick: {
-    minHeight: t.sizes.minTouch,
-    justifyContent: 'center',
-    gap: t.space.xxxs,
-    paddingVertical: t.space.xs,
-    paddingHorizontal: t.space.sm,
-    borderRadius: t.radii.md,
-  },
-  pressed: { backgroundColor: t.colors.cardBg },
-  links: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: t.space.md,
-    paddingHorizontal: t.space.sm,
+    borderRadius: t.radii.md,
+    backgroundColor: t.colors.softBg,
+    paddingLeft: t.space.xs,
   },
+  pick: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: t.sizes.minTouch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: t.space.sm,
+    paddingHorizontal: t.space.xs,
+    borderRadius: t.radii.md,
+  },
+  value: { flexShrink: 1 },
+  pressed: { opacity: 0.6 },
 }));

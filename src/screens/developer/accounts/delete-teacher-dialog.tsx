@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { errorText, hasErrorCode, useApi } from '@/api';
 import type { ManagedTeacher } from '@/api/types';
 import { format, plural, useI18n } from '@/i18n';
+import { Hint } from '@/providers';
 import { useLatched } from '@/screens/teacher/students';
 import { makeStyles } from '@/theme';
 import { BottomSheet, Button, Notice, Select, Text } from '@/ui';
@@ -118,10 +119,13 @@ export function DeleteTeacherDialog({ teacher, teachers, onClose, onDeleted, onM
             </Text>
           </View>
 
+          {/* Nothing is lost here, so it is an explanation, not a warning: what IS deleted stays below in red. */}
           {plan.transferredLessons > 0 ? (
-            <Text variant="small" color="textMuted" testID="delete-teacher-lessons-transfer">
-              {format(t.lessonsTransfer, { lessons: plural(locale, plan.transferredLessons, t.lessonForms) })}
-            </Text>
+            <Hint>
+              <Text variant="small" color="textMuted" testID="delete-teacher-lessons-transfer">
+                {format(t.lessonsTransfer, { lessons: plural(locale, plan.transferredLessons, t.lessonForms) })}
+              </Text>
+            </Hint>
           ) : null}
 
           {plan.showCascade ? (

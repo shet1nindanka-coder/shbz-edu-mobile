@@ -6,9 +6,8 @@ import type { Handout } from '@/components/lessons';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { planErrorText } from '@/domain/plan-error';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Button, Notice, Spinner, Text } from '@/ui';
+import { Button, IconButton, Notice, Spinner, Text } from '@/ui';
 
 import { LessonItemRow } from './lesson-item-row';
 import { splitLessonParts, type LessonItem, type LessonPlanState } from './lessons-logic';
@@ -17,7 +16,7 @@ import type { LessonBusy } from './use-student-lessons';
 export type LessonDetailProps = {
   /** The lesson with the in-flight results applied. */
   lesson: TeacherStudentLesson;
-  /** «12.11.2026, 17:00 · 11А · 60 мин · Запланирован»: part of the accessible name of «Открыть занятие». */
+  /** «12.11.2026, 17:00 · 11А · 60 мин · Запланирован»: part of the accessible name of «Открыть». */
   meta: string;
   planState: LessonPlanState;
   busy: LessonBusy | undefined;
@@ -43,8 +42,9 @@ export type LessonDetailProps = {
 
 /**
  * What a lesson of the student holds (docs/spec/04-teacher-students.md S6 "lesson card", expanded): the
- * state of the AI selection, the main and the extra part with the "how did it go" marks, and the actions
- * — the lesson board, adding a problem by hand, a homework from the results, the PDF handout. A phone
+ * state of the AI selection, the main and the extra part with the "how did it go" marks, and one row of
+ * actions — «Открыть» (the lesson board), «Выдать ДЗ» (a homework from the results) and two icon buttons:
+ * add a problem by hand, the PDF handout. The parts are captioned only when there are two of them. A phone
  * shows it inside the unfolded lesson card, a tablet in the panel next to the list.
  */
 export function LessonDetail({
@@ -124,16 +124,12 @@ export function LessonDetail({
 
       {main.length > 0 ? (
         <View>
-          <View style={styles.partHead}>
+          {/* One list needs no caption; with an extra part both are named. */}
+          {extra.length > 0 ? (
             <Text variant="kicker" color="textMuted" accessibilityRole="header">
               {t.mainPart}
             </Text>
-            <Hint>
-              <Text variant="hint" color="textMuted">
-                {t.howSolved}
-              </Text>
-            </Hint>
-          </View>
+          ) : null}
           {renderItems(main)}
         </View>
       ) : null}
@@ -141,15 +137,15 @@ export function LessonDetail({
       {extra.length > 0 ? (
         <View>
           <Text variant="kicker" color="textMuted" accessibilityRole="header">
-            {t.extraPart}
+            {dict.student.lessonView.extraPart}
           </Text>
           {renderItems(extra)}
         </View>
       ) : null}
 
       {lesson.items.length === 0 && !pending ? (
-        <Text variant="small" color="textMuted" testID={`student-lesson-empty-${lesson.id}`}>
-          {t.emptySet}
+        <Text variant="small" color="textMuted" accessibilityLabel={t.emptySet} testID={`student-lesson-empty-${lesson.id}`}>
+          {m.teacher.lessons.emptySet}
         </Text>
       ) : null}
 
@@ -163,40 +159,28 @@ export function LessonDetail({
 
       <View style={styles.actions}>
         <Button
-          label={t.openLesson}
+          label={dict.planner.common.open}
           accessibilityLabel={format(m.teacher.card.openLessonOf, { title: lesson.title, meta })}
           variant="outline"
-          rightIcon="forward"
           onPress={onOpen}
           testID={`student-lesson-open-${lesson.id}`}
           style={styles.action}
         />
         <Button
-          label={t.addNumber}
+          label={dict.students.detail.tabAssign}
+          accessibilityLabel={t.assignFromResults}
           variant="outline"
-          leftIcon="plus"
-          loading={busy === 'items'}
-          disabled={editingPaused}
-          onPress={onAdd}
-          testID={`student-lesson-add-${lesson.id}`}
-          style={styles.action}
-        />
-        <Button
-          label={t.assignFromResults}
-          variant="outline"
-          leftIcon="send"
           onPress={onAssignFromResults}
           testID={`student-lesson-homework-${lesson.id}`}
           style={styles.action}
         />
-        <Button
-          label={t.downloadPdf}
-          variant="outline"
-          leftIcon="download"
+        <IconButton icon="plus" accessibilityLabel={t.addNumber} disabled={editingPaused} onPress={onAdd} testID={`student-lesson-add-${lesson.id}`} />
+        <IconButton
+          icon="download"
+          accessibilityLabel={t.downloadPdf}
           disabled={handout.wait.waiting}
           onPress={onDownloadPdf}
           testID={`student-lesson-pdf-${lesson.id}`}
-          style={styles.action}
         />
       </View>
     </View>
@@ -207,8 +191,7 @@ const useStyles = makeStyles((t) => ({
   body: { gap: t.space.md },
   pending: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm, minHeight: t.sizes.control.xs },
   pendingText: { flex: 1 },
-  partHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: t.space.sm },
-  // Two to a row on a tablet; a phone has no room for two of these labels side by side.
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  action: { flexGrow: 1, flexBasis: t.tablet ? '45%' : '100%' },
+  // One row: the two worded actions share the width, the two icon buttons keep their 44.
+  actions: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  action: { flex: 1, minWidth: 0 },
 }));

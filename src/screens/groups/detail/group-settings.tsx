@@ -5,9 +5,8 @@ import { View } from 'react-native';
 import { errorText, isNotFoundError, qk, useApi } from '@/api';
 import type { GroupDetailResponse } from '@/api/types';
 import { useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { BottomSheet, Button, Dialog, Icon, ListRow, Notice, Text, TextField } from '@/ui';
+import { BottomSheet, Button, Dialog, Icon, ListRow, Notice, TextField } from '@/ui';
 
 import { GROUP_NAME_MAX_LENGTH, normalizeGroupName } from '../logic';
 import { invalidateGroupLists } from '../shared/invalidate';
@@ -31,7 +30,8 @@ type Step = 'rename' | 'delete';
 
 /**
  * «Настройки группы» (06 §1.2 item 8, §3.2, §3.3) behind the app bar's "⋯": rename in a one-field sheet,
- * delete behind a confirmation that spells out the consequences. Grade and subject cannot be edited.
+ * delete behind a confirmation that spells out the consequences. Grade and subject cannot be edited (the
+ * create sheet says so; the rename sheet is one field and its button).
  */
 export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDeleted, onDeleteFailed, onMissing }: GroupSettingsProps) {
   const styles = useStyles();
@@ -196,11 +196,6 @@ export function GroupSettings({ group, menuOpen, onCloseMenu, onRenamed, onDelet
             disabled={rename.isPending}
             testID="group-rename-name"
           />
-          <Hint>
-            <Text variant="hint" color="textMuted">
-              {m.groups.detail.renameHint}
-            </Text>
-          </Hint>
         </View>
       </BottomSheet>
 

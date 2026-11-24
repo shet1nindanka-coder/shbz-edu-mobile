@@ -16,8 +16,8 @@ import { LoadingState, Notice, Screen, Segmented } from '@/ui';
 
 import { ActionsTab } from './panel/actions-tab';
 import { BroadcastTab } from './panel/broadcast-tab';
-import { budgetRows, panelFigures } from './panel/logic';
-import { SettingsSaveActions, SettingsSaveBar, SettingsStatusLine } from './panel/settings-save';
+import { budgetRows, panelFigures, type PanelFigure } from './panel/logic';
+import { SettingsSaveActions, SettingsSaveBar, SettingsStatusLine, useSettingsStatusShown } from './panel/settings-save';
 import { SettingsTab } from './panel/settings-tab';
 import { StatusChips } from './panel/status-chips';
 import { StatusTab } from './panel/status-tab';
@@ -90,10 +90,19 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
 
   const settingsShown = data !== undefined && form !== null && active === 'settings';
   const roomyHeader = window.width >= ROOMY_HEADER_FROM;
+  // The tablet row under the header holds the status line and, on a narrow tablet, the save button; with
+  // neither it would only add an empty gap above the panels.
+  const statusShown = useSettingsStatusShown(form);
+  const statusRowShown = !roomyHeader || statusShown || (form?.waitSeconds ?? 0) > 0;
   const budgets = budgetRows(data?.aiBudgets);
   // A budget that is running out is the one warning of the panel: a soft notice above every tab.
   const strained = budgets.filter((budget) => budget.state !== 'ok');
   const tabStyle = theme.tablet ? styles.tabFill : null;
+  const stripCaptions: Record<PanelFigure['key'], string> = {
+    queue: m.developer.status.tiles.queueShort,
+    ai: m.developer.status.tiles.runs24h,
+    storage: m.developer.status.tiles.storage,
+  };
 
   return (
     <Screen
@@ -147,8 +156,10 @@ export function DeveloperPanelScreen({ tab }: DeveloperPanelScreenProps) {
             <Notice tone="error" text={errorText(panel.error, m.developer.panel.refreshFailed)} testID="panel-refresh-error" />
           ) : null}
           {/* The counters live on «Статус»; the actions change them, so that tab repeats the three main ones. */}
-          {active === 'actions' ? <StatusChips figures={panelFigures(data.stats, data.settings, t)} /> : null}
-          {theme.tablet && active === 'settings' ? (
+          {active === 'actions' ? (
+            <StatusChips figures={panelFigures(data.stats, data.settings, t).map((figure) => ({ ...figure, short: stripCaptions[figure.key] }))} />
+          ) : null}
+          {theme.tablet && active === 'settings' && statusRowShown ? (
             <View style={styles.statusRow}>
               <View style={styles.statusLine}>
                 <SettingsStatusLine form={form} />

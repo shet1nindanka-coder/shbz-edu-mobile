@@ -2,47 +2,49 @@
 // Site texts stay in `dict.planner.*`.
 const ru = {
   lessonBoard: {
-    // replaces `dict.planner.lessonBoard.downloadPdf` («Скачать PDF»): the PDF opens in the file viewer
-    handout: "Раздатка (PDF)",
     // replaces `dict.planner.lessonBoard.print` («Для печати» opens a browser tab): the HTML handout is
     // handed to the system, which prints it or saves it as a PDF
     print: "Версия для печати",
-    // replaces `dict.planner.lessonBoard.hotkeysHint` (no keyboard on a phone)
-    resultHint: "Нажмите на ученика: откроются его номера, там же отмечается итог по каждому.",
     // the one caption of a running lesson: how long it still lasts
     timeLeft: "осталось {n} мин",
     actions: "Действия с уроком",
     // the site finishes without asking; on a touch screen an accidental tap is likelier (05 §7 item 9)
     finishTitle: "Завершить урок?",
-    finishDescription:
-      "Урок закончится для всех учеников. Номерам без отметки итог проставится сам: «не решил» — если ученик сдавал решение, «не успел» — если не сдавал. Отменить завершение нельзя.",
-    finishConfirm: "Да, завершить",
-    noFreeNumbers: "В этой теме все номера уже в наборе.",
+    finishDescription: "Номерам без отметки итог проставится сам. Отменить нельзя.",
+    // the one hint of an unscheduled lesson's board (`dict.planner.lessonBoard.noTime`, cut to a line)
+    noTime: "Без времени урок не начнётся",
+    // the caption of a student who has not opened the running lesson (the site: «ещё не открыл урок»)
+    notJoined: "не вошёл",
+    noTasks: "Задач пока нет",
+    noFreeNumbers: "Все номера уже в наборе",
     // the topic itself is empty (`m.teacher.assign.noNumbers` on the assign tab says the same)
-    noNumbers: "В этой теме пока нет номеров.",
+    noNumbers: "В теме нет номеров",
     bankLoading: "Загружаем банк номеров…",
     bankFailed: "Не удалось загрузить банк номеров.",
-    numberPlaceholder: "Сначала выберите тему",
     // names of a row's controls out of context (explore by touch, the rotor): every row has the same ones
     resultGroupAria: "Итог урока, {number}",
     resultOptionAria: "{result}, {number}",
     historyAria: "История статуса, {number}"
   },
   lessonsList: {
+    // the header button; its full name («Составить занятие») is the site's and stays the spoken one
+    compose: "Составить",
+    empty: "Уроков пока нет",
     openLesson: "Открыть урок «{title}»",
-    // the tablet panel of the selected lesson
-    openBoard: "Открыть доску",
-    resultsOf: "Итоги отмечены: {done} из {total}"
+    // names of the figures in the tablet panel of the selected lesson
+    results: "Итоги",
+    selecting: "Подбор",
+    errors: "Ошибки"
   },
   lessonNew: {
-    searchPlaceholder: "Найти группу или ученика",
+    searchPlaceholder: "Поиск",
     searchAria: "Поиск группы или ученика",
+    noGroups: "Групп пока нет",
+    noStudents: "Учеников пока нет",
     durationDecrease: "Уменьшить на 5 минут",
     durationIncrease: "Увеличить на 5 минут",
-    pickTopics: "Выбрать темы",
-    // replaces `dict.planner.lessonCompose.steps` («Кликните по номерам ниже…»)
-    composeSteps:
-      "1. Отметьте номера касанием · 2. Укажите длительность · 3. Нажмите «Составить занятие». Итоги по каждому номеру отметите на доске занятия.",
+    // the main button of the manual composer once numbers are ticked: «Составить · 3»
+    composeCount: "Составить · {n}",
     statementsLoading: "Загружаем условия…"
   },
   handout: {
@@ -57,53 +59,50 @@ const ru = {
     openDraft: "Открыть черновик «{title}»"
   },
   draftNew: {
-    // the site only names the rule («бюджет = минуты × дни до дедлайна»); the form shows the result
-    budgetForms: [
-      "Бюджет: {minutes} мин × {n} день = {total} мин",
-      "Бюджет: {minutes} мин × {n} дня = {total} мин",
-      "Бюджет: {minutes} мин × {n} дней = {total} мин"
-    ]
+    // the site only names the rule («бюджет = минуты × дни до дедлайна»); the form shows the result next
+    // to the minutes: «× 5 дней = 300 мин»
+    budgetForms: ["× {n} день = {total} мин", "× {n} дня = {total} мин", "× {n} дней = {total} мин"]
   },
   draftBoard: {
     actions: "Действия с черновиком",
-    issueHint: "ДЗ получат ученики, у которых в наборе есть номера. Тем, кому оно уже выдано, повторно не выдаём.",
     numbersAria: "Номера темы, которых ещё нет в наборе"
   }
 };
 
 const en: typeof ru = {
   lessonBoard: {
-    handout: "Handout (PDF)",
     print: "Print version",
-    resultHint: "Tap a student to open their problems and mark the result of each one.",
     timeLeft: "{n} min left",
     actions: "Lesson actions",
     finishTitle: "Finish the lesson?",
-    finishDescription:
-      "The lesson will end for every student. Problems without a mark get a result automatically: “not solved” if the student submitted a solution, “not reached” if not. This cannot be undone.",
-    finishConfirm: "Yes, finish",
-    noFreeNumbers: "Every problem of this topic is already in the set.",
-    noNumbers: "This topic has no problems yet.",
+    finishDescription: "Problems without a mark get a result automatically. This cannot be undone.",
+    noTime: "A lesson without a time never starts",
+    notJoined: "not joined",
+    noTasks: "No problems yet",
+    noFreeNumbers: "Every problem is already in the set",
+    noNumbers: "The topic has no problems",
     bankLoading: "Loading the problem bank…",
     bankFailed: "Could not load the problem bank.",
-    numberPlaceholder: "Pick a topic first",
     resultGroupAria: "Lesson result, {number}",
     resultOptionAria: "{result}, {number}",
     historyAria: "Status history, {number}"
   },
   lessonsList: {
+    compose: "Compose",
+    empty: "No lessons yet",
     openLesson: "Open lesson “{title}”",
-    openBoard: "Open the board",
-    resultsOf: "Results marked: {done} of {total}"
+    results: "Results",
+    selecting: "Selection",
+    errors: "Errors"
   },
   lessonNew: {
-    searchPlaceholder: "Find a group or a student",
+    searchPlaceholder: "Search",
     searchAria: "Search for a group or a student",
+    noGroups: "No groups yet",
+    noStudents: "No students yet",
     durationDecrease: "Decrease by 5 minutes",
     durationIncrease: "Increase by 5 minutes",
-    pickTopics: "Choose topics",
-    composeSteps:
-      "1. Tap the problems below · 2. Set the duration · 3. Press “Compose lesson”. You will mark the result of each problem on the lesson board.",
+    composeCount: "Compose · {n}",
     statementsLoading: "Loading statements…"
   },
   handout: {
@@ -117,11 +116,10 @@ const en: typeof ru = {
     openDraft: "Open draft “{title}”"
   },
   draftNew: {
-    budgetForms: ["Budget: {minutes} min × {n} day = {total} min", "Budget: {minutes} min × {n} days = {total} min"]
+    budgetForms: ["× {n} day = {total} min", "× {n} days = {total} min"]
   },
   draftBoard: {
     actions: "Draft actions",
-    issueHint: "Homework goes to the students whose set has problems. Students who already have it are skipped.",
     numbersAria: "Problems of the topic that are not in the set yet"
   }
 };

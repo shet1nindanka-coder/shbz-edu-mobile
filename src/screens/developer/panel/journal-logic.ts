@@ -1,7 +1,9 @@
 // Pure decisions of the developer journal (docs/spec/07-developer-content.md §1.10): filter state ⇄ query,
 // the texts of a row and paging. No React, no RN — covered by tests/developer-panel-journal.test.ts.
-import type { AuditCategory, JournalEntry, JournalPage, JournalQuery, UserRole } from '@/api/types';
+import type { AuditCategory, JournalEntry, JournalPage, JournalQuery, Locale, UserRole } from '@/api/types';
 import type { Dictionary } from '@/lib/i18n/dictionary';
+
+import { shortDateTime } from './logic';
 
 type JournalDict = Dictionary['planner']['journal'];
 
@@ -83,7 +85,17 @@ export function actorOptionLabel(actor: { name: string; role: UserRole }, roles:
   return `${actor.name} — ${roles[actor.role]}`;
 }
 
-/** The "who" cell: the name snapshot (or a dash), then ` · role` when the role is known. */
+/**
+ * The one caption of a journal row: «Анна Петрова · 17:32» — the name snapshot and a short "when" (the time
+ * alone today, «23 нояб., 19:33» before). A row without an actor is the "when" alone. The role, the year
+ * and the zone mark are in the entry's detail.
+ */
+export function entryCaption(entry: Pick<JournalEntry, 'actorName' | 'createdAt'>, now: number, locale: Locale): string {
+  const when = shortDateTime(entry.createdAt, now, locale, true);
+  return entry.actorName ? `${entry.actorName} · ${when}` : when;
+}
+
+/** The "who" field of the detail: the name snapshot (or a dash), then ` · role` when the role is known. */
 export function whoText(entry: Pick<JournalEntry, 'actorName' | 'actorRole'>, roles: JournalDict['roles']): string {
   const name = entry.actorName ?? '—';
   return entry.actorRole ? `${name} · ${roles[entry.actorRole]}` : name;

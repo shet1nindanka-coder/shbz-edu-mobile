@@ -1,5 +1,5 @@
-// Pure decisions of the groups screens (src/screens/groups/logic.ts): card texts, the add-member search,
-// statistics labels and the attendance matrix helpers.
+// Pure decisions of the groups screens (src/screens/groups/logic.ts): row texts, the add-member search,
+// the figures and labels of the statistics, short dates and the attendance matrix helpers.
 /// <reference path="../node_modules/@types/node/assert.d.ts" />
 /// <reference path="../node_modules/@types/node/assert/strict.d.ts" />
 /// <reference path="../node_modules/@types/node/test.d.ts" />
@@ -13,18 +13,20 @@ import {
   aiNoteForRequest,
   applyAttendanceMark,
   applyPendingMarks,
+  attendanceRatioText,
   attendanceTotalText,
   attentionLabels,
   defaultAttendanceLessonId,
+  groupFigures,
+  groupRowCaption,
   hasActiveLesson,
   isInOtherGroup,
   lessonCells,
   memberAttendanceSummary,
   normalizeGroupName,
   parseGradeInput,
-  speedLabel,
+  shortDateTime,
   suggestCandidates,
-  summaryTiles,
 } from "@/screens/groups/logic";
 
 const ru = getDictionary("ru").planner;
@@ -47,6 +49,11 @@ test("parseGradeInput: empty is no grade, 1..11 is a grade, anything else is ref
   assert.deepEqual(parseGradeInput("8.5"), { ok: false });
   assert.deepEqual(parseGradeInput("-3"), { ok: false });
   assert.deepEqual(parseGradeInput("восемь"), { ok: false });
+});
+
+test("groupRowCaption: the spoken caption of a row — the grade only when it is set", () => {
+  assert.equal(groupRowCaption({ grade: 8 }, "4 ученика", ru.groups.list), "8 класс · 4 ученика");
+  assert.equal(groupRowCaption({ grade: null }, "0 учеников", ru.groups.list), "0 учеников");
 });
 
 // ───────────────────────────── members ─────────────────────────────
@@ -82,9 +89,7 @@ test("isInOtherGroup: only a student of a different group will be moved", () => 
   assert.equal(isInOtherGroup(students[1]!, "g1"), false);
 });
 
-test("speedLabel and aiNoteForRequest", () => {
-  assert.equal(speedLabel(null, ru.groups.memberEditor), "Не указана");
-  assert.equal(speedLabel(8, ru.groups.memberEditor), "8 из 10");
+test("aiNoteForRequest: one line, trimmed, cut at the limit; empty is not set", () => {
   assert.equal(aiNoteForRequest("  теряется\nв длинных   выкладках "), "теряется в длинных выкладках");
   assert.equal(aiNoteForRequest("   "), null);
   assert.equal(aiNoteForRequest("я".repeat(400))?.length, 300);
@@ -139,30 +144,46 @@ function statistics(overrides: Partial<GroupStatisticsResponse> = {}): GroupStat
   };
 }
 
-test("summaryTiles: leaders, group totals and the attention tile", () => {
-  const tiles = summaryTiles(statistics(), ru.groups.statistics);
-  assert.deepEqual(tiles.map((tile) => tile.key), ["mostActive", "leastActive", "closedByGroup", "needsAttention"]);
-  assert.deepEqual(tiles[0], { key: "mostActive", label: "Самый активный", value: "Артём", hint: "5 за 7 дней · 12 за 30" });
-  assert.deepEqual(tiles[1], { key: "leastActive", label: "Меньше всех активности", value: "Кирилл", hint: "0 за 7 дней · 1 за 30" });
-  assert.deepEqual(tiles[2], { key: "closedByGroup", label: "Закрыто группой", value: "5 за 7 дней", hint: "13 за 30 дней · красных 2" });
-  assert.deepEqual(tiles[3], { key: "needsAttention", label: "Нужно внимание", value: "никому", hint: "просроченных ДЗ нет" });
+const attentionTexts = { label: "внимание", aria: "Нужно внимание: {n} из {total}" };
+
+test("groupFigures: four numbers with one-word labels; the site's wording is spoken", () => {
+  const figures = groupFigures(statistics(), ru.groups.statistics, attentionTexts);
+  assert.deepEqual(
+    figures.map((figure) => [figure.key, figure.value, figure.label, figure.alert]),
+    [
+      ["closed7", 5, "за 7 дн.", false],
+      ["closed30", 13, "за 30 дн.", false],
+      ["red30", 2, "красных", false],
+      ["attention", 0, "внимание", false],
+    ],
+  );
+  assert.equal(figures[0]?.spoken, "Закрыто группой: 5 за 7 дней");
+  assert.equal(figures[1]?.spoken, "Закрыто группой: 13 за 30 дн.");
+  assert.equal(figures[2]?.spoken, "2 красных");
+  assert.equal(figures[3]?.spoken, "Нужно внимание: 0 из 2");
 });
 
-test("summaryTiles: no leaders in a group of one; attention counts members, the hint counts homework", () => {
-  const tiles = summaryTiles(
-    statistics({
-      mostActiveId: null,
-      leastActiveId: null,
-      totals: { closed7: 0, closed30: 0, red30: 0, overdueHomeworks: 3, attentionCount: 1 },
-    }),
+test("groupFigures: attention counts members and turns red; overdue homework is spoken with it", () => {
+  const figures = groupFigures(
+    statistics({ totals: { closed7: 0, closed30: 0, red30: 0, overdueHomeworks: 3, attentionCount: 1 } }),
     ru.groups.statistics,
+    attentionTexts,
   );
-  assert.equal(tiles[0]?.value, "—");
-  assert.equal(tiles[0]?.hint, "пока нет активности");
-  assert.equal(tiles[1]?.value, "—");
-  assert.equal(tiles[1]?.hint, undefined);
-  assert.equal(tiles[3]?.value, "1 из 2");
-  assert.equal(tiles[3]?.hint, "просроченных ДЗ: 3");
+  assert.equal(figures[3]?.value, 1);
+  assert.equal(figures[3]?.alert, true);
+  assert.equal(figures[3]?.spoken, "Нужно внимание: 1 из 2, просроченных ДЗ: 3");
+});
+
+// ───────────────────────────── dates ─────────────────────────────
+
+test("shortDateTime: no year inside the current Moscow year, the full date for another one", () => {
+  const now = "2026-11-24T09:00:00.000Z";
+  // 14:00 UTC = 17:00 in Moscow.
+  assert.equal(shortDateTime("2026-11-25T14:00:00.000Z", now, "ru"), "25 нояб., 17:00");
+  assert.equal(shortDateTime("2026-11-25T14:00:00.000Z", now, "en"), "25 Nov, 17:00");
+  assert.equal(shortDateTime("2025-11-25T14:00:00.000Z", now, "ru"), "25.11.2025, 17:00");
+  // 22:30 UTC on 31 December is already the next year in Moscow.
+  assert.equal(shortDateTime("2026-12-31T22:30:00.000Z", now, "ru"), "01.01.2027, 01:30");
 });
 
 // ───────────────────────────── attendance ─────────────────────────────
@@ -206,6 +227,11 @@ test("memberAttendanceSummary: only the lessons the member took part in are coun
   assert.deepEqual(memberAttendanceSummary("s1", attendance.lessons), { counted: 2, attended: 1, late: 0, absent: 1, excused: 0, percent: 50 });
   // Мария took part in no lesson: nothing to count.
   assert.equal(memberAttendanceSummary("s2", attendance.lessons).counted, 0);
+});
+
+test("attendanceRatioText: «attended/counted» through the app's template, a dash for nothing", () => {
+  assert.equal(attendanceRatioText({ counted: 6, attended: 5, late: 1, absent: 1, excused: 0, percent: 83 }, "{done}/{total}"), "5/6");
+  assert.equal(attendanceRatioText({ counted: 0, attended: 0, late: 0, absent: 0, excused: 0, percent: null }, "{done}/{total}"), "—");
 });
 
 test("attendanceTotalText: «attended / counted · percent», no percent when all is excused, a dash for nothing", () => {

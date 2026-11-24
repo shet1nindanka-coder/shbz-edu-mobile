@@ -1,7 +1,7 @@
 /**
  * Pure decisions of the groups screens (docs/spec/06-teacher-groups-calls-stats.md §1.1, §1.2, §4.1 – §4.3):
- * which text a card shows, which students the add-member search offers, how the attendance matrix is laid
- * out and how an optimistic mark is applied. No React, no React Native — unit-tested in
+ * what a row says, which figures stand above the ranking, which students the add-member search offers,
+ * how the attendance matrix is laid out and how an optimistic mark is applied. No React, no React Native — unit-tested in
  * `tests/groups-logic.test.ts`.
  */
 import type {
@@ -17,7 +17,8 @@ import type {
 } from "@/api/types";
 import { LIMITS } from "@/api/types";
 import { summarizeAttendance, type AttendanceSummary } from "@/domain/attendance";
-import { formatShortDate } from "@/domain/dates";
+import { formatClockTime, formatDateTime, formatMsk, formatShortDate } from "@/domain/dates";
+import { mskParts, type DateInput } from "@/domain/moscow-time";
 import { normalizeSingleLineText } from "@/domain/text";
 import { format, type Dictionary } from "@/lib/i18n";
 
@@ -55,8 +56,9 @@ export function parseGradeInput(raw: string): { ok: true; grade: number | null }
 }
 
 /**
- * The one caption of a group row: «8 класс · 4 ученика» — the grade part only when it is set. `students`
- * is the counted word form («4 ученика»), which the caller declines for its locale.
+ * What a group row says to a screen reader after the name: «8 класс · 4 ученика» — the grade part only
+ * when it is set. The eye reads the number of members alone, on the right of the row. `students` is the
+ * counted word form («4 ученика»), which the caller declines for its locale.
  */
 export function groupRowCaption(group: Pick<GroupListItem, "grade">, students: string, t: GroupsDict["list"]): string {
   return group.grade ? `${format(t.grade, { n: group.grade })} · ${students}` : students;
@@ -85,11 +87,6 @@ export function suggestCandidates(
 /** The student is in a different group and will be moved here. */
 export function isInOtherGroup(candidate: GroupCandidate, groupId: string): boolean {
   return candidate.groupId !== null && candidate.groupId !== groupId;
-}
-
-/** «8 из 10» / «Не указана». */
-export function speedLabel(speed: number | null, t: GroupsDict["memberEditor"]): string {
-  return speed === null ? t.speedNotSet : format(t.speedOf, { n: speed });
 }
 
 /** What the AI-profile request carries for the note field: trimmed, empty = not set. */
@@ -132,49 +129,59 @@ export function activityLabel(
   return row.activeHomeworks > 0 ? `${when} · ${format(t.activeHomework, { n: row.activeHomeworks })}` : when;
 }
 
-export type SummaryTile = { key: "mostActive" | "leastActive" | "closedByGroup" | "needsAttention"; label: string; value: string; hint?: string };
+/** A figure above the ranking: the number, its one-word label and what a screen reader says instead. */
+export type GroupFigure = { key: "closed7" | "closed30" | "red30" | "attention"; value: number; label: string; spoken: string; alert: boolean };
 
-/** The four summary tiles above the member list (06 §1.2 item 5). */
-export function summaryTiles(stats: GroupStatisticsResponse, t: GroupsDict["statistics"]): SummaryTile[] {
-  const byId = new Map(stats.members.map((row) => [row.id, row]));
-  const most = stats.mostActiveId ? byId.get(stats.mostActiveId) : undefined;
-  const least = stats.leastActiveId ? byId.get(stats.leastActiveId) : undefined;
+/**
+ * The figures above the ranking (06 §1.2 item 5; docs/design/glass-over-paper.md §1a): what the group
+ * closed in 7 and in 30 days, its red numbers of the month and how many members need attention — each a
+ * number with one word. The site's «самый активный» / «меньше всех активности» boxes are the first and
+ * the last row of the ranking under the figures; its note lines (overdue homework) are spoken, and every
+ * member that needs attention carries the reason in its own row.
+ */
+export function groupFigures(
+  stats: GroupStatisticsResponse,
+  t: GroupsDict["statistics"],
+  attention: { label: string; aria: string },
+): GroupFigure[] {
   const { totals } = stats;
+  const needs = format(attention.aria, { n: totals.attentionCount, total: stats.members.length });
   return [
+    { key: "closed7", value: totals.closed7, label: t.for7, spoken: `${t.closedByGroup}: ${format(t.closedFor7, { n: totals.closed7 })}`, alert: false },
+    { key: "closed30", value: totals.closed30, label: t.for30, spoken: `${t.closedByGroup}: ${totals.closed30} ${t.for30}`, alert: false },
+    { key: "red30", value: totals.red30, label: t.red, spoken: `${totals.red30} ${t.red}`, alert: false },
     {
-      key: "mostActive",
-      label: t.mostActive,
-      value: most ? most.name : "—",
-      hint: most ? format(t.activityHint, { d7: most.closed7, d30: most.closed30 }) : t.noActivity,
-    },
-    {
-      key: "leastActive",
-      label: t.leastActive,
-      value: least ? least.name : "—",
-      hint: least ? format(t.activityHint, { d7: least.closed7, d30: least.closed30 }) : undefined,
-    },
-    {
-      key: "closedByGroup",
-      label: t.closedByGroup,
-      value: format(t.closedFor7, { n: totals.closed7 }),
-      hint: format(t.closedHint, { d30: totals.closed30, red: totals.red30 }),
-    },
-    {
-      key: "needsAttention",
-      label: t.needsAttention,
-      value: totals.attentionCount === 0 ? t.nobody : format(t.ofMembers, { n: totals.attentionCount, total: stats.members.length }),
-      hint: totals.overdueHomeworks > 0 ? format(t.overdueHomework, { n: totals.overdueHomeworks }) : t.noOverdueHomework,
+      key: "attention",
+      value: totals.attentionCount,
+      label: attention.label,
+      spoken: totals.overdueHomeworks > 0 ? `${needs}, ${format(t.overdueHomework, { n: totals.overdueHomeworks })}` : needs,
+      alert: totals.attentionCount > 0,
     },
   ];
+}
+
+// ───────────────────────────── dates ─────────────────────────────
+
+/**
+ * A moment as a row or an option shows it: «25 нояб., 17:00» within the current Moscow year — the year
+ * is noise there — and the full «25.11.2025, 17:00» for any other year.
+ */
+export function shortDateTime(value: string, now: DateInput, locale: Locale): string {
+  if (mskParts(value).year !== mskParts(now).year) return formatDateTime(value, locale);
+  const day = formatMsk(value, "dayMonthShort", locale);
+  return day ? `${day}, ${formatClockTime(value, locale)}` : formatDateTime(value, locale);
 }
 
 // ───────────────────────────── attendance ─────────────────────────────
 
 export type AttendanceCell = { participantId: string; attendance: AttendanceStatus };
 
-/** «5 / 6» — the row total of the table, without the percent (the tiles of the row already show it). */
-export function attendanceRatioText(summary: AttendanceSummary): string {
-  return summary.counted === 0 ? "—" : `${summary.attended} / ${summary.counted}`;
+/**
+ * «5/6» — the row total of the table, without the percent (the tiles of the row already show it).
+ * `doneOf` is the app's «{done}/{total}» template.
+ */
+export function attendanceRatioText(summary: AttendanceSummary, doneOf: string): string {
+  return summary.counted === 0 ? "—" : format(doneOf, { done: summary.attended, total: summary.counted });
 }
 
 /** The cell of every student that took part in the lesson, by student id. */

@@ -47,7 +47,7 @@ export function CalendarDayCell({ cell, selected, accessibilityLabel, onPress }:
       testID={`calendar-day-${cell.key}`}
       style={styles.cell}
     >
-      <View style={[styles.day, selected ? styles.selected : null, cell.isToday ? styles.today : null]}>
+      <View style={[styles.day, selected ? styles.selected : null, cell.isToday ? styles.today : null, selected && cell.isToday ? styles.todaySelected : null]}>
         <Text variant={cell.isToday ? 'bodyBold' : 'bodyStrong'} tabular color={cell.isToday ? 'accentSolid' : 'textStrong'}>
           {cell.day}
         </Text>
@@ -76,6 +76,8 @@ const useStyles = makeStyles((t) => ({
   },
   today: { borderColor: t.colors.accentSolid },
   selected: { backgroundColor: t.colors.soft2 },
+  // Today picked: the disc takes the tint of its ring.
+  todaySelected: { backgroundColor: t.colors.accentSoftStrong },
   dimmed: { opacity: 0.4 },
   pressed: { opacity: 0.6 },
 }));

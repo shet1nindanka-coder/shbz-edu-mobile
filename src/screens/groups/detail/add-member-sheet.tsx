@@ -3,9 +3,8 @@ import { View } from 'react-native';
 
 import type { GroupCandidate } from '@/api/types';
 import { useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { Avatar, BottomSheet, EmptyState, ListRow, Text, TextField } from '@/ui';
+import { Avatar, BottomSheet, EmptyState, ListRow, TextField } from '@/ui';
 
 import { isInOtherGroup, suggestCandidates } from '../logic';
 
@@ -20,8 +19,9 @@ export type AddMemberSheetProps = {
 };
 
 /**
- * Add-member search (06 §1.2 item 4): by name only, first 8 matches, with the «в другой группе — будет
- * переведён сюда» warning. Tapping a row closes the sheet and adds the student.
+ * Add-member search (06 §1.2 item 4): by name only, first 8 matches; a student of another group says so
+ * in the row's one caption (the site's «в другой группе — будет переведён сюда» is its spoken form).
+ * Tapping a row closes the sheet and adds the student.
  */
 export function AddMemberSheet({ visible, groupId, allStudents, onClose, onPick }: AddMemberSheetProps) {
   const styles = useStyles();
@@ -39,14 +39,14 @@ export function AddMemberSheet({ visible, groupId, allStudents, onClose, onPick 
       onClose={onClose}
       onClosed={() => setQuery('')}
       closeLabel={m.common.actions.close}
-      title={t.addAria}
+      title={dict.students.list.addStudent}
       testID="member-add-sheet"
     >
       <View style={styles.content}>
         <TextField
           value={query}
           onChangeText={setQuery}
-          placeholder={m.groups.members.searchPlaceholder}
+          placeholder={dict.students.createForm.name}
           accessibilityLabel={t.addAria}
           autoCorrect={false}
           autoCapitalize="words"
@@ -54,13 +54,7 @@ export function AddMemberSheet({ visible, groupId, allStudents, onClose, onPick 
           autoFocus
           testID="member-add-search"
         />
-        {!searching ? (
-          <Hint>
-            <Text variant="hint" color="textMuted" testID="member-add-prompt">
-              {m.groups.members.searchPrompt}
-            </Text>
-          </Hint>
-        ) : suggestions.length === 0 ? (
+        {!searching ? null : suggestions.length === 0 ? (
           <EmptyState variant="plain" title={dict.planner.common.nobodyFound} testID="member-add-empty" />
         ) : (
           <View accessibilityRole="list">
@@ -71,8 +65,7 @@ export function AddMemberSheet({ visible, groupId, allStudents, onClose, onPick 
                   key={student.id}
                   title={student.name}
                   // The one consequence worth a line: the student leaves the other group at once.
-                  subtitle={moved ? t.inOtherGroup : undefined}
-                  subtitleLines={2}
+                  subtitle={moved ? m.groups.members.fromOtherGroup : undefined}
                   left={<Avatar name={student.name} tone="neutral" />}
                   inset={0}
                   divider={index < suggestions.length - 1}

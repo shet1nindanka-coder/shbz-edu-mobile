@@ -88,11 +88,6 @@ export function callRowCaption(student: ParentCallStudentOverview, t: CallsDict,
   return student.lastReachedAt ? agoLabel(student.reminder.daysSinceAnchor, t) : never;
 }
 
-/** The site's summary line: the spoken name of the list (the eye has the chips of the rows). */
-export function summaryLine(counts: { overdue: number; due: number; total: number }, t: CallsDict): string {
-  return format(t.summary, counts);
-}
-
 // ───────────────────────────── history ─────────────────────────────
 
 /**

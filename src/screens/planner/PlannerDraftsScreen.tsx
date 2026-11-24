@@ -41,7 +41,7 @@ export function PlannerDraftsScreen() {
   const plans = useMemo(() => (data ? sortDrafts(data) : []), [data]);
 
   const { refreshing, refresh } = usePullRefresh([drafts]);
-  // Only decides whether a row's date needs its year.
+  // The deadline captions («до пятницы», «просрочено 2 дня») are counted from it.
   const now = useNowTick(60_000);
 
   const open = (plan: HomeworkPlanListItem) => navigation.open({ screen: 'planner.draftBoard', planId: plan.id });
@@ -73,7 +73,8 @@ export function PlannerDraftsScreen() {
           <LoadingState variant="list" count={5} accessibilityLabel={m.common.a11y.loading} testID="drafts-loading" />
         )
       ) : plans.length === 0 ? (
-        <EmptyState title={t.emptyTitle} hint={t.emptyHint} testID="drafts-empty" />
+        // One line: a draft is started from a lesson board, a group or a student, not here.
+        <EmptyState title={t.emptyTitle} testID="drafts-empty" />
       ) : theme.tablet ? (
         <Panels testID="drafts-list">
           <Panel weight={3} padded={false} contentStyle={styles.listPanel}>
@@ -83,7 +84,7 @@ export function PlannerDraftsScreen() {
             weight={2}
             footer={selected ? <Button label={dict.planner.common.open} rightIcon="forward" fullWidth onPress={() => open(selected)} testID="draft-summary-open" /> : undefined}
           >
-            {selected ? <DraftSummary plan={selected} /> : null}
+            {selected ? <DraftSummary plan={selected} now={now} /> : null}
           </Panel>
         </Panels>
       ) : (

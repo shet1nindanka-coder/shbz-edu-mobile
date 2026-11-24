@@ -30,7 +30,7 @@ export type CallHistoryProps = {
  *
  * The block has no scroller of its own: it lives inside a sheet or a panel that scrolls, and the log
  * grows only by a page per «Показать ещё». It has no caption: the rows — a phone glyph and a day — say
- * what they are; the list's name is spoken.
+ * what they are.
  */
 export function CallHistory({ student, showTeacher }: CallHistoryProps) {
   const styles = useStyles();
@@ -67,7 +67,7 @@ export function CallHistory({ student, showTeacher }: CallHistoryProps) {
 
   return (
     <View style={styles.block}>
-      <View accessibilityRole="list" accessibilityLabel={m.calls.history.title} testID="call-history-list">
+      <View accessibilityRole="list" testID="call-history-list">
         {entries.map((entry, index) => (
           <CallHistoryEntry key={entry.id} entry={entry} now={now} showTeacher={showTeacher} divider={index < entries.length - 1} />
         ))}

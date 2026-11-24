@@ -3,7 +3,6 @@ import { View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Text } from '@/ui';
 
@@ -33,7 +32,8 @@ export type WeekBarsProps = {
  * «Занятия по неделям» (06 §1.6.b; mockup D-stats): twelve rounded columns in the accent gradient, a
  * neutral stub for an empty week, the count above each non-empty one, the week's Monday under every
  * fourth and the last. The site's hover
- * tooltip becomes a selection: the caption under the chart names the chosen week. A column is 27 pt wide
+ * tooltip becomes a selection: the caption between the arrows names the chosen week (nothing is written
+ * there until a week is chosen). A column is 27 pt wide
  * on a phone — too narrow for a touch target of its own — so the whole plot is one target (the week under
  * the finger is selected) and the arrows beside the caption step week by week.
  */
@@ -42,7 +42,7 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
   const theme = useTheme();
   const gradientId = useId();
   const accent = accentStops(theme);
-  const { locale, dict, m } = useI18n();
+  const { locale, dict } = useI18n();
   const t = dict.planner.teacherStats;
   const [width, setWidth] = useState(0);
   // Kept by the week's Monday, not by position: a refetch after a new week began shifts every column.
@@ -138,13 +138,7 @@ export function WeekBars({ counts, weekStarts, testID }: WeekBarsProps) {
           <Text variant="smallStrong" align="center" accessibilityLiveRegion="polite" testID={testID ? `${testID}-selected` : undefined}>
             {weekBarTitle(selectedBar, t, dict.planner.common, locale)}
           </Text>
-        ) : (
-          <Hint>
-            <Text variant="small" color="textMuted" align="center">
-              {m.stats.chart.barHint}
-            </Text>
-          </Hint>
-        )}
+        ) : null}
       </ChartStepper>
     </View>
   );

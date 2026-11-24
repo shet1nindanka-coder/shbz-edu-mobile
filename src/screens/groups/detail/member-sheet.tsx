@@ -4,7 +4,7 @@ import type { GroupMember } from '@/api/types';
 import { statusBreakdown } from '@/components/numbers';
 import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Button, SectionCaption, StatusBar, Text } from '@/ui';
+import { BottomSheet, Button, StatusBar, Text } from '@/ui';
 
 import { MemberAiEditor } from './member-ai-editor';
 
@@ -18,16 +18,17 @@ export type MemberSheetProps = {
   onClose: () => void;
   /** Called when the sheet has left the screen: the place to open the confirmation of a removal. */
   onClosed: () => void;
-  /** «Убрать из группы»: the caller closes the sheet and asks for a confirmation. */
+  /** «Убрать»: the caller closes the sheet and asks for a confirmation. */
   onRemove: (member: GroupMember) => void;
   /** A note sent while the AI-profile editor was closing was refused (see `MemberAiEditor`). */
   onProfileError?: (text: string) => void;
 };
 
 /**
- * What a member row opens (06 §1.2 item 4): the login, the three status counters over the whole bank,
- * the AI profile — speed and note, saved as they are edited — and the way out of the group. Closing the
- * sheet is "leaving the field" for a note that is still being typed (see `MemberAiEditor`).
+ * What a member row opens (06 §1.2 item 4): the login, the bar by status over the whole bank with its
+ * three counts as coloured figures (the words are spoken), the AI profile — speed and note, saved as they
+ * are edited — and the way out of the group. Closing the sheet is "leaving the field" for a note that is
+ * still being typed (see `MemberAiEditor`).
  */
 export function MemberSheet({ groupId, member, visible, busy, onClose, onClosed, onRemove, onProfileError }: MemberSheetProps) {
   const styles = useStyles();
@@ -54,18 +55,27 @@ export function MemberSheet({ groupId, member, visible, busy, onClose, onClosed,
           </Text>
 
           {marked > 0 ? (
-            <View style={styles.progress}>
-              <StatusBar counts={counts} accessibilityLabel={statusBreakdown(counts, m.common.statuses)} />
-              <Text variant="small" color="textMuted" tabular>
-                {statusBreakdown(counts, m.common.statuses)}
-              </Text>
+            <View accessible accessibilityLabel={statusBreakdown(counts, m.common.statuses)} style={styles.progress}>
+              <StatusBar counts={counts} style={styles.bar} />
+              {counts.green > 0 ? (
+                <Text variant="smallStrong" color="greenText" tabular>
+                  {counts.green}
+                </Text>
+              ) : null}
+              {counts.yellow > 0 ? (
+                <Text variant="smallStrong" color="yellowText" tabular>
+                  {counts.yellow}
+                </Text>
+              ) : null}
+              {counts.red > 0 ? (
+                <Text variant="smallStrong" color="redText" tabular>
+                  {counts.red}
+                </Text>
+              ) : null}
             </View>
           ) : null}
 
-          <View style={styles.profile}>
-            <SectionCaption>{m.groups.members.aiProfile}</SectionCaption>
-            <MemberAiEditor groupId={groupId} member={member} onDetachedError={onProfileError} />
-          </View>
+          <MemberAiEditor groupId={groupId} member={member} onDetachedError={onProfileError} />
 
           <Button
             label={m.groups.members.remove}
@@ -83,6 +93,7 @@ export function MemberSheet({ groupId, member, visible, busy, onClose, onClosed,
 
 const useStyles = makeStyles((t) => ({
   content: { gap: t.space.lg },
-  progress: { gap: t.space.xs },
-  profile: { gap: t.space.xs },
+  // The bar takes the line; the counts of its segments stand after it, in their colours.
+  progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
+  bar: { flex: 1, alignSelf: 'center' },
 }));

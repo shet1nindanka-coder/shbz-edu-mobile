@@ -4,8 +4,9 @@ import { View } from 'react-native';
 import type { DerivedLessonStatus, LessonBoardItem, LessonBoardParticipant } from '@/api/types';
 import { useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
-import { Button, Card, Notice, NumberTile, Text, TextButton, accessibilityLabelOf } from '@/ui';
+import { Button, EmptyState, Notice, NumberTile, Text, TextButton, accessibilityLabelOf } from '@/ui';
 
+import { CollapsedText } from '../shared/collapsed-text';
 import type { PlanState } from '../shared/plan-state';
 import { PlanStatusBlock } from '../shared/plan-status-block';
 import { BoardItemCard } from './board-item-card';
@@ -20,7 +21,7 @@ export type ParticipantDetailProps = {
   lessonStatus: DerivedLessonStatus;
   planState: PlanState;
   live: ParticipantLive;
-  /** The same caption the student's row carries: the state line under the title. */
+  /** The student's state: its `detail` is the line under the title (a live fact the sheet shows nowhere else). */
   caption: CaptionText;
   aiAvailable: boolean;
   busy: ParticipantBusy | undefined;
@@ -47,10 +48,11 @@ export type ParticipantDetailProps = {
 
 /**
  * One student of the lesson (docs/spec/05-teacher-lessons-plans.md §1.3 "Participant cards"; layout:
- * mockups `PT-board` — a sheet, `T-board` — the panel next to the class): the state line, the AI-plan state
- * and summary, the grid of the student's number tiles coloured by the lesson result — the main part, then
- * the extra one — and ONE card, of the picked number. "Add a problem" closes the body; the result buttons
- * are the footer of the sheet / panel (`ItemResultBar`).
+ * mockups `PT-board` — a sheet, `T-board` — the panel next to the class): a state line while the lesson
+ * runs («в классе с 17:02», «не вошёл»), the AI-plan state, the AI's summary folded to a line, the grid of
+ * the student's number tiles coloured by the lesson result — the main part, then the extra one — and ONE
+ * card, of the picked number. "Add a problem" closes the body; the result buttons are the footer of the
+ * sheet / panel (`ItemResultBar`).
  */
 export function ParticipantDetail({
   participant,
@@ -101,9 +103,11 @@ export function ParticipantDetail({
     <View style={styles.body} testID={`lesson-participant-${participant.id}`}>
       {top}
 
-      <Text variant="small" color={caption.attention ? 'redText' : 'textMuted'} tabular>
-        {caption.text}
-      </Text>
+      {caption.detail ? (
+        <Text variant="small" color={caption.attention ? 'redText' : 'textMuted'} tabular>
+          {caption.detail}
+        </Text>
+      ) : null}
 
       <PlanStatusBlock
         state={planState}
@@ -116,11 +120,7 @@ export function ParticipantDetail({
         testID={`lesson-plan-${participant.id}`}
       />
 
-      {participant.planSummary ? (
-        <Text variant="small" color="textMuted">
-          {participant.planSummary}
-        </Text>
-      ) : null}
+      {participant.planSummary ? <CollapsedText text={participant.planSummary} testID={`lesson-plan-summary-${participant.id}`} /> : null}
 
       {undoText ? (
         // The board's "undo" toast would sit under a sheet: the removed number is undone right here.
@@ -151,11 +151,7 @@ export function ParticipantDetail({
           ) : null}
         </View>
       ) : !planState.pending ? (
-        <Card dashed>
-          <Text variant="small" color="textMuted">
-            {common.noTasksYet}
-          </Text>
-        </Card>
+        <EmptyState variant="plain" title={m.planner.lessonBoard.noTasks} />
       ) : null}
 
       {current ? (

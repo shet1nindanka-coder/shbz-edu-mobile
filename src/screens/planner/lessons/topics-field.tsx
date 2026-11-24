@@ -3,7 +3,6 @@ import { View } from 'react-native';
 
 import type { TopicOption } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { BottomSheet, Button, EmptyState, Icon, PressableScale, Text, TextField } from '@/ui';
 
@@ -20,7 +19,8 @@ export type TopicsFieldProps = {
 
 /**
  * «Темы занятия» (docs/spec/05-teacher-lessons-plans.md §1.2.d): the site's type-ahead combobox as a
- * searchable multi-select sheet; the selected topics stay under the field as removable chips.
+ * searchable multi-select sheet behind one button that carries the field's name; the selected topics stay
+ * under it as removable chips, which are their own count.
  */
 export function TopicsField({ topics, value, onChange, disabled = false }: TopicsFieldProps) {
   const styles = useStyles();
@@ -35,9 +35,8 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
 
   return (
     <View style={styles.field}>
-      <Text variant="label">{t.topicsLabel}</Text>
       <Button
-        label={m.planner.lessonNew.pickTopics}
+        label={t.topicsLabel}
         variant="outline"
         leftIcon="plus"
         disabled={disabled}
@@ -66,15 +65,6 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
           ))}
         </View>
       ) : null}
-      {selected.length > 0 ? (
-        <Text variant="hint" tabular>
-          {format(t.topicsSelected, { n: selected.length })}
-        </Text>
-      ) : (
-        <Hint>
-          <Text variant="hint">{t.topicsHint}</Text>
-        </Hint>
-      )}
 
       <BottomSheet
         visible={open}
@@ -89,7 +79,7 @@ export function TopicsField({ topics, value, onChange, disabled = false }: Topic
           <TextField
             value={query}
             onChangeText={setQuery}
-            placeholder={t.topicsPlaceholder}
+            placeholder={m.planner.lessonNew.searchPlaceholder}
             accessibilityLabel={t.topicsSearchAria}
             autoCorrect={false}
             returnKeyType="search"

@@ -3,18 +3,18 @@ import { View } from 'react-native';
 
 import type { SolutionVerdict, StudentCheckResultDto } from '@/api/types';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, type ColorToken } from '@/theme';
-import { PressableScale, Text, TextButton } from '@/ui';
+import { Icon, PressableScale, Text, TextButton, type IconName } from '@/ui';
 
 import { recognizedAnswerOf, shortenRecognizedAnswer } from './logic';
 
-/** Only a wrong solution asks for attention; the other verdicts are plain text. */
-const VERDICT_COLOR: Record<SolutionVerdict, ColorToken> = { CORRECT: 'textStrong', INCORRECT: 'redText', UNCERTAIN: 'textStrong' };
+/** The verdict is a glyph on the right of the number; only a wrong solution is drawn in red. */
+const VERDICT_ICON: Record<SolutionVerdict, IconName> = { CORRECT: 'check', INCORRECT: 'close', UNCERTAIN: 'help' };
+const VERDICT_COLOR: Record<SolutionVerdict, ColorToken> = { CORRECT: 'textStrong', INCORRECT: 'redText', UNCERTAIN: 'textMuted' };
 
 export type CheckResultRowProps = {
   result: StudentCheckResultDto;
-  /** «Перерешать № N»: show the card of this problem. */
+  /** «Перерешать»: show the card of this problem. */
   onRedo: (result: StudentCheckResultDto) => void;
   /** Hairline under the row; off on the last one. */
   divider?: boolean;
@@ -22,9 +22,10 @@ export type CheckResultRowProps = {
 
 /**
  * One verdict of a finished check (docs/spec/03-student-homework-lesson.md §1 H2.b "DONE with results"):
- * a row — «051004 · неверно» as its title (red only for a wrong solution), the recognised answer
- * (shortened; a tap shows it in full) and the comment as its caption, and — for a wrong solution — the way
- * to the number's card.
+ * the number and the verdict as a glyph — a check, a red cross, a question mark (the words are the row's
+ * accessible name) — then what the check has to say: the recognised answer (shortened; a tap shows it in
+ * full) and its comment. A wrong solution gets the way to the number's card; an unclear one says in two
+ * words that the teacher will look.
  */
 export function CheckResultRow({ result, onRedo, divider = true }: CheckResultRowProps) {
   const styles = useStyles();
@@ -35,15 +36,26 @@ export function CheckResultRow({ result, onRedo, divider = true }: CheckResultRo
   const answer = recognizedAnswerOf(result);
   const short = answer ? shortenRecognizedAnswer(answer) : null;
   const shortened = answer !== null && short !== answer;
+  const color = VERDICT_COLOR[result.verdict];
 
   return (
     <View style={[styles.row, divider ? styles.divider : null]} testID={`check-result-${result.number}`}>
-      <Text variant="bodyStrong" color={VERDICT_COLOR[result.verdict]} accessibilityLabel={`${format(dict.topics.widgets.numberLabel, { number: result.number })}, ${t.verdicts[result.verdict]}`}>
-        <Text variant="bodyStrong" tabular color={VERDICT_COLOR[result.verdict]}>
+      <View
+        accessible
+        accessibilityLabel={`${format(dict.topics.widgets.numberLabel, { number: result.number })}, ${t.verdicts[result.verdict]}`}
+        style={styles.head}
+      >
+        <Text variant="bodyStrong" tabular color={result.verdict === 'INCORRECT' ? 'redText' : 'textStrong'} style={styles.number}>
           {result.number}
         </Text>
-        {` · ${t.verdicts[result.verdict].toLocaleLowerCase()}`}
-      </Text>
+        <Icon name={VERDICT_ICON[result.verdict]} size={20} color={color} />
+      </View>
+
+      {result.verdict === 'UNCERTAIN' ? (
+        <Text variant="small" color="textMuted">
+          {dict.student.lessonView.verdicts.UNCERTAIN}
+        </Text>
+      ) : null}
 
       {answer ? (
         shortened ? (
@@ -78,14 +90,12 @@ export function CheckResultRow({ result, onRedo, divider = true }: CheckResultRo
       {result.verdict === 'INCORRECT' ? (
         <View style={styles.redo}>
           <TextButton
-            label={format(t.redo, { number: result.number })}
+            label={m.studentWork.check.redo}
+            accessibilityLabel={format(t.redo, { number: result.number })}
             variant="buttonSm"
             onPress={() => onRedo(result)}
             testID={`check-redo-${result.number}`}
           />
-          <Hint>
-            <Text variant="hint">{t.redoHint}</Text>
-          </Hint>
         </View>
       ) : null}
     </View>
@@ -95,6 +105,8 @@ export function CheckResultRow({ result, onRedo, divider = true }: CheckResultRo
 const useStyles = makeStyles((t) => ({
   row: { gap: t.space.xxxs, paddingVertical: t.space.md },
   divider: { borderBottomWidth: t.borders.hairline, borderBottomColor: t.colors.line },
+  head: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  number: { flex: 1, minWidth: 0 },
   answer: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
-  redo: { gap: t.space.xxs, marginTop: t.space.xs, alignItems: 'flex-start' },
+  redo: { marginTop: t.space.xs, alignItems: 'flex-start' },
 }));

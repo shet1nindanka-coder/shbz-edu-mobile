@@ -30,10 +30,11 @@ export type ReviewNumberRowProps = {
 };
 
 /**
- * One number that waits for the teacher (`.row` of the review mockups): the number, ONE caption — what the
- * AI said about it, else the student's note, else the current status — and the three status marks on the
- * right. The texts open the number's sheet (verdict, diagnostics, statement, history); the marks are their
- * sibling, so each has its own touch target.
+ * One number that waits for the teacher (`.row` of the review mockups): the number, ONE word — the AI's
+ * verdict («ошибка» in red), else nothing — and the three status marks on the right; the filled mark is the
+ * current status. What the AI wrote, the student's note and the statement are in the number's sheet, which
+ * the texts open, and in the row's accessibility label (docs/design/glass-over-paper.md §1a). The marks are
+ * the texts' sibling, so each has its own touch target.
  */
 export function ReviewNumberRow({ number, result, saving, blocked, error, divider, sheetOpen, onStatus, onOpen }: ReviewNumberRowProps) {
   const styles = useStyles();
@@ -48,18 +49,20 @@ export function ReviewNumberRow({ number, result, saving, blocked, error, divide
   useStatusAnnouncement(error, !sheetOpen && error !== heard);
   const t = dict.students.review;
   const comment = result?.comment?.trim() ?? '';
-  // What the AI said about the number. A verdict it could not reach leads the line — its comment alone
-  // («Верно.») would read as a verdict.
+  // Spoken: what the AI said about the number. A verdict it could not reach leads the line — its comment
+  // alone («Верно.») would read as a verdict.
   const verdict = result ? t.verdict[result.verdict].chip : '';
   const said = result ? (comment && result.verdict !== 'UNCERTAIN' ? comment : [verdict, comment].filter(Boolean).join(' · ')) : '';
-  const caption = said || number.note.trim() || statusLabel(number.status, m.common.statuses);
+  const spoken = said || number.note.trim() || statusLabel(number.status, m.common.statuses);
+  // Shown: the verdict in one word.
+  const caption = result ? t.verdict[result.verdict].short : '';
 
   return (
     <View style={[styles.row, divider ? styles.divider : null]} testID={`review-number-${number.homeworkNumberId}`}>
       <View style={styles.line}>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`${format(t.number, { n: number.number })}. ${caption}`}
+          accessibilityLabel={`${format(t.number, { n: number.number })}. ${spoken}`}
           accessibilityHint={format(m.teacher.review.showConditionOf, { n: number.number })}
           onPress={onOpen}
           scaleTo={1}
@@ -70,9 +73,11 @@ export function ReviewNumberRow({ number, result, saving, blocked, error, divide
           <Text variant="bodyBold" tabular numberOfLines={1} style={theme.tablet ? styles.numberWide : null}>
             {number.number}
           </Text>
-          <Text variant={theme.tablet ? 'body' : 'small'} color={theme.tablet ? 'textStrong' : 'textMuted'} numberOfLines={1} style={styles.caption}>
-            {caption}
-          </Text>
+          {caption ? (
+            <Text variant="small" color={result?.verdict === 'INCORRECT' ? 'redText' : 'textMuted'} numberOfLines={1} style={styles.caption}>
+              {caption}
+            </Text>
+          ) : null}
         </PressableScale>
         <StatusMarks
           accessibilityLabel={format(m.teacher.review.statusAria, { n: number.number })}

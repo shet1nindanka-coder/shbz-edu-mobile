@@ -20,9 +20,10 @@ export type CreateGroupSheetProps = {
 
 /**
  * "Создать группу" (06 §1.1 item 3, §3.1) as a bottom sheet: name (required, ≤ 120) and an optional
- * grade 1..11, with the submit button in the sheet's footer (the one ending of every form sheet). The
- * subject is not asked — the server defaults it to maths. The form is emptied when the sheet has closed,
- * so a cancelled draft never comes back.
+ * grade 1..11, with the submit button in the sheet's footer (the one ending of every form sheet). Each
+ * field has its label and nothing else; the limits are said when they are broken. The subject is not
+ * asked — the server defaults it to maths. The form is emptied when the sheet has closed, so a cancelled
+ * draft never comes back.
  */
 export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupSheetProps) {
   const styles = useStyles();
@@ -85,7 +86,8 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
       dismissible={!create.isPending}
       footer={
         <Button
-          label={create.isPending ? m.common.states.saving : t.createForm.submit}
+          label={create.isPending ? m.common.states.saving : m.groups.list.create}
+          accessibilityLabel={create.isPending ? m.common.states.saving : t.createForm.submit}
           size="lg"
           fullWidth
           onPress={submit}
@@ -102,7 +104,6 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
           label={t.createForm.nameLabel}
           value={name}
           onChangeText={setName}
-          placeholder={t.createForm.namePlaceholder}
           maxLength={GROUP_NAME_MAX_LENGTH}
           autoCapitalize="sentences"
           returnKeyType="next"
@@ -117,7 +118,6 @@ export function CreateGroupSheet({ visible, onClose, onCreated }: CreateGroupShe
           label={t.createForm.gradeLabel}
           value={grade}
           onChangeText={(text) => setGrade(text.replace(/\D+/g, '').slice(0, 2))}
-          placeholder="—"
           keyboardType="number-pad"
           inputMode="numeric"
           maxLength={2}

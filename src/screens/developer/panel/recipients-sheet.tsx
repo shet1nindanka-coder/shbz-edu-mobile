@@ -52,8 +52,9 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
       contentStyle={styles.shrink}
       footer={
         <View style={styles.footer}>
+          {/* «Выбрано: 2»; with nobody picked there is nothing to say. */}
           <Text variant="small" color="textMuted" style={styles.counter} testID="recipients-sheet-count">
-            {pickedIds.length > 0 ? format(t.picked, { n: pickedIds.length }) : t.nonePicked}
+            {pickedIds.length > 0 ? format(t.picked, { n: pickedIds.length }) : ''}
           </Text>
           <Button label={m.common.actions.done} onPress={onClose} testID="recipients-sheet-done" />
         </View>
@@ -64,7 +65,7 @@ export function RecipientsSheet({ visible, students, pickedIds, onToggle, onClos
         <TextField
           value={query}
           onChangeText={setQuery}
-          placeholder={t.searchPlaceholder}
+          placeholder={t.searchAria}
           accessibilityLabel={t.searchAria}
           autoCorrect={false}
           autoCapitalize="words"

@@ -6,14 +6,16 @@ const ru = {
     teacherActions: "Действия с аккаунтом учителя",
     studentActions: "Учитель, пароль и удаление аккаунта",
     // The mark of a student whose new teacher is picked but not saved yet.
-    changed: "изменено"
+    changed: "изменено",
+    // The red caption of a student nobody owns; the site's whole sentence is in the row's sheet.
+    noOwner: "Без учителя"
   },
   create: {
     // The header button of a phone: «Новый аккаунт» does not fit next to the segments.
-    short: "Новый",
-    onceHint: "После создания логин и пароль будут показаны один раз — скопируйте их и передайте человеку."
+    short: "Новый"
   },
   search: {
+    placeholder: "Поиск",
     clear: "Очистить поиск"
   },
   // Accessible names that start with the visible label («Сменить пароль», «Учитель ученика»), so voice
@@ -25,7 +27,7 @@ const ru = {
   },
   // Owner changes are drafts until saved; the bar with the save button sits at the bottom of the screen.
   owner: {
-    saveHint: "Смена учителя вступит в силу после кнопки «Сохранить изменения» внизу экрана."
+    saveHint: "Смена учителя сохраняется кнопкой внизу экрана."
   }
 };
 
@@ -33,14 +35,15 @@ const en: typeof ru = {
   row: {
     teacherActions: "Teacher account actions",
     studentActions: "Teacher, password and account deletion",
-    changed: "changed"
+    changed: "changed",
+    noOwner: "No teacher"
   },
   create: {
     // Part of the accessible name «New account» (WCAG 2.5.3): voice control finds the button by what it shows.
-    short: "New",
-    onceHint: "Once the account is created, its login and password are shown one time — copy them and pass them on."
+    short: "New"
   },
   search: {
+    placeholder: "Search",
     clear: "Clear search"
   },
   a11y: {
@@ -49,7 +52,7 @@ const en: typeof ru = {
     ownerOf: "Student's teacher: {name}"
   },
   owner: {
-    saveHint: "The teacher changes once you tap “Save changes” at the bottom of the screen."
+    saveHint: "The button at the bottom of the screen saves the new teacher."
   }
 };
 

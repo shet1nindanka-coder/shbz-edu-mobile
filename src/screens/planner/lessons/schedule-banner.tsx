@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { mskToday, parseMskDateTimeInput } from '@/domain/moscow-time';
 import { useI18n } from '@/i18n';
+import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
 import { Button, Card, DateTimeField, Text } from '@/ui';
 
@@ -17,7 +18,8 @@ export type ScheduleBannerProps = {
 
 /**
  * "The lesson has no time" (docs/spec/05-teacher-lessons-plans.md §1.3 banners): an unscheduled lesson
- * never starts and never reaches the students' "Lesson" tab, so the board offers to set its time.
+ * never starts and never reaches the students' "Lesson" tab, so the board offers to set its time — a date
+ * field named «Дата и время урока, МСК» and its button. Why it matters is a hint (off by default).
  */
 export function ScheduleBanner({ pending, disabled, onSchedule }: ScheduleBannerProps) {
   const styles = useStyles();
@@ -26,19 +28,19 @@ export function ScheduleBanner({ pending, disabled, onSchedule }: ScheduleBanner
   const labels = useDateTimeLabels();
   const [value, setValue] = useState('');
   const instant = value ? parseMskDateTimeInput(value) : null;
+  // The one name of the field; the zone is said where a time is entered.
+  const name = `${t.dateTimeAria}, ${m.common.dateTime.msk}`;
 
   return (
     <Card style={styles.card} testID="lesson-schedule-banner">
-      <Text variant="bodyStrong">{t.noTime}</Text>
       <DateTimeField
         value={value}
         onChange={setValue}
         today={mskToday()}
-        placeholder={t.dateTimeAria}
-        accessibilityLabel={t.dateTimeAria}
+        placeholder={name}
+        accessibilityLabel={name}
         labels={labels}
         locale={locale}
-        helper={m.common.dateTime.moscowTime}
         disabled={pending}
         testID="lesson-schedule-value"
       />
@@ -53,6 +55,11 @@ export function ScheduleBanner({ pending, disabled, onSchedule }: ScheduleBanner
         testID="lesson-schedule-submit"
         style={styles.submit}
       />
+      <Hint>
+        <Text variant="small" color="textMuted">
+          {m.planner.lessonBoard.noTime}
+        </Text>
+      </Hint>
     </Card>
   );
 }

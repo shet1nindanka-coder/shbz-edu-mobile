@@ -11,7 +11,7 @@ import type { CaptionText } from './use-participant-caption';
 
 export type ParticipantRowProps = {
   participant: LessonBoardParticipant;
-  /** The one caption of the row: what the student is at. */
+  /** What the student is at: the row draws it only when it asks for the teacher. */
   caption: CaptionText;
   /** The AI plan of this student is being built: the set is not there yet. */
   planPending: boolean;
@@ -22,9 +22,10 @@ export type ParticipantRowProps = {
 };
 
 /**
- * One student of the lesson board (layout: mockups `PT-board`, `T-board`): avatar, name, ONE caption — red
- * when the student needs the teacher — and «2/7», the solved numbers of the set, on the right. A tablet has
- * the room for the bar by result before it. The whole row opens the student's numbers.
+ * One student of the lesson board (layout: mockups `PT-board`, `T-board`): avatar, name and «2/7», the
+ * solved numbers of the set, on the right. A caption appears only when the student needs the teacher's eye
+ * («Ошибка», «№ 010206», «не вошёл») — red when it is urgent. A tablet has the room for the bar by result
+ * before the count. The whole row opens the student's numbers.
  */
 export function ParticipantRow({ participant, caption, planPending, selected = false, divider, onPress }: ParticipantRowProps) {
   const styles = useStyles();
@@ -48,7 +49,7 @@ export function ParticipantRow({ participant, caption, planPending, selected = f
     <ListRow
       left={<Avatar name={participant.studentName} tone="neutral" />}
       title={participant.studentName}
-      subtitle={caption.text}
+      subtitle={caption.row ?? undefined}
       subtitleTone={caption.attention ? 'attention' : 'muted'}
       right={right}
       selected={selected}

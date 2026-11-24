@@ -16,7 +16,8 @@ export type ReviewAssignmentPanelProps = Omit<ReviewHomeworkProps, 'cancelBelow'
 
 /**
  * The selected homework in the second panel of a tablet (the `T-student` mockup): the title with the
- * deadline and «Отменить ДЗ» next to it, the bar by status and the review itself (`ReviewHomework`).
+ * deadline and «Отменить ДЗ» next to it, the bar by status and the review itself (`ReviewHomework`). The
+ * counters of the homework are on its row in the list next to the panel.
  */
 export function ReviewAssignmentPanel({ assignment, now, ...review }: ReviewAssignmentPanelProps) {
   const styles = useStyles();
@@ -31,7 +32,7 @@ export function ReviewAssignmentPanel({ assignment, now, ...review }: ReviewAssi
             {summary.title}
           </Text>
           <Text variant="small" color={summary.attention ? 'redText' : 'textMuted'}>
-            {`${summary.caption} · ${summary.done}`}
+            {summary.caption}
           </Text>
         </View>
         <TextButton label={dict.students.review.cancelLabel} tone="danger" onPress={review.onCancel} testID={`review-cancel-${assignment.id}`} />

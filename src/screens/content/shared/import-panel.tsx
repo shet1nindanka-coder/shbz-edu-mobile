@@ -6,13 +6,10 @@ import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
 import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
-import { Button, Card, Icon, Notice, PressableScale, Switch, Text, TextArea, TextButton } from '@/ui';
+import { Button, Card, Icon, IconButton, Notice, PressableScale, Switch, Text, TextArea } from '@/ui';
 
 import { ImportPromptButton } from './import-prompt-button';
 import type { ImportPanelState } from './use-import-panel';
-
-/** Placeholder of the «JSON текстом» field — a format sample, not a sentence (the site hard-codes it too). */
-const JSON_PLACEHOLDER = '{"formatVersion": 1, "topic": {...}, "numbers": [...]}';
 
 export type ImportPanelViewProps = {
   state: ImportPanelState;
@@ -27,9 +24,11 @@ export type ImportPanelViewProps = {
 };
 
 /**
- * Import panel (site: `TopicImportPanel`, docs/spec/07-developer-content.md §1.5): load the AI's JSON
- * reply (file, clipboard or typed), check it, read the preview of what will change, apply. The app never
- * calls a model here. Drag & drop becomes a tap on the slot. Rendered inside a card or a sheet.
+ * Import panel (site: `TopicImportPanel`, docs/spec/07-developer-content.md §1.5; text:
+ * docs/design/glass-over-paper.md §1a): load the AI's JSON reply (file, clipboard or typed), check it,
+ * read the preview of what will change, apply. The app never calls a model here. Drag & drop becomes a
+ * tap on the slot. The three ways to load sit on ONE line — the slot and two marks (paste, type); what to
+ * do with the prompt is the panel's one hint. Rendered inside a card or a sheet.
  */
 export function ImportPanelView({ state, hidePromptButton = false, secondary = false, testID = 'import-panel' }: ImportPanelViewProps) {
   const styles = useStyles();
@@ -41,46 +40,41 @@ export function ImportPanelView({ state, hidePromptButton = false, secondary = f
   const loaded = hasText && !state.textOpen;
   const done = state.justLoaded || loaded;
 
-  const tileTitle = state.justLoaded ? t.successTitle : (state.fileName ?? m.content.importPanel.loadTitle);
-  const tileSubtitle = state.fileName ? t.fileRead : loaded ? m.content.importPanel.textLoaded : m.content.importPanel.chooseJsonFile;
+  // What is in the slot: the file's name, «Текст вставлен», or — while empty — what it takes.
+  const slotText = state.justLoaded ? t.successTitle : (state.fileName ?? (loaded ? m.content.importPanel.textLoaded : m.content.importPanel.slot));
 
   return (
     <View style={styles.root} testID={testID}>
       {hidePromptButton ? null : <ImportPromptButton />}
 
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityLabel={`${m.content.importPanel.chooseJsonFile}. ${tileTitle}`}
-        accessibilityState={{ disabled: busy || state.picking, busy: state.picking }}
-        disabled={busy || state.picking}
-        onPress={state.pickFile}
-        scaleTo={0.99}
-        style={[styles.drop, done ? styles.dropLoaded : null]}
-        testID="import-pick-file"
-      >
-        <Icon name={done ? 'check' : 'upload'} size={theme.sizes.icon.lg} color={done ? 'greenText' : 'textMuted'} />
-        <Text variant="bodyBold" color={done ? 'greenText' : 'textStrong'} align="center" numberOfLines={2}>
-          {tileTitle}
-        </Text>
-        <Text variant="small" color={done ? 'greenText' : 'textMuted'} align="center" numberOfLines={2}>
-          {tileSubtitle}
-        </Text>
-      </PressableScale>
-
       <View style={styles.sources}>
-        <Button
-          label={m.content.importPanel.pasteFromClipboard}
-          variant="outline"
-          size="sm"
-          leftIcon="clipboard"
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${m.content.importPanel.chooseJsonFile}. ${state.fileName ? `${state.fileName}. ${t.fileRead}` : done ? slotText : dict.topics.widgets.fileDrop.none}`}
+          accessibilityState={{ disabled: busy || state.picking, busy: state.picking }}
+          disabled={busy || state.picking}
+          onPress={state.pickFile}
+          scaleTo={0.99}
+          style={[styles.drop, done ? styles.dropLoaded : null]}
+          testID="import-pick-file"
+        >
+          <Icon name={done ? 'check' : 'upload'} size={theme.sizes.icon.md} color={done ? 'greenText' : 'textMuted'} />
+          <Text variant="bodyStrong" color={done ? 'greenText' : 'label'} numberOfLines={1} style={styles.grow}>
+            {slotText}
+          </Text>
+        </PressableScale>
+        <IconButton
+          icon="clipboard"
+          accessibilityLabel={m.content.importPanel.pasteFromClipboard}
           disabled={busy}
           onPress={state.pasteFromClipboard}
           testID="import-paste"
         />
-        <TextButton
-          label={state.textOpen ? m.content.importPanel.hideText : t.pasteText}
+        <IconButton
+          icon="code"
+          accessibilityLabel={state.textOpen ? m.content.importPanel.hideText : t.pasteText}
+          active={state.textOpen}
           onPress={state.toggleText}
-          style={styles.toggle}
           testID="import-toggle-text"
         />
       </View>
@@ -90,7 +84,6 @@ export function ImportPanelView({ state, hidePromptButton = false, secondary = f
           label={t.jsonLabel}
           value={state.text}
           onChangeText={state.changeText}
-          placeholder={JSON_PLACEHOLDER}
           numberOfLines={5}
           autoCapitalize="none"
           autoCorrect={false}
@@ -102,7 +95,7 @@ export function ImportPanelView({ state, hidePromptButton = false, secondary = f
       ) : null}
 
       <Hint>
-        <Text variant="hint">{state.createMode ? t.hintCreate : t.hintAdd}</Text>
+        <Text variant="hint">{m.content.importPanel.hint}</Text>
       </Hint>
 
       {state.preview === null ? (
@@ -138,7 +131,7 @@ export function ImportPanelView({ state, hidePromptButton = false, secondary = f
 
 function ImportPreviewBlock({ state, preview, secondary }: { state: ImportPanelState; preview: ImportPreview; secondary: boolean }) {
   const styles = useStyles();
-  const { dict } = useI18n();
+  const { dict, m } = useI18n();
   const t = dict.topics.importPanel;
   const tiles: { key: string; label: string; value: number; danger: boolean }[] = [
     { key: 'add', label: t.tiles.add, value: preview.willAddNumbers, danger: false },
@@ -149,26 +142,27 @@ function ImportPreviewBlock({ state, preview, secondary }: { state: ImportPanelS
 
   return (
     <View style={styles.preview} testID="import-preview">
-      <Text variant="bodyStrong">{format(t.fileSummary, { title: preview.fileTitle, count: preview.totalInFile })}</Text>
-
+      {/* The file is named once: as the topic it creates, or as a plain title. «Задач внутри» is the sum of the tiles. */}
       {preview.willCreateTopic ? (
-        <Card style={styles.create} testID="import-will-create">
-          <Text variant="small" color="textMuted">
-            {t.willCreate}
-          </Text>
+        <Card style={styles.create} accessibilityLabel={`${t.willCreate}: ${preview.fileTitle}`} testID="import-will-create">
           <Text variant="cardTitle">{preview.fileTitle}</Text>
           {preview.fileDescription ? (
-            <Text variant="small" color="textMuted">
+            <Text variant="small" color="textMuted" numberOfLines={1}>
               {preview.fileDescription}
             </Text>
           ) : null}
+          {/* A warning about a second copy of a topic: it stays whole. */}
           {preview.duplicateTitle ? (
             <Text variant="small" color="redText" testID="import-duplicate-title">
               {t.duplicateTitle}
             </Text>
           ) : null}
         </Card>
-      ) : null}
+      ) : (
+        <Text variant="bodyStrong" numberOfLines={2} accessibilityLabel={format(t.fileSummary, { title: preview.fileTitle, count: preview.totalInFile })}>
+          {preview.fileTitle}
+        </Text>
+      )}
 
       {/* What the import will change: the number first, its caption under it. */}
       <View style={styles.tiles}>
@@ -188,16 +182,20 @@ function ImportPreviewBlock({ state, preview, secondary }: { state: ImportPanelS
         <View style={styles.overwrite}>
           <Switch
             trailing
-            label={t.overwriteLabel}
+            label={m.content.importPanel.overwrite}
+            accessibilityLabel={t.overwriteLabel}
             value={state.overwriteFilled}
             onValueChange={state.setOverwriteFilled}
             disabled={state.applying}
             testID="import-overwrite"
           />
-          {/* Not the switch's own sub-line: this warning is about lost work and must stand out. */}
-          <Text variant="small" color="redText" testID="import-overwrite-warning">
-            {format(t.overwriteWarning, { count: preview.willOverwrite })}
-          </Text>
+          {/* Lost work is said where it is chosen: once the switch is on. Not the switch's own sub-line —
+              the warning must stand out. */}
+          {state.overwriteFilled ? (
+            <Text variant="small" color="redText" testID="import-overwrite-warning">
+              {format(t.overwriteWarning, { count: preview.willOverwrite })}
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -206,11 +204,9 @@ function ImportPreviewBlock({ state, preview, secondary }: { state: ImportPanelS
           warnings are data of the file, so they stay visible. */}
       {preview.warnings.length > 0 ? <MessageList label={t.warnings} lines={preview.warnings} testID="import-warnings" /> : null}
 
+      {/* «Как это увидит ученик»: the cards speak for themselves; the caption is spoken. */}
       {preview.sample.length > 0 ? (
-        <View style={styles.sample}>
-          <Text variant="smallStrong" color="textMuted" accessibilityRole="header">
-            {t.sample}
-          </Text>
+        <View style={styles.sample} accessibilityLabel={t.sample}>
           {preview.sample.map((entry) => (
             <SampleCard key={entry.number} entry={entry} />
           ))}
@@ -219,7 +215,8 @@ function ImportPreviewBlock({ state, preview, secondary }: { state: ImportPanelS
 
       <View style={styles.actions}>
         <Button
-          label={state.applying ? t.applying : state.createMode ? t.applyCreate : t.apply}
+          label={state.applying ? t.applying : state.createMode ? dict.topics.createForm.submit : t.apply}
+          accessibilityLabel={!state.applying && state.createMode ? t.applyCreate : undefined}
           variant={secondary ? 'dark' : 'primary'}
           leftIcon="upload"
           loading={state.applying}
@@ -268,9 +265,10 @@ function SampleCard({ entry }: { entry: ImportNumber }) {
           <MathContent value={entry.answerLatex} variant="bare" />
         </>
       ) : (
-        <Hint>
-          <Text variant="hint">{t.noAnswer}</Text>
-        </Hint>
+        // «Ответа нет — автопроверка отправит номер на ручную проверку» is spoken; the eye gets two words.
+        <Text variant="small" color="textMuted" accessibilityLabel={t.noAnswer}>
+          {dict.topics.answerManager.noAnswer}
+        </Text>
       )}
     </Card>
   );
@@ -278,23 +276,25 @@ function SampleCard({ entry }: { entry: ImportNumber }) {
 
 const useStyles = makeStyles((t) => ({
   root: { gap: t.space.md },
-  // The slot for the AI's reply (`.drop`): dashed while empty, solid green once something is loaded.
+  // The slot for the AI's reply (`.drop`) and the two other ways to load it, on one line. The slot is
+  // dashed while empty, solid green once something is loaded.
+  sources: { flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   drop: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: t.sizes.iconCircle,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: t.space.xxs,
-    paddingVertical: t.space.xl,
+    gap: t.space.md,
     paddingHorizontal: t.space.lg,
-    borderRadius: t.radii.lg,
+    borderRadius: t.radii.md,
     borderWidth: t.borders.interactive,
     borderStyle: 'dashed',
     borderColor: t.colors.line2,
     backgroundColor: t.colors.softBg,
   },
   dropLoaded: { borderStyle: 'solid', borderColor: t.colors.greenSolid, backgroundColor: t.colors.greenSoft },
-  // The text link drops under the button on a narrow phone: no extra air between the two then.
-  sources: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: t.space.md },
-  toggle: { minHeight: t.sizes.minTouch, justifyContent: 'center' },
+  grow: { flex: 1, minWidth: 0 },
   mono: { ...t.typography.mono },
   preview: { gap: t.space.md },
   create: { gap: t.space.xxs },

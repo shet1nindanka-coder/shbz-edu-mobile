@@ -9,15 +9,16 @@ import { ListRow, Text } from '@/ui';
 
 import { MAX_GAPS_SHOWN, bankInsight, bankUsageRows, contentRows, gapLine, moreGapsLine, platformMetricCards } from '../logic';
 import { Columns } from '../parts/columns';
-import { InsightBox } from '../parts/insight-box';
 import { MetricGrid } from '../parts/metric-card';
 import { ProgressRow } from '../parts/progress-row';
 import { StatsCard } from '../parts/stats-card';
 
 /**
- * View «Метрики платформы» (06 §1.6.c; layout: mockup D-stats): the summary figures, then two cards — the
- * size of the problem bank and how much of it is in use, and how complete the content is. A content gap is
- * a row that opens the topic's edit screen.
+ * View «Метрики платформы» (06 §1.6.c; layout: mockup D-stats; text diet §1a): the summary figures, then
+ * two cards of «name · ratio · bar» rows — how much of the problem bank is in use, and how complete the
+ * content is. The site's «Ключевой вывод» is read out with the bank rows; what «банк» means is the one
+ * hint of the view. A content gap is a row — the topic and what it lacks — that opens the topic's edit
+ * screen.
  */
 export function PlatformView({ data }: { data: StatisticsPlatformResponse }) {
   const styles = useStyles();
@@ -27,6 +28,7 @@ export function PlatformView({ data }: { data: StatisticsPlatformResponse }) {
   const { overview, homework, content } = data;
   const moreGaps = moreGapsLine(content.gaps.length, t, locale);
   const gaps = content.gaps.slice(0, MAX_GAPS_SHOWN);
+  const bankRows = bankUsageRows(overview, t);
 
   return (
     <View style={styles.view} testID="stats-view-developer">
@@ -34,15 +36,20 @@ export function PlatformView({ data }: { data: StatisticsPlatformResponse }) {
 
       <Columns>
         <StatsCard title={t.bankUsage}>
-          <View style={styles.rows}>
-            {bankUsageRows(overview, t).map((row) => (
+          {/* One element for a screen reader: the four shares and the conclusion the site prints under them. */}
+          <View
+            style={styles.rows}
+            accessible
+            accessibilityLabel={`${bankRows.map((row) => `${row.label}: ${row.value}`).join(', ')}. ${bankInsight(overview, t)}`}
+            testID="stats-bank-rows"
+          >
+            {bankRows.map((row) => (
               <ProgressRow key={row.key} row={row} />
             ))}
           </View>
-          <InsightBox caption={t.keyInsight} text={bankInsight(overview, t)} testID="stats-bank-insight" />
           <Hint>
             <Text variant="small" color="textMuted">
-              {t.bankExplainer}
+              {m.stats.bank.hint}
             </Text>
           </Hint>
         </StatsCard>
@@ -76,7 +83,6 @@ export function PlatformView({ data }: { data: StatisticsPlatformResponse }) {
                       titleLines={2}
                       subtitle={line}
                       subtitleLines={2}
-                      chevron={canOpen}
                       inset={0}
                       divider={index < gaps.length - 1}
                       onPress={canOpen ? () => navigation.open(link) : undefined}
@@ -86,8 +92,8 @@ export function PlatformView({ data }: { data: StatisticsPlatformResponse }) {
                   );
                 })}
                 {moreGaps ? (
-                  <Text variant="small" color="textMuted" testID="stats-gaps-more">
-                    {moreGaps}
+                  <Text variant="small" color="textMuted" tabular accessibilityLabel={moreGaps} testID="stats-gaps-more">
+                    {format(m.stats.gaps.more, { n: content.gaps.length - MAX_GAPS_SHOWN })}
                   </Text>
                 ) : null}
               </>

@@ -6,7 +6,6 @@ import { HandoutNotice } from '@/components/lessons';
 import type { Handout } from '@/components/lessons';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { format, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Notice, Spinner, Text } from '@/ui';
 
@@ -23,14 +22,13 @@ export type BoardNoticesProps = {
 /**
  * What the lesson board says above the class (docs/spec/05-teacher-lessons-plans.md §1.3 banners), in the
  * site's order: a failed refresh, "the lesson has no time", AI unavailable, the answer to the last action
- * with the cool-down line, a handout that did not open — then the generation counter and the hint. Each
- * line appears only while it has something to say, so a quiet board starts with its class.
+ * with the cool-down line, a handout that did not open — then the generation counter («1/3» next to a
+ * spinner). Each line appears only while it has something to say, so a quiet board starts with its class.
  */
 export function BoardNotices({ lesson, controller, handout }: BoardNoticesProps) {
   const styles = useStyles();
   const theme = useTheme();
   const { dict, m } = useI18n();
-  const t = dict.planner.lessonBoard;
   const { waits, notice, board } = controller;
   // Result marks have their own line next to the result buttons (item-result-bar.tsx).
   const waitSeconds = Math.max(waits.plan.seconds, waits.items.seconds, waits.lesson.seconds);
@@ -44,7 +42,8 @@ export function BoardNotices({ lesson, controller, handout }: BoardNoticesProps)
         <ScheduleBanner pending={controller.schedule.isPending} disabled={waits.lesson.waiting} onSchedule={(iso) => controller.schedule.mutate(iso)} />
       ) : null}
 
-      {!lesson.aiAvailable ? <Notice tone="warning" text={t.aiUnavailable} testID="lesson-ai-unavailable" /> : null}
+      {/* The short site wording; what to do instead («добавляйте номера…») is the board itself. */}
+      {!lesson.aiAvailable ? <Notice tone="warning" text={dict.planner.lessonCompose.aiUnavailable} testID="lesson-ai-unavailable" /> : null}
 
       {notice ? (
         <Notice tone={notice.tone} text={notice.text} onDismiss={controller.dismissNotice} dismissLabel={m.common.actions.close} testID="lesson-notice" />
@@ -55,20 +54,19 @@ export function BoardNotices({ lesson, controller, handout }: BoardNoticesProps)
       <HandoutNotice handout={handout} testID="lesson-handout-error" />
 
       {controller.pendingCount > 0 ? (
-        <View accessibilityRole="progressbar" accessibilityLiveRegion="polite" style={styles.progress} testID="lesson-ready-of">
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={format(dict.planner.common.readyOf, { ready: controller.readyCount, total: lesson.participants.length })}
+          accessibilityLiveRegion="polite"
+          style={styles.progress}
+          testID="lesson-ready-of"
+        >
           <Spinner size={theme.sizes.icon.sm} color="accentSolid" />
           <Text variant="small" color="textMuted" tabular>
-            {format(dict.planner.common.readyOf, { ready: controller.readyCount, total: lesson.participants.length })}
+            {format(m.common.numbers.doneOf, { done: controller.readyCount, total: lesson.participants.length })}
           </Text>
         </View>
-      ) : null}
-
-      {lesson.participants.some((participant) => participant.items.length > 0) ? (
-        <Hint>
-          <Text variant="small" color="textMuted" style={styles.hint}>
-            {m.planner.lessonBoard.resultHint}
-          </Text>
-        </Hint>
       ) : null}
     </>
   );
@@ -76,5 +74,4 @@ export function BoardNotices({ lesson, controller, handout }: BoardNoticesProps)
 
 const useStyles = makeStyles((t) => ({
   progress: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs, paddingHorizontal: t.space.xxs },
-  hint: { paddingHorizontal: t.space.xxs },
 }));

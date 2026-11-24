@@ -6,6 +6,7 @@ import { format, useI18n } from '@/i18n';
 import { makeStyles } from '@/theme';
 import { Card, CardPressArea, StatusBar, Text } from '@/ui';
 
+import { HomeworkFact } from './homework-fact';
 import { ReviewHomework, type ReviewHomeworkProps } from './review-homework';
 import { reviewSummary } from './review-summary';
 
@@ -20,8 +21,9 @@ export type ReviewAssignmentCardProps = Omit<ReviewHomeworkProps, 'cancelBelow'>
 
 /**
  * One homework in the review list of a phone (docs/spec/04-teacher-students.md S4 "assignment card";
- * layout: the `PT-student` mockup). Folded it is a summary — the title, the deadline with what waits for
- * the teacher, «37 из 50» and the bar by status; a tap unfolds the review itself (`ReviewHomework`).
+ * layout: the `PT-student` mockup). Folded it is a summary — the title, the deadline, the red counter of
+ * what waits for the teacher with «37/50», and the bar by status; a tap unfolds the review itself
+ * (`ReviewHomework`).
  */
 export function ReviewAssignmentCard({ assignment, expanded, highlighted, now, onToggle, ...review }: ReviewAssignmentCardProps) {
   const styles = useStyles();
@@ -34,7 +36,7 @@ export function ReviewAssignmentCard({ assignment, expanded, highlighted, now, o
           what tells several homeworks of the same topic apart. */}
       <CardPressArea
         accessibilityLabel={format(expanded ? m.teacher.card.collapse : m.teacher.card.expand, { title: summary.title })}
-        accessibilityParts={[summary.caption, summary.done]}
+        accessibilityParts={[summary.caption, summary.waitingLabel, summary.done]}
         expanded={expanded}
         onPress={onToggle}
         testID={`review-assignment-toggle-${assignment.id}`}
@@ -44,13 +46,11 @@ export function ReviewAssignmentCard({ assignment, expanded, highlighted, now, o
           <Text variant="bodyBold" accessibilityRole="header" numberOfLines={2}>
             {summary.title}
           </Text>
-          <Text variant="small" color={summary.attention ? 'redText' : 'textMuted'} numberOfLines={2}>
+          <Text variant="small" color={summary.attention ? 'redText' : 'textMuted'} numberOfLines={1}>
             {summary.caption}
           </Text>
         </View>
-        <Text variant="small" color="textMuted" tabular numberOfLines={1}>
-          {summary.done}
-        </Text>
+        <HomeworkFact waiting={summary.waiting} done={summary.done} />
       </CardPressArea>
       <StatusBar counts={summary.counts} accessibilityLabel={statusBreakdown(summary.counts, m.common.statuses, true)} />
       {expanded ? <ReviewHomework assignment={assignment} cancelBelow {...review} /> : null}

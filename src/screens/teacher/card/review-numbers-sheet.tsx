@@ -103,7 +103,8 @@ export function ReviewNumbersSheet({
     const last = numbers[numbers.length - 1]?.number;
     body = (
       <View style={styles.grid}>
-        {first && last && numbers.length > 1 ? (
+        {/* The tiles show the numbers themselves; the range is said only when they are cut to their tails. */}
+        {first && last && numbers.length > 1 && prefix > 0 ? (
           <Text variant="small" color="textMuted" tabular>
             {format(m.common.numbers.range, { first, last })}
           </Text>

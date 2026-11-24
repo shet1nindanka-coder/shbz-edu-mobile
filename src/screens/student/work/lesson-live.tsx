@@ -5,7 +5,6 @@ import type { ActiveLessonDto, GetLessonResponse, LessonItemDto, PhotoUpload } f
 import { PhotoSourceSheet } from '@/components/files';
 import { RetryWaitLine } from '@/components/retry-wait';
 import { format, plural, useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles, useTheme } from '@/theme';
 import { Card, Icon, Notice, NumberTile, Panel, Panels, PressableScale, Text, TextButton } from '@/ui';
 
@@ -29,10 +28,11 @@ export type LessonLiveProps = {
 
 /**
  * The «Урок» tab during a lesson (docs/spec/03-student-homework-lesson.md §1 L2; layout: docs/design/
- * glass-over-paper.md §8): a strip of the lesson's numbers — the main part, then the extra part once every
- * main item is closed — and ONE card, of the current number, with its statement, the check's remark and
- * the main action «Сдать решение» (camera first, then a look at the shots before they go to the check).
- * The tiles are coloured by the outcome; a student only chooses which number to look at.
+ * glass-over-paper.md §8, §1a): a strip of the lesson's numbers — the main part, then the extra part once
+ * every main item is closed — and ONE card, of the current number, with its statement, the check's remark
+ * and the main action «Сдать фото» (camera first, then a look at the shots before they go to the check).
+ * The tiles are coloured by the outcome; a student only chooses which number to look at. The extra part
+ * that is still closed is a lock tile with its count at the end of the strip, not a sentence.
  */
 export function LessonLive({ data, lesson, serverOffsetMs, live, refreshError }: LessonLiveProps) {
   const styles = useStyles();
@@ -130,21 +130,23 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshError }:
       style={theme.tablet ? styles.cardWide : undefined}
     />
   ) : null;
+  const closed = format(m.studentWork.lesson.closedOf, { closed: parts.closedMain, total: parts.main.length });
+  // The extra part, while it is closed: a lock and how many numbers wait behind it. The site's two lines
+  // («Откроется, когда…», «Ещё 2 номера — и…») are what a screen reader hears.
   const locked =
     parts.extra.length > 0 && !parts.extraUnlocked ? (
-      <View style={styles.locked} testID="lesson-extra-locked">
+      <View
+        accessible
+        accessibilityLabel={`${t.extraLocked}. ${format(t.extraLockedHint, { count: plural(locale, parts.remainingMain, t.problemForms) })}`}
+        style={styles.locked}
+        testID="lesson-extra-locked"
+      >
         <Icon name="lock" size={16} color="textMuted" />
-        <View style={styles.lockedTexts}>
-          <Text variant="small" color="textMuted">
-            {t.extraLocked}
-          </Text>
-          <Hint>
-            <Text variant="hint">{format(t.extraLockedHint, { count: plural(locale, parts.remainingMain, t.problemForms) })}</Text>
-          </Hint>
-        </View>
+        <Text variant="tile" color="textMuted" tabular>
+          {parts.extra.length}
+        </Text>
       </View>
     ) : null;
-  const closed = format(m.studentWork.lesson.closedOf, { closed: parts.closedMain, total: parts.main.length });
   const noItems = (
     <Card dashed testID="lesson-no-items">
       <Text variant="small" color="textMuted">
@@ -170,8 +172,8 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshError }:
                   <Text variant="sectionTitle" accessibilityRole="header" style={styles.planTitle}>
                     {m.studentWork.lesson.plan}
                   </Text>
-                  <Text variant="small" color="textMuted" tabular testID="lesson-summary">
-                    {closed}
+                  <Text variant="small" color="textMuted" tabular accessibilityLabel={closed} testID="lesson-summary">
+                    {format(m.common.numbers.doneOf, { done: parts.closedMain, total: parts.main.length })}
                   </Text>
                 </View>
               }
@@ -202,15 +204,13 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshError }:
         </>
       ) : (
         <>
-          <Text variant="kicker" color="textMuted" style={styles.summary} testID="lesson-summary">
-            {closed}
-          </Text>
           {notices}
           {items.length === 0 ? (
             noItems
           ) : (
             // One row, scrolled sideways; the screen gutter is cancelled so the tiles run to the edges.
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.stripContent} testID="lesson-items">
+            // The tiles are the progress: «Закрыто 1 из 3» is said to a screen reader, not printed above them.
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel={closed} style={styles.strip} contentContainerStyle={styles.stripContent} testID="lesson-items">
               {items.map((item) => (
                 <NumberTile
                   key={item.id}
@@ -221,10 +221,10 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshError }:
                   testID={`lesson-tile-${item.number}`}
                 />
               ))}
+              {locked}
             </ScrollView>
           )}
           {card}
-          {locked}
         </>
       )}
 
@@ -232,7 +232,7 @@ export function LessonLive({ data, lesson, serverOffsetMs, live, refreshError }:
         visible={source.sheetOpen}
         onClose={source.closeSheet}
         onSelect={source.select}
-        title={m.studentWork.photos.sourceTitle}
+        title={m.common.photos.add}
       />
       <LessonSubmitSheet
         visible={previewOpen}
@@ -256,11 +256,23 @@ const useStyles = makeStyles((t) => ({
   root: { gap: t.space.block },
   rootWide: { flex: 1, minHeight: 0 },
   cardWide: { flex: 3, minWidth: 0 },
-  summary: { paddingHorizontal: t.space.xxs },
   strip: { marginHorizontal: -t.space.gutter, flexGrow: 0 },
   stripContent: { gap: t.space.sm, paddingHorizontal: t.space.gutter },
-  locked: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm, paddingHorizontal: t.space.xxs },
-  lockedTexts: { flex: 1, minWidth: 0, gap: t.space.xxxs },
+  // A tile of the strip's size that cannot be pressed: dashed, no fill.
+  locked: {
+    height: t.sizes.tile,
+    minWidth: t.sizes.tile,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: t.space.xxs,
+    paddingHorizontal: t.space.md,
+    borderRadius: t.radii.md,
+    borderWidth: t.borders.hairline,
+    borderStyle: 'dashed',
+    borderColor: t.colors.line2,
+  },
   planHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: t.space.md, paddingHorizontal: t.space.card, paddingTop: t.space.card },
   planTitle: { flexShrink: 1 },
   planFooter: { paddingHorizontal: t.space.card, paddingBottom: t.space.card },

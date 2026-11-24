@@ -21,8 +21,7 @@ const ru = {
     saved: "Звонок записан"
   },
   history: {
-    // Spoken names: the list of a student's calls, the button that loads a page, the position in the log.
-    title: "История звонков",
+    // Spoken name of «Показать ещё»: what it loads and the position in the log.
     shownOf: "Показано {shown} из {total}",
     showEarlier: "Показать более ранние",
     loadFailed: "Не удалось загрузить более ранние звонки. Попробуйте ещё раз.",
@@ -58,7 +57,6 @@ const en: typeof ru = {
     saved: "Call logged"
   },
   history: {
-    title: "Call history",
     shownOf: "Showing {shown} of {total}",
     showEarlier: "Show earlier calls",
     loadFailed: "Could not load earlier calls. Try again.",

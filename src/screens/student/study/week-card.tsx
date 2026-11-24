@@ -19,9 +19,10 @@ export type WeekCardProps = {
 };
 
 /**
- * «За неделю» of the overview (docs/design/glass-over-paper.md §8): the streak chip, the number of
- * problems closed in the last seven days, and one bar per day — the mint gradient for an active day, a
- * grey stub for an empty one. It replaces the «Огонёк и ритм» stack of panels: one card, one figure.
+ * The week of the overview (docs/design/glass-over-paper.md §8, §1a): ONE figure — the problems closed in
+ * the last seven days — the streak chip, and one bar per day: the mint gradient for an active day, a grey
+ * stub for an empty one. No title and no «сегодня: …» line: the seven weekday letters say it is the week,
+ * and each bar tells its own day to a screen reader.
  */
 export function WeekCard({ streak: cached, today, barHeight = 44, fill = false, testID }: WeekCardProps) {
   const styles = useStyles();
@@ -35,9 +36,19 @@ export function WeekCard({ streak: cached, today, barHeight = 44, fill = false, 
   return (
     <Card style={[styles.card, fill ? styles.fill : null]} testID={testID}>
       <View style={styles.head}>
-        <Text variant="sectionTitle" accessibilityRole="header" style={styles.title}>
-          {weekly.week}
-        </Text>
+        <View
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={format(m.student.home.weekA11y, { solved: plural(locale, streak.solvedThisWeek, weekly.solvedForms) })}
+          style={styles.figure}
+        >
+          <Text variant="metric" tabular testID="streak-solved-week">
+            {streak.solvedThisWeek}
+          </Text>
+          <Text variant="body" color="textMuted" numberOfLines={1} style={styles.word}>
+            {plural(locale, streak.solvedThisWeek, m.student.home.solvedWords)}
+          </Text>
+        </View>
         {streak.currentStreak > 0 ? (
           <Chip
             tone="streak"
@@ -47,19 +58,6 @@ export function WeekCard({ streak: cached, today, barHeight = 44, fill = false, 
             testID="streak-chip"
           />
         ) : null}
-      </View>
-
-      <View
-        accessible
-        accessibilityLabel={format(m.student.home.weekA11y, { solved: plural(locale, streak.solvedThisWeek, weekly.solvedForms) })}
-        style={styles.figure}
-      >
-        <Text variant="metric" tabular testID="streak-solved-week">
-          {streak.solvedThisWeek}
-        </Text>
-        <Text variant="body" color="textMuted">
-          {plural(locale, streak.solvedThisWeek, m.student.home.solvedWords)}
-        </Text>
       </View>
 
       <View style={[styles.chart, fill ? styles.chartFill : null]}>
@@ -87,10 +85,6 @@ export function WeekCard({ streak: cached, today, barHeight = 44, fill = false, 
           </View>
         ))}
       </View>
-
-      <Text variant="small" color="textMuted" testID="streak-solved-today">
-        {format(m.student.home.todayLine, { solved: texts.solvedToday.toLocaleLowerCase() })}
-      </Text>
     </Card>
   );
 }
@@ -99,8 +93,8 @@ const useStyles = makeStyles((t) => ({
   card: { gap: t.space.md },
   fill: { flex: 1 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  title: { flexShrink: 1 },
-  figure: { flexDirection: 'row', alignItems: 'baseline', gap: t.space.sm },
+  figure: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', gap: t.space.sm },
+  word: { flexShrink: 1 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: t.space.sm },
   // A tablet panel gives the chart all the height that is left: the columns stretch, the bars grow from the bottom.
   chartFill: { flex: 1, minHeight: 0, alignItems: 'stretch' },

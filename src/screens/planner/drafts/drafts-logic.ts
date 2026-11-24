@@ -13,14 +13,34 @@ import type {
   LessonBoardItem,
 } from '@/api/types';
 import { META_LIMITS } from '@/api/types/limits';
+import { formatMsk } from '@/domain/dates';
+import { deadlineCaption, type DeadlineCaption, type DeadlineCaptionCopy } from '@/domain/deadline-caption';
 import { daysUntil } from '@/domain/homework-plan';
 import { parseMskDateTimeInput, toEpochMs } from '@/domain/moscow-time';
+import { format, type Locale } from '@/lib/i18n';
 
 // ───────────────────────────── list ─────────────────────────────
 
 /** Newest first, as the site orders the list (`createdAt desc`); the id breaks ties so the order is stable. */
 export function sortDrafts<T extends Pick<HomeworkPlanListItem, 'id' | 'createdAt'>>(plans: readonly T[]): T[] {
   return [...plans].sort((left, right) => toEpochMs(right.createdAt) - toEpochMs(left.createdAt) || left.id.localeCompare(right.id));
+}
+
+/**
+ * The one caption of a draft — its deadline, worded like the caption of a homework row («до пятницы»,
+ * «завтра, 20:00», «просрочено 2 дня»). A passed deadline asks for attention only while somebody has not
+ * got the homework (such a set cannot be issued any more); a draft issued to everyone just names the day.
+ */
+export function draftDeadlineCaption(
+  draft: { deadlineAt: string | null; issuedCount: number; participantsCount: number },
+  now: number,
+  locale: Locale,
+  copy: DeadlineCaptionCopy,
+): DeadlineCaption {
+  const caption = deadlineCaption(draft.deadlineAt, false, now, locale, copy);
+  const everybodyHasIt = draft.participantsCount > 0 && draft.issuedCount >= draft.participantsCount;
+  if (!caption.attention || !everybodyHasIt) return caption;
+  return { text: format(copy.date, { date: formatMsk(draft.deadlineAt, 'dayMonth', locale) ?? '' }), attention: false };
 }
 
 // ───────────────────────────── new draft ─────────────────────────────

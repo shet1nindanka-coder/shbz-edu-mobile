@@ -13,6 +13,7 @@ import {
   countIssued,
   draftBudget,
   draftCreatedAt,
+  draftDeadlineCaption,
   draftSourceKey,
   draftSourceOf,
   freeTopicNumbers,
@@ -28,6 +29,7 @@ import {
   validateDraftForm,
   numberGridColumns,
 } from "@/screens/planner/drafts/drafts-logic";
+import { getMobileDictionary } from "@/i18n/mobile";
 import { planSignature, statusRowsOnBoard } from "@/screens/planner/shared/plan-state";
 
 const NOW = Date.parse("2026-11-16T12:00:00.000Z"); // 15:00 Moscow
@@ -302,4 +304,22 @@ test("numberGridColumns fits as many tiles as the width allows, never fewer than
   assert.equal(numberGridColumns(0, 84, 8), 1);
   assert.equal(numberGridColumns(Number.NaN, 84, 8), 1);
   assert.equal(numberGridColumns(500, 0, 8), 1);
+});
+
+// The text diet: a draft row has ONE caption, its deadline, worded like a homework row's.
+test("draftDeadlineCaption: the deadline in short words; red only while a passed deadline still blocks sets", () => {
+  const copy = getMobileDictionary("ru").common.deadline;
+  // Wednesday 18 November 2026, 12:00 Moscow time.
+  const now = Date.parse("2026-11-18T09:00:00.000Z");
+  const draft = (deadlineAt: string | null, issuedCount: number, participantsCount = 3) => ({ deadlineAt, issuedCount, participantsCount });
+
+  assert.deepEqual(draftDeadlineCaption(draft("2026-11-20T17:00:00.000Z", 0), now, "ru", copy), { text: "до пятницы", attention: false });
+  assert.deepEqual(draftDeadlineCaption(draft("2026-11-19T17:00:00.000Z", 3), now, "ru", copy), { text: "завтра, 20:00", attention: false });
+  assert.deepEqual(draftDeadlineCaption(draft(null, 0), now, "ru", copy), { text: "без срока", attention: false });
+  // Passed, and somebody still has no homework: the sets cannot be issued any more.
+  assert.deepEqual(draftDeadlineCaption(draft("2026-11-16T17:00:00.000Z", 1), now, "ru", copy), { text: "просрочено 2 дня", attention: true });
+  // Passed, but everybody has it: nothing to do about it — just the day.
+  assert.deepEqual(draftDeadlineCaption(draft("2026-11-16T17:00:00.000Z", 3), now, "ru", copy), { text: "до 16 ноября", attention: false });
+  // A draft without participants is never "issued to everyone".
+  assert.equal(draftDeadlineCaption(draft("2026-11-16T17:00:00.000Z", 0, 0), now, "ru", copy).attention, true);
 });

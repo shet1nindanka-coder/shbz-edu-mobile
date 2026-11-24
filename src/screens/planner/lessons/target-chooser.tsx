@@ -21,15 +21,15 @@ export type TargetChooserProps = {
 
 /**
  * Whom the lesson is for (docs/spec/05-teacher-lessons-plans.md §1.2.a): the teacher's groups and
- * students as two lists of rows under one search field. A phone stacks the lists; a tablet puts them side
- * by side.
+ * students as two lists of rows — «Группы», «Ученики» — under one search field. A phone stacks the lists;
+ * a tablet puts them side by side.
  */
 export function TargetChooser({ header, onPick }: TargetChooserProps) {
   const styles = useStyles();
   const theme = useTheme();
   const api = useApi();
   const { dict, m } = useI18n();
-  const t = dict.planner.lessonNew;
+  const names = { groups: dict.planner.groups.list.kicker, students: dict.planner.homeworkPlans.createForm.studentsLabel };
   const [query, setQuery] = useState('');
 
   const targets = useQuery({ queryKey: qk('planner', 'getLessonTargets'), queryFn: () => api.planner.getLessonTargets() });
@@ -72,7 +72,7 @@ export function TargetChooser({ header, onPick }: TargetChooserProps) {
             testID={`lesson-target-group-${group.id}`}
           />
         ))
-      : note(searching && data.groups.length > 0 ? dict.planner.common.nothingFound : t.noGroups);
+      : note(searching && data.groups.length > 0 ? dict.planner.common.nothingFound : m.planner.lessonNew.noGroups);
 
   const studentRows =
     students.length > 0
@@ -86,7 +86,7 @@ export function TargetChooser({ header, onPick }: TargetChooserProps) {
             testID={`lesson-target-student-${student.id}`}
           />
         ))
-      : note(searching && data.students.length > 0 ? dict.planner.common.nobodyFound : t.noStudents);
+      : note(searching && data.students.length > 0 ? dict.planner.common.nobodyFound : m.planner.lessonNew.noStudents);
 
   const top = (
     <>
@@ -114,7 +114,7 @@ export function TargetChooser({ header, onPick }: TargetChooserProps) {
             contentStyle={styles.panelRows}
             header={
               <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelHead}>
-                {t.forGroup}
+                {names.groups}
               </Text>
             }
           >
@@ -125,7 +125,7 @@ export function TargetChooser({ header, onPick }: TargetChooserProps) {
             contentStyle={styles.panelRows}
             header={
               <Text variant="sectionTitle" accessibilityRole="header" style={styles.panelHead}>
-                {t.forStudent}
+                {names.students}
               </Text>
             }
           >
@@ -140,11 +140,11 @@ export function TargetChooser({ header, onPick }: TargetChooserProps) {
     <Screen testID="planner-lesson-new-screen" header={header} onRefresh={refresh} refreshing={refreshing}>
       {top}
       <View style={styles.section} testID="lesson-targets-list">
-        <SectionCaption>{t.forGroup}</SectionCaption>
+        <SectionCaption>{names.groups}</SectionCaption>
         <ListCard>{groupRows}</ListCard>
       </View>
       <View style={styles.section}>
-        <SectionCaption>{t.forStudent}</SectionCaption>
+        <SectionCaption>{names.students}</SectionCaption>
         <ListCard>{studentRows}</ListCard>
       </View>
     </Screen>

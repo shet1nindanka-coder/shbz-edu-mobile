@@ -1,9 +1,8 @@
 import { View } from 'react-native';
 
 import { useI18n } from '@/i18n';
-import { Hint } from '@/providers';
 import { makeStyles } from '@/theme';
-import { BottomSheet, Text } from '@/ui';
+import { BottomSheet } from '@/ui';
 
 import { CreateAccountFields } from './create-account-fields';
 import { CreateAccountSubmit } from './create-account-submit';
@@ -42,11 +41,6 @@ export function CreateAccountSheet({ visible, form, onClose, onClosed }: CreateA
     >
       <View style={styles.content}>
         <CreateAccountFields form={form} />
-        <Hint>
-          <Text variant="small" color="textMuted">
-            {m.accounts.create.onceHint}
-          </Text>
-        </Hint>
       </View>
     </BottomSheet>
   );
