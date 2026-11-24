@@ -146,6 +146,10 @@ Rules:
   right, pressed as a whole (no «Открыть» buttons in rows); a coloured label only where attention is
   needed; forms and secondary actions are folded behind a button that opens a sheet; many numbers never
   grow a screen (`NumbersOverview` + one selected-number card + the «Все номера» sheet).
+- **Text** — as little as possible (design doc §1a): no sentences on a screen, a row is its title (a caption
+  only for the one fact the list is opened for), a number or a glyph on the right instead of a phrase, one
+  name per field and no helper lines, explanations only inside `<Hint>`; what is cut from the eye stays in
+  the `accessibilityLabel`.
 - **Math** — conditions and answers are rendered only through `MathContent` (KaTeX, same output as the site).
 - **Web quirk** — inactive tab scenes stay in the DOM on web (inert); Playwright selectors in screenshot
   scripts need `:not([inert] *)`.

@@ -214,6 +214,14 @@ from `lucide-static` (a dev dependency) into `src/ui/internal/generated/lucide-i
 - **Tablet:** two panels side by side — the list card on the left (the selected row has a soft fill), the
   detail card on the right, both stretched to the dock (`flex: 1`). Use `theme.tablet`.
 
+- **A calendar is the screen** («Дедлайны»): one month card that fills the screen down to the dock — the
+  month name with ‹ ›, the weekday letters, six rows of days. A day shows its number and one small bar per
+  homework (red = overdue, ink = due, pale = done; more than three → two bars and «+N»); today has the
+  accent ring. There is no list, no week strip and no legend under it: a tap on a marked day unfolds the
+  day in a sheet (a tablet shows the day in the right panel).
+- **Status next to a number** is `NumberStatusMark` (`@/components/numbers`): a coloured dot for a solved
+  number, the word only for «нужна помощь», nothing for an unmarked one.
+
 ## 8. What is deliberately not built
 
 - «Позвать учителя» of the student's lesson mockup: the app has no such request.
