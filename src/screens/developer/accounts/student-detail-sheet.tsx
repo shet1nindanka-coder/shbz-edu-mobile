@@ -21,7 +21,7 @@ export type StudentDetailSheetProps = {
   dirty: boolean;
   /** Owner changes are being saved: the picker is locked. */
   saving: boolean;
-  /** A teacher was picked: only a draft — nothing is sent until «Сохранить изменения». */
+  /** A teacher was picked: only a draft — nothing is sent until the save bar's «Сохранить · N». */
   onOwnerChange: (student: ManagedStudent, teacherId: string) => void;
   onSelect: (action: StudentAction, student: ManagedStudent) => void;
   onClose: () => void;

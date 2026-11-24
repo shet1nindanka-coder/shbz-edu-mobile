@@ -147,6 +147,7 @@ export function issuedSolvedPercent(homework: Homework): number {
   return completionPercent(homework.issuedNumbersSolved, homework.issuedNumbersTotal);
 }
 
+/** The site's «Ключевой вывод» of the donut card: not drawn in the app, read out with the donut. */
 export function issuedInsight(homework: Homework, t: StatsDict): string {
   if (homework.issuedNumbersUnmarked > homework.issuedNumbersSolved) return t.insightUnmarked;
   if (homework.issuedNumbersRed > 0) return t.insightRed;
@@ -348,6 +349,7 @@ export function bankUsageRows(overview: TeacherTopicsOverview, t: StatsDict): Pr
   ];
 }
 
+/** The site's «Ключевой вывод» of the bank card: not drawn in the app, read out with the bank rows. */
 export function bankInsight(overview: TeacherTopicsOverview, t: StatsDict): string {
   const summary = platformSummary(overview);
   if (summary.totalUnfilled > summary.totalSolved) return t.bankInsightUnmarked;
@@ -483,7 +485,10 @@ export type DrilldownInsightInput = {
   metrics: DrilldownMetrics;
 };
 
-/** The sentence of the «Сейчас» box; the first matching rule wins (06 §4.6). */
+/**
+ * The site's sentence «Сейчас»; the first matching rule wins (06 §4.6). The app does not draw it (text
+ * diet): it is what a screen reader hears with the bar by status.
+ */
 export function drilldownInsight(input: DrilldownInsightInput, t: DrilldownDict): string {
   const { studentName: name, homework, metrics } = input;
   if (!input.hasTopic || name === null) return t.pickFirst;

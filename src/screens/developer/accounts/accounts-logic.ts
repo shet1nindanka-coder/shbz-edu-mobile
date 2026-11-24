@@ -63,7 +63,7 @@ export function withOwnerDraft(drafts: OwnerDrafts, student: ManagedStudent, tea
 }
 
 /**
- * Everything «Сохранить изменения» sends, in directory order — rows hidden by the search included.
+ * Everything the save bar («Сохранить · N») sends, in directory order — rows hidden by the search included.
  * Drafts of students that are no longer in the directory are left out.
  */
 export function ownerChanges(students: readonly ManagedStudent[], drafts: OwnerDrafts, teachers: readonly TeacherRef[]): OwnerChange[] {

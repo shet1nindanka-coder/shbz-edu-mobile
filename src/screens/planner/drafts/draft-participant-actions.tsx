@@ -80,7 +80,7 @@ export function DraftParticipantActions({
         disabled={working || planState.pending || !aiAvailable || planBlocked}
         onPress={onRegenerate}
         testID={`draft-participant-regenerate-${participant.id}`}
-        style={styles.action}
+        style={styles.regenerate}
       />
       <Button
         label={t.issue}
@@ -97,5 +97,8 @@ export function DraftParticipantActions({
 
 const useStyles = makeStyles((t) => ({
   actions: { flexDirection: 'row', gap: t.space.xs },
-  action: { flex: 1 },
+  // «Пересобрать» with its icon is the longer label: in the card of a one-student draft on a phone an
+  // equal half cut it («Пересобра…»).
+  regenerate: { flex: 3 },
+  action: { flex: 2 },
 }));

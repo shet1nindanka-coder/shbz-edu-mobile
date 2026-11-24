@@ -38,7 +38,7 @@ type PanelSegment = DeveloperPanelTab | typeof JOURNAL;
  * mockup D-panel): the developer's service panel — status, service actions, broadcast and site settings.
  * The segments of the panel are in the header; the fifth one, «Журнал», is a link as on the site: the
  * journal is a screen of its own (07 §1.9 layout item 2). A tablet lays every tab out as two panels down
- * to the dock and keeps «Сохранить настройки» in the header (on a narrow tablet — in the status row under
+ * to the dock and keeps «Сохранить» in the header (on a narrow tablet — in the status row under
  * it); on a phone the header scrolls away with the long form, so the save bar is pinned above the dock.
  *
  * The panel has neither a realtime event nor polling (07 §5): it is read on entry, on every return to the
