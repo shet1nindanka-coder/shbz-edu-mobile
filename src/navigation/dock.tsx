@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePathname, useSegments } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, Platform, View } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -12,6 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import type { NavSection, UserRole } from '@/api/types';
 import { useI18n } from '@/i18n';
@@ -25,6 +27,14 @@ import { dockActiveIndex, dockHasMore, dockOverflow, dockSections, navItemOf, na
 
 /** First route segments under which the dock is shown: the three role trees and settings. */
 const DOCK_SEGMENTS: readonly string[] = ['(student)', '(teacher)', '(developer)', 'settings'];
+
+/** A tap that arrives this soon after a slide ended is the same touch: the slide has already chosen. */
+const SLIDE_TAP_GUARD_MS = 350;
+/** How much the lens grows while a finger holds it, and how far a fast slide may stretch it. */
+const LENS_LIFT = 0.1;
+const LENS_STRETCH_MAX = 0.24;
+/** Finger speed (pt/s) at which the lens is stretched to the maximum. */
+const LENS_STRETCH_SPEED = 2400;
 
 /** Gap between the dock and the last block of a screen scrolled to its end. */
 const DOCK_CLEARANCE = 12;
@@ -49,6 +59,10 @@ export type DockProps = { role: UserRole };
  * section changes it travels on a spring, squeezes a little and a glint runs across it. With reduced
  * motion it simply jumps.
  *
+ * The dock is also switched by a slide (§1 rule 11): a finger put on it picks the lens up — the drop
+ * grows, flows under the finger, stretches with its speed, the glint moves across it — the item under it
+ * lights up, and lifting the finger opens that section. A plain tap is still a tap of the item.
+ *
  * It is one overlay for the whole role tree, not the tab bar of a navigator: it stays in place over the
  * screens pushed above the tabs and over settings (where no item is lit), and reads the lit item from the
  * current path.
@@ -71,8 +85,28 @@ export function Dock({ role }: DockProps) {
   const activeIndex = dockActiveIndex(role, layout, pathname);
   const itemWidth = count > 0 ? Math.max(0, rowWidth / count) : 0;
 
+  // The item under the lens while a finger holds it, with the route it was held on: once the section (or
+  // the screen under the dock) changes, the lit item is the current section again.
+  const routeKey = `${activeIndex}|${pathname}`;
+  const [heldItem, setHeldItem] = useState<{ index: number; route: string } | null>(null);
+  const heldIndex = heldItem && heldItem.route === routeKey ? heldItem.index : null;
+  const hold = (index: number) => setHeldItem({ index, route: routeKey });
+  const release = () => setHeldItem(null);
+  // True for a moment after a slide has chosen: the tap that ends the same touch must not choose again.
+  const slideChose = useRef(false);
+  // A section chosen by a slide: the lens is already there, the arrival is not squeezed again.
+  const arrivedBySlide = useRef(false);
+
   const x = useSharedValue(0);
   const visible = useSharedValue(0);
+  /** 0 → 1 while a finger holds the lens. */
+  const lift = useSharedValue(0);
+  /** Stretch along the travel, from the finger's speed. */
+  const stretch = useSharedValue(0);
+  /** The item under the lens on the UI thread; -1 = not held. */
+  const held = useSharedValue(-1);
+  /** 1 once the held finger has started to slide. */
+  const sliding = useSharedValue(0);
   const scaleX = useSharedValue(1);
   const scaleY = useSharedValue(1);
   const glint = useSharedValue(0);
@@ -96,16 +130,33 @@ export function Dock({ role }: DockProps) {
       return;
     }
     x.set(withSpring(target, spring));
+    if (arrivedBySlide.current) {
+      arrivedBySlide.current = false;
+      return;
+    }
     // The squeeze of a drop of glass: `@keyframes sq` of the mockups (0 → 40 % → 75 % → 100 % of 0.55 s).
     scaleX.set(withSequence(withTiming(0.7, { duration: 0 }), withTiming(1.18, { duration: lensDuration * 0.4 }), withTiming(0.97, { duration: lensDuration * 0.35 }), withTiming(1, { duration: lensDuration * 0.25 })));
     scaleY.set(withSequence(withTiming(0.86, { duration: lensDuration * 0.4 }), withTiming(1.03, { duration: lensDuration * 0.35 }), withTiming(1, { duration: lensDuration * 0.25 })));
     glint.set(withSequence(withTiming(0, { duration: 0 }), withTiming(1, { duration: lensGlint, easing: Easing.out(Easing.quad) })));
   }, [activeIndex, itemWidth, reducedMotion, x, visible, scaleX, scaleY, glint, lensDuration, lensGlint, base, spring]);
 
-  const lensStyle = useAnimatedStyle(() => ({
-    opacity: visible.get(),
-    transform: [{ translateX: x.get() }, { scaleX: scaleX.get() }, { scaleY: scaleY.get() }],
-  }));
+  // The section the lens returns to, read by callbacks that outlive a render (a delayed settle).
+  const activeIndexRef = useRef(activeIndex);
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
+  const lensStyle = useAnimatedStyle(() => {
+    const grow = 1 + lift.get() * LENS_LIFT;
+    return {
+      opacity: visible.get(),
+      transform: [
+        { translateX: x.get() },
+        { scaleX: scaleX.get() * (grow + stretch.get()) },
+        { scaleY: scaleY.get() * (grow - stretch.get() * 0.35) },
+      ],
+    };
+  });
   // The glint: a mint band that crosses the lens once and fades (`@keyframes sh`).
   const glintStyle = useAnimatedStyle(() => {
     const progress = glint.get();
@@ -120,17 +171,110 @@ export function Dock({ role }: DockProps) {
     navigation.open(link);
   };
 
-  const tab = (key: string, label: string, icon: IconName, focused: boolean, onPress: () => void, extra?: { expanded: boolean }) => {
+  /** The lens goes back under the current section (or fades where no section is lit). */
+  const settle = () => {
+    release();
+    const current = activeIndexRef.current;
+    if (current < 0) {
+      visible.set(withTiming(0, { duration: base }));
+      return;
+    }
+    x.set(reducedMotion ? current * itemWidth : withSpring(current * itemWidth, spring));
+  };
+  // After a press without a slide the item's own tap may be changing the section: the drop waits a moment
+  // where the finger left it instead of starting back and turning round.
+  const settleSoon = () => {
+    setTimeout(settle, 160);
+  };
+  /** The finger was lifted over the item `index` after a slide. */
+  const choose = (index: number) => {
+    slideChose.current = true;
+    setTimeout(() => {
+      slideChose.current = false;
+    }, SLIDE_TAP_GUARD_MS);
+    if (hasMore && index === sections.length) {
+      settle();
+      setMoreOpen(true);
+      return;
+    }
+    const section = sections[index];
+    if (!section || index === activeIndex) {
+      settle();
+      return;
+    }
+    arrivedBySlide.current = true;
+    open({ screen: section.screen } as AppLink);
+  };
+  /** A tap of an item; ignored when it is the tail of a slide that has already chosen. */
+  const tapped = (action: () => void) => () => {
+    if (slideChose.current) return;
+    action();
+  };
+
+  const slide = usePanGesture({
+    enabled: itemWidth > 0 && count > 1,
+    // A touch that only presses stays a tap of the item; the slide starts with the first few points.
+    activeOffsetX: [-6, 6],
+    failOffsetY: [-24, 24],
+    onBegin: (event) => {
+      // The drop is picked up where the finger landed.
+      const index = Math.min(count - 1, Math.max(0, Math.floor(event.x / itemWidth)));
+      held.set(index);
+      sliding.set(0);
+      visible.set(withTiming(1, { duration: 120 }));
+      lift.set(withSpring(1, spring));
+      x.set(withSpring(index * itemWidth, spring));
+      scheduleOnRN(hold, index);
+    },
+    onActivate: () => {
+      sliding.set(1);
+    },
+    onUpdate: (event) => {
+      const max = Math.max(0, rowWidth - itemWidth);
+      const left = Math.min(max, Math.max(0, event.x - itemWidth / 2));
+      x.set(left);
+      if (!reducedMotion) {
+        stretch.set(Math.min(LENS_STRETCH_MAX, (Math.abs(event.velocityX) / LENS_STRETCH_SPEED) * LENS_STRETCH_MAX));
+        // The glint follows the travel: a slide from edge to edge carries it across the drop.
+        glint.set(max > 0 ? 0.25 + (left / max) * 0.5 : 0.5);
+      }
+      const index = Math.min(count - 1, Math.max(0, Math.floor(event.x / itemWidth)));
+      if (index !== held.get()) {
+        held.set(index);
+        scheduleOnRN(hold, index);
+      }
+    },
+    onFinalize: () => {
+      const index = held.get();
+      const slid = sliding.get() === 1;
+      held.set(-1);
+      sliding.set(0);
+      lift.set(withSpring(0, spring));
+      stretch.set(withTiming(0, { duration: 180 }));
+      glint.set(withTiming(1, { duration: 260 }));
+      if (slid && index >= 0) {
+        x.set(withSpring(index * itemWidth, spring));
+        scheduleOnRN(choose, index);
+      } else {
+        // A press without a slide: the item's own tap decides; the drop returns unless the section changes.
+        scheduleOnRN(settleSoon);
+      }
+    },
+  });
+
+  const tab = (key: string, label: string, icon: IconName, index: number, onPress: () => void, extra?: { expanded: boolean }) => {
+    const focused = index === (heldIndex ?? activeIndex);
+    const selected = index === activeIndex;
     const tint = focused ? theme.colors.textStrong : theme.colors.textMuted;
     return (
       <PressableScale
         key={key}
         accessibilityRole="tab"
         accessibilityLabel={label}
-        accessibilityState={extra ? { selected: focused, expanded: extra.expanded } : { selected: focused }}
+        accessibilityState={extra ? { selected, expanded: extra.expanded } : { selected }}
         aria-expanded={extra?.expanded}
         testID={`dock-${key}`}
-        onPress={onPress}
+        onPress={tapped(onPress)}
         scaleTo={0.94}
         style={styles.tab}
       >
@@ -145,9 +289,11 @@ export function Dock({ role }: DockProps) {
   return (
     <>
       <Glass style={styles.dock} contentStyle={styles.content} testID="dock">
+        <GestureDetector gesture={slide}>
         <View
           accessibilityRole="tablist"
           accessibilityLabel={dict.nav.sections}
+          collapsable={false}
           style={styles.row}
           onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
         >
@@ -177,14 +323,15 @@ export function Dock({ role }: DockProps) {
             // «общая инфа» and «дев-панель» do not fit an item: the dock says «инфа» and «панель».
             const label =
               item === 'info' ? m.shell.nav.infoShort : item === 'panel' ? m.shell.nav.panelShort : navLabel(dict.nav, section.labelKey);
-            return tab(item, label, sectionIcon(role, section), index === activeIndex, () => open({ screen: section.screen } as AppLink));
+            return tab(item, label, sectionIcon(role, section), index, () => open({ screen: section.screen } as AppLink));
           })}
           {hasMore
-            ? tab('more', m.shell.nav.more, navIcons.teacher.more, activeIndex === sections.length, () => setMoreOpen((value) => !value), {
+            ? tab('more', m.shell.nav.more, navIcons.teacher.more, sections.length, () => setMoreOpen((value) => !value), {
                 expanded: moreOpen,
               })
             : null}
         </View>
+        </GestureDetector>
       </Glass>
 
       {hasMore ? (
